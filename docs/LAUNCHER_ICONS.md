@@ -11,7 +11,7 @@ assets/launcher_icons/
 └── 节日版.png
 ```
 
-文件名（不带 `.png`）是 App 中显示的图标名称。内置默认图标使用 `assets/icon.png`，不放入此目录。PNG 图标将由生成脚本按原文件复制到 `res/mipmap-nodpi`，不进行修改或再压缩。建议自行设计符合 Android 安全区域的图案。
+文件名（不带 `.png`）是 App 中显示的图标名称。内置默认图标使用 `assets/icon.png`（当前为线条蓝），不放入此目录；默认选项之外保留 6 个备用图标。PNG 图标将由生成脚本按原文件复制到 `res/mipmap-nodpi`，不进行修改或再压缩。建议自行设计符合 Android 安全区域的图案。
 
 ## 更新图标清单并打包
 

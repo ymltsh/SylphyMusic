@@ -16,7 +16,7 @@ internal class LauncherIconManager(private val activity: Activity) {
         val json = activity.assets.open("launcher_icons.json")
             .bufferedReader(Charsets.UTF_8).use { JSONArray(it.readText()) }
         buildList {
-            add(Icon("default", "默认图标", "assets/icon.png"))
+            add(Icon("default", "线条蓝（默认）", "assets/icon.png"))
             for (index in 0 until json.length()) {
                 val item = json.getJSONObject(index)
                 val id = item.getString("id")

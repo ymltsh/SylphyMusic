@@ -514,3 +514,9 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 - `aapt` 核对包名 `com.ymltsh.sylphymusic`、本地化应用名、8 个 launcher alias 与 mipmap；`apksigner` v2 验签通过。
 - `version.json` 更新为 stable 0.2.2+4，历史保留 0.2.1+3；`version-beta.json` 保持 `latest: null`。
 - 仍为测试签名，非正式发布；正式发布门槛尚未通过。尚未在 Android 真机验证图标切换、诊断日志、媒体通知封面、后台播放和覆盖安装。
+
+## 2026-10-28 默认图标改为线条蓝
+
+按用户要求移除旧的绿色音符默认图标：`assets/icon.png` 与 Android `mipmap-*/ic_launcher.png` 全部替换为 `logo/1.png` 的线条蓝缩放版本；备用图标目录移除重复的「线形蓝」，当前为 6 个备用图标 + 1 个线条蓝默认图标。原生默认选项标签改为「线条蓝（默认）」，重新生成 launcher alias 和 mipmap 资源。该变更尚未提交、未发布，当前已发布的 0.2.2+4 仍是旧的默认图标方案。
+
+验证：`flutter analyze` 无问题；`test/launcher_icon_service_test.dart` 2 项通过；全量测试串行运行 **175 项通过、5 项默认跳过**；Android Debug APK 构建成功，`aapt` 确认 7 个 alias（线条蓝默认 + 6 个备用）和对应 mipmap。并行全量测试曾出现一次 `media_proxy_test` 未完成，单独及 `--concurrency=1` 重跑均通过。未在 Android 真机验证默认图标是否立即刷新；Windows 桌面图标未改动。
