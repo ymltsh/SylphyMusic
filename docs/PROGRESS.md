@@ -517,6 +517,21 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 
 ## 2026-10-28 默认图标改为线条蓝
 
-按用户要求移除旧的绿色音符默认图标：`assets/icon.png` 与 Android `mipmap-*/ic_launcher.png` 全部替换为 `logo/1.png` 的线条蓝缩放版本；备用图标目录移除重复的「线形蓝」，当前为 6 个备用图标 + 1 个线条蓝默认图标。原生默认选项标签改为「线条蓝（默认）」，重新生成 launcher alias 和 mipmap 资源。该变更尚未提交、未发布，当前已发布的 0.2.2+4 仍是旧的默认图标方案。
+按用户要求移除旧的绿色音符默认图标：`assets/icon.png` 与 Android `mipmap-*/ic_launcher.png` 全部替换为 `logo/1793130613776.png` 的线条蓝缩放版本（此前曾使用 `logo/1.png`，现由该图替代）；备用图标目录移除重复的「线形蓝」，当前为 6 个备用图标 + 1 个线条蓝默认图标。原生默认选项标签保持「线条蓝（默认）」，launcher alias 与 mipmap 资源已同步。该变更尚未提交、未发布，当前已发布的 0.2.2+4 仍是旧的默认图标方案。
 
 验证：`flutter analyze` 无问题；`test/launcher_icon_service_test.dart` 2 项通过；全量测试串行运行 **175 项通过、5 项默认跳过**；Android Debug APK 构建成功，`aapt` 确认 7 个 alias（线条蓝默认 + 6 个备用）和对应 mipmap。并行全量测试曾出现一次 `media_proxy_test` 未完成，单独及 `--concurrency=1` 重跑均通过。未在 Android 真机验证默认图标是否立即刷新；Windows 桌面图标未改动。
+
+## 2026-10-28 首页每日一言、随机探索与 API 设置
+
+按 `SylphyMusic-r.zip` 应用首页、歌单与 API 设置修改：
+
+- 歌单页移除「我的歌单」标题，同步云歌单图标移至「新建歌单」左侧。
+- 首页横幅副标题接入每日一言，默认 `https://v1.hitokoto.cn/?encode=json`；同一自然日成功获取后写入 SQLite 缓存，失败保留旧内容或默认文案。
+- 首页「探索音乐库」改为读取完整目录队列、随机打乱后开始播放并切换音乐库；空库和错误分别提示。
+- 设置 → 网络与接口 → API 设置：可修改每日一言 API 与 GitHub 加速前缀；留空保存恢复默认，仅接受 HTTPS。
+- 更新检查、APK / Windows 下载按钮和发布页链接统一使用已配置的 GitHub 加速前缀；清单本身仍只允许本项目 GitHub Release 资源。加速请求失败不再回退 GitHub 原始地址。
+- 新增 `ApiSettings` 服务及测试；更新检查测试改为验证自定义 gateway 和无回退行为。
+
+验证：`flutter analyze` 无问题；全量测试串行 **180 项通过、5 项默认跳过**；Windows UI 集成通过；Android Debug APK 构建成功。默认 GitHub 加速清单返回 200，默认每日一言接口返回 200。修复了生成补丁中 API 测试未声明 UTF-8 响应头导致的失败，并把设置页 UI 测试的懒加载滚动改为先回顶再定位。
+
+当前修改未提交、未推送、未发布，版本仍为 0.2.2+4；已发布包不包含本轮 API 设置、首页每日一言和默认图标替换。未在 Android 真机验证每日一言、加速下载和随机播放。

@@ -23,6 +23,7 @@ enum _Section {
   player,
   icon,
   cache,
+  api,
   diagnostics,
   about,
 }
@@ -81,7 +82,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([app, app.appearance, app.playback]),
+    listenable: Listenable.merge([
+      app,
+      app.appearance,
+      app.playback,
+      app.apiSettings,
+    ]),
     builder: (context, _) {
       final section = widget._section;
       final title = switch (section) {
@@ -93,6 +99,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _Section.player => '播放器外观',
         _Section.icon => '应用图标',
         _Section.cache => '下载与缓存',
+        _Section.api => 'API 设置',
         _Section.diagnostics => '诊断与反馈',
         _Section.about => '关于风灵音乐',
       };
@@ -239,6 +246,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _Section.cache,
       ),
     ]),
+    _group('网络与接口', [
+      _entry(Icons.api_outlined, 'API 设置', '每日一言 · GitHub 加速', _Section.api),
+    ]),
     _group('应用与支持', [
       ListTile(
         leading: _entryIcon(Icons.system_update_alt),
@@ -249,7 +259,10 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute<void>(
-            builder: (_) => AppUpdatePage(onCheck: app.checkForUpdates),
+            builder: (_) => AppUpdatePage(
+              onCheck: app.checkForUpdates,
+              mirror: app.apiSettings.githubMirror,
+            ),
           ),
         ),
       ),
@@ -486,6 +499,29 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _downloads,
       ),
     ],
+    _Section.api => [
+      ListTile(
+        key: const ValueKey('api-quote'),
+        leading: const Icon(Icons.format_quote_rounded),
+        title: const Text('每日一言 API'),
+        subtitle: Text(app.apiSettings.quoteUrl),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: () => _editApiUrl(quote: true),
+      ),
+      const Divider(height: 1),
+      ListTile(
+        key: const ValueKey('api-github-mirror'),
+        leading: const Icon(Icons.cloud_download_outlined),
+        title: const Text('GitHub 加速 API'),
+        subtitle: Text(app.apiSettings.githubMirror),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: () => _editApiUrl(quote: false),
+      ),
+      const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('使用 HTTPS 链接，留空保存即可恢复默认。更新检查、安装包下载和发布页都将通过加速地址访问。'),
+      ),
+    ],
     _Section.diagnostics => [
       SwitchListTile(
         key: const ValueKey('diagnostics-toggle'),
@@ -548,6 +584,49 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     ],
   };
+  Future<void> _editApiUrl({required bool quote}) async {
+    final controller = TextEditingController(
+      text: quote ? app.apiSettings.quoteUrl : app.apiSettings.githubMirror,
+    );
+    try {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(quote ? '每日一言 API' : 'GitHub 加速 API'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.url,
+            decoration: InputDecoration(
+              labelText: 'HTTPS URL',
+              helperText: quote
+                  ? '返回 hitokoto/text/content 字段的 JSON'
+                  : '例如 https://hub.wgen.top/ （GitHub URL 前缀）',
+              helperMaxLines: 2,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      );
+      if (value == null) return;
+      await _act(
+        () => quote
+            ? app.apiSettings.setQuoteUrl(value)
+            : app.apiSettings.setGitHubMirror(value),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
   Future<void> _chooseThemeColor() async {
     final chosen = await showDialog<Color>(
       context: context,

@@ -8,9 +8,11 @@ class AppUpdatePage extends StatefulWidget {
   const AppUpdatePage({
     super.key,
     required this.onCheck,
+    this.mirror = AppUpdates.defaultMirror,
     this.openUrl = _launch,
   });
   final Future<UpdateCheck> Function({bool beta}) onCheck;
+  final String mirror;
   final Future<bool> Function(Uri) openUrl;
   static Future<bool> _launch(Uri uri) =>
       launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -40,7 +42,9 @@ class _AppUpdatePageState extends State<AppUpdatePage> {
 
   Future<void> _open(Uri uri) async {
     try {
-      if (!await widget.openUrl(uri)) throw StateError('无法打开链接');
+      if (!await widget.openUrl(AppUpdates.accelerate(uri, widget.mirror))) {
+        throw StateError('无法打开链接');
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)

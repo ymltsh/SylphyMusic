@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
@@ -43,6 +45,38 @@ class _HomePageState extends State<HomePage> {
     if (revision != widget.app.catalogRevision) {
       revision = widget.app.catalogRevision;
       albums = _albums();
+    }
+  }
+
+  bool _exploring = false;
+
+  Future<void> _exploreLibrary() async {
+    final app = widget.app;
+    if (_exploring) return;
+    if (app.sources.isEmpty) {
+      widget.onSources();
+      return;
+    }
+    setState(() => _exploring = true);
+    try {
+      final tracks = await app.catalog.queue(const CatalogQuery());
+      if (!mounted) return;
+      if (tracks.isEmpty) {
+        widget.onLibrary(0);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('音乐库暂无可播放的歌曲')));
+        return;
+      }
+      tracks.shuffle(Random());
+      await app.playback.setQueue(tracks);
+      if (mounted) widget.onLibrary(0);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('随机播放失败，请检查音乐来源')));
+      }
+    } finally {
+      if (mounted) setState(() => _exploring = false);
     }
   }
 
@@ -100,20 +134,24 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      app.sources.isEmpty
-                          ? '从连接音乐库开始，让喜欢的声音常伴左右。'
-                          : '音乐随心，聆听自在。',
+                      app.apiSettings.quote,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 20),
                     FilledButton.icon(
-                      onPressed: app.sources.isEmpty
-                          ? widget.onSources
-                          : () => widget.onLibrary(0),
-                      icon: Icon(
-                        app.sources.isEmpty
-                            ? Icons.add_link
-                            : Icons.play_arrow_rounded,
-                      ),
+                      onPressed: _exploring ? null : _exploreLibrary,
+                      icon: _exploring
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              app.sources.isEmpty
+                                  ? Icons.add_link
+                                  : Icons.play_arrow_rounded,
+                            ),
                       label: Text(app.sources.isEmpty ? '连接音乐库' : '探索音乐库'),
                     ),
                   ],

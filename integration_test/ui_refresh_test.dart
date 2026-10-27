@@ -403,6 +403,15 @@ void main() {
         await tester.tap(find.byTooltip('设置'));
         await tester.pumpAndSettle();
         Future<void> openSetting(String title) async {
+          final scrollable = find.byType(Scrollable).last;
+          // The list is lazy and may be scrolled below an earlier entry.
+          await tester.drag(scrollable, const Offset(0, 3000));
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text(title),
+            200,
+            scrollable: scrollable,
+          );
           await tester.ensureVisible(find.text(title));
           await tester.pumpAndSettle();
           await tester.tap(find.text(title));

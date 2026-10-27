@@ -6,16 +6,16 @@
 
 ## App 手动检查更新
 
-设置 → 应用与支持 → 检查更新。启动和进入此页均不主动访问更新服务器，点击按钮后才请求；可切换测试版渠道。应用版本从实际安装包读取，不维护第二套硬编码版本常量。Windows 预发布包另由构建参数 `SYLPHY_RELEASE_VERSION` 保留 beta 后缀，构建号仍读安装包。
+设置 → 应用与支持 → 检查更新。启动和进入此页均不主动访问更新服务器，点击按钮后才请求；可切换测试版渠道。应用版本从实际安装包读取，不维护第二套硬编码版本常量。Windows 预发布包另由构建参数 `SYLPHY_RELEASE_VERSION` 保留 beta 后缀，构建号仍读安装包。加速前缀可在 设置 → 网络与接口 → API 设置 中修改，留空保存恢复默认。
 
 | 用途 | 地址 |
 |---|---|
 | 正式版源清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
-| 正式版加速清单 | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
-| 测试版清单 | 上述两种地址的文件名换为 `version-beta.json` |
-| 发布页 | https://github.com/ymltsh/SylphyMusic/releases/latest |
+| 默认正式版加速清单 | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
+| 测试版清单 | 将文件名换为 `version-beta.json`，仍通过已配置的加速前缀访问 |
+| 发布页 | GitHub Release，按已配置的加速前缀打开 |
 
-优先使用加速清单，读取失败回退 GitHub 原始地址；每次请求限时 12 秒，清单最大 1 MiB。不发送音乐源信息或凭据。版本比较先按三段数字，再按 beta → beta2 → 正式版，最后比较构建号。旧版本不会被作为更新提供；正式渠道拒绝预发布清单。下载按钮按当前平台显示，打开浏览器后由用户下载 / 安装，不在应用内静默安装。下载与发布页链接仅接受本项目 GitHub releases 下的 HTTPS 地址。
+App 使用“API 设置”中的 GitHub 加速 API 前缀请求清单、下载按钮和发布页；默认 `https://hub.wgen.top/`，**读取失败不再回退 GitHub 原始地址**，用户应选择确实支持清单 / Release 下载的加速服务。每次请求限时 12 秒，清单最大 1 MiB。不发送音乐源信息或凭据。版本比较先按三段数字，再按 beta → beta2 → 正式版，最后比较构建号。旧版本不会被作为更新提供；正式渠道拒绝预发布清单。下载按钮按当前平台显示，打开浏览器后由用户下载 / 安装，不在应用内静默安装。下载与发布页链接仅接受本项目 GitHub releases 下的 HTTPS 地址，再套用加速前缀。
 
 ## 清单格式
 

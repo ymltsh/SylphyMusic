@@ -60,7 +60,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     app.diagnostics.record('app', 'lifecycle', details: {'state': state.name});
-    if (state == AppLifecycleState.resumed) unawaited(app.refreshIfStale());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(app.refreshIfStale());
+      unawaited(app.apiSettings.refreshQuote());
+    }
   }
 
   @override
@@ -651,15 +654,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Row(
           children: [
-            Expanded(
-              child: Text(
-                '我的歌单',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ),
+            const Spacer(),
             IconButton(
               tooltip: '同步云歌单',
               onPressed: app.busy
@@ -670,6 +665,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     }),
               icon: const Icon(Icons.cloud_sync_outlined),
             ),
+            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _newPlaylist,
               icon: const Icon(Icons.add),

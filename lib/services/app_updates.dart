@@ -124,12 +124,39 @@ class AppUpdates {
   AppUpdates({
     http.Client Function()? clientFactory,
     Future<AppVersion> Function()? readVersion,
+    this.mirror = defaultMirror,
   }) : _clientFactory = clientFactory ?? (() => http.Client()),
        _readVersion = readVersion ?? AppVersion.installed;
   static const repository = 'ymltsh/SylphyMusic';
   static const releasePage = 'https://github.com/$repository/releases/latest';
   static const rawBase = 'https://raw.githubusercontent.com/$repository/main';
-  static const mirror = 'https://hub.wgen.top/';
+  static const defaultMirror = 'https://hub.wgen.top/';
+  final String mirror;
+
+  /// The release manifest is validated before its GitHub links are proxied.
+  static Uri accelerate(Uri original, String mirror) {
+    if (original.scheme != 'https' ||
+        original.userInfo.isNotEmpty ||
+        original.hasPort ||
+        original.host.isEmpty ||
+        !(original.host == 'github.com' ||
+            original.host == 'raw.githubusercontent.com')) {
+      throw const FormatException('只能加速受信任的 GitHub 发布链接');
+    }
+    final gateway = Uri.tryParse(mirror);
+    if (gateway == null ||
+        gateway.scheme != 'https' ||
+        gateway.host.isEmpty ||
+        gateway.userInfo.isNotEmpty ||
+        gateway.hasPort ||
+        gateway.hasQuery ||
+        gateway.hasFragment) {
+      throw const FormatException('GitHub 加速地址无效');
+    }
+    final base = gateway.toString().replaceFirst(RegExp(r'/+$'), '');
+    return Uri.parse('$base/$original');
+  }
+
   final http.Client Function() _clientFactory;
   final Future<AppVersion> Function() _readVersion;
 
@@ -138,18 +165,12 @@ class AppUpdates {
     final file = beta ? 'version-beta.json' : 'version.json';
     final client = _clientFactory();
     try {
-      Map<String, dynamic> manifest;
-      try {
-        manifest = await _fetch(
-          client,
-          Uri.parse('$mirror$rawBase/$file'),
-        ).timeout(const Duration(seconds: 12));
-      } catch (_) {
-        manifest = await _fetch(
-          client,
-          Uri.parse('$rawBase/$file'),
-        ).timeout(const Duration(seconds: 12));
-      }
+      // No direct fallback: the configured gateway is used for both checking
+      // and downloading releases, including in regions without GitHub access.
+      final manifest = await _fetch(
+        client,
+        accelerate(Uri.parse('$rawBase/$file'), mirror),
+      ).timeout(const Duration(seconds: 12));
       if (!manifest.containsKey('latest')) {
         throw const FormatException('更新清单缺少 latest');
       }

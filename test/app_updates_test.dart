@@ -45,24 +45,51 @@ void main() {
     expect(() => AppVersion('0.3', 3), throwsFormatException);
     expect(() => AppVersion('00.3.0', 3), throwsFormatException);
   });
-  test('checking is explicit and falls back from mirror to origin', () async {
+  test('checking uses only the configured GitHub gateway', () async {
     final calls = <Uri>[];
     final service = AppUpdates(
+      mirror: 'https://mirror.example/proxy/',
       readVersion: () async => AppVersion('0.2.0', 2),
       clientFactory: () => MockClient((request) async {
         calls.add(request.url);
-        if (request.url.host == 'hub.wgen.top') return reply('offline', 503);
         return reply(jsonEncode({'latest': release()}), 200);
       }),
     );
     expect(calls, isEmpty);
     final result = await service.check();
     expect(result.available, isTrue);
-    expect(calls.map((u) => u.host), [
-      'hub.wgen.top',
-      'raw.githubusercontent.com',
-    ]);
+    expect(
+      calls.single.toString(),
+      'https://mirror.example/proxy/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json',
+    );
     expect(result.latest!.page.toString(), AppUpdates.releasePage);
+  });
+  test('gateway failure never falls back to direct GitHub', () async {
+    final calls = <Uri>[];
+    final service = AppUpdates(
+      readVersion: () async => AppVersion('0.2.0', 2),
+      clientFactory: () => MockClient((request) async {
+        calls.add(request.url);
+        return reply('offline', 503);
+      }),
+    );
+    await expectLater(service.check(), throwsFormatException);
+    expect(calls, hasLength(1));
+    expect(calls.single.host, 'hub.wgen.top');
+  });
+  test('gateway rewrites verified release URLs only', () {
+    final original = Uri.parse(AppUpdates.releasePage);
+    expect(
+      AppUpdates.accelerate(original, AppUpdates.defaultMirror).toString(),
+      'https://hub.wgen.top/https://github.com/ymltsh/SylphyMusic/releases/latest',
+    );
+    expect(
+      () => AppUpdates.accelerate(
+        Uri.parse('https://evil.example/foo'),
+        AppUpdates.defaultMirror,
+      ),
+      throwsFormatException,
+    );
   });
   test(
     'same or older manifests never offer update; empty release is supported',
@@ -192,11 +219,15 @@ void main() {
       await tester.ensureVisible(find.text('Windows 安装程序'));
       await tester.tap(find.text('Windows 安装程序'));
       await tester.pumpAndSettle();
+      expect(opened.single.toString(), startsWith(AppUpdates.defaultMirror));
       expect(opened.single.path, endsWith('/setup.exe'));
       await tester.ensureVisible(find.text('查看发布页'));
       await tester.tap(find.text('查看发布页'));
       await tester.pumpAndSettle();
-      expect(opened.last.toString(), AppUpdates.releasePage);
+      expect(
+        opened.last.toString(),
+        'https://hub.wgen.top/${AppUpdates.releasePage}',
+      );
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.windows),

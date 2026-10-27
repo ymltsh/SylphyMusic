@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../data/app_db.dart';
 import '../data/library_catalog.dart';
 import '../services/app_updates.dart';
+import '../services/api_settings.dart';
 import '../services/cache.dart';
 import '../services/cache_jobs.dart';
 import '../services/cloud_sync.dart';
@@ -60,6 +61,7 @@ class SylphyApp extends ChangeNotifier {
   int catalogRevision = 0;
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
+  late final apiSettings = ApiSettings(db);
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   List<PlaylistModel> playlists = [];
@@ -143,6 +145,8 @@ class SylphyApp extends ChangeNotifier {
       onResume: () => unawaited(app.sleepTimer.checkDue()),
     );
     await app.appearance.initialize();
+    app.apiSettings.addListener(app._apiChanged);
+    await app.apiSettings.initialize();
     await app.playerLayouts.initialize();
     await app.history.initialize();
     app.history.addListener(app._indexChanged);
@@ -476,7 +480,11 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<UpdateCheck> checkForUpdates({bool beta = false}) =>
-      AppUpdates().check(beta: beta);
+      AppUpdates(mirror: apiSettings.githubMirror).check(beta: beta);
+
+  void _apiChanged() {
+    if (!_disposed) notifyListeners();
+  }
 
   Future<void> clearCache({String? sourceId, Set<String>? keys}) async {
     await jobs.cancelAffected(sourceId: sourceId, trackKeys: keys);
@@ -562,6 +570,8 @@ class SylphyApp extends ChangeNotifier {
     await sleepTimer.shutdown();
     desktop?.dispose();
     history.removeListener(_indexChanged);
+    apiSettings.removeListener(_apiChanged);
+    apiSettings.dispose();
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
