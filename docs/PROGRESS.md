@@ -517,7 +517,7 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 
 ## 2026-10-28 默认图标改为线条蓝
 
-按用户要求移除旧的绿色音符默认图标：`assets/icon.png` 与 Android `mipmap-*/ic_launcher.png` 全部替换为 `logo/1793130613776.png` 的线条蓝缩放版本（此前曾使用 `logo/1.png`，现由该图替代）；备用图标目录移除重复的「线形蓝」，当前为 6 个备用图标 + 1 个线条蓝默认图标。原生默认选项标签保持「线条蓝（默认）」，launcher alias 与 mipmap 资源已同步。该变更尚未提交、未发布，当前已发布的 0.2.2+4 仍是旧的默认图标方案。
+按用户要求移除旧的绿色音符默认图标：`assets/icon.png` 与 Android `mipmap-*/ic_launcher.png` 全部替换为 `logo/1793130613776.png` 的线条蓝缩放版本（此前曾使用 `logo/1.png`，现由该图替代）；备用图标目录移除重复的「线形蓝」，当前为 6 个备用图标 + 1 个线条蓝默认图标。原生默认选项标签保持「线条蓝（默认）」，launcher alias 与 mipmap 资源已同步。该变更已随 0.2.3+5 测试签名版本发布；0.2.2+4 仍是旧的默认图标方案。
 
 验证：`flutter analyze` 无问题；`test/launcher_icon_service_test.dart` 2 项通过；全量测试串行运行 **175 项通过、5 项默认跳过**；Android Debug APK 构建成功，`aapt` 确认 7 个 alias（线条蓝默认 + 6 个备用）和对应 mipmap。并行全量测试曾出现一次 `media_proxy_test` 未完成，单独及 `--concurrency=1` 重跑均通过。未在 Android 真机验证默认图标是否立即刷新；Windows 桌面图标未改动。
 
@@ -534,4 +534,13 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 
 验证：`flutter analyze` 无问题；全量测试串行 **180 项通过、5 项默认跳过**；Windows UI 集成通过；Android Debug APK 构建成功。默认 GitHub 加速清单返回 200，默认每日一言接口返回 200。修复了生成补丁中 API 测试未声明 UTF-8 响应头导致的失败，并把设置页 UI 测试的懒加载滚动改为先回顶再定位。
 
-当前修改未提交、未推送、未发布，版本仍为 0.2.2+4；已发布包不包含本轮 API 设置、首页每日一言和默认图标替换。未在 Android 真机验证每日一言、加速下载和随机播放。
+上述修改已随 0.2.3+5 测试签名版本发布。未在 Android 真机验证每日一言、加速下载和随机播放。
+
+## 2026-10-28 测试签名 0.2.3+5 发布
+
+- 版本提交 `dd19777`，标签 `v0.2.3+5`；GitHub Release：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.3%2B5
+- 三份 APK 使用本机 Android Debug 测试证书：arm64-v8a 32.91 MB、armeabi-v7a 29.95 MB、x86_64 35.22 MB；versionName 0.2.3，versionCode 2005 / 1005 / 4005。
+- `aapt` 核对包名 `com.ymltsh.sylphymusic`、本地化应用名、7 个 launcher alias 与 mipmap；`apksigner` v2 验签通过。
+- `version.json` 更新为 stable 0.2.3+5，历史保留 0.2.2+4 与 0.2.1+3；`version-beta.json` 保持 `latest: null`。
+- 仍为测试签名，非正式发布；正式发布门槛尚未通过。尚未在 Android 真机验证首页每日一言、随机播放、加速下载、默认图标、诊断日志、媒体通知封面、后台播放和覆盖安装。
+

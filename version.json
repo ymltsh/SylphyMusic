@@ -1,18 +1,31 @@
 {
   "latest": {
-    "version": "0.2.2",
-    "build": 4,
-    "name": "风灵音乐 v0.2.2（测试签名）",
+    "version": "0.2.3",
+    "build": 5,
+    "name": "风灵音乐 v0.2.3（测试签名）",
     "date": "2026-10-28",
-    "notes": "风灵音乐 v0.2.2（测试签名）\n\n- 新增“设置 → 诊断与反馈”：可主动开启诊断日志，导出或分享文本；默认关闭，不记录歌曲名、账号、地址、URL、异常正文或堆栈。\n- 修复 Android 系统媒体通知封面：媒体会话现在会携带实际存在的本机封面 URI，并在切歌和封面更新时同步。\n- 新增 7 个 Android 备用桌面图标：线形蓝、实心蓝、青绿线形、青绿实心、黑底圆点、白底圆点、银发精灵；可在设置 → 外观与个性化 → 应用图标中切换。\n- 保留现有歌单、播放队列、缓存、云同步、更新检查和测试签名发布流程。\n\n本版本仍使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布版。后续切换到生产签名可能需要卸载重装。applicationId 已变更，旧包 music.sylphy.sylphy_music 不会自动升级，旧数据不会自动迁移。\n\n诊断日志和图标切换尚未在 Android 真机做长时/启动器兼容性验收；媒体通知封面使用 file:// URI，实际 SystemUI 访问行为需真机确认。",
+    "notes": "风灵音乐 v0.2.3（测试签名）\n\n- 首页横幅新增每日一言：默认使用 hitokoto，同日成功获取后缓存；失败保留已有文案。\n- 首页“探索音乐库”改为随机打乱曲库队列后开始播放，并跳到音乐库。\n- 设置 → 网络与接口 → API 设置：可修改每日一言 API 和 GitHub 加速前缀；留空恢复默认，仅允许 HTTPS。\n- 更新检查、APK / Windows 下载和发布页统一使用配置的 GitHub 加速前缀；清单请求失败不再回退 GitHub 原始地址。\n- 歌单页移除“我的歌单”标题，云同步按钮移到“新建歌单”左侧。\n- Android 默认图标改为新线条蓝图标；保留 6 个备用桌面图标。\n- 继续包含诊断日志、媒体通知封面、后台播放和测试签名发布流程。\n\n本版本仍使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布版。后续切换到生产签名可能需要卸载重装。旧包 music.sylphy.sylphy_music 不会自动升级，旧数据不会自动迁移。\n\n每日一言、加速下载、随机播放和默认图标切换尚未在 Android 真机做完整网络/启动器兼容性验收。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-x86_64.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-x86_64.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.2%2B4"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.3%2B5"
   },
   "history": [
+    {
+      "version": "0.2.2",
+      "build": 4,
+      "name": "风灵音乐 v0.2.2（测试签名）",
+      "date": "2026-10-28",
+      "notes": "风灵音乐 v0.2.2（测试签名）\n\n- 新增“设置 → 诊断与反馈”：可主动开启诊断日志，导出或分享文本；默认关闭，不记录歌曲名、账号、地址、URL、异常正文或堆栈。\n- 修复 Android 系统媒体通知封面：媒体会话现在会携带实际存在的本机封面 URI，并在切歌和封面更新时同步。\n- 新增 7 个 Android 备用桌面图标：线形蓝、实心蓝、青绿线形、青绿实心、黑底圆点、白底圆点、银发精灵；可在设置 → 外观与个性化 → 应用图标中切换。\n- 保留现有歌单、播放队列、缓存、云同步、更新检查和测试签名发布流程。\n\n本版本仍使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布版。后续切换到生产签名可能需要卸载重装。applicationId 已变更，旧包 music.sylphy.sylphy_music 不会自动升级，旧数据不会自动迁移。\n\n诊断日志和图标切换尚未在 Android 真机做长时/启动器兼容性验收；媒体通知封面使用 file:// URI，实际 SystemUI 访问行为需真机确认。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.2%2B4/sylphy-music-0.2.2-4-x86_64.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.2%2B4"
+    },
     {
       "version": "0.2.1",
       "build": 3,
