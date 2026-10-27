@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -17,13 +15,19 @@ import '../services/cache_jobs.dart';
 import '../services/cloud_sync.dart';
 import '../services/media_proxy.dart';
 import '../services/playback.dart';
+import '../services/playback_sleep_timer.dart';
 import '../services/sources.dart';
 import '../services/desktop.dart';
 import '../services/local_library.dart';
 import '../services/artwork.dart';
+import '../services/media_assets.dart';
+import '../services/lyrics_store.dart';
 import '../services/library_sync.dart';
 import '../services/source_connections.dart';
 import 'models.dart';
+import 'appearance.dart';
+import 'listening_history.dart';
+import 'player_layout_store.dart';
 
 class SylphyApp extends ChangeNotifier {
   SylphyApp._(
@@ -44,11 +48,16 @@ class SylphyApp extends ChangeNotifier {
   final CacheManager cache;
   final MediaProxy proxy;
   final PlaybackCoordinator playback;
+  late final sleepTimer = PlaybackSleepTimer(onStop: playback.pause);
+  AppLifecycleListener? _sleepLifecycle;
   final PlaylistSyncService cloud;
   final CacheJobs jobs;
   List<SourceProfile> sources = [];
   int catalogRevision = 0;
   late final catalog = LibraryCatalog(db);
+  late final appearance = Appearance(db);
+  late final playerLayouts = PlayerLayoutStore(db);
+  late final history = ListeningHistory(db, playback);
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};
   int _busyOperations = 0;
@@ -56,7 +65,9 @@ class SylphyApp extends ChangeNotifier {
   bool _disposed = false;
   String? message;
   DesktopControls? desktop;
-  late final artwork = ArtworkStore(db, factory, root);
+  late final assets = MediaAssetStore(db, root);
+  late final artwork = ArtworkStore(db, factory, root, assets: assets);
+  late final lyrics = LyricsStore(db, factory, assets, cache, root);
   late final index = LibrarySync(db, factory);
   late final connections = SourceConnections(
     db,
@@ -109,7 +120,15 @@ class SylphyApp extends ChangeNotifier {
       cloud,
       jobs,
     );
+    await app.assets.initialize();
     app.index.addListener(app._indexChanged);
+    app._sleepLifecycle = AppLifecycleListener(
+      onResume: () => unawaited(app.sleepTimer.checkDue()),
+    );
+    await app.appearance.initialize();
+    await app.playerLayouts.initialize();
+    await app.history.initialize();
+    app.history.addListener(app._indexChanged);
     await app.reload();
     if (platformIntegration) {
       await playback.attachHandler();
@@ -309,6 +328,7 @@ class SylphyApp extends ChangeNotifier {
     index.cancel(source.id);
     proxy.revokeSource(source.id);
     artwork.suspendSource(source.id);
+    lyrics.suspendSource(source.id);
     await jobs.sourceUnavailable(source.id);
     await cache.cancelSource(source.id);
     await index.cancelAndWait(source.id);
@@ -330,6 +350,7 @@ class SylphyApp extends ChangeNotifier {
     await cache.clear(sourceId: source.id);
     await db.removeSourceData(source.id);
     await artwork.clearSource(source.id);
+    await lyrics.clearSource(source.id);
     await vault.delete(source.id);
     await reload();
   }
@@ -413,73 +434,19 @@ class SylphyApp extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> loadLyrics(Track track) async {
-    final source = await db.source(track.ref.sourceId);
-    if (source == null || !source.enabled) return null;
-    final saved = _lyricsFile(track.ref);
-    if (await saved.exists()) return saved.readAsString();
-    if (source.kind == SourceKind.webdav) {
-      cache.lease(track.ref);
-      try {
-        final ready = await cache.find(track.ref);
-        if (ready != null) {
-          final embedded = await LocalLibrary.embeddedLyrics(ready.file);
-          if (embedded?.trim().isNotEmpty == true) return embedded;
-        }
-      } finally {
-        cache.release(track.ref);
-      }
-    }
-    if (source.kind == SourceKind.local) {
-      final file = File(
-        p.setExtension(
-          track.remote['path']?.toString() ?? track.ref.id,
-          '.lrc',
-        ),
-      );
-      return await file.exists()
-          ? file.readAsString()
-          : track.remote['lyrics']?.toString();
-    }
-    final adapter = factory.create(source);
-    try {
-      final text = await adapter.lyrics(track);
-      if (text != null &&
-          text.isNotEmpty &&
-          utf8.encode(text).length <= 1024 * 1024 &&
-          await db.source(source.id) != null) {
-        await saved.parent.create(recursive: true);
-        await saved.writeAsString(text, flush: true);
-      }
-      return text;
-    } finally {
-      adapter.close();
-    }
-  }
-
-  File _lyricsFile(TrackRef ref) => File(
-    p.join(
-      root.path,
-      'lyrics',
-      sha256.convert(utf8.encode(ref.sourceId)).toString(),
-      '${sha256.convert(utf8.encode(ref.key))}.lrc',
-    ),
-  );
-
+  Future<String?> loadLyrics(Track track, {bool forceRefresh = false}) =>
+      lyrics.load(track, forceRefresh: forceRefresh);
   Future<void> attachLyrics(Track track) async {
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['lrc', 'txt'],
     );
     if (picked?.path == null) return;
-    final original = File(picked!.path!);
-    if (await original.length() > 1024 * 1024) {
-      throw StateError('歌词文件不能超过 1 MiB');
-    }
-    final text = await original.readAsString();
-    final target = _lyricsFile(track.ref);
-    await target.parent.create(recursive: true);
-    await target.writeAsString(text, flush: true);
+    await importLyricsFile(track, File(picked!.path!));
+  }
+
+  Future<void> importLyricsFile(Track track, File original) async {
+    await lyrics.importFile(track, original);
     notifyListeners();
   }
 
@@ -556,7 +523,11 @@ class SylphyApp extends ChangeNotifier {
   Future<void> disposeAsync() async {
     if (_disposed) return;
     _disposed = true;
+    _sleepLifecycle?.dispose();
+    await sleepTimer.shutdown();
     desktop?.dispose();
+    history.removeListener(_indexChanged);
+    await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
     await connections.shutdown();
@@ -565,6 +536,10 @@ class SylphyApp extends ChangeNotifier {
     await proxy.dispose();
     await cache.shutdown();
     await artwork.shutdown();
+    await lyrics.shutdown();
+    await assets.shutdown();
+    await appearance.shutdown();
+    await playerLayouts.shutdown();
     await db.close();
   }
 }

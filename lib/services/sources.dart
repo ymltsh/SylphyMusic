@@ -11,6 +11,7 @@ import 'package:xml/xml.dart';
 
 import '../core/models.dart';
 import 'local_library.dart' show audioExtensions;
+import 'lyrics.dart';
 
 part 'webdav.dart';
 
@@ -52,6 +53,11 @@ abstract class MusicAdapter {
   Future<String?> lyrics(Track track);
   Future<Map<String, String>> mediaHeaders();
   Future<Uri?> coverUrl(Track track) async => null;
+  Future<List<Uri>> coverUrls(Track track) async {
+    final url = await coverUrl(track);
+    return url == null ? [] : [url];
+  }
+
   void close();
 }
 
@@ -312,7 +318,11 @@ class EmbyAdapter extends MusicAdapter {
       year: (x['ProductionYear'] as num?)?.toInt() ?? 0,
       number: (x['IndexNumber'] as num?)?.toInt() ?? 0,
       disc: (x['ParentIndexNumber'] as num?)?.toInt() ?? 0,
-      coverId: x['AlbumId']?.toString() ?? x['Id'].toString(),
+      coverId: (x['ImageTags'] as Map?)?['Primary'] != null
+          ? x['Id'].toString()
+          : x['AlbumPrimaryImageTag'] != null
+          ? x['AlbumId']?.toString() ?? x['Id'].toString()
+          : x['Id'].toString(),
       remote: {
         ...x,
         'format':
@@ -475,46 +485,65 @@ class EmbyAdapter extends MusicAdapter {
     if (sources.isEmpty) {
       sources.add({'Id': track.ref.id, 'MediaStreams': item['MediaStreams']});
     }
+    String? plainFallback;
     for (final source in sources) {
       final streams = (source['MediaStreams'] ?? item['MediaStreams']) as List?;
       for (final stream in streams?.whereType<Map>() ?? const <Map>[]) {
         final codec = stream['Codec']?.toString().toLowerCase();
         if (stream['Type'] != 'Subtitle' ||
-            !['lrc', 'text', 'txt'].contains(codec)) {
+            !(stream['IsTextSubtitleStream'] == true ||
+                [
+                  'lrc',
+                  'text',
+                  'txt',
+                  'srt',
+                  'subrip',
+                  'vtt',
+                  'webvtt',
+                  'ass',
+                  'ssa',
+                ].contains(codec))) {
           continue;
         }
         final index = int.tryParse('${stream['Index']}');
         if (index == null || index < 0) continue;
         final mediaId = source['Id']?.toString() ?? track.ref.id;
-        final format = codec == 'lrc' ? 'lrc' : 'txt';
-        for (final route in ['Items', 'Videos']) {
-          try {
-            final response = await transport.request(
-              'GET',
-              appendPath(
-                profile,
-                '$route/${track.ref.id}/$mediaId/Subtitles/$index/Stream.$format',
-              ),
-              headers: {...await _headers(), 'Accept': 'text/plain'},
-              retrySafe: true,
-            );
-            if (response.bodyBytes.length > 1024 * 1024) {
-              throw StateError('服务器歌词超过 1 MiB');
+        // Stream.txt can strip every timestamp from embedded text lyrics.
+        // Ask Emby for a timed subtitle conversion before a plain-text fallback.
+        final formats = codec == 'lrc' ? ['lrc', 'srt', 'txt'] : ['srt', 'txt'];
+        for (final format in formats) {
+          for (final route in ['Items', 'Videos']) {
+            try {
+              final response = await transport.request(
+                'GET',
+                appendPath(
+                  profile,
+                  '$route/${track.ref.id}/$mediaId/Subtitles/$index/Stream.$format',
+                ),
+                headers: {...await _headers(), 'Accept': 'text/plain'},
+                retrySafe: true,
+              );
+              if (response.bodyBytes.length > 1024 * 1024) {
+                throw StateError('服务器歌词超过 1 MiB');
+              }
+              final text = normalizeSubtitleLyrics(
+                utf8.decode(response.bodyBytes),
+              );
+              if (text.isNotEmpty) {
+                if (parseLrc(text).isNotEmpty) return text;
+                plainFallback ??= text;
+              }
+              break;
+            } on HttpFailure catch (error) {
+              if (error.status == 404 && route == 'Items') continue;
+              if ([400, 404, 406, 415].contains(error.status)) break;
+              rethrow;
             }
-            final text = utf8
-                .decode(response.bodyBytes)
-                .replaceFirst('\uFEFF', '')
-                .trim();
-            if (text.isNotEmpty) return text;
-            break;
-          } on HttpFailure catch (error) {
-            // Older Emby versions expose the same service under /Videos.
-            if (route != 'Items' || error.status != 404) rethrow;
           }
         }
       }
     }
-    return null;
+    return plainFallback;
   }
 
   @override
@@ -523,11 +552,41 @@ class EmbyAdapter extends MusicAdapter {
   @override
   Future<Map<String, String>> mediaHeaders() => _headers();
   @override
-  Future<Uri?> coverUrl(Track track) async => appendPath(
-    profile,
-    'Items/${track.coverId.isEmpty ? track.ref.id : track.coverId}/Images/Primary',
-    {'MaxWidth': '800', 'Quality': '90'},
-  );
+  Future<Uri?> coverUrl(Track track) async => (await coverUrls(track)).first;
+  @override
+  Future<List<Uri>> coverUrls(Track track) async {
+    final images = <String, String?>{};
+    void add(Object? id, Object? tag) {
+      if (id == null || id.toString().isEmpty) return;
+      images.putIfAbsent(id.toString(), () => tag?.toString());
+    }
+
+    final ownTag = (track.remote['ImageTags'] as Map?)?['Primary'];
+    if (ownTag != null) add(track.ref.id, ownTag);
+    final albumTag = track.remote['AlbumPrimaryImageTag'];
+    if (albumTag != null) add(track.remote['AlbumId'], albumTag);
+    final parentTag = track.remote['ParentPrimaryImageTag'];
+    if (parentTag != null) {
+      add(track.remote['ParentPrimaryImageItemId'], parentTag);
+    }
+    // Old indexed rows may have an album cover_id even when only the song has art.
+    add(track.ref.id, null);
+    add(track.remote['AlbumId'], null);
+    add(track.coverId, null);
+    return [
+      for (final image in images.entries)
+        appendPath(
+          profile,
+          'Items/${Uri.encodeComponent(image.key)}/Images/Primary',
+          {
+            if (image.value?.isNotEmpty == true) 'tag': image.value!,
+            'MaxWidth': '800',
+            'Quality': '90',
+          },
+        ),
+    ];
+  }
+
   @override
   void close() => transport.close();
 }

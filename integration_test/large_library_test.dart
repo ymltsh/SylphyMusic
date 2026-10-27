@@ -42,7 +42,7 @@ void main() {
             (i) => Track(
               ref: TrackRef(source.id, '${page * 250 + i}'),
               title: 'Track ${(page * 250 + i).toString().padLeft(5, '0')}',
-              artist: 'Artist ${page % 20}',
+              artist: 'Artist $page',
               album: 'Album $page',
             ),
           );
@@ -65,8 +65,8 @@ void main() {
         final groups = await app.catalog.page(
           CatalogQuery(sourceId: source.id, view: 2),
         );
-        expect(groups.total, 20);
-        expect(groups.rows.every((row) => row.count == 2500), true);
+        expect(groups.total, 200);
+        expect(groups.rows.every((row) => row.count == 250), true);
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
@@ -79,12 +79,74 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('播放全部 · 50000 首'), findsOneWidget);
-        expect(find.text('1–100 / 50000'), findsOneWidget);
-        await tester.tap(find.byTooltip('下一页'));
+        expect(find.text('50000'), findsOneWidget);
+        expect(find.byTooltip('下一页'), findsNothing);
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        for (final index in [100, 1000, 10000, 25000, 49990, 0]) {
+          scroll.position.jumpTo(
+            (index * 76).clamp(0, scroll.position.maxScrollExtent).toDouble(),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text('Track ${index.toString().padLeft(5, '0')}'),
+            findsOneWidget,
+          );
+        }
+        scroll.position.jumpTo(scroll.position.maxScrollExtent);
         await tester.pumpAndSettle();
-        expect(find.text('101–200 / 50000'), findsOneWidget);
-        expect(find.text('Track 00100'), findsOneWidget);
+        expect(find.text('Track 49999'), findsOneWidget);
+        // Replace the query while a distant batch is being fetched.
+        scroll.position.jumpTo(30000 * 76);
+        await tester.pump();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: LibraryBrowser(
+                app: app,
+                query: const CatalogQuery(search: 'Track 49999'),
+                onAction: (_, _) async {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('1'), findsOneWidget);
+        expect(find.text('Track 49999'), findsOneWidget);
+        expect(find.text('Track 30000'), findsNothing);
+        for (final view in [1, 2]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: LibraryBrowser(
+                  app: app,
+                  query: CatalogQuery(view: view),
+                  onAction: (_, _) async {},
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byTooltip('下一页'), findsNothing);
+          final expected = await app.catalog.page(
+            CatalogQuery(view: view),
+            offset: 100,
+          );
+          final list = tester.state<ScrollableState>(
+            find.byType(Scrollable).first,
+          );
+          list.position.jumpTo(100 * 76);
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              view == 1
+                  ? expected.rows.first.track.album
+                  : expected.rows.first.track.artist,
+            ),
+            findsOneWidget,
+          );
+        }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       } finally {

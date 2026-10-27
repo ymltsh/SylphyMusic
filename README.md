@@ -6,6 +6,8 @@ Flutter / Material 3 多音源播放器，支持 Android、Windows、Linux。主
 
 ## 构建与运行
 
+开发入口：[AGENTS.md](AGENTS.md) · [ARCH.md](ARCH.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [文档索引](docs/README.md)。
+
 已验证工具链：Flutter **3.47.8 stable** / Dart **3.13.7**。Android 使用 Gradle 9.3.1、AGP 9.1.0、内建 Kotlin、JDK 17；Windows 需要 Visual Studio C++ 工具；Linux 需要 GTK3、libsecret、libmpv 及 Flutter 的桌面构建依赖。
 
 ```powershell
@@ -26,7 +28,7 @@ flutter run -d linux
 
 平台 Runner 已包含自定义媒体会话、托盘和缓存服务，**不要运行 flutter create 覆盖它们**。`tool/bootstrap_platforms.py` 现在只检查必要文件。`pubspec.lock` 与 CI 固定构建输入。
 
-首次启动，在「来源」中添加 Emby / Navidrome / OpenSubsonic / WebDAV，或导入本地文件、添加音乐文件夹。凭据由系统安全存储管理，独立于 SQLite。Android 文件选择器的临时副本会复制到应用管理目录；桌面文件夹来源引用原始文件，重新扫描按大小与修改时间增量更新。WebDAV 的支持范围和设置见 [docs/WEBDAV.md](docs/WEBDAV.md)。
+首次启动，通过独立引导连接 Emby / Navidrome / OpenSubsonic / WebDAV 或导入本地音乐，也可以跳过。之后在右上角「设置 → 音乐源管理」中添加服务器、本地文件和音乐文件夹。底部导航为首页、音乐库、歌单、我的，桌面宽屏使用侧栏；UI 范围见 [界面说明](docs/UI_REFRESH.md)。默认主题色为 #5094B2，可在设置中选择主色及四个主页面的自适应背景图；Android 支持透明手势条，歌曲 / 专辑 / 艺术家使用连续滚动。凭据由系统安全存储管理，独立于 SQLite。Android 文件选择器的临时副本会复制到应用管理目录；桌面文件夹来源引用原始文件，重新扫描按大小与修改时间增量更新。WebDAV 的支持范围和设置见 [docs/WEBDAV.md](docs/WEBDAV.md)。
 
 ## 实现范围
 
@@ -57,7 +59,7 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 集成测试会覆盖构建输出。内部验收打包使用 `tool/build_review.ps1`：重新构建普通入口的 Windows Release 与 Android Release / 分架构 APK，调用 `tool/package_review.py --mode optimized` 检查已跟踪源码和包内容中的已知私密值，输出到 `build/internal-review/`。脚本在本机显式启用测试签名；若有正式 `android/key.properties` 则优先使用其配置。这些包仍须通过正式版发布闸门。
 
-当前 Android arm64 内部包 **28.5 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **21.4 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
+当前 Android arm64 内部包 **29.3 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **21.7 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
 
 真实服务器测试默认跳过。私密测试凭据由环境变量指定文件路径，不把密码放入命令行或源码：
 
@@ -72,6 +74,6 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 Linux 真实构建与运行、Android 实机来电 / 蓝牙 / 耳机与后台限制、更多只读 / 权限撤销 / 并发冲突场景，以及原生媒体依赖的分发许可证审计和正式签名，仍以 [发布闸门](docs/RELEASE_GATES.md) 为准。经授权的真实 Emby 临时歌单 CRUD 已通过；用户目前要求先本地运行，未推送源码或 CI。
 
-Emby 不同版本的服务端歌词接口尚未统一验证，目前可使用本地 / 内嵌歌词及每曲导入。OpenSubsonic 支持结构化歌词接口并兼容传统文本接口。服务器不提供稳定身份时，不允许在旧来源身份下更换 OpenSubsonic 地址；需添加独立来源来隔离旧缓存和歌单。
+Emby 内嵌文本歌词优先获取保留时间轴的 SRT，转换为毫秒精度 LRC；外置 LRC 优先读取原格式，不支持时间轴转换时回退纯文本。旧 Emby 纯文本缓存会尝试升级，手动导入独立保存；详见 [Emby 歌词](docs/EMBY_LYRICS.md)。不同服务端版本的转换兼容性仍需继续验证。OpenSubsonic 支持结构化歌词接口并兼容传统文本接口。服务器不提供稳定身份时，不允许在旧来源身份下更换 OpenSubsonic 地址；需添加独立来源来隔离旧缓存和歌单。
 
 自有代码使用 MIT。原生 libmpv / FFmpeg 等依赖的许可须分别核实；MIT 不覆盖它们的分发义务。不要把测试凭据、私有服务器地址、原始音乐、签名密钥或 `.private/` 内容提交到公共仓库。

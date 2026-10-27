@@ -11,6 +11,7 @@ import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/services/local_library.dart';
 import 'package:sylphy_music/services/sources.dart';
 import 'package:sylphy_music/ui/app_shell.dart';
+import 'package:sylphy_music/ui/library_browser.dart';
 
 import '../test/playback_native_test.dart' show wav;
 import '../test/live_emby_test.dart' show MemoryVault;
@@ -77,6 +78,8 @@ void main() {
         await app.reload();
         await tester.pumpWidget(MaterialApp(home: SylphyShell(app: app)));
         await tester.pumpAndSettle();
+        await tester.tap(find.text('音乐库').first);
+        await tester.pumpAndSettle();
         expect(find.text('integration'), findsOneWidget);
         await app.db.replaceSourceTracks('local', [
           track,
@@ -92,18 +95,26 @@ void main() {
         ]);
         await app.reload();
         await tester.pumpAndSettle();
-        expect(find.text('1–100 / 206'), findsOneWidget);
-        await tester.tap(find.byTooltip('下一页'));
+        expect(find.byTooltip('下一页'), findsNothing);
+        final songScroll = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(LibraryBrowser),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        songScroll.position.jumpTo(100 * 76);
         await tester.pumpAndSettle();
-        expect(find.text('101–200 / 206'), findsOneWidget);
-        await tester.tap(find.byTooltip('下一页'));
+        expect(find.text('Paged 100'), findsOneWidget);
+        songScroll.position.jumpTo(200 * 76);
         await tester.pumpAndSettle();
-        expect(find.text('201–206 / 206'), findsOneWidget);
+        expect(find.text('Paged 204'), findsOneWidget);
         await tester.tap(find.text('艺术家').first);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Paged Artist').first);
         await tester.pumpAndSettle();
-        expect(find.text('播放全部 · 205 首'), findsOneWidget);
+        expect(find.text('205'), findsOneWidget);
         await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.tap(find.text('歌曲').first);

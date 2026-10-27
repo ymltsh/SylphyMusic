@@ -47,6 +47,10 @@ class PlaybackCoordinator extends ChangeNotifier {
     await _setMpvOption('gapless-audio', 'weak');
     await _setMpvOption('replaygain', await db.setting('replaygain') ?? 'no');
     await _setMpvOption('audio-pitch-correction', 'yes');
+    // Lyrics are resolved by SylphyApp, not mpv's external subtitle loader.
+    // Autoloading a sidecar LRC can emit a fatal stream error on Windows
+    // extended-length paths even though the audio itself is playable.
+    await _setMpvOption('sub-auto', 'no');
     _subscriptions.add(
       player.stream.playing.listen((v) {
         playing = v;
@@ -66,6 +70,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.position.listen((v) {
+        if (error != null && playing && !buffering && v > position) {
+          error = null;
+        }
         position = v;
         if (v >= const Duration(seconds: 5)) failures = 0;
         notifyListeners();
@@ -350,7 +357,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     if (player.state.playlist.medias.isEmpty ||
-        _reloadSources.contains(source.id)) {
+        _reloadSources.contains(source.id) ||
+        error != null) {
       await _loadCurrent(autoplay: true, manual: true);
       return;
     }
@@ -517,23 +525,16 @@ class PlaybackCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setRepeat(RepeatKind repeat) async {
-    snapshot = QueueSnapshot(
-      tracks: snapshot.tracks,
-      index: snapshot.index,
-      positionMs: snapshot.positionMs,
-      repeat: repeat,
-      shuffle: snapshot.shuffle,
-      order: snapshot.order,
-      history: snapshot.history,
-    );
-    await save();
-    notifyListeners();
-  }
+  Future<void> cyclePlaybackMode() =>
+      setPlaybackMode(snapshot.playbackMode.next);
 
-  Future<void> setShuffle(bool active) async {
+  Future<void> setPlaybackMode(PlaybackMode mode) async {
+    final shuffle = mode == PlaybackMode.shuffle;
     final indices = List.generate(snapshot.tracks.length, (i) => i);
-    if (active && indices.isNotEmpty) {
+    var order = indices;
+    if (shuffle && snapshot.shuffle) {
+      order = snapshot.order;
+    } else if (shuffle && indices.isNotEmpty) {
       indices.remove(snapshot.index);
       indices.shuffle(Random());
       indices.insert(0, snapshot.index);
@@ -542,14 +543,31 @@ class PlaybackCoordinator extends ChangeNotifier {
       tracks: snapshot.tracks,
       index: snapshot.index,
       positionMs: snapshot.positionMs,
-      repeat: snapshot.repeat,
-      shuffle: active,
-      order: indices,
+      repeat: mode == PlaybackMode.singleLoop ? RepeatKind.one : RepeatKind.all,
+      shuffle: shuffle,
+      order: order,
       history: snapshot.history,
     );
+    cache.invalidatePreview();
     await save();
     notifyListeners();
   }
+
+  Future<void> setRepeat(RepeatKind repeat) => setPlaybackMode(
+    repeat == RepeatKind.one
+        ? PlaybackMode.singleLoop
+        : snapshot.shuffle
+        ? PlaybackMode.shuffle
+        : PlaybackMode.listLoop,
+  );
+
+  Future<void> setShuffle(bool active) => setPlaybackMode(
+    active
+        ? PlaybackMode.shuffle
+        : snapshot.repeat == RepeatKind.one
+        ? PlaybackMode.singleLoop
+        : PlaybackMode.listLoop,
+  );
 
   Future<void> setSpeed(double v) async {
     speed = v.clamp(0.5, 2);

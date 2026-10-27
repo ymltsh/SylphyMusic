@@ -19,10 +19,12 @@ try {
     Invoke-CheckedFlutter -FlutterArguments @('test', '--no-pub')
     Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/desktop_test.dart', '-d', 'windows', '--no-pub')
     Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/webdav_test.dart', '-d', 'windows', '--no-pub')
+    Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/media_assets_test.dart', '-d', 'windows', '--no-pub')
     Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/large_library_test.dart', '-d', 'windows', '--no-pub')
     if ($AndroidDevice) {
         Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/desktop_test.dart', '-d', $AndroidDevice, '--no-pub')
         Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/webdav_test.dart', '-d', $AndroidDevice, '--no-pub')
+        Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/media_assets_test.dart', '-d', $AndroidDevice, '--no-pub')
         Invoke-CheckedFlutter -FlutterArguments @('test', 'integration_test/large_library_test.dart', '-d', $AndroidDevice, '--no-pub')
     }
     # Distribute optimized main-entrypoint builds after testing.

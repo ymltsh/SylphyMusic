@@ -126,6 +126,68 @@ void main() {
     skip: !available ? 'Build Windows debug or set SYLPHY_MPV_LIBRARY' : false,
   );
 
+  test(
+    'combined modes preserve current audio, persist and restore queue traversal',
+    () async {
+      final player = app.playback;
+      await player.setQueue(
+        tracks.map((t) => t.ref).toList(),
+        start: 1,
+        autoplay: false,
+      );
+      await player.seek(const Duration(seconds: 2));
+      await player.pause();
+      await player.cyclePlaybackMode();
+      expect(player.snapshot.playbackMode, PlaybackMode.singleLoop);
+      expect(player.snapshot.shuffle, isFalse);
+      await player.cyclePlaybackMode();
+      expect(player.snapshot.playbackMode, PlaybackMode.shuffle);
+      expect(player.snapshot.repeat, RepeatKind.all);
+      expect(player.snapshot.order.first, 1);
+      expect(player.snapshot.order.toSet(), {0, 1, 2});
+      expect(player.currentRef, tracks[1].ref);
+      expect(player.position.inMilliseconds, closeTo(2000, 2));
+      expect(player.playing, isFalse);
+      final randomOrder = List.of(player.snapshot.order);
+      await app.disposeAsync();
+      app = await SylphyApp.bootstrap(
+        dataRoot: root,
+        resumeBackground: false,
+        platformIntegration: false,
+      );
+      expect(app.playback.snapshot.playbackMode, PlaybackMode.shuffle);
+      expect(app.playback.snapshot.order, randomOrder);
+      expect(app.playback.currentRef, tracks[1].ref);
+      expect(app.playback.playing, isFalse);
+      await app.playback.cyclePlaybackMode();
+      expect(app.playback.snapshot.playbackMode, PlaybackMode.listLoop);
+      expect(app.playback.snapshot.order, [0, 1, 2]);
+      await app.playback.jumpTo(2);
+      await app.playback.next();
+      await app.playback.pause();
+      expect(app.playback.currentRef, tracks.first.ref);
+    },
+    skip: !available ? 'Build Windows debug or set SYLPHY_MPV_LIBRARY' : false,
+  );
+
+  test(
+    'successful native playback progress clears a previous failure',
+    () async {
+      await app.playback.setQueue([tracks.first.ref]);
+      await app.playback.player.stream.position
+          .firstWhere((p) => p > Duration.zero)
+          .timeout(const Duration(seconds: 5));
+      app.playback.error = 'fixture transient load failure';
+      for (var i = 0; i < 100 && app.playback.error != null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(app.playback.error, isNull);
+      expect(app.playback.currentRef, tracks.first.ref);
+      await app.playback.pause();
+    },
+    skip: !available,
+  );
+
   testWidgets('mobile shell and queue render without overflow', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -135,7 +197,10 @@ void main() {
     await tester.runAsync(() async {
       for (var i = 0; i < 200; i++) {
         await tester.pump();
-        if (find.text('播放全部 · 3 首').evaluate().isNotEmpty) return;
+        if (find.text('属于你的音乐时光').evaluate().isNotEmpty &&
+            find.byType(CircularProgressIndicator).evaluate().isEmpty) {
+          return;
+        }
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       throw StateError('Catalog page did not load');

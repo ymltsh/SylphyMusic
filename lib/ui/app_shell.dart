@@ -3,14 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/appearance.dart';
 import '../core/models.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
 import 'playlist_page.dart';
 import 'player_bar.dart';
+import 'playback_notice.dart';
 import 'cover_art.dart';
 import 'library_browser.dart';
 import 'track_lookup.dart';
+import 'home_page.dart';
+import 'search_page.dart';
+import 'app_background.dart';
+import 'player_cover.dart';
+import 'theme_color_dialog.dart';
 import '../data/library_catalog.dart';
 
 class SylphyShell extends StatefulWidget {
@@ -22,18 +29,18 @@ class SylphyShell extends StatefulWidget {
 
 class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
-  String query = '';
+  int libraryView = 0;
+  bool playerCollapsed = false;
+  bool? onboarding;
   String? sourceFilter;
   bool descending = false;
   String sort = 'name';
-  static const labels = ['歌曲', '专辑', '艺术家', '歌单', '来源', '设置'];
+  static const labels = ['首页', '音乐库', '歌单', '我的'];
   static const icons = [
-    Icons.music_note_outlined,
-    Icons.album_outlined,
-    Icons.person_outline,
+    Icons.home_outlined,
+    Icons.library_music_outlined,
     Icons.queue_music_outlined,
-    Icons.dns_outlined,
-    Icons.tune_outlined,
+    Icons.person_outline,
   ];
   SylphyApp get app => widget.app;
   @override
@@ -42,6 +49,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     app.addListener(_update);
     app.playback.addListener(_update);
+    unawaited(_loadWelcome());
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -73,149 +86,446 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width > 750;
-    final main = Column(
-      children: [
-        if (tab <= 2)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: '搜索音乐库',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (v) => setState(() => query = v.trim()),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  tooltip: '音乐来源',
-                  icon: const Icon(Icons.filter_list),
-                  onSelected: (v) =>
-                      setState(() => sourceFilter = v == 'all' ? null : v),
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'all', child: Text('全部来源')),
-                    ...app.sources.map(
-                      (s) => PopupMenuItem(value: s.id, child: Text(s.name)),
-                    ),
-                  ],
-                ),
-                PopupMenuButton<String>(
-                  tooltip: '排序',
-                  icon: const Icon(Icons.sort),
-                  onSelected: (v) => setState(() => sort = v),
-                  itemBuilder: (ctx) => const [
-                    PopupMenuItem(value: 'name', child: Text('名称')),
-                    PopupMenuItem(value: 'artist', child: Text('艺术家')),
-                    PopupMenuItem(value: 'album', child: Text('专辑')),
-                    PopupMenuItem(value: 'duration', child: Text('时长')),
-                    PopupMenuItem(value: 'year', child: Text('年份')),
-                  ],
-                ),
-                IconButton(
-                  tooltip: '升序 / 降序',
-                  onPressed: () => setState(() => descending = !descending),
-                  icon: Icon(
-                    descending ? Icons.arrow_downward : Icons.arrow_upward,
-                  ),
-                ),
-              ],
-            ),
+  Future<void> _loadWelcome() async {
+    final done = await app.db.setting('ui_onboarded') == 'true';
+    if (mounted) setState(() => onboarding = !done && app.sources.isEmpty);
+  }
+
+  Future<void> _finishWelcome() async {
+    await _act(() async {
+      await app.db.setSetting('ui_onboarded', 'true');
+      if (mounted) setState(() => onboarding = false);
+    });
+  }
+
+  void _open(String title, Widget Function() page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AnimatedBuilder(
+          animation: Listenable.merge([app, app.appearance, app.playback]),
+          builder: (context, _) => Scaffold(
+            appBar: AppBar(title: Text(title)),
+            body: SafeArea(top: false, child: page()),
           ),
-        if (app.busy) const LinearProgressIndicator(),
-        Expanded(child: _page()),
-        _playerBar(),
-      ],
-    );
-    return Scaffold(
-      appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('风灵音乐', style: TextStyle(fontWeight: FontWeight.w700)),
-            Text('Sylphy Music', style: TextStyle(fontSize: 12)),
-          ],
         ),
-        actions: [
-          IconButton(
-            tooltip: '刷新所有来源',
-            onPressed: app.busy ? null : () => _act(app.syncAll),
-            icon: const Icon(Icons.sync),
-          ),
-          IconButton(
-            tooltip: '歌曲黑名单',
-            onPressed: _showBlacklist,
-            icon: const Icon(Icons.block_outlined),
-          ),
-        ],
       ),
-      body: wide
-          ? Row(
-              children: [
-                NavigationRail(
-                  extended: MediaQuery.sizeOf(context).width > 1050,
-                  selectedIndex: tab,
-                  onDestinationSelected: (v) => setState(() => tab = v),
-                  destinations: List.generate(
-                    labels.length,
-                    (i) => NavigationRailDestination(
-                      icon: Icon(icons[i]),
-                      label: Text(labels[i]),
-                    ),
-                  ),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: main),
-              ],
-            )
-          : main,
-      bottomNavigationBar: wide
-          ? null
-          : NavigationBar(
-              height: 72,
-              selectedIndex: tab,
-              onDestinationSelected: (v) => setState(() => tab = v),
-              destinations: List.generate(
-                labels.length,
-                (i) => NavigationDestination(
-                  icon: Icon(icons[i]),
-                  label: labels[i],
-                ),
-              ),
-            ),
     );
   }
+
+  void _library([int view = 0]) => setState(() {
+    tab = 1;
+    libraryView = view;
+  });
+  void _favorites() {
+    final favorite = app.playlists
+        .where((p) => p.kind == PlaylistKind.favorites)
+        .firstOrNull;
+    if (favorite != null) _playlistDetails(favorite);
+  }
+
+  void _downloads() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => CacheTasksPage(app: app)),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return PlaybackNotice(
+      playback: app.playback,
+      readError: () => app.playback.error,
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (onboarding == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (onboarding!) return _welcome();
+    final wide = MediaQuery.sizeOf(context).width > 750;
+    final playerAnimation = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 260);
+    final main = Column(
+      children: [
+        if (app.busy) const LinearProgressIndicator(),
+        Expanded(
+          child: Stack(
+            children: [
+              Positioned.fill(child: _page()),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: wide ? 16 : 8,
+                child: IgnorePointer(
+                  ignoring: playerCollapsed,
+                  child: AnimatedSlide(
+                    offset: playerCollapsed
+                        ? const Offset(0, 1.4)
+                        : Offset.zero,
+                    duration: playerAnimation,
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: playerCollapsed ? 0 : 1,
+                      duration: playerAnimation,
+                      curve: Curves.easeOutCubic,
+                      child: wide
+                          ? SafeArea(top: false, child: _playerBar())
+                          : _playerBar(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    final solidBackground = app.appearance.solidBackground;
+    final customBackground =
+        app.appearance.backgroundFile != null && !solidBackground;
+    final scheme = Theme.of(context).colorScheme;
+    return AppBackground(
+      appearance: app.appearance,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: solidBackground
+              ? Colors.transparent
+              : customBackground
+              ? scheme.surface.withValues(alpha: .90)
+              : null,
+          surfaceTintColor: solidBackground ? Colors.transparent : null,
+          title: Text(
+            tab == 0
+                ? (WidgetsBinding
+                              .instance
+                              .platformDispatcher
+                              .locale
+                              .languageCode ==
+                          'en'
+                      ? 'sylphymusic'
+                      : '风灵音乐')
+                : labels[tab],
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          actions: [
+            IconButton(
+              tooltip: '搜索',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SearchPage(
+                    app: app,
+                    onAction: _trackAction,
+                    initialSource: sourceFilter,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.search),
+            ),
+            IconButton(
+              tooltip: '设置',
+              onPressed: () => _open('设置', _settings),
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ],
+        ),
+        body: wide
+            ? Row(
+                children: [
+                  NavigationRail(
+                    extended: MediaQuery.sizeOf(context).width > 1050,
+                    backgroundColor: solidBackground
+                        ? Colors.transparent
+                        : null,
+                    selectedIndex: tab,
+                    onDestinationSelected: (v) => setState(() => tab = v),
+                    destinations: List.generate(
+                      labels.length,
+                      (i) => NavigationRailDestination(
+                        icon: Icon(icons[i]),
+                        label: Text(labels[i]),
+                      ),
+                    ),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(child: main),
+                ],
+              )
+            : main,
+        floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
+        bottomNavigationBar: wide
+            ? null
+            : NavigationBar(
+                backgroundColor: solidBackground
+                    ? Colors.transparent
+                    : customBackground
+                    ? scheme.surfaceContainer.withValues(alpha: .90)
+                    : null,
+                surfaceTintColor: solidBackground ? Colors.transparent : null,
+                height: 54,
+                maintainBottomViewPadding: true,
+                selectedIndex: tab,
+                onDestinationSelected: (v) => setState(() => tab = v),
+                destinations: List.generate(
+                  labels.length,
+                  (i) => NavigationDestination(
+                    icon: Icon(icons[i]),
+                    label: labels[i],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _libraryFilterBar() {
+    final scheme = Theme.of(context).colorScheme;
+    Widget chip(int value, String label, IconData icon) {
+      final selected = libraryView == value;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          key: ValueKey('library-filter-$value'),
+          selected: selected,
+          onSelected: (_) => setState(() => libraryView = value),
+          showCheckmark: false,
+          avatar: Icon(
+            icon,
+            size: 16,
+            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+          ),
+          label: Text(label),
+          labelStyle: TextStyle(
+            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+          backgroundColor: scheme.surfaceContainerHighest.withValues(
+            alpha: .72,
+          ),
+          selectedColor: scheme.primary,
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+
+    return Align(
+      key: const ValueKey('library-filter-bar'),
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              chip(0, '歌曲', Icons.music_note_outlined),
+              chip(1, '专辑', Icons.album_outlined),
+              chip(2, '艺术家', Icons.person_outline),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sourceFilterControl() => PopupMenuButton<String>(
+    tooltip: '音乐来源',
+    icon: const Icon(Icons.filter_list),
+    onSelected: (v) => setState(() => sourceFilter = v == 'all' ? null : v),
+    itemBuilder: (ctx) => [
+      const PopupMenuItem(value: 'all', child: Text('全部来源')),
+      ...app.sources.map(
+        (s) => PopupMenuItem(value: s.id, child: Text(s.name)),
+      ),
+    ],
+  );
+
+  Widget _sortControls() => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      PopupMenuButton<String>(
+        tooltip: '排序',
+        icon: const Icon(Icons.sort),
+        onSelected: (v) => setState(() => sort = v),
+        itemBuilder: (ctx) => const [
+          PopupMenuItem(value: 'name', child: Text('名称')),
+          PopupMenuItem(value: 'artist', child: Text('艺术家')),
+          PopupMenuItem(value: 'album', child: Text('专辑')),
+          PopupMenuItem(value: 'duration', child: Text('时长')),
+          PopupMenuItem(value: 'year', child: Text('年份')),
+        ],
+      ),
+      IconButton(
+        tooltip: '升序 / 降序',
+        onPressed: () => setState(() => descending = !descending),
+        icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+      ),
+    ],
+  );
 
   Widget _page() {
     switch (tab) {
       case 0:
+        return HomePage(
+          app: app,
+          onLibrary: _library,
+          onFavorites: _favorites,
+          onDownloads: _downloads,
+          onSources: () => _open('音乐源管理', _sources),
+          onAction: _trackAction,
+        );
       case 1:
-      case 2:
         return LibraryBrowser(
           app: app,
           query: CatalogQuery(
-            view: tab,
-            search: query,
+            view: libraryView,
             sourceId: sourceFilter,
             sort: sort,
             descending: descending,
           ),
           onAction: _trackAction,
+          viewControls: _libraryFilterBar(),
+          songActions: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [_sourceFilterControl(), _sortControls()],
+          ),
         );
-      case 3:
+      case 2:
         return _playlists();
-      case 4:
-        return _sources();
       default:
-        return _settings();
+        return _personal();
     }
   }
+
+  Widget _welcome() => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(28),
+            children: [
+              Icon(
+                Icons.air_rounded,
+                size: 76,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '让音乐，轻盈相随',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '欢迎使用风灵音乐\n连接私人音乐库，收藏喜欢的声音，离线也能自在聆听。',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              const ListTile(
+                leading: Icon(Icons.link),
+                title: Text('01  连接音乐来源'),
+                subtitle: Text('Emby · Navidrome / OpenSubsonic · WebDAV'),
+              ),
+              FilledButton.icon(
+                onPressed: app.busy
+                    ? null
+                    : () async {
+                        await _addSource();
+                        if (app.sources.isNotEmpty) await _finishWelcome();
+                      },
+                icon: const Icon(Icons.add_link),
+                label: const Text('连接我的音乐库'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: app.busy
+                    ? null
+                    : () async {
+                        await _act(app.importLocalFiles);
+                        if (app.sources.isNotEmpty) await _finishWelcome();
+                      },
+                icon: const Icon(Icons.folder_open),
+                label: const Text('导入本地音乐'),
+              ),
+              if (app.busy) ...[
+                const SizedBox(height: 16),
+                const LinearProgressIndicator(),
+                const Text('正在验证连接并初始化音乐库…', textAlign: TextAlign.center),
+              ],
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: app.busy ? null : _finishWelcome,
+                child: const Text('稍后设置，先进入首页'),
+              ),
+              const Text(
+                '以后可在右上角「设置 → 音乐源管理」中继续添加。',
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _personal() => ListView(
+    padding: const EdgeInsets.fromLTRB(20, 20, 20, 116),
+    children: [
+      Card.filled(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.air_rounded, size: 40),
+              const SizedBox(height: 16),
+              Text('我的音乐空间', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              Text('${app.playlists.length} 个歌单 · ${app.sources.length} 个音乐来源'),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+      ListTile(
+        leading: const Icon(Icons.favorite_outline),
+        title: const Text('我的收藏'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _favorites,
+      ),
+      ListTile(
+        leading: const Icon(Icons.queue_music),
+        title: const Text('最近播放'),
+        subtitle: const Text('最近听过的 50 首歌曲'),
+        onTap: () => _open('最近播放', () => ListeningHistoryPage(app: app)),
+      ),
+      ListTile(
+        leading: const Icon(Icons.download_outlined),
+        title: const Text('下载管理'),
+        onTap: _downloads,
+      ),
+      ListTile(
+        leading: const Icon(Icons.storage_outlined),
+        title: const Text('缓存与存储'),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => CacheStoragePage(app: app)),
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.block_outlined),
+        title: const Text('歌曲黑名单'),
+        onTap: _showBlacklist,
+      ),
+    ],
+  );
 
   Widget _tracks(List<Track> tracks, {bool showPlayAll = true}) {
     if (tracks.isEmpty) {
@@ -228,8 +538,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       itemBuilder: (ctx, i) {
         if (showPlayAll && i == 0) {
           return ListTile(
-            leading: const Icon(Icons.play_circle),
-            title: Text('播放全部 · ${tracks.length} 首'),
+            leading: const Tooltip(
+              message: '播放全部',
+              child: Icon(Icons.play_circle),
+            ),
+            title: Text('${tracks.length}'),
             onTap: () => _act(
               () => app.playback.setQueue(tracks.map((t) => t.ref).toList()),
             ),
@@ -336,7 +649,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     children: [
       Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
             FilledButton.icon(
               onPressed: _newPlaylist,
@@ -357,6 +672,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       ),
       Expanded(
         child: ListView(
+          padding: const EdgeInsets.only(bottom: 96),
           children: app.playlists
               .map(
                 (p) => ListTile(
@@ -728,6 +1044,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           spacing: 8,
           runSpacing: 8,
           children: [
+            OutlinedButton.icon(
+              onPressed: app.busy ? null : () => _act(app.syncAll),
+              icon: const Icon(Icons.sync),
+              label: const Text('同步所有来源'),
+            ),
             FilledButton.icon(
               onPressed: _addSource,
               icon: const Icon(Icons.add),
@@ -763,7 +1084,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   title: Text(s.name),
                   onTap: () => setState(() {
                     sourceFilter = s.id;
-                    tab = 0;
+                    tab = 1;
+                    libraryView = 0;
+                    Navigator.pop(context);
                   }),
                   subtitle: Text(
                     s.kind == SourceKind.local
@@ -980,8 +1303,123 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     password.dispose();
   }
 
+  Future<void> _chooseThemeColor() async {
+    final chosen = await showDialog<Color>(
+      context: context,
+      builder: (_) => ThemeColorDialog(initial: app.appearance.seed),
+    );
+    if (chosen != null) await _act(() => app.appearance.update(color: chosen));
+  }
+
+  Future<void> _setLyricFont(double size) =>
+      app.appearance.update(lyricFont: size);
+
   Widget _settings() => ListView(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     children: [
+      const ListTile(
+        title: Text('音乐与存储', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      ListTile(
+        leading: const Icon(Icons.dns_outlined),
+        title: const Text('音乐源管理'),
+        subtitle: Text('${app.sources.length} 个来源'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _open('音乐源管理', _sources),
+      ),
+      ListTile(
+        leading: const Icon(Icons.download_outlined),
+        title: const Text('下载管理'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _downloads,
+      ),
+      const ListTile(
+        title: Text('外观与体验', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      ListTile(
+        title: const Text('外观模式'),
+        leading: const Icon(Icons.palette_outlined),
+        trailing: DropdownButton<ThemeMode>(
+          value: app.appearance.mode,
+          underline: const SizedBox(),
+          items: const [
+            DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
+            DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
+            DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
+          ],
+          onChanged: (v) => _act(() => app.appearance.update(theme: v)),
+        ),
+      ),
+      ListTile(
+        title: const Text('主题颜色'),
+        subtitle: Text(app.appearance.seedHex),
+        leading: CircleAvatar(backgroundColor: app.appearance.seed, radius: 12),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _chooseThemeColor,
+      ),
+      SwitchListTile(
+        title: const Text('纯色背景'),
+        subtitle: const Text('一级页面与播放页基础底色跟随深浅色使用白 / 黑；播放页封面模糊开启时叠加封面模糊'),
+        value: app.appearance.solidBackground,
+        onChanged: (v) => _act(() => app.appearance.update(solid: v)),
+      ),
+      ListTile(
+        title: const Text('自定义背景图'),
+        subtitle: Text(
+          app.appearance.backgroundFile == null
+              ? '选择图片，仅在四个主页面显示'
+              : app.appearance.solidBackground
+              ? '已选择图片 · 纯色背景开启时不显示'
+              : '四个主页面 · 保持比例自适应铺满',
+        ),
+        leading: const Icon(Icons.wallpaper_outlined),
+        trailing: app.appearance.backgroundFile == null
+            ? const Icon(Icons.chevron_right)
+            : IconButton(
+                tooltip: '移除背景',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _act(app.appearance.clearBackground),
+              ),
+        onTap: () => _act(app.appearance.pickBackground),
+      ),
+      if (app.appearance.backgroundFile != null &&
+          !app.appearance.solidBackground)
+        ListTile(
+          title: const Text('背景可见度'),
+          subtitle: Text(
+            '${(app.appearance.backgroundVisibility * 100).round()}%',
+          ),
+          trailing: SizedBox(
+            width: 160,
+            child: Slider(
+              min: .1,
+              max: .4,
+              divisions: 30,
+              value: app.appearance.backgroundVisibility,
+              onChanged: (v) =>
+                  _act(() => app.appearance.update(visibility: v)),
+            ),
+          ),
+        ),
+      SwitchListTile(
+        title: const Text('唱片播放样式'),
+        subtitle: const Text('系统默认与自定义播放页共用；关闭时使用方形封面'),
+        value: app.appearance.disc,
+        onChanged: (v) => _act(() => app.appearance.update(record: v)),
+      ),
+      SwitchListTile(
+        title: const Text('封面模糊背景'),
+        subtitle: const Text('播放页布局背景为封面模糊时生效；关闭时使用主题 / 纯色底色'),
+        value: app.appearance.ambient,
+        onChanged: (v) => _act(() => app.appearance.update(background: v)),
+      ),
+      SwitchListTile(
+        title: const Text('磨砂迷你播放器'),
+        subtitle: const Text('实验性效果，默认关闭'),
+        value: app.appearance.glass,
+        onChanged: (v) => _act(() => app.appearance.update(frost: v)),
+      ),
+      const Divider(),
       ListTile(
         title: const Text('开源许可证'),
         leading: const Icon(Icons.article_outlined),
@@ -1017,6 +1455,44 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           ),
         ),
       ),
+      ListTile(
+        leading: const Icon(Icons.lyrics_outlined),
+        title: const Text('完整歌词字号'),
+        subtitle: Text(Appearance.lyricFontLabel(app.appearance.lyricFontSize)),
+        trailing: DropdownButton<double>(
+          value: app.appearance.lyricFontSize,
+          underline: const SizedBox(),
+          items: [
+            for (final size in Appearance.lyricFontSizes)
+              DropdownMenuItem(
+                value: size,
+                child: Text(Appearance.lyricFontLabel(size)),
+              ),
+          ],
+          onChanged: (v) => _act(() => _setLyricFont(v!)),
+        ),
+      ),
+      ListTile(
+        leading: const Icon(Icons.text_fields_rounded),
+        title: const Text('迷你歌词字号'),
+        subtitle: Text(
+          '${Appearance.miniLyricFontLabel(app.appearance.miniLyricFontSize)} · 仅播放页迷你歌词区',
+        ),
+        trailing: DropdownButton<double>(
+          value: app.appearance.miniLyricFontSize,
+          underline: const SizedBox(),
+          items: [
+            for (final size in Appearance.miniLyricFontSizes)
+              DropdownMenuItem(
+                value: size,
+                child: Text(Appearance.miniLyricFontLabel(size)),
+              ),
+          ],
+          onChanged: (v) =>
+              _act(() => app.appearance.update(miniLyricFont: v!)),
+        ),
+      ),
+
       ListTile(
         title: const Text('ReplayGain 响度调整'),
         subtitle: const Text('默认关闭，可选按曲目或按专辑调整'),
@@ -1169,5 +1645,37 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _playerBar() => PlayerBar(app: app);
+  Widget _playerBar() => ListenableBuilder(
+    listenable: app.appearance,
+    builder: (context, _) => PlayerBar(
+      app: app,
+      compact: true,
+      onCollapse: () => setState(() => playerCollapsed = true),
+    ),
+  );
+
+  Widget _collapsedPlayerFab() {
+    final player = app.playback, track = player.current;
+    return FloatingActionButton(
+      key: const ValueKey('collapsed-player-fab'),
+      heroTag: 'collapsed-player-fab',
+      tooltip: '展开播放器',
+      backgroundColor: const Color(0xff0d0d10),
+      foregroundColor: Colors.white,
+      elevation: 4,
+      shape: const CircleBorder(),
+      onPressed: () => setState(() => playerCollapsed = false),
+      child: track == null
+          ? const Icon(Icons.headphones_rounded, size: 22)
+          : PlayerCover(
+              app: app,
+              track: track,
+              size: 48,
+              circle: app.appearance.disc,
+              radius: 16,
+              rotate: true,
+              playing: player.playing,
+            ),
+    );
+  }
 }

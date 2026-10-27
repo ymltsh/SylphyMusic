@@ -9,6 +9,16 @@ import 'package:uuid/uuid.dart';
 import '../core/models.dart';
 
 class AppDb {
+  static const _assetsTable = '''CREATE TABLE media_assets(
+    source_id TEXT NOT NULL,asset_key TEXT NOT NULL,kind TEXT NOT NULL,
+    version TEXT NOT NULL,relative_file TEXT NOT NULL,bytes INTEGER NOT NULL,
+    sha256 TEXT NOT NULL,fetched_at INTEGER NOT NULL,last_used INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,
+    etag TEXT,last_modified TEXT,PRIMARY KEY(source_id,asset_key))''';
+  static const _assetsIndex =
+      'CREATE INDEX idx_assets_lru ON media_assets(kind,pinned,last_used)';
+  static const _assetMigrations =
+      'CREATE TABLE media_asset_migrations(source_id TEXT NOT NULL,asset_key TEXT NOT NULL,PRIMARY KEY(source_id,asset_key))';
   static const _indexRuns =
       'CREATE TABLE index_runs(source_id TEXT PRIMARY KEY,run_id TEXT NOT NULL)';
   static Future<void> _catalogSchema(DatabaseExecutor d) async {
@@ -58,7 +68,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 5,
+      version: 6,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -98,6 +108,11 @@ class AppDb {
           await database.execute(_indexRuns);
           await _catalogSchema(database);
         }
+        if (oldVersion < 6) {
+          await database.execute(_assetsTable);
+          await database.execute(_assetsIndex);
+          await database.execute(_assetMigrations);
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -118,6 +133,9 @@ class AppDb {
           _stageTable,
           _stageIndex,
           _indexRuns,
+          _assetsTable,
+          _assetsIndex,
+          _assetMigrations,
         ]) {
           await d.execute(sql);
         }

@@ -11,12 +11,16 @@ class LibraryBrowser extends StatefulWidget {
     required this.app,
     required this.query,
     required this.onAction,
+    this.songActions,
+    this.viewControls,
     this.selected,
     this.onSelection,
   });
   final SylphyApp app;
   final CatalogQuery query;
   final Future<void> Function(String, Track) onAction;
+  final Widget? songActions;
+  final Widget? viewControls;
   final Set<String>? selected;
   final void Function(Track, bool)? onSelection;
   @override
@@ -24,8 +28,77 @@ class LibraryBrowser extends StatefulWidget {
 }
 
 class _LibraryBrowserState extends State<LibraryBrowser> {
-  int offset = 0, revision = 0;
+  int revision = 0;
   late Future<CatalogPage> page;
+  int generation = 0;
+  final batches = <int, List<CatalogRow>>{};
+  final pending = <int>{};
+  final failed = <int>{};
+
+  void _reset() {
+    generation++;
+    batches.clear();
+    pending.clear();
+    failed.clear();
+    page = _load();
+  }
+
+  // Virtual rows keep only six SQL batches of metadata, even in a huge library.
+  Widget _virtualRow(int index) {
+    final start = index ~/ 100 * 100;
+    final rows = batches.remove(start);
+    if (rows != null) {
+      batches[start] = rows;
+      final at = index - start;
+      if (at < rows.length) return _row(rows[at]);
+      return const SizedBox.shrink();
+    }
+    if (failed.contains(start)) {
+      return Center(
+        child: TextButton(
+          onPressed: () => setState(() {
+            failed.remove(start);
+            _request(start);
+          }),
+          child: const Text('加载失败，点击重试'),
+        ),
+      );
+    }
+    _request(start);
+    return const Center(
+      child: SizedBox.square(
+        dimension: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+
+  void _request(int start) {
+    if (!pending.add(start)) return;
+    final requestedGeneration = generation;
+    widget.app.catalog
+        .page(widget.query, offset: start)
+        .then(
+          (result) {
+            if (!mounted || requestedGeneration != generation) return;
+            setState(() {
+              pending.remove(start);
+              batches[start] = result.rows;
+              while (batches.length > 6) {
+                batches.remove(batches.keys.first);
+              }
+            });
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!mounted || requestedGeneration != generation) return;
+            setState(() {
+              pending.remove(start);
+              failed.add(start);
+            });
+          },
+        );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,19 +108,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   Future<CatalogPage> _load() async {
-    final query = widget.query, requestedOffset = offset;
-    final result = await widget.app.catalog.page(
-      query,
-      offset: requestedOffset,
-    );
-    if (query.signature != widget.query.signature ||
-        requestedOffset != offset) {
-      return result;
-    }
-    if (result.total > 0 && offset >= result.total) {
-      offset = (result.total - 1) ~/ 100 * 100;
-      return widget.app.catalog.page(widget.query, offset: offset);
-    }
+    final query = widget.query, requestedGeneration = generation;
+    final result = await widget.app.catalog.page(query);
+    if (mounted && requestedGeneration == generation) batches[0] = result.rows;
     return result;
   }
 
@@ -55,7 +118,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     if (mounted && revision != widget.app.catalogRevision) {
       revision = widget.app.catalogRevision;
       setState(() {
-        page = _load();
+        _reset();
       });
     }
   }
@@ -64,8 +127,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   void didUpdateWidget(covariant LibraryBrowser oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.query.signature != widget.query.signature) {
-      offset = 0;
-      page = _load();
+      _reset();
     }
   }
 
@@ -93,7 +155,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           ?.name ??
       '来源已移除';
   Future<void> _play([Track? track]) async {
-    final refs = await widget.app.catalog.queue(widget.query);
+    final refs = await widget.app.catalog.queue(widget.query.songs);
     final start = track == null ? 0 : refs.indexOf(track.ref);
     if (start < 0) throw StateError('音乐库已变更，请重新选择歌曲');
     await widget.app.playback.setQueue(refs, start: start);
@@ -177,80 +239,67 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<CatalogPage>(
-    future: page,
-    builder: (context, snapshot) {
-      if (snapshot.hasError) {
-        return Center(
-          child: TextButton(
-            onPressed: () => setState(() {
-              page = _load();
-            }),
-            child: const Text('读取音乐库失败，点击重试'),
-          ),
-        );
-      }
-      if (snapshot.connectionState != ConnectionState.done ||
-          !snapshot.hasData) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      final result = snapshot.data!;
-      if (result.total == 0) {
-        return Center(
-          child: Text(
-            widget.query.blocked ? '尚未屏蔽歌曲' : '暂无音乐。可以先添加 Emby 或 Navidrome 来源。',
-          ),
-        );
-      }
-      final playAll =
-          widget.query.view == 0 &&
-          widget.selected == null &&
-          !widget.query.blocked;
-      return Column(
-        children: [
-          if (playAll)
-            ListTile(
-              leading: const Icon(Icons.play_circle),
-              title: Text('播放全部 · ${result.total} 首'),
-              onTap: () => _act(_play),
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: FutureBuilder<CatalogPage>(
+      future: page,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _withViewControls(
+            Center(
+              child: TextButton(
+                onPressed: () => setState(() {
+                  page = _load();
+                }),
+                child: const Text('读取音乐库失败，点击重试'),
+              ),
             ),
-          Expanded(
-            child: ListView.builder(
-              key: ValueKey('${widget.query.signature}:$offset'),
-              itemCount: result.rows.length,
-              itemBuilder: (_, i) => _row(result.rows[i]),
-            ),
+          );
+        }
+        if (snapshot.connectionState != ConnectionState.done ||
+            !snapshot.hasData) {
+          return _withViewControls(
+            const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final result = snapshot.data!;
+        final emptyMessage = widget.query.blocked
+            ? '尚未屏蔽歌曲'
+            : widget.query.search.isNotEmpty
+            ? '没有找到匹配的音乐'
+            : '暂无音乐，可以在设置中添加音乐来源或导入本地音乐。';
+        return _withViewControls(
+          result.total == 0
+              ? Center(child: Text(emptyMessage))
+              : ListView.builder(
+                  key: ValueKey('${widget.query.signature}:$generation'),
+                  padding: const EdgeInsets.only(bottom: 96),
+                  itemExtent:
+                      76 * MediaQuery.textScalerOf(context).scale(14) / 14,
+                  itemCount: result.total,
+                  itemBuilder: (_, i) => _virtualRow(i),
+                ),
+          result: result,
+        );
+      },
+    ),
+  );
+
+  Widget _withViewControls(Widget content, {CatalogPage? result}) => Column(
+    children: [
+      if (widget.selected == null && !widget.query.blocked)
+        ListTile(
+          key: const ValueKey('song-summary'),
+          leading: const Tooltip(
+            message: '播放全部',
+            child: Icon(Icons.play_circle),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                tooltip: '上一页',
-                onPressed: offset == 0
-                    ? null
-                    : () => setState(() {
-                        offset -= 100;
-                        page = _load();
-                      }),
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Text(
-                '${offset + 1}–${offset + result.rows.length} / ${result.total}',
-              ),
-              IconButton(
-                tooltip: '下一页',
-                onPressed: offset + result.rows.length >= result.total
-                    ? null
-                    : () => setState(() {
-                        offset += 100;
-                        page = _load();
-                      }),
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-        ],
-      );
-    },
+          title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
+          trailing: widget.songActions,
+          onTap: result == null || result.total == 0 ? null : () => _act(_play),
+        ),
+      if (widget.viewControls != null) widget.viewControls!,
+      Expanded(child: content),
+    ],
   );
 }

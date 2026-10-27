@@ -13,6 +13,16 @@ enum SyncStatus { synced, pending, syncing, conflict, failed, readonly }
 
 enum RepeatKind { off, all, one }
 
+enum PlaybackMode {
+  listLoop('列表循环'),
+  singleLoop('单曲循环'),
+  shuffle('随机播放');
+
+  const PlaybackMode(this.label);
+  final String label;
+  PlaybackMode get next => values[(index + 1) % values.length];
+}
+
 class TrackRef {
   const TrackRef(this.sourceId, this.id);
   final String sourceId;
@@ -87,6 +97,31 @@ class Track {
   final int durationMs, year, disc, number;
   final Map<String, dynamic> remote;
   final bool missing;
+  ({String id, String? tag}) get primaryArtwork {
+    final own = (remote['ImageTags'] as Map?)?['Primary']?.toString();
+    if (own?.isNotEmpty == true) return (id: ref.id, tag: own);
+    final album = remote['AlbumPrimaryImageTag']?.toString();
+    if (album?.isNotEmpty == true && remote['AlbumId'] != null) {
+      return (id: remote['AlbumId'].toString(), tag: album);
+    }
+    final parent = remote['ParentPrimaryImageTag']?.toString();
+    if (parent?.isNotEmpty == true &&
+        remote['ParentPrimaryImageItemId'] != null) {
+      return (id: remote['ParentPrimaryImageItemId'].toString(), tag: parent);
+    }
+    return (
+      id: remote.containsKey('AlbumId') || coverId.isEmpty ? ref.id : coverId,
+      tag: null,
+    );
+  }
+
+  String get artworkIdentity => primaryArtwork.id;
+  String get artworkVersion => jsonEncode([
+    primaryArtwork.id,
+    primaryArtwork.tag ??
+        [remote['etag'], remote['DateModified'], remote['modified']],
+    remote['coverPath'],
+  ]);
   String get resourceVersion {
     final media = (remote['MediaSources'] as List?)
         ?.whereType<Map>()
@@ -205,7 +240,7 @@ class QueueSnapshot {
     this.tracks = const [],
     this.index = 0,
     this.positionMs = 0,
-    this.repeat = RepeatKind.off,
+    this.repeat = RepeatKind.all,
     this.shuffle = false,
     this.order = const [],
     this.history = const [],
@@ -215,6 +250,11 @@ class QueueSnapshot {
   final RepeatKind repeat;
   final bool shuffle;
   final List<int> order, history;
+  PlaybackMode get playbackMode => repeat == RepeatKind.one
+      ? PlaybackMode.singleLoop
+      : shuffle
+      ? PlaybackMode.shuffle
+      : PlaybackMode.listLoop;
   Map<String, dynamic> toJson() => {
     'tracks': tracks,
     'index': index,
@@ -232,19 +272,23 @@ class QueueSnapshot {
         order.toSet().length == tracks.length &&
         order.every((index) => index >= 0 && index < tracks.length);
     final position = json['positionMs'] as int? ?? 0;
+    final savedRepeat =
+        RepeatKind.values
+            .where((kind) => kind.name == json['repeat'])
+            .firstOrNull ??
+        RepeatKind.all;
+    // Old sequential queues become list loops; single-repeat takes precedence
+    // over an old combined shuffle + repeat-one configuration.
+    final shuffle = json['shuffle'] == true && savedRepeat != RepeatKind.one;
     return QueueSnapshot(
       tracks: tracks,
       index: tracks.isEmpty
           ? 0
           : (json['index'] as int? ?? 0).clamp(0, tracks.length - 1),
       positionMs: position < 0 ? 0 : position,
-      repeat:
-          RepeatKind.values
-              .where((kind) => kind.name == json['repeat'])
-              .firstOrNull ??
-          RepeatKind.off,
-      shuffle: json['shuffle'] == true,
-      order: valid ? order : List.generate(tracks.length, (i) => i),
+      repeat: savedRepeat == RepeatKind.off ? RepeatKind.all : savedRepeat,
+      shuffle: shuffle,
+      order: valid && shuffle ? order : List.generate(tracks.length, (i) => i),
       history: List<int>.from(json['history'] as List? ?? [])
           .where((i) => i >= 0 && i < tracks.length)
           .toList(),

@@ -1,11 +1,14 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
-import 'cover_art.dart';
-import 'lyrics_view.dart';
-import 'player_bar.dart';
+import '../core/models.dart';
+import '../core/player_layout.dart';
+import 'cover_palette.dart';
+import 'lyrics_page.dart';
+import 'player_layout/layout_editor.dart';
+import 'player_scene.dart';
+import 'player_visuals.dart';
+import 'system_bars.dart';
 
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key, required this.app});
@@ -14,181 +17,315 @@ class NowPlayingPage extends StatefulWidget {
   State<NowPlayingPage> createState() => _NowPlayingPageState();
 }
 
-class _NowPlayingPageState extends State<NowPlayingPage>
-    with SingleTickerProviderStateMixin {
-  late final motion = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 14),
-  )..repeat(reverse: true);
+class _NowPlayingPageState extends State<NowPlayingPage> {
   String? lyricsKey;
   Future<String?>? lyrics;
+  String? _paletteKey;
+  Future<ColorScheme?>? _paletteFuture;
+  double _dragOffset = 0;
+  bool _dragging = false;
+  double _horizontalOffset = 0;
+  bool _openingLyrics = false;
   @override
-  void dispose() {
-    motion.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    widget.app.assets.addListener(_assetChanged);
+  }
+
+  void _assetChanged() {
+    final track = widget.app.playback.current,
+        change = widget.app.assets.lastChange;
+    if (track == null) return;
+    if (change != null &&
+        (change.sourceId != track.ref.sourceId ||
+            (change.key != widget.app.artwork.key(track) &&
+                change.key != widget.app.lyrics.key(track) &&
+                change.key != widget.app.lyrics.manualKey(track)))) {
+      return;
+    }
+    if (mounted) setState(() {});
   }
 
   @override
+  void dispose() {
+    widget.app.assets.removeListener(_assetChanged);
+    super.dispose();
+  }
+
+  PlayerLayout get _layout =>
+      widget.app.playerLayouts.active ?? playerTemplate();
+
+  Future<ColorScheme?> _paletteFor(Track track, Brightness brightness) {
+    final key =
+        '${track.ref.key}/${track.artworkVersion}/${widget.app.artwork.revision(track)}/${brightness.name}';
+    if (_paletteKey != key) {
+      _paletteKey = key;
+      _paletteFuture = _loadPalette(track, brightness);
+    }
+    return _paletteFuture!;
+  }
+
+  Future<ColorScheme?> _loadPalette(Track track, Brightness brightness) async {
+    final file = await widget.app.artwork.load(track);
+    if (file == null) return null;
+    return coverColorScheme(file, brightness: brightness);
+  }
+
+  ColorScheme _withCoverPalette(ColorScheme base, ColorScheme? cover) {
+    if (cover == null) return base;
+    return base.copyWith(
+      primary: cover.primary,
+      onPrimary: cover.onPrimary,
+      primaryContainer: cover.primaryContainer,
+      onPrimaryContainer: cover.onPrimaryContainer,
+      secondary: cover.secondary,
+      onSecondary: cover.onSecondary,
+      secondaryContainer: cover.secondaryContainer,
+      onSecondaryContainer: cover.onSecondaryContainer,
+      tertiary: cover.tertiary,
+      onTertiary: cover.onTertiary,
+      inversePrimary: cover.inversePrimary,
+      surfaceTint: cover.primary,
+    );
+  }
+
+  Future<void> _openLyrics(
+    Track track,
+    ThemeData theme,
+    PlayerLayout layout,
+  ) async {
+    if (_openingLyrics) return;
+    _openingLyrics = true;
+    try {
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LyricsPage(
+            app: widget.app,
+            track: track,
+            theme: theme,
+            lyrics: lyrics,
+            background: layout.background,
+            backgroundOpacity: layout.backgroundOpacity,
+          ),
+        ),
+      );
+    } finally {
+      _openingLyrics = false;
+    }
+    if (mounted && widget.app.playback.currentRef == track.ref) {
+      setState(() {
+        lyrics = widget.app.loadLyrics(track);
+      });
+    }
+  }
+
+  void _onHorizontalDragStart(DragStartDetails details) {
+    _horizontalOffset = 0;
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dx < 0) {
+      _horizontalOffset += details.delta.dx;
+    }
+  }
+
+  void _onHorizontalDragEnd(
+    DragEndDetails details,
+    Track track,
+    ThemeData theme,
+    PlayerLayout layout,
+  ) {
+    final velocity = details.primaryVelocity ?? 0;
+    final open = _horizontalOffset < -56 || velocity < -500;
+    _horizontalOffset = 0;
+    if (open) _openLyrics(track, theme, layout);
+  }
+
+  void _onHorizontalDragCancel() {
+    _horizontalOffset = 0;
+  }
+
+  Future<void> _openEditor(
+    Track track,
+    ThemeData theme,
+    PlayerLayout layout,
+  ) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PlayerLayoutEditor(
+          app: widget.app,
+          initial: layout,
+          theme: theme,
+          track: track,
+          lyrics: lyrics,
+        ),
+      ),
+    );
+  }
+
+  void _onVerticalDragStart(DragStartDetails details) {
+    _dragging = true;
+    if (_dragOffset != 0) setState(() => _dragOffset = 0);
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dy <= 0) return;
+    setState(() {
+      _dragOffset = (_dragOffset + details.delta.dy).clamp(0.0, 220.0);
+    });
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    _dragging = false;
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragOffset > 110 || velocity > 700) {
+      Navigator.maybePop(context);
+      return;
+    }
+    if (_dragOffset != 0) setState(() => _dragOffset = 0);
+  }
+
+  void _onVerticalDragCancel() {
+    _dragging = false;
+    if (_dragOffset != 0) setState(() => _dragOffset = 0);
+  }
+
+  String _quality(Track track) {
+    final details = [
+      track.remote['format'],
+      if (track.remote['sampleRate'] != null)
+        '${track.remote['sampleRate']} Hz',
+      if (track.remote['bitrate'] != null) '${track.remote['bitrate']} bps',
+    ].whereType<Object>().join(' · ');
+    return details.isEmpty ? '暂无音质信息' : details;
+  }
+
+  void _showQuality(Track track) => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(_quality(track)),
+      ),
+    ),
+  );
+
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.app.playback,
+    animation: Listenable.merge([
+      widget.app.playback,
+      widget.app.appearance,
+      widget.app.playerLayouts,
+    ]),
     builder: (context, _) {
       final track = widget.app.playback.current;
       if (track == null) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('正在播放')),
-          body: const Center(child: Text('队列为空')),
+        return const Scaffold(
+          body: SafeArea(child: Center(child: Text('队列为空'))),
         );
       }
-      if (lyricsKey != track.ref.key) {
-        lyricsKey = track.ref.key;
+      final nextLyricsKey =
+          '${track.ref.key}/${track.resourceVersion}/${widget.app.lyrics.revision(track)}';
+      if (lyricsKey != nextLyricsKey) {
+        lyricsKey = nextLyricsKey;
         lyrics = widget.app.loadLyrics(track);
       }
-      final art = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CoverArt(app: widget.app, track: track, size: 240),
-          const SizedBox(height: 24),
-          Text(
-            track.title,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text('${track.artist} · ${track.album}', textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          Text(
-            [
-              track.remote['format'],
-              if (track.remote['sampleRate'] != null)
-                '${track.remote['sampleRate']} Hz',
-              if (track.remote['bitrate'] != null)
-                '${track.remote['bitrate']} bps',
-            ].whereType<Object>().join(' · '),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+      final layout = _layout;
+      final brightness = Theme.of(context).brightness;
+      final baseScheme = ColorScheme.fromSeed(
+        seedColor: widget.app.appearance.seed,
+        brightness: brightness,
       );
-      final lyricView = FutureBuilder<String?>(
-        future: lyrics,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError ||
-              snapshot.data == null ||
-              snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    snapshot.hasError ? '歌词获取失败，请检查网络或来源登录状态' : '当前歌曲没有可用歌词',
-                  ),
-                  TextButton.icon(
-                    onPressed: () => setState(() {
-                      lyrics = widget.app.loadLyrics(track);
-                    }),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('重试'),
-                  ),
-                ],
-              ),
-            );
-          }
-          return LyricsView(
-            text: snapshot.data!,
-            position: widget.app.playback.position,
-            onSeek: (position) => widget.app.playback.seek(position),
+      return FutureBuilder<ColorScheme?>(
+        future: _paletteFor(track, brightness),
+        builder: (context, paletteSnapshot) {
+          final scheme = _withCoverPalette(baseScheme, paletteSnapshot.data);
+          final theme = ThemeData(
+            useMaterial3: true,
+            brightness: brightness,
+            colorScheme: scheme,
+            scaffoldBackgroundColor: scheme.surface,
           );
-        },
-      );
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('正在播放'),
-          actions: [
-            IconButton(
-              tooltip: '导入这首歌的歌词',
-              icon: const Icon(Icons.note_add_outlined),
-              onPressed: () async {
-                try {
-                  await widget.app.attachLyrics(track);
-                  if (mounted) {
-                    setState(() {
-                      lyrics = widget.app.loadLyrics(track);
-                    });
-                  }
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('歌词导入失败，请使用 UTF-8 编码的 LRC 或文本文件'),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-          ],
-        ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: ClipRect(
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(sigmaX: 55, sigmaY: 55),
-                  child: Opacity(
-                    opacity: .13,
-                    child: AnimatedBuilder(
-                      animation: motion,
-                      builder: (context, _) => Transform.scale(
-                        scale: MediaQuery.disableAnimationsOf(context)
-                            ? 1.1
-                            : 1.1 + motion.value * .15,
-                        child: CoverArt(
+          return Theme(
+            data: theme,
+            child: AppSystemBars(
+              child: Scaffold(
+                body: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ExcludeSemantics(
+                        child: PlayerBackdrop(
                           app: widget.app,
                           track: track,
-                          size: MediaQuery.sizeOf(context).width,
+                          background: layout.background,
+                          opacity: layout.backgroundOpacity,
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, size) => size.maxWidth > 850
-                        ? Row(
-                            children: [
-                              Expanded(
-                                child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(32),
-                                    child: art,
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onVerticalDragStart: _onVerticalDragStart,
+                        onVerticalDragUpdate: _onVerticalDragUpdate,
+                        onVerticalDragEnd: _onVerticalDragEnd,
+                        onVerticalDragCancel: _onVerticalDragCancel,
+                        child: AnimatedContainer(
+                          duration:
+                              MediaQuery.disableAnimationsOf(context) ||
+                                  _dragging
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          transform: Matrix4.translationValues(
+                            0,
+                            _dragOffset,
+                            0,
+                          ),
+                          child: SafeArea(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onHorizontalDragStart: _onHorizontalDragStart,
+                              onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                              onHorizontalDragEnd: (details) =>
+                                  _onHorizontalDragEnd(
+                                    details,
+                                    track,
+                                    theme,
+                                    layout,
+                                  ),
+                              onHorizontalDragCancel: _onHorizontalDragCancel,
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 1200,
+                                  ),
+                                  child: PlayerScene(
+                                    app: widget.app,
+                                    layout: layout,
+                                    track: track,
+                                    lyrics: lyrics,
+                                    onOpenLyrics: () =>
+                                        _openLyrics(track, theme, layout),
+                                    onOpenEditor: () =>
+                                        _openEditor(track, theme, layout),
+                                    onQuality: () => _showQuality(track),
                                   ),
                                 ),
                               ),
-                              Expanded(child: lyricView),
-                            ],
-                          )
-                        : ListView(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: art,
-                              ),
-                              SizedBox(height: 300, child: lyricView),
-                            ],
+                            ),
                           ),
-                  ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                PlayerBar(app: widget.app),
-              ],
+              ),
             ),
-          ],
-        ),
+          );
+        },
       );
     },
   );

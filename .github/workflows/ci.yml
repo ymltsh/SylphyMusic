@@ -37,6 +37,9 @@ jobs:
       - name: Windows WebDAV native test
         if: runner.os == 'Windows'
         run: flutter test integration_test/webdav_test.dart -d windows
+      - name: Windows persistent media assets
+        if: runner.os == 'Windows'
+        run: flutter test integration_test/media_assets_test.dart -d windows
       - name: Linux build
         if: runner.os == 'Linux'
         run: flutter build linux --debug
@@ -51,6 +54,9 @@ jobs:
       - name: Linux WebDAV native test
         if: runner.os == 'Linux'
         run: xvfb-run -a dbus-run-session -- flutter test integration_test/webdav_test.dart -d linux --dart-define=SYLPHY_HEADLESS_AUDIO=true
+      - name: Linux persistent media assets
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dbus-run-session -- flutter test integration_test/media_assets_test.dart -d linux --dart-define=SYLPHY_HEADLESS_AUDIO=true
   android:
     runs-on: ubuntu-24.04
     steps:

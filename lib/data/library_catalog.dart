@@ -28,6 +28,17 @@ class CatalogQuery {
     groupKey,
     blocked,
   ]);
+
+  /// All matching songs, preserving scope and sorting from a grouped view.
+  CatalogQuery get songs => CatalogQuery(
+    search: search,
+    sourceId: sourceId,
+    sort: sort,
+    descending: descending,
+    groupKind: groupKind,
+    groupKey: groupKey,
+    blocked: blocked,
+  );
   CatalogQuery songsIn(String kind, String key) => CatalogQuery(
     search: search,
     sourceId: sourceId,
@@ -56,8 +67,8 @@ class CatalogPage {
   final int total;
 }
 
-/// Filtering, grouping and ordering stay in SQLite. Only one visible page holds
-/// complete Track metadata; creating a queue fetches identities without blobs.
+/// Filtering, grouping and ordering stay in SQLite. Queries return bounded
+/// metadata batches; creating a queue fetches identities without blobs.
 class LibraryCatalog {
   LibraryCatalog(this.db);
   final AppDb db;

@@ -92,6 +92,55 @@ void main() {
     },
   );
 
+  test(
+    'group play-all uses every matching song and preserves filters',
+    () async {
+      await db.replaceSourceTracks('a', [
+        track('a', 'one', title: 'keep one'),
+        track('a', 'two', title: 'keep two'),
+        track('a', 'blocked', title: 'keep blocked'),
+        track('a', 'other'),
+      ]);
+      await db.replaceSourceTracks('b', [
+        track('b', 'outside', title: 'keep outside'),
+      ]);
+      await db.setBlocked(const TrackRef('a', 'blocked'), true);
+      for (final view in [1, 2]) {
+        for (final sort in ['name', 'duration', 'year']) {
+          final query = CatalogQuery(
+            view: view,
+            sourceId: 'a',
+            search: 'keep',
+            sort: sort,
+            descending: true,
+          );
+          final groups = await catalog.page(query);
+          expect(groups.total, 1);
+          final songs = query.songs;
+          expect(songs.view, 0);
+          expect(songs.sort, sort);
+          expect(songs.descending, isTrue);
+          final refs = await catalog.queue(songs);
+          expect(refs.toSet(), {
+            const TrackRef('a', 'one'),
+            const TrackRef('a', 'two'),
+          });
+          final narrowed = query.songsIn(
+            view == 1 ? 'album' : 'artist',
+            groups.rows.single.key,
+          );
+          expect((await catalog.queue(narrowed.songs)).toSet(), refs.toSet());
+        }
+        expect(
+          await catalog.queue(
+            CatalogQuery(view: view, sourceId: 'missing').songs,
+          ),
+          isEmpty,
+        );
+      }
+    },
+  );
+
   test('source, literal search and blacklist filters apply before paging and grouping', () async {
     final special = track('a', 'quote"\\id', title: '100%_music');
     await db.replaceSourceTracks('a', [special, track('a', 'other')]);
