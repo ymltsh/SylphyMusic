@@ -61,7 +61,7 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 集成测试会覆盖构建输出。内部验收打包使用 `tool/build_review.ps1`：重新构建普通入口的 Windows Release 与 Android Release / 分架构 APK，调用 `tool/package_review.py --mode optimized` 检查已跟踪源码和包内容中的已知私密值，输出到 `build/internal-review/`。脚本在本机显式启用测试签名；若有正式 `android/key.properties` 则优先使用其配置。这些包仍须通过正式版发布闸门。
 
-当前 Android arm64 内部包 **29.4 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **21.8 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
+当前 Android arm64 内部包 **32.9 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **23.7 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
 
 真实服务器测试默认跳过。私密测试凭据由环境变量指定文件路径，不把密码放入命令行或源码：
 

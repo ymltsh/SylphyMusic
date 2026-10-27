@@ -505,4 +505,12 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 
 验证：`flutter analyze` 无问题；`test/launcher_icon_service_test.dart` 2 项通过；全量测试 **175 项通过、5 项默认跳过**；Android Debug APK 构建成功，`aapt` 确认 8 个 alias（1 个默认 + 7 个备用）和对应 mipmap，启动器资源打包。未在 Android 真机验证图标切换、启动器刷新、播放中切换和重启保持；桌面平台图标不变。
 
-当前修改未提交、未推送、未发布；已发布 0.2.1+3 不包含诊断日志、媒体通知封面和本图标方案。
+这些修改已随 `0.2.2+4` 测试签名版本发布；已发布 0.2.1+3 不包含诊断日志、媒体通知封面和本图标方案。
+
+## 2026-10-28 测试签名 0.2.2+4 发布
+
+- 版本提交 `5584814`，标签 `v0.2.2+4`；GitHub Release：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.2%2B4
+- 三份 APK 使用本机 Android Debug 测试证书：arm64-v8a 32.94 MB、armeabi-v7a 29.94 MB、x86_64 35.25 MB；versionName 0.2.2，versionCode 2004 / 1004 / 4004。
+- `aapt` 核对包名 `com.ymltsh.sylphymusic`、本地化应用名、8 个 launcher alias 与 mipmap；`apksigner` v2 验签通过。
+- `version.json` 更新为 stable 0.2.2+4，历史保留 0.2.1+3；`version-beta.json` 保持 `latest: null`。
+- 仍为测试签名，非正式发布；正式发布门槛尚未通过。尚未在 Android 真机验证图标切换、诊断日志、媒体通知封面、后台播放和覆盖安装。
