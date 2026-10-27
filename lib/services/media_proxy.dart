@@ -6,14 +6,16 @@ import 'package:uuid/uuid.dart';
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'cache.dart';
+import 'diagnostic_logs.dart';
 import 'sources.dart';
 import 'byte_range.dart';
 
 class MediaProxy {
-  MediaProxy(this.db, this.cache, this.factory);
+  MediaProxy(this.db, this.cache, this.factory, {this.diagnostics});
   final AppDb db;
   final CacheManager cache;
   final AdapterFactory factory;
+  final DiagnosticLogs? diagnostics;
   HttpServer? _server;
   final Set<Future<void>> _handlers = {};
   final Map<HttpClient, String> _clients = {};
@@ -37,6 +39,7 @@ class MediaProxy {
       0,
       shared: false,
     );
+    diagnostics?.record('proxy', 'server_listening');
     _server!.listen((req) {
       final handler = _handle(req);
       _handlers.add(handler);
@@ -58,6 +61,7 @@ class MediaProxy {
   }
 
   Future<void> _handle(HttpRequest req) async {
+    diagnostics?.record('proxy', 'request_started');
     try {
       if (req.method != 'GET' && req.method != 'HEAD') {
         req.response.statusCode = HttpStatus.methodNotAllowed;
@@ -97,6 +101,11 @@ class MediaProxy {
     } catch (e) {
       final parts = req.uri.pathSegments;
       final track = parts.length == 2 ? _tickets[parts[1]]?.track : null;
+      diagnostics?.record(
+        'proxy',
+        'request_failed',
+        details: {'type': e.runtimeType.toString()},
+      );
       if (track != null) {
         _failures[track.ref.key] = e is HandshakeException ? 'tls' : 'network';
       }
@@ -105,9 +114,15 @@ class MediaProxy {
         req.response.write('上游音频读取失败');
       } catch (_) {}
     } finally {
+      final status = req.response.statusCode;
       try {
         await req.response.close();
       } catch (_) {}
+      diagnostics?.record(
+        'proxy',
+        'request_finished',
+        details: {'http_status': status},
+      );
     }
   }
 

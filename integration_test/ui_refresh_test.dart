@@ -403,11 +403,8 @@ void main() {
         await tester.tap(find.byTooltip('设置'));
         await tester.pumpAndSettle();
         Future<void> openSetting(String title) async {
-          await tester.scrollUntilVisible(
-            find.text(title),
-            200,
-            scrollable: find.byType(Scrollable).last,
-          );
+          await tester.ensureVisible(find.text(title));
+          await tester.pumpAndSettle();
           await tester.tap(find.text(title));
           await tester.pumpAndSettle();
         }
@@ -495,6 +492,23 @@ void main() {
         expect(find.text('仅在点击时检查更新，下载后由你手动安装。'), findsOneWidget);
         expect(find.text('正在检查…'), findsNothing);
         await capture('settings-update-mobile');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await openSetting('诊断与反馈');
+        expect(find.text('记录诊断日志'), findsOneWidget);
+        expect(app.diagnostics.enabled, isFalse);
+        await tester.tap(find.byKey(const ValueKey('diagnostics-toggle')));
+        await tester.pumpAndSettle();
+        expect(app.diagnostics.enabled, isTrue);
+        await app.diagnostics.flush();
+        expect(
+          await File('${app.root.path}/diagnostics/diagnostic.jsonl').exists(),
+          isTrue,
+        );
+        await tester.tap(find.byKey(const ValueKey('diagnostics-toggle')));
+        await tester.pumpAndSettle();
+        expect(app.diagnostics.enabled, isFalse);
+        await capture('settings-diagnostics-mobile');
         await tester.pageBack();
         await tester.pumpAndSettle();
         await openSetting('关于风灵音乐');

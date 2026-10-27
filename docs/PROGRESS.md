@@ -467,3 +467,42 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 - 应用内更新入口保持手动检查；未接入自动下载 / 静默安装。
 
 限制：这是**测试签名**的 stable 清单，不是正式签名发布；17 项正式发布门槛仍未通过。由于 applicationId 从旧包名变更，旧包用户不会自动升级且旧数据不会迁移。尚未在 Android 真机安装验证锁屏后台播放、覆盖安装和更新检查。发布脚本因生产签名 / 正式门槛被明确绕过，改由内部构建和 GitHub API 上传；后续正式发布应恢复 `release.py` 流程。
+
+## 2026-10-28 用户主动启用的诊断日志
+
+应用 `SylphyMusic-diagnostic-logging.zip`。原安装脚本因播放器暂停保护和设置页拆分，无法通过当前代码的锚点预检；已按同一逻辑合并到当前结构：
+
+- 新增 `DiagnosticLogs`：默认关闭，状态持久化在既有 settings 表；3 × 512 KiB JSON Lines 轮转、串行写队列、导出前等待队列、清除与关闭；只接受白名单 scope / event / detail 字段，不写曲名、来源 ID、URL、路径、异常正文或堆栈。
+- 应用装配：创建 `diagnostics` 目录并恢复开关；注入播放器与媒体代理；退出时先停生产任务、再 flush / 关闭诊断。设置页新增「诊断与反馈」：记录开关、导出、系统分享和清除；Linux 分享转为导出。应用生命周期与播放、缓冲、完成、恢复、代理请求结果写入安全事件。
+- 依赖新增 `share_plus` / `cross_file`，重新生成 Windows 插件注册并更新 Dart 许可证清单；Android 原生 Debug 构建通过。
+- 新增服务测试 6 项；全量测试 **172 项通过、5 项私密测试默认跳过**（`build/test_logs/diagnostics-full-suite.log`）；Windows UI 集成通过，实际开启诊断、写入日志文件、关闭并截图（`build/test_logs/diagnostics-ui-2.log`、`build/test_logs/ui/settings-diagnostics-mobile.png`）。`flutter analyze` 无问题。
+- 本轮未提交、未推送、未重新打包正式版本；已发布的 0.2.1+3 不包含此功能。后续发布需要使用新版本号和新的构建号。
+- 未连接 Android 真机验证锁屏长时记录、系统分享附件接收和清除后的真实文件行为。
+
+## 2026-10-28 Android 系统媒体封面修复
+
+应用 `apply_sylphy_media_artwork.py`。脚本因当前播放器已加入诊断日志导入，无法通过锚点预检；已按同一逻辑合并：
+
+- 新增 `mediaItemForTrack`，Android 媒体通知的 `MediaItem.artUri` 使用实际存在的本机封面文件 URI。
+- `PlaybackCoordinator` 连接 `ArtworkStore`，对当前曲目封面保留租约并在切歌 / 退出时释放；监听封面缓存更新，重新加载并发布通知元数据。
+- 媒体元数据只在曲目、可见元数据或封面 URI 变化时发送，避免播放进度更新造成重复通知刷新。
+- Android 启动媒体服务前接入封面仓库；非 Android 不注册该逻辑。
+- 保留现有播放意图、诊断日志和播放状态发布路径。
+
+验证：`flutter analyze` 无问题；`test/artwork_test.dart` **10 项通过**（含新增的封面 URI 可读测试）；全量测试 **173 项通过、5 项私密测试默认跳过**；Android Debug APK 构建成功。
+
+限制：尚未在 Android 真机验证锁屏 / 通知栏 / 蓝牙媒体面板能否读取该 `file://` 封面 URI；Android SystemUI 对应用私有文件 URI 的实际访问行为必须真机确认。当前工作树仍未提交、未推送，版本仍为已发布的 0.2.1+3；该发布包不包含本次诊断日志和媒体封面修改，下一次发布需要新版本号与构建号。
+
+## 2026-10-28 Android 备用桌面图标方案
+
+应用 `SylphyMusic_launcher_icon_switch.zip`，并接入用户提供的 7 张图标（`logo/1.png` 至 `logo/7.png`）：
+
+- Android Manifest 改为 `LauncherIconDefault` 启动别名；备用图标使用生成脚本创建的 `activity-alias`，默认只启用默认图标。
+- 新增原生 `LauncherIconManager` 与 Flutter `LauncherIconPicker`：设置 → 外观与个性化 → 应用图标（仅 Android 显示），由 PackageManager 保存所选组件状态，不写数据库。
+- 7 张源图转换为真实 PNG（其中 3–6 原文件实际为 WebP）并命名为：线形蓝、实心蓝、青绿线形、青绿实心、黑底圆点、白底圆点、银发精灵；默认图标仍为 `assets/icon.png`。
+- 生成 7 个备用 alias、`mipmap-nodpi` 资源和 `android/app/src/main/assets/launcher_icons.json`；预览资源加入 Flutter assets。
+- Android 13+ 使用原子组件状态切换；旧版本先启用新入口再禁用其余入口，`DONT_KILL_APP` 降低中断风险。
+
+验证：`flutter analyze` 无问题；`test/launcher_icon_service_test.dart` 2 项通过；全量测试 **175 项通过、5 项默认跳过**；Android Debug APK 构建成功，`aapt` 确认 8 个 alias（1 个默认 + 7 个备用）和对应 mipmap，启动器资源打包。未在 Android 真机验证图标切换、启动器刷新、播放中切换和重启保持；桌面平台图标不变。
+
+当前修改未提交、未推送、未发布；已发布 0.2.1+3 不包含诊断日志、媒体通知封面和本图标方案。

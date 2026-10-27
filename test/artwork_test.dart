@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/data/app_db.dart';
 import 'package:sylphy_music/services/artwork.dart';
+import 'package:sylphy_music/services/playback.dart';
 import 'package:sylphy_music/services/sources.dart';
 
 import 'live_emby_test.dart' show MemoryVault;
@@ -99,6 +100,19 @@ void main() {
     await db.close();
     await root.delete(recursive: true);
   });
+  test(
+    'notification metadata includes a readable cached artwork URI',
+    () async {
+      final song = track();
+      final file = await store.load(song);
+      expect(file, isNotNull);
+      final item = mediaItemForTrack(song, artUri: file!.uri);
+      expect(item.artUri, file.uri);
+      expect(item.artUri!.scheme, 'file');
+      expect(await File.fromUri(item.artUri!).exists(), isTrue);
+    },
+  );
+
   test(
     'song Primary tag overrides stale album cover_id and preserves prefix',
     () async {

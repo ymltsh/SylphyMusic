@@ -1,14 +1,31 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/app_controller.dart';
 import '../core/appearance.dart';
 import 'cache_storage.dart';
 import 'app_update_page.dart';
+import 'launcher_icon_picker.dart';
 import '../services/app_updates.dart';
 import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
 
-enum _Section { playback, lyrics, theme, background, player, cache, about }
+enum _Section {
+  playback,
+  lyrics,
+  theme,
+  background,
+  player,
+  icon,
+  cache,
+  diagnostics,
+  about,
+}
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.app, required this.onSources})
@@ -74,7 +91,9 @@ class _SettingsPageState extends State<SettingsPage> {
         _Section.theme => '主题与配色',
         _Section.background => '页面背景',
         _Section.player => '播放器外观',
+        _Section.icon => '应用图标',
         _Section.cache => '下载与缓存',
+        _Section.diagnostics => '诊断与反馈',
         _Section.about => '关于风灵音乐',
       };
       return Scaffold(
@@ -196,6 +215,13 @@ class _SettingsPageState extends State<SettingsPage> {
         '${app.appearance.disc ? '唱片样式' : '方形封面'} · 封面模糊${app.appearance.ambient ? '开启' : '关闭'}',
         _Section.player,
       ),
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+        _entry(
+          Icons.apps_outlined,
+          '应用图标',
+          '选择桌面启动图标 · 仅 Android',
+          _Section.icon,
+        ),
     ]),
     _group('音乐与存储', [
       ListTile(
@@ -226,6 +252,12 @@ class _SettingsPageState extends State<SettingsPage> {
             builder: (_) => AppUpdatePage(onCheck: app.checkForUpdates),
           ),
         ),
+      ),
+      _entry(
+        Icons.bug_report_outlined,
+        '诊断与反馈',
+        app.diagnostics.enabled ? '诊断日志记录中 · 导出或分享日志' : '默认关闭 · 记录、导出与分享本机日志',
+        _Section.diagnostics,
       ),
       _entry(
         Icons.info_outline_rounded,
@@ -419,6 +451,7 @@ class _SettingsPageState extends State<SettingsPage> {
             : null,
       ),
     ],
+    _Section.icon => [const LauncherIconPicker()],
     _Section.cache => [
       ListTile(
         title: const Text('缓存空间与逐曲清理'),
@@ -451,6 +484,44 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('查看缓存任务与进度'),
         trailing: const Icon(Icons.chevron_right),
         onTap: _downloads,
+      ),
+    ],
+    _Section.diagnostics => [
+      SwitchListTile(
+        key: const ValueKey('diagnostics-toggle'),
+        secondary: const Icon(Icons.bug_report_outlined),
+        title: const Text('记录诊断日志'),
+        subtitle: const Text(
+          '默认关闭。开启后记录播放、切歌、缓冲与网络代理事件；不记录歌曲名、账号和地址。最多保留约 1.5 MiB。',
+        ),
+        value: app.diagnostics.enabled,
+        onChanged: (v) => _act(() => app.setDiagnosticLogging(v)),
+      ),
+      ListTile(
+        key: const ValueKey('diagnostics-export'),
+        leading: const Icon(Icons.save_alt),
+        title: const Text('导出诊断日志'),
+        subtitle: const Text('保存为可阅读的文本文件，关闭记录后也可导出'),
+        onTap: () => _act(_exportDiagnosticLogs),
+      ),
+      ListTile(
+        key: const ValueKey('diagnostics-share'),
+        leading: const Icon(Icons.share_outlined),
+        title: const Text('分享诊断日志'),
+        subtitle: Text(
+          Platform.isLinux ? 'Linux 不支持直接分享附件，改为导出文件' : '通过系统分享面板发送日志附件',
+        ),
+        onTap: () => _act(_shareDiagnosticLogs),
+      ),
+      ListTile(
+        key: const ValueKey('diagnostics-clear'),
+        leading: const Icon(Icons.delete_outline),
+        title: const Text('清除诊断日志'),
+        onTap: () async {
+          if (await _confirm('确认删除全部已记录的诊断日志？')) {
+            await _act(app.clearDiagnosticLogs);
+          }
+        },
       ),
     ],
     _Section.about => [
@@ -487,6 +558,36 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _setLyricFont(double size) =>
       app.appearance.update(lyricFont: size);
+
+  Future<void> _exportDiagnosticLogs() async {
+    final bytes = await app.diagnostics.exportBytes();
+    final saved = await FilePicker.saveFile(
+      dialogTitle: '导出诊断日志',
+      fileName: app.diagnostics.exportFileName,
+      bytes: bytes,
+      mimeType: 'text/plain',
+    );
+    if (saved != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('诊断日志已导出')));
+    }
+  }
+
+  Future<void> _shareDiagnosticLogs() async {
+    // share_plus does not support file sharing on Linux.
+    if (Platform.isLinux) {
+      await _exportDiagnosticLogs();
+      return;
+    }
+    final bytes = await app.diagnostics.exportBytes();
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(bytes, mimeType: 'text/plain')],
+        fileNameOverrides: [app.diagnostics.exportFileName],
+        title: 'SylphyMusic 诊断日志',
+      ),
+    );
+  }
 
   Future<void> _changeBudget() async {
     var amount = '${(app.cache.maxBytes / 1073741824).round()}';

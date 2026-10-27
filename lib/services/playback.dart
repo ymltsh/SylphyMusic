@@ -9,14 +9,28 @@ import 'package:media_kit/media_kit.dart' hide Track;
 
 import '../core/models.dart';
 import '../data/app_db.dart';
+import 'artwork.dart';
 import 'cache.dart';
+import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
 
+/// Metadata sent to Android must include an actual artwork URI; the platform
+/// cannot access Flutter's in-widget Image.file cache automatically.
+MediaItem mediaItemForTrack(Track track, {Uri? artUri}) => MediaItem(
+  id: track.ref.key,
+  title: track.title,
+  artist: track.artist,
+  album: track.album,
+  duration: Duration(milliseconds: track.durationMs),
+  artUri: artUri,
+);
+
 class PlaybackCoordinator extends ChangeNotifier {
-  PlaybackCoordinator(this.db, this.proxy, this.cache);
+  PlaybackCoordinator(this.db, this.proxy, this.cache, {this.diagnostics});
   final AppDb db;
   final MediaProxy proxy;
   final CacheManager cache;
+  final DiagnosticLogs? diagnostics;
   final Player player = Player();
   QueueSnapshot snapshot = const QueueSnapshot();
   Track? current;
@@ -42,6 +56,23 @@ class PlaybackCoordinator extends ChangeNotifier {
   SylphyAudioHandler? handler;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
+  // The Android media session needs its own image URI in addition to the
+  // Flutter UI's CoverArt widget. Keep the cached file leased while current.
+  ArtworkStore? _notificationArtwork;
+  Track? _notificationArtworkTrack;
+  String? _notificationArtworkKey;
+  Uri? _notificationArtUri;
+  int _notificationArtworkRequest = 0;
+  ({
+    String id,
+    String title,
+    String artist,
+    String album,
+    int durationMs,
+    Uri? artUri,
+  })?
+  _lastMediaItem;
+
   Future<void> initialize() async {
     snapshot = await db.queue();
     speed = double.tryParse(await db.setting('speed') ?? '1') ?? 1;
@@ -58,6 +89,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     _subscriptions.add(
       player.stream.playing.listen((v) {
         playing = v;
+        diagnostics?.record(
+          'playback',
+          'playing_changed',
+          details: {'playing': v},
+        );
         cache.updatePlaybackPriority(active: v, buffering: buffering);
         notifyListeners();
         _publish();
@@ -66,6 +102,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     _subscriptions.add(
       player.stream.buffering.listen((v) {
         buffering = v;
+        diagnostics?.record(
+          'playback',
+          'buffering_changed',
+          details: {'buffering': v},
+        );
         if (v && !_opening) cache.invalidatePreview();
         cache.updatePlaybackPriority(active: playing, buffering: v);
         notifyListeners();
@@ -106,6 +147,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     _subscriptions.add(
       player.stream.completed.listen((done) {
         if (done && !_opening && !_finishingTrack) {
+          diagnostics?.record(
+            'playback',
+            'track_completed',
+            details: {'index': snapshot.index},
+          );
           _finishingTrack = true;
           _publish();
           unawaited(
@@ -119,6 +165,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.error.listen((e) {
+        diagnostics?.record('playback', 'player_error');
         error = e;
         notifyListeners();
         if (!_opening && !_handlingFailure) {
@@ -179,6 +226,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> attachHandler() async {
     if (!Platform.isAndroid) return;
+    diagnostics?.record('android', 'media_service_initializing');
     handler = await AudioService.init(
       builder: () => SylphyAudioHandler(this),
       config: const AudioServiceConfig(
@@ -187,7 +235,92 @@ class PlaybackCoordinator extends ChangeNotifier {
         androidNotificationOngoing: true,
       ),
     );
+    diagnostics?.record('android', 'media_service_ready');
     _publish();
+  }
+
+  /// Connect the same authenticated, on-disk artwork cache used by the UI.
+  /// Network artwork URLs are intentionally not exposed to Android SystemUI.
+  void attachNotificationArtwork(ArtworkStore artwork) {
+    if (_notificationArtwork != null) {
+      throw StateError('媒体通知封面已经初始化');
+    }
+    _notificationArtwork = artwork;
+    artwork.assets.addListener(_onNotificationArtworkChanged);
+    _publish();
+  }
+
+  void _onNotificationArtworkChanged() {
+    final store = _notificationArtwork;
+    final track = current;
+    final change = store?.assets.lastChange;
+    if (store == null ||
+        track == null ||
+        change == null ||
+        change.sourceId != track.ref.sourceId ||
+        change.key != store.key(track)) {
+      return;
+    }
+    _requestNotificationArtwork(track);
+  }
+
+  void _syncNotificationArtwork(Track? track) {
+    final key = track == null
+        ? null
+        : '${track.ref.key}/${track.artworkVersion}';
+    if (_notificationArtworkKey == key) return;
+
+    final previous = _notificationArtworkTrack;
+    if (previous != null) _notificationArtwork?.release(previous);
+    _notificationArtworkTrack = track;
+    _notificationArtworkKey = key;
+    _notificationArtUri = null;
+    // Invalidate outstanding loads from the previous song.
+    ++_notificationArtworkRequest;
+
+    if (track != null && _notificationArtwork != null) {
+      _notificationArtwork!.retain(track);
+      _requestNotificationArtwork(track);
+    }
+  }
+
+  void _requestNotificationArtwork(Track track) {
+    final store = _notificationArtwork;
+    if (store == null) return;
+    final request = ++_notificationArtworkRequest;
+    unawaited(_loadNotificationArtwork(store, track, request));
+  }
+
+  Future<void> _loadNotificationArtwork(
+    ArtworkStore store,
+    Track track,
+    int request,
+  ) async {
+    try {
+      final file = await store.load(track);
+      if (request != _notificationArtworkRequest) return;
+      final uri = file != null && await file.exists() ? file.uri : null;
+      if (request != _notificationArtworkRequest) return;
+      if (_notificationArtUri != uri) {
+        _notificationArtUri = uri;
+        _publish();
+      }
+    } catch (_) {
+      // Missing/unavailable artwork must never interrupt audio playback.
+    }
+  }
+
+  void _detachNotificationArtwork() {
+    ++_notificationArtworkRequest;
+    final store = _notificationArtwork;
+    if (store != null) {
+      store.assets.removeListener(_onNotificationArtworkChanged);
+      final retained = _notificationArtworkTrack;
+      if (retained != null) store.release(retained);
+    }
+    _notificationArtwork = null;
+    _notificationArtworkTrack = null;
+    _notificationArtworkKey = null;
   }
 
   TrackRef? get currentRef =>
@@ -237,6 +370,16 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _loadCurrent({bool autoplay = true, bool manual = false}) async {
+    diagnostics?.record(
+      'playback',
+      'load_started',
+      details: {
+        'index': snapshot.index,
+        'queue_size': snapshot.tracks.length,
+        'autoplay': autoplay,
+        'manual': manual,
+      },
+    );
     _opening = true;
     _playRequested = autoplay;
     final resumeMs = snapshot.positionMs;
@@ -258,6 +401,11 @@ class PlaybackCoordinator extends ChangeNotifier {
       final source = await db.source(ref.sourceId);
       if (source == null) throw StateError('来源已删除');
       if (!source.enabled) throw StateError('来源已停用');
+      diagnostics?.record(
+        'playback',
+        'source_resolved',
+        details: {'source_kind': source.kind.name},
+      );
       // Start/retain the media playback foreground service *before* opening
       // the next URL or requesting audio focus in the background.
       _publish();
@@ -269,6 +417,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       }
       cache.lease(ref);
       _leased = ref;
+      diagnostics?.record('playback', 'player_opening');
       final shouldPlay = autoplay && _playRequested;
       if (source.kind == SourceKind.local) {
         final f = File(current!.remote['path']?.toString() ?? ref.id);
@@ -281,18 +430,25 @@ class PlaybackCoordinator extends ChangeNotifier {
             : proxy.ticket(current!, source);
         await player.open(Media(uri.toString()), play: shouldPlay);
       }
+      diagnostics?.record('playback', 'player_opened');
       if (resumeMs > 0) {
         await player.seek(Duration(milliseconds: resumeMs));
       }
       // A pause can arrive while the async track opening was in flight.
       if (!_playRequested) await player.pause();
       _userPaused = !_playRequested;
+      diagnostics?.record('playback', 'load_finished');
       _reloadSources.remove(source.id);
       notifyListeners();
       _publish();
       await save();
       unawaited(_prefetchNext());
     } catch (e) {
+      diagnostics?.record(
+        'playback',
+        'load_failed',
+        details: {'type': e.runtimeType.toString()},
+      );
       error = e.toString();
       notifyListeners();
       if (autoplay && _playRequested) {
@@ -369,6 +525,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> play() async {
+    diagnostics?.record('playback', 'play_requested');
     _userPaused = false;
     if (current == null) await _prepareCurrent();
     if (current == null) return;
@@ -398,6 +555,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> pause({bool system = false}) async {
+    diagnostics?.record(
+      'playback',
+      'pause_requested',
+      details: {'system': system},
+    );
     if (!system) _userPaused = true;
     _playRequested = false;
     _publish();
@@ -425,6 +587,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> next({bool manual = true}) async {
+    diagnostics?.record(
+      'playback',
+      'next_requested',
+      details: {'manual': manual, 'index': snapshot.index},
+    );
     // Automatic continuation must not override a pause during a transition.
     if (!manual && !_playRequested) return;
     var next = _nextIndex();
@@ -486,6 +653,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _finished() async {
+    diagnostics?.record('playback', 'finish_handler_started');
     if (!_playRequested) return;
     if (snapshot.repeat == RepeatKind.one) {
       await player.seek(Duration.zero);
@@ -500,6 +668,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _failed(String reason, {bool manual = false}) async {
+    diagnostics?.record(
+      'playback',
+      'recovery_started',
+      details: {'manual': manual, 'attempt': _reconnects},
+    );
     if (_userPaused || !_playRequested) return;
     if (manual) {
       await pause();
@@ -529,6 +702,11 @@ class PlaybackCoordinator extends ChangeNotifier {
         _playRequested &&
         proxyFailure != '404') {
       _reconnects++;
+      diagnostics?.record(
+        'playback',
+        'reconnect_attempt',
+        details: {'attempt': _reconnects},
+      );
       position = Duration(milliseconds: resumeMs);
       await save();
       await Future<void>.delayed(Duration(milliseconds: 400 * _reconnects));
@@ -687,6 +865,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> clearQueue() async {
+    diagnostics?.record('playback', 'queue_cleared');
     _playRequested = false;
     _publish();
     final ref = currentRef;
@@ -710,17 +889,28 @@ class PlaybackCoordinator extends ChangeNotifier {
     final h = handler;
     final t = current;
     if (h == null) return;
-    h.mediaItem.add(
-      t == null
-          ? null
-          : MediaItem(
-              id: t.ref.key,
-              title: t.title,
-              artist: t.artist,
-              album: t.album,
-              duration: Duration(milliseconds: t.durationMs),
-            ),
-    );
+    _syncNotificationArtwork(t);
+    if (t == null) {
+      if (_lastMediaItem != null) {
+        h.mediaItem.add(null);
+        _lastMediaItem = null;
+      }
+    } else {
+      final metadata = (
+        id: t.ref.key,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        durationMs: t.durationMs,
+        artUri: _notificationArtUri,
+      );
+      // Don't resend metadata on every position tick; update only when the
+      // song, its visible metadata, or its downloaded artwork changes.
+      if (_lastMediaItem != metadata) {
+        _lastMediaItem = metadata;
+        h.mediaItem.add(mediaItemForTrack(t, artUri: _notificationArtUri));
+      }
+    }
     h.playbackState.add(
       PlaybackState(
         controls: [
@@ -743,6 +933,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    _detachNotificationArtwork();
     if (_leased != null) cache.release(_leased!);
     for (final s in _subscriptions) {
       unawaited(s.cancel());
@@ -754,6 +945,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> shutdown() async {
     _playRequested = false;
     _publish();
+    _detachNotificationArtwork();
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }

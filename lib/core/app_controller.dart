@@ -14,6 +14,7 @@ import '../services/app_updates.dart';
 import '../services/cache.dart';
 import '../services/cache_jobs.dart';
 import '../services/cloud_sync.dart';
+import '../services/diagnostic_logs.dart';
 import '../services/media_proxy.dart';
 import '../services/playback.dart';
 import '../services/playback_sleep_timer.dart';
@@ -41,12 +42,14 @@ class SylphyApp extends ChangeNotifier {
     this.playback,
     this.cloud,
     this.jobs,
+    this.diagnostics,
   );
   final Directory root;
   final AppDb db;
   final AdapterFactory factory;
   final AuthVault vault;
   final CacheManager cache;
+  final DiagnosticLogs diagnostics;
   final MediaProxy proxy;
   final PlaybackCoordinator playback;
   late final sleepTimer = PlaybackSleepTimer(onStop: playback.pause);
@@ -96,6 +99,13 @@ class SylphyApp extends ChangeNotifier {
         );
     final db = AppDb(root);
     await db.open();
+    final diagnostics = DiagnosticLogs(
+      Directory(p.join(root.path, 'diagnostics')),
+    );
+    await diagnostics.initialize(
+      enabled: await db.setting('diagnostic_logs_enabled') == 'true',
+    );
+    diagnostics.record('app', 'bootstrap_started');
     final vault = credentialVault ?? const AuthVault();
     final factory = AdapterFactory(vault);
     final cache = CacheManager(
@@ -104,9 +114,14 @@ class SylphyApp extends ChangeNotifier {
       Directory(p.join(root.path, 'audio')),
     );
     await cache.initialize();
-    final proxy = MediaProxy(db, cache, factory);
+    final proxy = MediaProxy(db, cache, factory, diagnostics: diagnostics);
     await proxy.start();
-    final playback = PlaybackCoordinator(db, proxy, cache);
+    final playback = PlaybackCoordinator(
+      db,
+      proxy,
+      cache,
+      diagnostics: diagnostics,
+    );
     await playback.initialize();
     final cloud = PlaylistSyncService(db, factory);
     final jobs = CacheJobs(db, cache);
@@ -120,6 +135,7 @@ class SylphyApp extends ChangeNotifier {
       playback,
       cloud,
       jobs,
+      diagnostics,
     );
     await app.assets.initialize();
     app.index.addListener(app._indexChanged);
@@ -132,6 +148,9 @@ class SylphyApp extends ChangeNotifier {
     app.history.addListener(app._indexChanged);
     await app.reload();
     if (platformIntegration) {
+      if (Platform.isAndroid) {
+        playback.attachNotificationArtwork(app.artwork);
+      }
       await playback.attachHandler();
       app.desktop = DesktopControls(playback, app.disposeAsync);
       await app.desktop!.initialize();
@@ -524,6 +543,18 @@ class SylphyApp extends ChangeNotifier {
     });
   }
 
+  Future<void> setDiagnosticLogging(bool value) async {
+    if (_disposed) return;
+    await db.setSetting('diagnostic_logs_enabled', value.toString());
+    await diagnostics.setEnabled(value);
+    notifyListeners();
+  }
+
+  Future<void> clearDiagnosticLogs() async {
+    await diagnostics.clear();
+    notifyListeners();
+  }
+
   Future<void> disposeAsync() async {
     if (_disposed) return;
     _disposed = true;
@@ -544,6 +575,7 @@ class SylphyApp extends ChangeNotifier {
     await assets.shutdown();
     await appearance.shutdown();
     await playerLayouts.shutdown();
+    await diagnostics.shutdown();
     await db.close();
   }
 }

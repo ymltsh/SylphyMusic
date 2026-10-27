@@ -59,6 +59,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    app.diagnostics.record('app', 'lifecycle', details: {'state': state.name});
     if (state == AppLifecycleState.resumed) unawaited(app.refreshIfStale());
   }
 

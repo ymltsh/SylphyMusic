@@ -28,5 +28,26 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+        val iconManager = LauncherIconManager(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/launcher_icons")
+            .setMethodCallHandler { call, result ->
+                try {
+                    when (call.method) {
+                        "getOptions" -> result.success(iconManager.options())
+                        "setIcon" -> {
+                            val iconId = call.argument<String>("id")
+                            if (iconId == null) {
+                                result.error("invalid_icon", "未指定图标", null)
+                            } else {
+                                iconManager.select(iconId)
+                                result.success(null)
+                            }
+                        }
+                        else -> result.notImplemented()
+                    }
+                } catch (error: Exception) {
+                    result.error("launcher_icon_error", error.message ?: "图标切换失败", null)
+                }
+            }
     }
 }
