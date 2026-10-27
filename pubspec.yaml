@@ -25,6 +25,8 @@ dependencies:
   file_picker: ^13.3.0
   disk_space_2: ^1.0.13
   xml: 7.1.0
+  package_info_plus: ^10.2.2
+  url_launcher: ^6.3.3
 dev_dependencies:
   integration_test:
     sdk: flutter

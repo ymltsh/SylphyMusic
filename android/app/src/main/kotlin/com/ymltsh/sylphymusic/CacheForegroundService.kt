@@ -1,4 +1,4 @@
-package music.sylphy.sylphy_music
+package com.ymltsh.sylphymusic
 
 import android.app.Notification
 import android.app.NotificationChannel

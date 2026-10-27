@@ -5,7 +5,7 @@ import shutil
 import subprocess
 
 root = Path(__file__).resolve().parents[1]
-required = ['android/app/src/main/AndroidManifest.xml', 'android/app/src/main/kotlin/music/sylphy/sylphy_music/MainActivity.kt',
+required = ['android/app/src/main/AndroidManifest.xml', 'android/app/src/main/kotlin/com/ymltsh/sylphymusic/MainActivity.kt',
             'windows/runner/desktop_integration.cpp', 'linux/runner/my_application.cc']
 missing = [path for path in required if not (root / path).is_file()]
 if missing:

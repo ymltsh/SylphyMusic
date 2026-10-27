@@ -316,6 +316,17 @@ class AppDb {
     p.toRow(),
     conflictAlgorithm: ConflictAlgorithm.replace,
   );
+  Future<({int count, String? firstKey})> playlistPreview(String id) async {
+    final row = (await db.rawQuery(
+      'SELECT COUNT(*) AS count, '
+      '(SELECT track_key FROM playlist_items WHERE playlist_id=? '
+      'ORDER BY position LIMIT 1) AS first_key '
+      'FROM playlist_items WHERE playlist_id=?',
+      [id, id],
+    )).single;
+    return (count: row['count'] as int, firstKey: row['first_key'] as String?);
+  }
+
   Future<List<String>> playlistKeys(String id) async => (await db.query(
     'playlist_items',
     columns: ['track_key'],

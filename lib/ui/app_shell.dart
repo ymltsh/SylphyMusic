@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
-import '../core/appearance.dart';
 import '../core/models.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
@@ -16,8 +15,9 @@ import 'track_lookup.dart';
 import 'home_page.dart';
 import 'search_page.dart';
 import 'app_background.dart';
+import 'app_identity.dart';
 import 'player_cover.dart';
-import 'theme_color_dialog.dart';
+import 'settings_page.dart';
 import '../data/library_catalog.dart';
 
 class SylphyShell extends StatefulWidget {
@@ -198,16 +198,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               : null,
           surfaceTintColor: solidBackground ? Colors.transparent : null,
           title: Text(
-            tab == 0
-                ? (WidgetsBinding
-                              .instance
-                              .platformDispatcher
-                              .locale
-                              .languageCode ==
-                          'en'
-                      ? 'sylphymusic'
-                      : '风灵音乐')
-                : labels[tab],
+            tab == 0 ? appDisplayName() : labels[tab],
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           actions: [
@@ -227,7 +218,15 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             ),
             IconButton(
               tooltip: '设置',
-              onPressed: () => _open('设置', _settings),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => SettingsPage(
+                    app: app,
+                    onSources: () => _open('音乐源管理', _sources),
+                  ),
+                ),
+              ),
               icon: const Icon(Icons.settings_outlined),
             ),
           ],
@@ -648,94 +647,91 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Widget _playlists() => Column(
     children: [
       Padding(
-        padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
           children: [
+            Expanded(
+              child: Text(
+                '我的歌单',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            IconButton(
+              tooltip: '同步云歌单',
+              onPressed: app.busy
+                  ? null
+                  : () => _act(() async {
+                      await app.cloud.syncAll();
+                      await app.reload();
+                    }),
+              icon: const Icon(Icons.cloud_sync_outlined),
+            ),
             FilledButton.icon(
               onPressed: _newPlaylist,
               icon: const Icon(Icons.add),
               label: const Text('新建歌单'),
             ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () => _act(() async {
-                await app.cloud.syncAll();
-                await app.reload();
-              }),
-              icon: const Icon(Icons.cloud_sync),
-              label: const Text('同步云歌单'),
-            ),
           ],
         ),
       ),
       Expanded(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 96),
-          children: app.playlists
-              .map(
-                (p) => ListTile(
-                  leading: Icon(
-                    p.kind == PlaylistKind.cloud
-                        ? Icons.cloud_outlined
-                        : p.kind == PlaylistKind.favorites
-                        ? Icons.favorite_border
-                        : Icons.queue_music,
-                  ),
-                  title: Text(p.name),
-                  subtitle: Text(
-                    p.kind == PlaylistKind.cloud
-                        ? '${_sourceName(p.sourceId ?? '')} · ${p.status.name}${p.message.isNotEmpty ? ' · ${p.message}' : ''}'
-                        : p.kind == PlaylistKind.favorites
-                        ? '本地收藏'
-                        : '本地歌单',
-                  ),
-                  onTap: () => _playlistDetails(p),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) => _playlistAction(value, p),
-                    itemBuilder: (ctx) => [
-                      const PopupMenuItem(value: 'cache', child: Text('缓存歌单')),
-                      if (p.kind != PlaylistKind.favorites)
-                        const PopupMenuItem(
-                          value: 'rename',
-                          child: Text('重命名歌单'),
-                        ),
-                      const PopupMenuItem(
-                        value: 'copy_local',
-                        child: Text('复制为本地歌单'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'copy_cloud',
-                        child: Text('复制为云端歌单'),
-                      ),
-                      if (p.kind == PlaylistKind.cloud)
-                        const PopupMenuItem(
-                          value: 'sync',
-                          child: Text('同步此云歌单'),
-                        ),
-                      if (p.kind == PlaylistKind.cloud &&
-                          p.status == SyncStatus.conflict)
-                        const PopupMenuItem(
-                          value: 'resolve',
-                          child: Text('解决同步冲突'),
-                        ),
-                      if (p.kind != PlaylistKind.favorites)
-                        const PopupMenuItem(
-                          value: 'remove',
-                          child: Text('从本设备移除'),
-                        ),
-                      if (p.kind == PlaylistKind.cloud)
-                        const PopupMenuItem(
-                          value: 'delete_remote',
-                          child: Text('从服务器删除（在线）'),
-                        ),
-                    ],
-                  ),
+        child: app.playlists.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.queue_music_rounded,
+                      size: 56,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('还没有歌单'),
+                    const SizedBox(height: 4),
+                    const Text('创建一个歌单，收纳喜欢的音乐。'),
+                  ],
                 ),
               )
-              .toList(),
-        ),
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 1200
+                      ? 5
+                      : constraints.maxWidth >= 900
+                      ? 4
+                      : constraints.maxWidth >= 640
+                      ? 3
+                      : 2;
+                  return GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 16,
+                      mainAxisExtent:
+                          (constraints.maxWidth - 32 - (columns - 1) * 14) /
+                              columns +
+                          MediaQuery.textScalerOf(context).scale(14) * 2 * 1.5 +
+                          MediaQuery.textScalerOf(context).scale(12) * 2 * 1.3 +
+                          16,
+                    ),
+                    itemCount: app.playlists.length,
+                    itemBuilder: (context, index) {
+                      final playlist = app.playlists[index];
+                      return PlaylistGridCard(
+                        key: ValueKey('playlist/${playlist.id}'),
+                        app: app,
+                        playlist: playlist,
+                        sourceName: _sourceName(playlist.sourceId ?? ''),
+                        onOpen: () => _playlistDetails(playlist),
+                        onAction: (value) => _playlistAction(value, playlist),
+                      );
+                    },
+                  );
+                },
+              ),
       ),
     ],
   );
@@ -803,7 +799,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         builder: (_) => PlaylistPage(
           app: app,
           id: playlist.id,
-          buildTracks: (tracks) => _tracks(tracks),
+          buildTracks: (tracks) => _tracks(tracks, showPlayAll: false),
           onEdit: () => _editPlaylist(latest()),
           onAdd: () => _addToPlaylist(latest()),
           onCache: () => _act(() => app.cachePlaylist(latest())),
@@ -1301,305 +1297,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     name.dispose();
     url.dispose();
     password.dispose();
-  }
-
-  Future<void> _chooseThemeColor() async {
-    final chosen = await showDialog<Color>(
-      context: context,
-      builder: (_) => ThemeColorDialog(initial: app.appearance.seed),
-    );
-    if (chosen != null) await _act(() => app.appearance.update(color: chosen));
-  }
-
-  Future<void> _setLyricFont(double size) =>
-      app.appearance.update(lyricFont: size);
-
-  Widget _settings() => ListView(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    children: [
-      const ListTile(
-        title: Text('音乐与存储', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      ListTile(
-        leading: const Icon(Icons.dns_outlined),
-        title: const Text('音乐源管理'),
-        subtitle: Text('${app.sources.length} 个来源'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _open('音乐源管理', _sources),
-      ),
-      ListTile(
-        leading: const Icon(Icons.download_outlined),
-        title: const Text('下载管理'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _downloads,
-      ),
-      const ListTile(
-        title: Text('外观与体验', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      ListTile(
-        title: const Text('外观模式'),
-        leading: const Icon(Icons.palette_outlined),
-        trailing: DropdownButton<ThemeMode>(
-          value: app.appearance.mode,
-          underline: const SizedBox(),
-          items: const [
-            DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
-            DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
-            DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
-          ],
-          onChanged: (v) => _act(() => app.appearance.update(theme: v)),
-        ),
-      ),
-      ListTile(
-        title: const Text('主题颜色'),
-        subtitle: Text(app.appearance.seedHex),
-        leading: CircleAvatar(backgroundColor: app.appearance.seed, radius: 12),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _chooseThemeColor,
-      ),
-      SwitchListTile(
-        title: const Text('纯色背景'),
-        subtitle: const Text('一级页面与播放页基础底色跟随深浅色使用白 / 黑；播放页封面模糊开启时叠加封面模糊'),
-        value: app.appearance.solidBackground,
-        onChanged: (v) => _act(() => app.appearance.update(solid: v)),
-      ),
-      ListTile(
-        title: const Text('自定义背景图'),
-        subtitle: Text(
-          app.appearance.backgroundFile == null
-              ? '选择图片，仅在四个主页面显示'
-              : app.appearance.solidBackground
-              ? '已选择图片 · 纯色背景开启时不显示'
-              : '四个主页面 · 保持比例自适应铺满',
-        ),
-        leading: const Icon(Icons.wallpaper_outlined),
-        trailing: app.appearance.backgroundFile == null
-            ? const Icon(Icons.chevron_right)
-            : IconButton(
-                tooltip: '移除背景',
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _act(app.appearance.clearBackground),
-              ),
-        onTap: () => _act(app.appearance.pickBackground),
-      ),
-      if (app.appearance.backgroundFile != null &&
-          !app.appearance.solidBackground)
-        ListTile(
-          title: const Text('背景可见度'),
-          subtitle: Text(
-            '${(app.appearance.backgroundVisibility * 100).round()}%',
-          ),
-          trailing: SizedBox(
-            width: 160,
-            child: Slider(
-              min: .1,
-              max: .4,
-              divisions: 30,
-              value: app.appearance.backgroundVisibility,
-              onChanged: (v) =>
-                  _act(() => app.appearance.update(visibility: v)),
-            ),
-          ),
-        ),
-      SwitchListTile(
-        title: const Text('唱片播放样式'),
-        subtitle: const Text('系统默认与自定义播放页共用；关闭时使用方形封面'),
-        value: app.appearance.disc,
-        onChanged: (v) => _act(() => app.appearance.update(record: v)),
-      ),
-      SwitchListTile(
-        title: const Text('封面模糊背景'),
-        subtitle: const Text('播放页布局背景为封面模糊时生效；关闭时使用主题 / 纯色底色'),
-        value: app.appearance.ambient,
-        onChanged: (v) => _act(() => app.appearance.update(background: v)),
-      ),
-      SwitchListTile(
-        title: const Text('磨砂迷你播放器'),
-        subtitle: const Text('实验性效果，默认关闭'),
-        value: app.appearance.glass,
-        onChanged: (v) => _act(() => app.appearance.update(frost: v)),
-      ),
-      const Divider(),
-      ListTile(
-        title: const Text('开源许可证'),
-        leading: const Icon(Icons.article_outlined),
-        onTap: () => showLicensePage(
-          context: context,
-          applicationName: '风灵音乐 · Sylphy Music',
-          applicationVersion: '0.2.0 开发版',
-        ),
-      ),
-      ListTile(
-        title: const Text('缓存空间与逐曲清理'),
-        leading: const Icon(Icons.storage),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => CacheStoragePage(app: app)),
-        ),
-      ),
-      const ListTile(
-        title: Text('播放器设置', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      ListTile(
-        title: const Text('播放速度'),
-        subtitle: Text('${app.playback.speed.toStringAsFixed(2)}×'),
-        trailing: SizedBox(
-          width: 180,
-          child: Slider(
-            min: 0.5,
-            max: 2,
-            divisions: 30,
-            value: app.playback.speed,
-            onChanged: (v) => _act(() => app.playback.setSpeed(v)),
-          ),
-        ),
-      ),
-      ListTile(
-        leading: const Icon(Icons.lyrics_outlined),
-        title: const Text('完整歌词字号'),
-        subtitle: Text(Appearance.lyricFontLabel(app.appearance.lyricFontSize)),
-        trailing: DropdownButton<double>(
-          value: app.appearance.lyricFontSize,
-          underline: const SizedBox(),
-          items: [
-            for (final size in Appearance.lyricFontSizes)
-              DropdownMenuItem(
-                value: size,
-                child: Text(Appearance.lyricFontLabel(size)),
-              ),
-          ],
-          onChanged: (v) => _act(() => _setLyricFont(v!)),
-        ),
-      ),
-      ListTile(
-        leading: const Icon(Icons.text_fields_rounded),
-        title: const Text('迷你歌词字号'),
-        subtitle: Text(
-          '${Appearance.miniLyricFontLabel(app.appearance.miniLyricFontSize)} · 仅播放页迷你歌词区',
-        ),
-        trailing: DropdownButton<double>(
-          value: app.appearance.miniLyricFontSize,
-          underline: const SizedBox(),
-          items: [
-            for (final size in Appearance.miniLyricFontSizes)
-              DropdownMenuItem(
-                value: size,
-                child: Text(Appearance.miniLyricFontLabel(size)),
-              ),
-          ],
-          onChanged: (v) =>
-              _act(() => app.appearance.update(miniLyricFont: v!)),
-        ),
-      ),
-
-      ListTile(
-        title: const Text('ReplayGain 响度调整'),
-        subtitle: const Text('默认关闭，可选按曲目或按专辑调整'),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.equalizer),
-          onSelected: (v) => _act(() => app.playback.setReplayGain(v)),
-          itemBuilder: (ctx) => const [
-            PopupMenuItem(value: 'no', child: Text('关闭')),
-            PopupMenuItem(value: 'track', child: Text('Track')),
-            PopupMenuItem(value: 'album', child: Text('Album')),
-          ],
-        ),
-      ),
-      ListTile(
-        title: const Text('应用内音量'),
-        subtitle: Text('${app.playback.volume.round()}%'),
-        trailing: SizedBox(
-          width: 180,
-          child: Slider(
-            min: 0,
-            max: 100,
-            value: app.playback.volume,
-            onChanged: (v) => _act(() => app.playback.setVolume(v)),
-          ),
-        ),
-      ),
-      const Divider(),
-      const ListTile(
-        title: Text('缓存管理', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      ListTile(
-        title: const Text('清理全部完整歌曲缓存'),
-        subtitle: const Text('同时取消受到影响的任务；不会删除服务器或本地原始音频'),
-        trailing: const Icon(Icons.delete_outline),
-        onTap: () async {
-          if (await _confirm('确认清理全部音频缓存？')) {
-            await _act(() => app.clearCache());
-          }
-        },
-      ),
-      ListTile(
-        title: const Text('缓存预算'),
-        subtitle: Text(
-          '当前 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB',
-        ),
-        trailing: const Icon(Icons.edit),
-        onTap: _changeBudget,
-      ),
-      ListTile(
-        title: const Text('查看缓存任务与进度'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (ctx) => CacheTasksPage(app: app)),
-        ),
-      ),
-      const Divider(),
-      const ListTile(
-        title: Text('关于', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-      const ListTile(
-        title: Text('风灵音乐 / Sylphy Music'),
-        subtitle: Text(
-          'Flutter · Material 3 · media_kit/libmpv\n本地优先 · 多音乐源 · 开源项目',
-        ),
-      ),
-      if (app.message != null)
-        ListTile(
-          leading: const Icon(Icons.warning_amber),
-          title: Text(app.message!),
-        ),
-    ],
-  );
-  Future<void> _changeBudget() async {
-    final amount = TextEditingController(
-      text: '${(app.cache.maxBytes / 1073741824).round()}',
-    );
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('缓存上限（GiB）'),
-        content: TextField(
-          controller: amount,
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-    if (answer == true) {
-      final n = int.tryParse(amount.text);
-      if (n != null && n >= 1 && n <= 200) {
-        app.cache.maxBytes = n * 1073741824;
-        await app.db.setSetting('cache_limit', '${app.cache.maxBytes}');
-        await app.cache.enforceQuota();
-        setState(() {});
-      }
-    }
-    amount.dispose();
   }
 
   Future<bool> _confirm(String message) async =>

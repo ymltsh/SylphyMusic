@@ -3,7 +3,7 @@
 **实施决定 IMP-001：** 不采用 M0 演示版、M1 PoC 版等逐步发布方式。内部调试包可用于验证，但首个正式发布必须包含所有已确认首版功能；缓存直接在主工程实现，后续实机测试中修复与调优。
 
 
-- [ ] 选定正式包名与可用品牌素材，更新 Android applicationId / 桌面 bundle 标识
+- [ ] 确认正式品牌素材与桌面 bundle 标识；Android applicationId 已定为 `com.ymltsh.sylphymusic`
 - [ ] 依赖许可扫描：`flutter pub deps`、`python tool/collect_licenses.py`、[原生依赖记录](NATIVE_DEPENDENCIES.md)及最终库的许可分发验收
 - [x] 对真实 Emby 测试账户完成临时歌单 CRUD 与原始音频播放（2026-10-27；写入经用户批准，仅操作脚本创建的临时歌单并已清理；更多权限 / 并发矩阵继续验收）
 - [ ] OpenSubsonic 对 Navidrome 以及至少一份符合规范的其他实现验证

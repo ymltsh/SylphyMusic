@@ -16,7 +16,7 @@ if (releaseRequested && !signingFile.exists() && !internalDebugSigning && System
 }
 
 extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
-    namespace = "music.sylphy.sylphy_music"
+    namespace = "com.ymltsh.sylphymusic"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -28,7 +28,7 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "music.sylphy.sylphy_music"
+        applicationId = "com.ymltsh.sylphymusic"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

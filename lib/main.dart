@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'core/app_controller.dart';
+import 'ui/app_identity.dart';
 import 'ui/app_shell.dart';
 import 'ui/system_bars.dart';
 import 'ui/app_theme.dart';
@@ -33,7 +34,7 @@ class _BootstrapState extends State<_Bootstrap> {
           builder: (context, child) =>
               AppSystemBars(child: child ?? const SizedBox.shrink()),
           debugShowCheckedModeBanner: false,
-          title: '风灵音乐 · Sylphy Music',
+          onGenerateTitle: (_) => appDisplayName(),
           theme: sylphyTheme(app?.appearance, Brightness.light),
           darkTheme: sylphyTheme(app?.appearance, Brightness.dark),
           home: snapshot.hasData

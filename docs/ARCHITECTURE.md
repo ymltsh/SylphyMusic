@@ -47,6 +47,8 @@ flowchart TD
 | `lib/services/local_library.dart`、`artwork.dart`、`lyrics.dart` | 本地导入和标签、封面缓存、LRC 解析 |
 | `lib/services/desktop.dart`、`lib/ui/` | 桌面平台协调，以及库、歌单、来源、播放、缓存和设置页面 |
 
+更新检查由 `AppUpdates` 处理，控制器提供 `checkForUpdates()` 入口，`AppUpdatePage` 仅在用户点击后调用。短生命周期 HTTP 客户端在每次检查结束后关闭，不加入后台同步或应用启动流程；版本来自安装包元数据。发布工具 / 清单和发布边界见 [更新与发布](../update.md)。
+
 ## 身份与来源能力
 
 `TrackRef(sourceId, id)` 唯一标识媒体，持久化 key 是二元数组 JSON。`sourceId` 为本机来源 UUID，账户间隔离。专辑 / 艺术家聚合只影响浏览，不改变身份。歌单 `entry_id` 独立于 TrackRef，重复歌曲保持重复。

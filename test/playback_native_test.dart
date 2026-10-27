@@ -241,7 +241,7 @@ void main() {
         ),
       ),
     );
-    await waitFor('Visible 0');
+    await waitFor('这个歌单暂无歌曲');
     await tester.runAsync(() => app.toggleFavorite(tracks.first));
     await waitFor('Visible 1');
     expect(tester.takeException(), isNull);

@@ -21,6 +21,9 @@ class PlaybackCoordinator extends ChangeNotifier {
   QueueSnapshot snapshot = const QueueSnapshot();
   Track? current;
   bool playing = false, buffering = false;
+  // Play intent must survive the native player's between-track false events.
+  // audio_service uses PlaybackState.playing to keep the Android FGS alive.
+  bool _playRequested = false;
   Duration position = Duration.zero, duration = Duration.zero;
   String? error;
   int failures = 0;
@@ -28,6 +31,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   double volume = 100;
   bool _opening = false, _userPaused = false, _interrupted = false;
   bool _handlingFailure = false;
+  bool _finishingTrack = false;
   int _lastSaved = 0;
   int _reconnects = 0;
   TrackRef? _recoveryRef;
@@ -101,8 +105,15 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.completed.listen((done) {
-        if (done && !_opening) {
-          unawaited(_finished());
+        if (done && !_opening && !_finishingTrack) {
+          _finishingTrack = true;
+          _publish();
+          unawaited(
+            _finished().whenComplete(() {
+              _finishingTrack = false;
+              _publish();
+            }),
+          );
         }
       }),
     );
@@ -227,6 +238,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> _loadCurrent({bool autoplay = true, bool manual = false}) async {
     _opening = true;
+    _playRequested = autoplay;
     final resumeMs = snapshot.positionMs;
     error = null;
     try {
@@ -246,27 +258,35 @@ class PlaybackCoordinator extends ChangeNotifier {
       final source = await db.source(ref.sourceId);
       if (source == null) throw StateError('来源已删除');
       if (!source.enabled) throw StateError('来源已停用');
-      if (autoplay && _session != null && !await _session!.setActive(true)) {
+      // Start/retain the media playback foreground service *before* opening
+      // the next URL or requesting audio focus in the background.
+      _publish();
+      if (autoplay &&
+          _playRequested &&
+          _session != null &&
+          !await _session!.setActive(true)) {
         throw StateError('系统暂时未授予音频焦点');
       }
       cache.lease(ref);
       _leased = ref;
+      final shouldPlay = autoplay && _playRequested;
       if (source.kind == SourceKind.local) {
         final f = File(current!.remote['path']?.toString() ?? ref.id);
         if (!await f.exists()) throw StateError('本地原始音频文件不存在');
-        await player.open(Media(f.uri.toString()), play: autoplay);
+        await player.open(Media(f.uri.toString()), play: shouldPlay);
       } else {
         final cached = await cache.find(ref, touch: true);
         final uri = cached != null
             ? cached.file.uri
             : proxy.ticket(current!, source);
-        await player.open(Media(uri.toString()), play: autoplay);
+        await player.open(Media(uri.toString()), play: shouldPlay);
       }
       if (resumeMs > 0) {
         await player.seek(Duration(milliseconds: resumeMs));
       }
-      if (!autoplay) await player.pause();
-      _userPaused = !autoplay;
+      // A pause can arrive while the async track opening was in flight.
+      if (!_playRequested) await player.pause();
+      _userPaused = !_playRequested;
       _reloadSources.remove(source.id);
       notifyListeners();
       _publish();
@@ -275,9 +295,12 @@ class PlaybackCoordinator extends ChangeNotifier {
     } catch (e) {
       error = e.toString();
       notifyListeners();
-      if (autoplay) await _failed(error!, manual: manual);
+      if (autoplay && _playRequested) {
+        await _failed(error!, manual: manual);
+      }
     } finally {
       _opening = false;
+      _publish();
     }
   }
 
@@ -362,16 +385,22 @@ class PlaybackCoordinator extends ChangeNotifier {
       await _loadCurrent(autoplay: true, manual: true);
       return;
     }
+    _playRequested = true;
+    _publish();
     if (_session != null && !await _session!.setActive(true)) {
+      _playRequested = false;
+      _publish();
       error = '系统暂时未授予音频焦点';
       notifyListeners();
       return;
     }
-    await player.play();
+    if (_playRequested) await player.play();
   }
 
   Future<void> pause({bool system = false}) async {
     if (!system) _userPaused = true;
+    _playRequested = false;
+    _publish();
     await player.pause();
     await save();
   }
@@ -396,6 +425,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> next({bool manual = true}) async {
+    // Automatic continuation must not override a pause during a transition.
+    if (!manual && !_playRequested) return;
     var next = _nextIndex();
     if (next == null) {
       await pause();
@@ -426,7 +457,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     if (old != null) await cache.cancel(old, automaticOnly: true);
     position = Duration.zero;
-    await _loadCurrent(autoplay: true, manual: manual);
+    await _loadCurrent(autoplay: manual || _playRequested, manual: manual);
   }
 
   Future<void> previous() async {
@@ -455,9 +486,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _finished() async {
+    if (!_playRequested) return;
     if (snapshot.repeat == RepeatKind.one) {
       await player.seek(Duration.zero);
-      await player.play();
+      if (_playRequested) await player.play();
       return;
     }
     if (_nextIndex() == null) {
@@ -468,7 +500,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _failed(String reason, {bool manual = false}) async {
-    if (_userPaused) return;
+    if (_userPaused || !_playRequested) return;
     if (manual) {
       await pause();
       return;
@@ -494,12 +526,13 @@ class PlaybackCoordinator extends ChangeNotifier {
         resumeMs > 0 &&
         _reconnects < 2 &&
         !_userPaused &&
+        _playRequested &&
         proxyFailure != '404') {
       _reconnects++;
       position = Duration(milliseconds: resumeMs);
       await save();
       await Future<void>.delayed(Duration(milliseconds: 400 * _reconnects));
-      if (currentRef == ref && !_userPaused) {
+      if (currentRef == ref && !_userPaused && _playRequested) {
         await _loadCurrent(autoplay: true, manual: false);
       }
       return;
@@ -623,7 +656,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> removeAt(int index) async {
     if (index < 0 || index >= snapshot.tracks.length) return;
     final wasCurrent = index == snapshot.index;
-    final wasPlaying = playing;
+    final wasPlaying = _playRequested;
     final tracks = [...snapshot.tracks]..removeAt(index);
     if (tracks.isEmpty) {
       await clearQueue();
@@ -654,6 +687,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> clearQueue() async {
+    _playRequested = false;
+    _publish();
     final ref = currentRef;
     if (ref != null) await cache.cancel(ref, automaticOnly: true);
     await player.stop();
@@ -690,14 +725,16 @@ class PlaybackCoordinator extends ChangeNotifier {
       PlaybackState(
         controls: [
           MediaControl.skipToPrevious,
-          playing ? MediaControl.pause : MediaControl.play,
+          _playRequested ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
         ],
         systemActions: const {MediaAction.seek},
-        processingState: buffering
+        processingState: buffering || _opening || _finishingTrack
             ? AudioProcessingState.buffering
             : AudioProcessingState.ready,
-        playing: playing,
+        // The OS must not leave foreground service between two tracks.
+        // Real user/system pause still sets this to false immediately.
+        playing: _playRequested,
         updatePosition: position,
         speed: speed,
       ),
@@ -715,6 +752,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> shutdown() async {
+    _playRequested = false;
+    _publish();
     for (final subscription in _subscriptions) {
       await subscription.cancel();
     }

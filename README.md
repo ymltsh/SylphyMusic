@@ -4,6 +4,8 @@ Flutter / Material 3 多音源播放器，支持 Android、Windows、Linux。主
 
 **当前是完整首版范围的开发工程，尚未通过全部正式发布闸门。调试构建不等于首个完整正式版。** 最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)，产品范围见 [docs/PROJECT_SPEC_v3.8.md](docs/PROJECT_SPEC_v3.8.md)。
 
+应用内「设置 → 检查更新」提供手动更新检查。Android / Windows 发布工具及版本清单维护见 [更新与发布流程](update.md)；默认仅准备本地包，远程发布需显式授权。
+
 ## 构建与运行
 
 开发入口：[AGENTS.md](AGENTS.md) · [ARCH.md](ARCH.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [文档索引](docs/README.md)。
@@ -59,7 +61,7 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 集成测试会覆盖构建输出。内部验收打包使用 `tool/build_review.ps1`：重新构建普通入口的 Windows Release 与 Android Release / 分架构 APK，调用 `tool/package_review.py --mode optimized` 检查已跟踪源码和包内容中的已知私密值，输出到 `build/internal-review/`。脚本在本机显式启用测试签名；若有正式 `android/key.properties` 则优先使用其配置。这些包仍须通过正式版发布闸门。
 
-当前 Android arm64 内部包 **29.3 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **21.7 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
+当前 Android arm64 内部包 **29.4 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **21.8 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
 
 真实服务器测试默认跳过。私密测试凭据由环境变量指定文件路径，不把密码放入命令行或源码：
 

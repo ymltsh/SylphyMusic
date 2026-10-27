@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:sylphy_music/core/app_controller.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/core/appearance.dart';
+import 'package:sylphy_music/services/app_updates.dart';
 import 'package:sylphy_music/ui/app_shell.dart';
 import 'package:sylphy_music/ui/lyrics_view.dart';
 import 'package:sylphy_music/ui/now_playing.dart';
@@ -103,7 +104,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byType(AppBar),
-            matching: find.text('sylphymusic'),
+            matching: find.text('Sylphy Music'),
           ),
           findsOneWidget,
         );
@@ -401,7 +402,129 @@ void main() {
         expect(tester.takeException(), isNull);
         await tester.tap(find.byTooltip('设置'));
         await tester.pumpAndSettle();
+        Future<void> openSetting(String title) async {
+          await tester.scrollUntilVisible(
+            find.text(title),
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.tap(find.text(title));
+          await tester.pumpAndSettle();
+        }
+
+        expect(find.byType(Slider), findsNothing);
+        expect(find.byType(SwitchListTile), findsNothing);
+        expect(find.byType(DropdownButton<ThemeMode>), findsNothing);
         await capture('settings-mobile');
+        await openSetting('播放器设置');
+        expect(find.text('播放速度'), findsOneWidget);
+        await tester.tap(find.byType(Slider).first);
+        await tester.pumpAndSettle();
+        expect(app.playback.speed, isNot(1));
+        await app.playback.setSpeed(1);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await openSetting('歌词设置');
+        await tester.tap(find.byType(DropdownButton<double>).first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('大').last);
+        await tester.pumpAndSettle();
+        expect(app.appearance.lyricFontSize, 28);
+        expect(app.appearance.miniLyricFontSize, 20);
+        await capture('settings-lyrics-mobile');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('完整歌词 大 · 迷你歌词 标准'), findsOneWidget);
+        await app.appearance.update(lyricFont: 24);
+        await openSetting('主题与配色');
+        await tester.tap(find.byType(DropdownButton<ThemeMode>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('深色').last);
+        await tester.pumpAndSettle();
+        expect(app.appearance.mode, ThemeMode.dark);
+        await capture('settings-theme-dark');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await capture('settings-mobile-dark');
+        await app.appearance.update(theme: ThemeMode.light);
+        await tester.pumpAndSettle();
+        await openSetting('页面背景');
+        expect(find.text('自定义背景图'), findsOneWidget);
+        await tester.tap(find.byType(SwitchListTile));
+        await tester.pumpAndSettle();
+        expect(app.appearance.solidBackground, isFalse);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await app.appearance.update(solid: true);
+        await openSetting('播放器外观');
+        await tester.tap(find.widgetWithText(SwitchListTile, '唱片播放样式'));
+        await tester.pumpAndSettle();
+        expect(app.appearance.disc, isTrue);
+        await tester.tap(find.widgetWithText(SwitchListTile, '唱片旋转'));
+        await tester.pumpAndSettle();
+        expect(app.appearance.discRotation, isTrue);
+        await capture('settings-player-mobile');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await app.appearance.update(record: false, rotateDisc: false);
+        await openSetting('下载与缓存');
+        await tester.tap(find.text('缓存预算'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), '3');
+        await tester.tap(find.text('保存'));
+        await tester.pumpAndSettle();
+        expect(app.cache.maxBytes, 3 * 1073741824);
+        await tester.tap(find.text('清理全部完整歌曲缓存'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('取消'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('缓存空间与逐曲清理'));
+        await tester.pumpAndSettle();
+        expect(find.text('缓存空间'), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('查看缓存任务与进度'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AppBar), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await capture('settings-cache-mobile');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await openSetting('检查更新');
+        expect(find.text('仅在点击时检查更新，下载后由你手动安装。'), findsOneWidget);
+        expect(find.text('正在检查…'), findsNothing);
+        await capture('settings-update-mobile');
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await openSetting('关于风灵音乐');
+        final installed = await AppVersion.installed();
+        expect(installed.build, greaterThan(0));
+        await waitFor(find.text('$installed'));
+        await tester.tap(find.text('开源许可证'));
+        await tester.pumpAndSettle();
+        expect(find.byType(LicensePage), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = const Size(1200, 850);
+        await tester.pumpAndSettle();
+        await capture('settings-desktop');
+        tester.view.physicalSize = const Size(320, 640);
+        await tester.pumpAndSettle();
+        await openSetting('播放器设置');
+        await capture('settings-playback-small');
+        expect(tester.takeException(), isNull);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = const Size(360, 800);
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('音乐源管理'),
+          -200,
+          scrollable: find.byType(Scrollable).last,
+        );
         await tester.tap(find.text('音乐源管理'));
         await tester.pumpAndSettle();
         expect(find.text('同步所有来源'), findsOneWidget);

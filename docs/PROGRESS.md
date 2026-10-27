@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-10-28 更新检查与本地发布工具
+
+参考用户提供的 Mfuns Flutter `update.md`，新增设置页手动检查更新、实际安装包版本读取、正式 / 测试版独立清单、更新说明和平台下载入口。仅点击检查时发请求，加速地址失败回退 GitHub，12 秒 / 次、1 MiB 上限、同版 / 旧版不提示更新，下载链接限于本项目 HTTPS GitHub Release。新增 package_info_plus / url_launcher 并锁定依赖，重新生成插件注册与 Dart 许可证清单。
+
+根目录 `release.py` 默认只本地准备：版本 / 构建号、检查、三 ABI APK、Windows 便携 ZIP / Inno Setup 安装程序、凭据内容扫描、SHA-256 与源码指纹记录。显式 `--publish` 才操作 GitHub，先上传草稿再公开，最后仅更新所选渠道清单；不自动提交或推送源码。要求正式签名、干净工作区和可在 GitHub 访问的源码提交，正式版继续受原发布门槛约束；复用产物校验摘要 / 源码，恢复发布核对远程文件且不覆盖已有资产。使用方法见根目录 [update.md](../update.md)。两份清单初始 latest=null，没有虚构已发布包。
+
+验证：`flutter analyze --no-pub` 无问题；`test/app_updates_test.dart` 7 项通过；Python 发布工具 11 项测试通过（模拟 GitHub，覆盖纯预览、构建号、清单历史、资产损坏、上传失败 / 恢复、凭据内容扫描与正式版门槛）。Windows 原生 `ui_refresh_test.dart` 最终通过（`build/test_logs/release-system-ui-final.log`），核对手动更新页不自动检查、实际安装包版本显示及既有设置 / 播放流程；已查看 `build/test_logs/ui/settings-update-mobile.png`。Android Debug 构建通过（`build/test_logs/release-system-android.log`），未安装到设备。
+
+未执行 GitHub 发布 / tag / 清单推送，线上接口需另行授权推送后才可使用。本机没有 Inno Setup 编译器和 `android/key.properties`，尚未实测安装程序编译、正式签名 Release 构建、安装升级 / 卸载或真实 GitHub 事务；未重新生成内部 Release 验收包，未执行 Linux 验收。
+
+
+## 2026-10-28 设置页分类与二级配置
+
+按用户提供的设置页讨论，将原 `app_shell.dart` 长列表抽到 `lib/ui/settings_page.dart`：一级页为四组八项分类入口及实时摘要；二级页分别处理播放、歌词、主题、背景、播放器外观、下载与缓存、关于。沿用原音乐源管理、缓存任务与逐曲清理页面、外观 / 播放 / 缓存持久化。补充已有唱片旋转偏好的入口；滑块放在标题下方，桌面内容限宽居中。返回目录后刷新缓存上限等摘要。
+
+首轮原生回归发现旧缓存预算弹窗在退出动画结束前释放 TextEditingController；改为表单输入，并验证 1–200 GiB 的整数。最终 `flutter analyze --no-pub` 无问题；`test/appearance_test.dart` 8 项通过；Windows 原生 `integration_test/ui_refresh_test.dart` 通过（`build/test_logs/settings-ui-final.log`），覆盖设置分类、二级跳转、速度调整、歌词字号独立性、主题 / 背景 / 唱片旋转、预算保存、清理取消、缓存空间 / 任务 / 许可证入口和既有来源 / 播放流程。已查看 360×800、320×640 和 1200×850 截图，位于 `build/test_logs/ui/settings-*.png`。未执行 Android 设备验证或重新打包 APK / Release 包。
+
+
 ## 2026-10-27 音乐库分类切换抽动修复
 
 根因是 `LibraryBrowser` 查询等待 / 失败时的布局没有播放数量行，筛选栏会短暂上移。统一加载 / 成功 / 失败的外层布局，保留播放数量行及来源 / 排序操作，等待期间显示「—」并禁用播放；加载完成只更新数量和列表，空结果仍显示 0。数量单行显示，不随位数改变行高。
@@ -184,7 +202,7 @@ Windows 既有原生桌面回归另行通过（`build/test_logs/ui-desktop-regre
 
 新增主题色与背景图设置。默认实际主色 #5094B2，支持预设 / HEX 输入和恢复默认；背景图保持比例自适应铺满，**仅首页、音乐库、歌单、我的四个一级页面使用**，其他路由保持主题 Surface。图片在应用数据目录保存受管副本，最长边归一化到 2048，源文件上限 40 MB；替换失败保留原背景，清理不删除用户原始图片，关闭数据库前等待写入完成。颜色对话框控制器由自身生命周期管理，修复应用新主题时退场动画中使用已释放控制器的问题。
 
-首页左上角仅显示应用名：系统为英文时 `sylphymusic`，其他语言「风灵音乐」；另三个一级页面显示对应页名，移除原副标题，并监听系统语言变化。专辑、艺术家与歌曲统一采用虚拟连续滚动，保持每批 100 行与最多六批缓存，不再显示任何分页栏。
+首页左上角仅显示应用名：系统为英文时 `Sylphy Music`，其他语言「风灵音乐」；另三个一级页面显示对应页名，移除原副标题，并监听系统语言变化。专辑、艺术家与歌曲统一采用虚拟连续滚动，保持每批 100 行与最多六批缓存，不再显示任何分页栏。
 
 验证：静态分析无问题；77 项单元 / Widget 测试通过，5 项私密联调默认跳过（`build/test_logs/appearance-full-suite.log`，包含工作区封面相关回归）。新增 appearance_test 覆盖主色、偏好恢复、原文件独立、坏图失败保留、图片比例 / 尺寸与串行清理。Windows UI 原生集成通过中英文系统名称、一级页面名和 360×800 / 宽屏布局（`appearance-ui-windows.log`）；五万首歌曲及 200 组专辑 / 艺术家连续列表跨 100 行边界、末尾和返回顶部通过（`continuous-all-groups.log`）。日志均位于 build/test_logs。
 
@@ -304,12 +322,12 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 
 按用户「打包」请求，使用 `tool/build_review.ps1` 从普通 `lib/main.dart` 入口重新构建 Android Release / split-per-ABI 与 Windows Release，并通过 `tool/package_review.py --mode optimized` 打包。使用现有私密测试凭据文件做内容扫描，未输出文件内容；扫描通过，未发现凭据进入已跟踪源码或包内容。
 
-- `build/internal-review/SylphyMusic-android-release-internal-arm64-v8a.apk`：**29.22 MB**，versionCode 2002，仅 arm64-v8a。
-- `build/internal-review/SylphyMusic-android-release-internal-armeabi-v7a.apk`：**26.16 MB**，versionCode 1002，仅 armeabi-v7a。
-- `build/internal-review/SylphyMusic-android-release-internal-x86_64.apk`：**31.46 MB**，versionCode 4002，仅 x86_64。
-- `build/internal-review/SylphyMusic-windows-release-internal.zip`：**21.69 MB**，完整解压后运行 `SylphyMusic/sylphy_music.exe`。
+- `build/internal-review/SylphyMusic-android-release-internal-arm64-v8a.apk`：**29.43 MB**，versionCode 2002，仅 arm64-v8a。
+- `build/internal-review/SylphyMusic-android-release-internal-armeabi-v7a.apk`：**26.40 MB**，versionCode 1002，仅 armeabi-v7a。
+- `build/internal-review/SylphyMusic-android-release-internal-x86_64.apk`：**31.74 MB**，versionCode 4002，仅 x86_64。
+- `build/internal-review/SylphyMusic-windows-release-internal.zip`：**21.84 MB**，完整解压后运行 `SylphyMusic/sylphy_music.exe`。
 - 追加的右向左滑动歌词、迷你歌词缩放手柄、浅深色跟随、可选封面模糊、54 dp 底栏、独立迷你歌词字号与音乐库胶囊筛选已重新打入上述四份产物；包内容重新扫描、签名和 SHA-256 核对通过。
-- 包名 `music.sylphy.sylphy_music`，versionName 0.2.0，minSdk 24，targetSdk 36；三份 APK 均由本机 Android Debug 测试证书签名，签名方案 v2，三份证书 SHA-256 一致。没有正式 `key.properties`，因此仍不是正式发布包。
+- 包名 `com.ymltsh.sylphymusic`，versionName 0.2.0，minSdk 24，targetSdk 36；三份 APK 均由本机 Android Debug 测试证书签名，签名方案 v2，三份证书 SHA-256 一致。没有正式 `key.properties`，因此仍不是正式发布包。
 - 三份 APK 与 ZIP 的 SHA-256 均与 `SHA256SUMS-optimized.txt` 一致；Windows ZIP 与 APK ZIP 完整性检查通过，APK 的 ABI、包名、版本和 SDK 信息已核对。
 
 本轮完成的是内部验收打包，未在 Android 设备安装运行，也未执行 Windows Release 启动或真机发布验收；APK / ZIP 使用合成数据与本地构建，正式签名、物理设备、Linux 和完整发布闸门仍按 [RELEASE_GATES](RELEASE_GATES.md) 执行。打包日志：`build/test_logs/review-build.log`。
@@ -397,3 +415,39 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 存储、服务和页面测试覆盖迁移、重开离线命中、SWR、并发合并、版本竞态、损坏 / 磁盘不足、配额、手动保护和页面自动更新。Windows 与 API 35 Android 原生测试均通过：使用本机模拟 Emby 和合成图片，关闭服务器，重建应用服务及 SQLite，以空凭据库再次读取、解码和显示封面 / 歌词。Windows 受执行环境目录写入限制，使用工程内独立测试目录及进程 TEMP / TMP，通过后未修改系统权限。原生日志为 assets-native-windows.log 和 assets-native-android.log；不以服务重建代替物理设备强杀验收。
 
 最终完整测试 159 项通过、5 项私密环境测试默认跳过，静态分析与 Dart 格式检查通过。重建普通入口 Release 优化包：arm64 29.28 MB、32 位 ARM 26.22 MB、x86_64 31.59 MB、Windows ZIP 21.72 MB。两组测试凭据内容扫描、APK 签名、产物摘要及 ZIP CRC 验证通过；API 35 模拟器已成功覆盖安装 x86_64 优化包并冷启动。日志 assets-full-suite.log、assets-review-build.log 位于 build/test_logs。仍使用本机内部测试签名，未推送远端。
+
+## 2026-10-28 Android applicationId 修改
+
+按用户要求，将 Android 包名从 `music.sylphy.sylphy_music` 改为 **`com.ymltsh.sylphymusic`**，并重新打包 APK：
+
+- `android/app/build.gradle.kts` 的 `namespace` 与 `applicationId` 同步修改。
+- Kotlin 源文件移动至 `android/app/src/main/kotlin/com/ymltsh/sylphymusic/`，`MainActivity.kt` 与 `CacheForegroundService.kt` 的 package 声明同步更新。
+- `tool/bootstrap_platforms.py` 的原生 runner 校验路径同步更新。
+- Android Manifest 仍使用相对 Activity / Service 名称，构建后的清单已解析为 `com.ymltsh.sylphymusic.MainActivity` 与 `com.ymltsh.sylphymusic.CacheForegroundService`。
+- Linux APPLICATION_ID、Windows 桌面标识和 Dart package 名称 `sylphy_music` 未改变；本轮只变更 Android 应用身份。
+
+验证：`flutter analyze` 无问题；使用 `tool/build_review.ps1` 重新构建并打包成功。三份 APK 经 `aapt dump badging` 核对：包名均为 `com.ymltsh.sylphymusic`、versionName 0.2.0、minSdk 24、targetSdk 36，versionCode 分别为 2002 / 1002 / 4002，ABI 分别为 arm64-v8a / armeabi-v7a / x86_64；启动 Activity 为新包名。`apksigner` 验证 APK Signature Scheme v2 通过，三份均使用同一本机 Android Debug 测试证书。SHA-256 与清单一致，APK ZIP 完整性和内容扫描通过（205 个已跟踪文件）。
+
+产物：arm64-v8a 29.43 MB、armeabi-v7a 26.40 MB、x86_64 31.74 MB；Windows ZIP 21.84 MB。日志 `build/test_logs/package-rename-review-build.log`。未在 Android 设备安装运行。由于 applicationId 改变，新包是独立的 Android 应用身份，旧包数据不会自动迁移；尚未配置正式签名，因此仍不是正式发布包。
+
+## 2026-10-28 应用显示名本地化
+
+按用户澄清，不显示双语名称，也不建立第二个桌面名称；同一应用按系统语言显示单一名称：
+
+- Android Manifest 的 `android:label` 改为 `@string/app_name`。默认资源为 `Sylphy Music`，新增 `values-zh/strings.xml` 为「风灵音乐」。
+- 首页标题与 MaterialApp 标题统一通过 `lib/ui/app_identity.dart` 获取名称：英文系统为 `Sylphy Music`，中文及其他非英文系统为「风灵音乐」。MaterialApp 的原双语 title 已移除。
+- Android 包名仍为 `com.ymltsh.sylphymusic`，未新增第二个应用身份；三份 APK 只是 ABI 拆分。
+
+验证：`flutter analyze` 无问题；Windows UI 集成测试切换英文 / 中文系统并分别断言 `Sylphy Music` 与「风灵音乐」，测试通过。重新打包后 `aapt dump badging` 显示 `application-label:'Sylphy Music'`、`application-label-zh:'风灵音乐'`；包名、versionCode、SDK、ABI 与 v2 签名均保持通过，SHA-256 / ZIP 完整性检查通过。产物尺寸保持不变：arm64-v8a 29.43 MB、armeabi-v7a 26.40 MB、x86_64 31.74 MB；Windows ZIP 21.84 MB。尚未在 Android 真机切换语言安装验证。
+
+## 2026-10-28 Android 后台播放前台服务修复
+
+应用 `SylphyMusic-android-background-playback.patch`。补丁与当前 `playback.dart` 的上下文已有差异，`git apply --check` 不能直接通过，因此按补丁逻辑逐处合并到现有实现：
+
+- 新增 `_playRequested`，让“用户想播放”的意图独立于底层播放器在切歌间隙短暂上报的 `playing=false`；`audio_service` 的 `PlaybackState.playing` 改用该意图，避免 Android 在换曲时退出前台服务。
+- 新增 `_finishingTrack`，完成回调期间上报 buffering，并防止同一完成事件重复触发切歌。
+- `_loadCurrent` 在打开下一首和申请音频焦点前先发布状态；打开期间收到暂停则不再自动播放，并在 finally 重新发布最终状态。
+- `play` / `pause` / 自动 `next` / `_finished` / `_failed` / 重连 / 清空队列 / shutdown 均同步维护播放意图；移除当前曲目时用播放意图决定是否继续。
+- 用户暂停仍然立即把 `PlaybackState.playing` 置为 false，不会因为过渡保护而继续占用前台服务。
+
+验证：`flutter analyze` 无问题；全量单元 / Widget 测试 **166 项通过、5 项默认跳过**（`build/test_logs/background-playback-full-suite.log`），包含真实 libmpv 播放、暂停、切歌、队列移除与恢复测试。日志 `build/test_logs/background-playback-analyze.log`。由于没有连接 Android 真机，尚未实测锁屏跨曲和 FGS 存活的系统行为；本轮未重新打包 APK。

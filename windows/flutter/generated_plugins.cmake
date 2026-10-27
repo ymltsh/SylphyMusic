@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   disk_space_2
   flutter_secure_storage_windows
   media_kit_libs_windows_audio
+  url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

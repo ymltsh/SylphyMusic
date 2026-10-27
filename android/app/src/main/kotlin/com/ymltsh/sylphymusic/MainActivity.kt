@@ -1,4 +1,4 @@
-package music.sylphy.sylphy_music
+package com.ymltsh.sylphymusic
 
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine

@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/app_db.dart';
 import '../data/library_catalog.dart';
+import '../services/app_updates.dart';
 import '../services/cache.dart';
 import '../services/cache_jobs.dart';
 import '../services/cloud_sync.dart';
@@ -454,6 +455,9 @@ class SylphyApp extends ChangeNotifier {
     final source = await db.source(track.ref.sourceId);
     if (source != null) await jobs.schedule(track.title, [track.ref]);
   }
+
+  Future<UpdateCheck> checkForUpdates({bool beta = false}) =>
+      AppUpdates().check(beta: beta);
 
   Future<void> clearCache({String? sourceId, Set<String>? keys}) async {
     await jobs.cancelAffected(sourceId: sourceId, trackKeys: keys);
