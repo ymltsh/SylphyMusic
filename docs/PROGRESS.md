@@ -451,3 +451,19 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 - 用户暂停仍然立即把 `PlaybackState.playing` 置为 false，不会因为过渡保护而继续占用前台服务。
 
 验证：`flutter analyze` 无问题；全量单元 / Widget 测试 **166 项通过、5 项默认跳过**（`build/test_logs/background-playback-full-suite.log`），包含真实 libmpv 播放、暂停、切歌、队列移除与恢复测试。日志 `build/test_logs/background-playback-analyze.log`。由于没有连接 Android 真机，尚未实测锁屏跨曲和 FGS 存活的系统行为；本轮未重新打包 APK。
+
+## 2026-10-28 测试签名 0.2.1+3 首次发布
+
+按用户「测试签名即可」的明确授权，完成首个可更新版本的本地构建和 GitHub Release：
+
+- `pubspec.yaml` 版本从 0.2.0+2 提升到 **0.2.1+3**，提交 `54b5f84`，标签 `v0.2.1+3` 已推送。
+- 使用 `tool/build_review.ps1` 以本机 Android Debug 测试证书构建三 ABI APK；`aapt` 核对包名 `com.ymltsh.sylphymusic`、versionName 0.2.1、versionCode 2003 / 1003 / 4003、minSdk 24、targetSdk 36，`apksigner` v2 验签通过。
+- GitHub Release：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.1%2B3
+  - `sylphy-music-0.2.1-3-arm64-v8a.apk` 29.43 MB
+  - `sylphy-music-0.2.1-3-armeabi-v7a.apk` 26.40 MB
+  - `sylphy-music-0.2.1-3-x86_64.apk` 31.74 MB
+  - `SHA256SUMS.txt`
+- `version.json` 已更新为 stable 0.2.1+3 并指向上述资产；`version-beta.json` 保持 `latest: null`。
+- 应用内更新入口保持手动检查；未接入自动下载 / 静默安装。
+
+限制：这是**测试签名**的 stable 清单，不是正式签名发布；17 项正式发布门槛仍未通过。由于 applicationId 从旧包名变更，旧包用户不会自动升级且旧数据不会迁移。尚未在 Android 真机安装验证锁屏后台播放、覆盖安装和更新检查。发布脚本因生产签名 / 正式门槛被明确绕过，改由内部构建和 GitHub API 上传；后续正式发布应恢复 `release.py` 流程。

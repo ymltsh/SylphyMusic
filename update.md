@@ -2,7 +2,7 @@
 
 参考 Mfuns Flutter 的发布体系，接入手动检查更新、分渠道清单、Android 分 ABI APK、Windows 安装程序 / 便携 ZIP、SHA-256 与 GitHub Release。发布工具为根目录 `release.py`，Python 部分仅依赖标准库。
 
-**当前只完成本地体系接入，没有发布远程版本。** `version.json` / `version-beta.json` 的 `latest` 均初始化为 `null`，不把当前开发包宣称为已发布版本。第一次启用接口前，需按项目授权流程将代码和两份清单推送到 `main`。现有内部验收继续用 `tool/build_review.ps1`。
+**首个测试签名版本 0.2.1+3 已于 2026-10-28 发布到 GitHub Release。** `version.json` 指向该版本的三个 Android APK；`version-beta.json` 的 `latest` 仍为 `null`。该版本使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布。正式发布仍需生产签名并通过发布门槛；后续切换到生产签名可能需要卸载重装。现有内部验收继续用 `tool/build_review.ps1`。
 
 ## App 手动检查更新
 
