@@ -1,0 +1,68 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libmpv-dev xvfb
+      - run: flutter pub get --enforce-lockfile
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test
+      - run: flutter analyze
+      - name: Windows build
+        if: runner.os == 'Windows'
+        run: flutter build windows --debug
+      - name: Windows native tests
+        if: runner.os == 'Windows'
+        run: flutter test integration_test/desktop_test.dart -d windows
+      - name: Windows large library test
+        if: runner.os == 'Windows'
+        run: flutter test integration_test/large_library_test.dart -d windows
+      - name: Windows WebDAV native test
+        if: runner.os == 'Windows'
+        run: flutter test integration_test/webdav_test.dart -d windows
+      - name: Linux build
+        if: runner.os == 'Linux'
+        run: flutter build linux --debug
+      - name: Unit and widget tests
+        run: flutter test
+      - name: Linux native tests
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dbus-run-session -- flutter test integration_test/desktop_test.dart -d linux --dart-define=SYLPHY_HEADLESS_AUDIO=true
+      - name: Linux large library test
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dbus-run-session -- flutter test integration_test/large_library_test.dart -d linux
+      - name: Linux WebDAV native test
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dbus-run-session -- flutter test integration_test/webdav_test.dart -d linux --dart-define=SYLPHY_HEADLESS_AUDIO=true
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build apk --debug

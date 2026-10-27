@@ -1,0 +1,570 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+
+import '../data/app_db.dart';
+import '../data/library_catalog.dart';
+import '../services/cache.dart';
+import '../services/cache_jobs.dart';
+import '../services/cloud_sync.dart';
+import '../services/media_proxy.dart';
+import '../services/playback.dart';
+import '../services/sources.dart';
+import '../services/desktop.dart';
+import '../services/local_library.dart';
+import '../services/artwork.dart';
+import '../services/library_sync.dart';
+import '../services/source_connections.dart';
+import 'models.dart';
+
+class SylphyApp extends ChangeNotifier {
+  SylphyApp._(
+    this.root,
+    this.db,
+    this.factory,
+    this.vault,
+    this.cache,
+    this.proxy,
+    this.playback,
+    this.cloud,
+    this.jobs,
+  );
+  final Directory root;
+  final AppDb db;
+  final AdapterFactory factory;
+  final AuthVault vault;
+  final CacheManager cache;
+  final MediaProxy proxy;
+  final PlaybackCoordinator playback;
+  final PlaylistSyncService cloud;
+  final CacheJobs jobs;
+  List<SourceProfile> sources = [];
+  int catalogRevision = 0;
+  late final catalog = LibraryCatalog(db);
+  List<PlaylistModel> playlists = [];
+  Set<String> blacklist = {};
+  int _busyOperations = 0;
+  bool get busy => _busyOperations > 0;
+  bool _disposed = false;
+  String? message;
+  DesktopControls? desktop;
+  late final artwork = ArtworkStore(db, factory, root);
+  late final index = LibrarySync(db, factory);
+  late final connections = SourceConnections(
+    db,
+    factory,
+    onDisabled: _suspendSource,
+    onEnabled: (source) async {
+      if (_disposed) return;
+      if (source.kind != SourceKind.local) {
+        await syncSource(source);
+      } else if (source.url != 'file:///') {
+        await rescanLocal(source);
+      }
+    },
+  );
+  static Future<SylphyApp> bootstrap({
+    Directory? dataRoot,
+    AuthVault? credentialVault,
+    bool resumeBackground = true,
+    bool platformIntegration = true,
+  }) async {
+    final root =
+        dataRoot ??
+        Directory(
+          p.join((await getApplicationSupportDirectory()).path, 'sylphy_music'),
+        );
+    final db = AppDb(root);
+    await db.open();
+    final vault = credentialVault ?? const AuthVault();
+    final factory = AdapterFactory(vault);
+    final cache = CacheManager(
+      db,
+      factory,
+      Directory(p.join(root.path, 'audio')),
+    );
+    await cache.initialize();
+    final proxy = MediaProxy(db, cache, factory);
+    await proxy.start();
+    final playback = PlaybackCoordinator(db, proxy, cache);
+    await playback.initialize();
+    final cloud = PlaylistSyncService(db, factory);
+    final jobs = CacheJobs(db, cache);
+    final app = SylphyApp._(
+      root,
+      db,
+      factory,
+      vault,
+      cache,
+      proxy,
+      playback,
+      cloud,
+      jobs,
+    );
+    app.index.addListener(app._indexChanged);
+    await app.reload();
+    if (platformIntegration) {
+      await playback.attachHandler();
+      app.desktop = DesktopControls(playback, app.disposeAsync);
+      await app.desktop!.initialize();
+    }
+    if (resumeBackground) unawaited(app._backgroundResume());
+    return app;
+  }
+
+  Future<void> _backgroundResume() async {
+    try {
+      unawaited(jobs.run());
+      final interrupted = await index.interruptedSources();
+      for (final source in [...sources]) {
+        if (source.kind != SourceKind.local &&
+            source.enabled &&
+            (interrupted.contains(source.id) ||
+                DateTime.now().millisecondsSinceEpoch - source.lastSync >
+                    6 * 60 * 60 * 1000)) {
+          try {
+            await syncSource(source);
+          } catch (_) {}
+        }
+      }
+      await cloud.syncAll();
+      await reload();
+    } catch (_) {}
+  }
+
+  Future<void> refreshIfStale() async {
+    if (busy) return;
+    for (final source in [...sources]) {
+      if (source.kind != SourceKind.local &&
+          source.enabled &&
+          DateTime.now().millisecondsSinceEpoch - source.lastSync >
+              6 * 60 * 60 * 1000) {
+        try {
+          await syncSource(source);
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<void> reload() async {
+    if (_disposed) return;
+    sources = await db.sources();
+    playlists = await db.playlists();
+    blacklist = await db.blacklist();
+    catalogRevision++;
+    notifyListeners();
+  }
+
+  void _indexChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<T> busyRun<T>(Future<T> Function() callback) async {
+    _busyOperations++;
+    message = null;
+    notifyListeners();
+    try {
+      return await callback();
+    } catch (e) {
+      message = e.toString();
+      rethrow;
+    } finally {
+      _busyOperations--;
+      if (!_disposed) await reload();
+    }
+  }
+
+  Future<void> addSource({
+    required SourceKind kind,
+    required String name,
+    required String url,
+    required String username,
+    required String password,
+  }) async {
+    final source = SourceProfile(
+      id: const Uuid().v4(),
+      name: name,
+      kind: kind,
+      url: url,
+      username: username,
+    );
+    final adapter = factory.create(source);
+    try {
+      await adapter.login(password);
+      await db.putSource(source);
+    } catch (_) {
+      await vault.delete(source.id);
+      rethrow;
+    } finally {
+      adapter.close();
+    }
+    await reload();
+    // A failed initial index never erases an old snapshot.
+    await syncSource(source);
+  }
+
+  Future<void> syncSource(SourceProfile source) async {
+    await busyRun(() async {
+      await index.sync(source);
+      if (_disposed || index.progress[source.id]?.state != 'completed') return;
+      artwork.invalidate();
+      await cloud.refreshCloudForSource(source);
+    });
+  }
+
+  Future<void> updateConnection(
+    SourceProfile source, {
+    required String name,
+    required String url,
+    required String password,
+  }) async {
+    final target = url.trim();
+    if ((source.kind == SourceKind.subsonic ||
+            source.kind == SourceKind.webdav) &&
+        target != source.url) {
+      throw StateError('此协议无法核对服务器稳定身份。更换地址请添加新来源，以隔离旧缓存和歌单');
+    }
+    // Authenticate in a fresh namespace: old tokens never reach a new endpoint.
+    final candidate = SourceProfile(
+      id: const Uuid().v4(),
+      name: name.trim(),
+      kind: source.kind,
+      url: target,
+      username: source.username,
+    );
+    final adapter = factory.create(candidate);
+    try {
+      await adapter.login(password);
+      if (source.kind == SourceKind.emby) {
+        final oldServer = await vault.read(source.id, 'serverId');
+        final newServer = await vault.read(candidate.id, 'serverId');
+        final oldUser = await vault.read(source.id, 'userId');
+        final newUser = await vault.read(candidate.id, 'userId');
+        if ((oldServer != null && oldServer != newServer) ||
+            (oldUser != null && oldUser != newUser) ||
+            (target != source.url &&
+                (oldServer == null || newServer == null))) {
+          throw StateError('无法确认是原服务器和原账号，已保留原连接；请添加独立来源');
+        }
+      }
+      if (playback.currentRef?.sourceId == source.id) await playback.pause();
+      playback.invalidateSource(source.id);
+      for (final key in ['token', 'password', 'userId', 'serverId']) {
+        final value = await vault.read(candidate.id, key);
+        if (value != null) await vault.write(source.id, key, value);
+      }
+      await db.putSource(
+        SourceProfile(
+          id: source.id,
+          name: name.trim(),
+          kind: source.kind,
+          url: target,
+          username: source.username,
+          enabled: source.enabled,
+          lastSync: source.lastSync,
+        ),
+      );
+      artwork.invalidate();
+      await reload();
+    } finally {
+      adapter.close();
+      await vault.delete(candidate.id);
+    }
+  }
+
+  Future<void> syncAll() async {
+    var failed = 0;
+    for (final s in [...sources]) {
+      if (!s.enabled || s.kind == SourceKind.local) continue;
+      try {
+        await syncSource(s);
+      } catch (_) {
+        failed++;
+      }
+    }
+    await cloud.syncAll();
+    await reload();
+    if (failed > 0) throw StateError('$failed 个来源未能完成同步，原索引已保留');
+  }
+
+  Future<void> toggleSource(SourceProfile source) async {
+    try {
+      await connections.toggle(source.id);
+    } finally {
+      await reload();
+    }
+  }
+
+  Future<void> _suspendSource(SourceProfile source) async {
+    playback.invalidateSource(source.id);
+    if (playback.currentRef?.sourceId == source.id) await playback.pause();
+    index.cancel(source.id);
+    proxy.revokeSource(source.id);
+    artwork.suspendSource(source.id);
+    await jobs.sourceUnavailable(source.id);
+    await cache.cancelSource(source.id);
+    await index.cancelAndWait(source.id);
+  }
+
+  Future<void> deleteSource(SourceProfile source) async {
+    await db.db.update(
+      'sources',
+      {'enabled': 0},
+      where: 'id=?',
+      whereArgs: [source.id],
+    );
+    await _suspendSource(source);
+    if (playback.currentRef?.sourceId == source.id) {
+      await playback.pause();
+      await playback.player.stop();
+    }
+    await jobs.cancelAffected(sourceId: source.id);
+    await cache.clear(sourceId: source.id);
+    await db.removeSourceData(source.id);
+    await artwork.clearSource(source.id);
+    await vault.delete(source.id);
+    await reload();
+  }
+
+  Future<void> toggleBlacklist(Track ref) async {
+    await db.setBlocked(ref.ref, !blacklist.contains(ref.ref.key));
+    await reload();
+  }
+
+  Future<void> toggleFavorite(Track ref) async {
+    final keys = await db.playlistKeys('favorites');
+    if (keys.contains(ref.ref.key)) {
+      keys.removeWhere((x) => x == ref.ref.key);
+    } else {
+      keys.add(ref.ref.key);
+    }
+    await db.replacePlaylistKeys('favorites', keys);
+    await reload();
+  }
+
+  Future<void> addPlaylist(String name, {SourceProfile? cloudSource}) async {
+    if (cloudSource == null) {
+      await cloud.newLocal(name);
+    } else {
+      await cloud.createCloud(cloudSource, name);
+    }
+    await reload();
+  }
+
+  Future<void> setPlaylistKeys(
+    PlaylistModel playlist,
+    List<String> keys,
+  ) async {
+    await cloud.editLocal(playlist.id, keys);
+    await reload();
+    if (playlist.kind == PlaylistKind.cloud) {
+      await cloud.syncOne(playlist.id);
+      await reload();
+    }
+  }
+
+  Future<void> syncPlaylist(PlaylistModel playlist) async {
+    await cloud.syncOne(playlist.id);
+    await reload();
+  }
+
+  Future<void> copyPlaylist(
+    PlaylistModel playlist, {
+    SourceProfile? target,
+  }) async {
+    if (target == null) {
+      await cloud.copyToLocal(playlist, '${playlist.name} · 本地副本');
+    } else {
+      await cloud.copyToCloud(playlist, target, '${playlist.name} · 云端副本');
+    }
+    await reload();
+  }
+
+  Future<void> deletePlaylist(
+    PlaylistModel playlist, {
+    bool remote = false,
+  }) async {
+    if (remote) {
+      await cloud.deleteRemoteOnline(playlist);
+    } else {
+      await db.removePlaylist(playlist.id);
+    }
+    await reload();
+  }
+
+  Future<void> cachePlaylist(PlaylistModel playlist) async {
+    final refs = (await db.playlistKeys(playlist.id))
+        .map(TrackRef.parse)
+        .where(
+          (r) => sources.any(
+            (s) => s.id == r.sourceId && s.kind != SourceKind.local,
+          ),
+        )
+        .toList();
+    await jobs.schedule(playlist.name, refs);
+    notifyListeners();
+  }
+
+  Future<String?> loadLyrics(Track track) async {
+    final source = await db.source(track.ref.sourceId);
+    if (source == null || !source.enabled) return null;
+    final saved = _lyricsFile(track.ref);
+    if (await saved.exists()) return saved.readAsString();
+    if (source.kind == SourceKind.webdav) {
+      cache.lease(track.ref);
+      try {
+        final ready = await cache.find(track.ref);
+        if (ready != null) {
+          final embedded = await LocalLibrary.embeddedLyrics(ready.file);
+          if (embedded?.trim().isNotEmpty == true) return embedded;
+        }
+      } finally {
+        cache.release(track.ref);
+      }
+    }
+    if (source.kind == SourceKind.local) {
+      final file = File(
+        p.setExtension(
+          track.remote['path']?.toString() ?? track.ref.id,
+          '.lrc',
+        ),
+      );
+      return await file.exists()
+          ? file.readAsString()
+          : track.remote['lyrics']?.toString();
+    }
+    final adapter = factory.create(source);
+    try {
+      final text = await adapter.lyrics(track);
+      if (text != null &&
+          text.isNotEmpty &&
+          utf8.encode(text).length <= 1024 * 1024 &&
+          await db.source(source.id) != null) {
+        await saved.parent.create(recursive: true);
+        await saved.writeAsString(text, flush: true);
+      }
+      return text;
+    } finally {
+      adapter.close();
+    }
+  }
+
+  File _lyricsFile(TrackRef ref) => File(
+    p.join(
+      root.path,
+      'lyrics',
+      sha256.convert(utf8.encode(ref.sourceId)).toString(),
+      '${sha256.convert(utf8.encode(ref.key))}.lrc',
+    ),
+  );
+
+  Future<void> attachLyrics(Track track) async {
+    final picked = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['lrc', 'txt'],
+    );
+    if (picked?.path == null) return;
+    final original = File(picked!.path!);
+    if (await original.length() > 1024 * 1024) {
+      throw StateError('歌词文件不能超过 1 MiB');
+    }
+    final text = await original.readAsString();
+    final target = _lyricsFile(track.ref);
+    await target.parent.create(recursive: true);
+    await target.writeAsString(text, flush: true);
+    notifyListeners();
+  }
+
+  Future<void> cacheTrack(Track track) async {
+    final source = await db.source(track.ref.sourceId);
+    if (source != null) await jobs.schedule(track.title, [track.ref]);
+  }
+
+  Future<void> clearCache({String? sourceId, Set<String>? keys}) async {
+    await jobs.cancelAffected(sourceId: sourceId, trackKeys: keys);
+    await cache.clear(sourceId: sourceId, keys: keys);
+    notifyListeners();
+  }
+
+  Future<void> importLocalFiles() async {
+    final picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3', 'flac', 'ogg', 'opus', 'wav', 'm4a', 'aac'],
+    );
+    if (picked.isEmpty) return;
+    var local = sources.where((s) => s.kind == SourceKind.local).firstOrNull;
+    local ??= const SourceProfile(
+      id: 'local',
+      name: '本地音乐',
+      kind: SourceKind.local,
+      url: 'file:///',
+      username: '',
+    );
+    await db.putSource(local);
+    final old = await db.tracks(sourceId: local.id, includeMissing: true);
+    final entries = {for (final t in old) t.ref.id: t};
+    for (final item in picked) {
+      final path = item.path;
+      if (path == null) continue;
+      var f = File(path);
+      if (!await f.exists()) continue;
+      final scanner = LocalLibrary(root);
+      f = await scanner.ownAndroidImport(f);
+      final track = await scanner.read(f, local.id);
+      entries[track.ref.id] = track;
+    }
+    await db.replaceSourceTracks(local.id, entries.values.toList());
+    await reload();
+  }
+
+  Future<void> importLocalFolder() async {
+    final path = await FilePicker.getDirectoryPath();
+    if (path == null) return;
+    final id = const Uuid().v4();
+    final source = SourceProfile(
+      id: id,
+      name: p.basename(path),
+      kind: SourceKind.local,
+      url: Directory(path).uri.toString(),
+      username: '',
+    );
+    await busyRun(() async {
+      final tracks = await LocalLibrary(root).scan(Directory(path), id, []);
+      await db.putSource(source);
+      await db.replaceSourceTracks(id, tracks);
+    });
+  }
+
+  Future<void> rescanLocal(SourceProfile source) async {
+    if (source.url == 'file:///') return;
+    await busyRun(() async {
+      final old = await db.tracks(sourceId: source.id, includeMissing: true);
+      final tracks = await LocalLibrary(root)
+          .scan(Directory.fromUri(Uri.parse(source.url)), source.id, old);
+      await db.replaceSourceTracks(source.id, tracks);
+    });
+  }
+
+  Future<void> disposeAsync() async {
+    if (_disposed) return;
+    _disposed = true;
+    desktop?.dispose();
+    index.removeListener(_indexChanged);
+    await index.shutdown();
+    await connections.shutdown();
+    await jobs.shutdown();
+    await playback.shutdown();
+    await proxy.dispose();
+    await cache.shutdown();
+    await artwork.shutdown();
+    await db.close();
+  }
+}
