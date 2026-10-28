@@ -1,32 +1,32 @@
 [
   {
-    "id": "alt_23b9bc0a7733",
-    "label": "实心蓝",
-    "preview": "assets/launcher_icons/实心蓝.png"
+    "id": "alt_ba18c34f010d",
+    "label": "高气压",
+    "preview": "assets/launcher_icons/2.高气压.png"
   },
   {
-    "id": "alt_c33c7b802bcc",
-    "label": "白底圆点",
-    "preview": "assets/launcher_icons/白底圆点.png"
+    "id": "alt_2ccaaaead9d9",
+    "label": "春风拂面",
+    "preview": "assets/launcher_icons/3.春风拂面.png"
   },
   {
-    "id": "alt_36ca5d8fd2af",
-    "label": "银发精灵",
-    "preview": "assets/launcher_icons/银发精灵.png"
+    "id": "alt_752a74c44a78",
+    "label": "杨柳依依",
+    "preview": "assets/launcher_icons/4.杨柳依依.png"
   },
   {
-    "id": "alt_fb06e5aff996",
-    "label": "青绿实心",
-    "preview": "assets/launcher_icons/青绿实心.png"
+    "id": "alt_a644bb7bced9",
+    "label": "点阵白",
+    "preview": "assets/launcher_icons/5.点阵白.png"
   },
   {
-    "id": "alt_8492f8a3df98",
-    "label": "青绿线形",
-    "preview": "assets/launcher_icons/青绿线形.png"
+    "id": "alt_cf98829dea87",
+    "label": "点阵黑",
+    "preview": "assets/launcher_icons/6.点阵黑.png"
   },
   {
-    "id": "alt_8a2553adc66a",
-    "label": "黑底圆点",
-    "preview": "assets/launcher_icons/黑底圆点.png"
+    "id": "alt_675dec0e3a30",
+    "label": "风精灵",
+    "preview": "assets/launcher_icons/7.风精灵.png"
   }
 ]

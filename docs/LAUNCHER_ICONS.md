@@ -2,20 +2,33 @@
 
 ## 准备图标
 
-将自制 PNG（建议透明底、1024×1024，必须是 192–4096 px 的正方形）复制到 `assets/launcher_icons/`，例如：
+将自制 PNG（建议 512×512，必须是 192–4096 px 的正方形）复制到 `assets/launcher_icons/`，例如：
 
 ```
 assets/launcher_icons/
-├── 经典蓝.png
-├── 极简黑.png
-└── 节日版.png
+├── 高气压.png
+├── 春风拂面.png
+└── 杨柳依依.png
 ```
 
-文件名（不带 `.png`）是 App 中显示的图标名称。内置默认图标使用 `assets/icon.png`（当前为线条蓝），不放入此目录；默认选项之外保留 6 个备用图标。PNG 图标将由生成脚本按原文件复制到 `res/mipmap-nodpi`，不进行修改或再压缩。建议自行设计符合 Android 安全区域的图案。
+文件名（不带 `.png`）是 App 中显示的图标名称；文件名前的数字只用于排序，例如 `2.高气压.png` 显示为「高气压」。内置默认图标使用 `assets/icon.png`（当前为「微风与低音」），不放入此目录；默认选项之外保留 6 个备用图标：高气压、春风拂面、杨柳依依、点阵白、点阵黑、风精灵。PNG 图标由生成脚本按原文件复制到 `res/mipmap-nodpi`，不进行修改或再压缩。
+
+关于页的 Logo 单独使用 `assets/about.png`（透明底），不再复用桌面默认图标。
+
+## 生成默认图标与平台图标
+
+默认图标以 `assets/icon.png` 为准。修改后运行：
+
+```bash
+python tool/generate_icons.py
+```
+
+脚本从 `assets/icon.png` 派生 Android `mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png` 和 Windows `runner/resources/app_icon.ico`（16–256 px 多尺寸），只依赖 Python 标准库。
 
 ## 更新图标清单并打包
 
 ```bash
+python tool/generate_icons.py
 python tool/generate_launcher_variants.py
 dart format lib/ui/settings_page.dart lib/ui/launcher_icon_picker.dart lib/services/launcher_icon_service.dart
 flutter analyze
@@ -41,3 +54,4 @@ flutter build apk --debug
 2. 切换每个图标与切回默认；桌面显示无重复入口，图标在重启和更新后仍然保留。
 3. 后台播放音乐时切换图标，检查通知、播放状态和桌面快捷方式。
 4. 对 Android 12 / 13 / 15+ 和不同厂商启动器分别验证。
+5. 关于页显示透明底的 `assets/about.png`；换用新图标后不应再出现桌面旧图标的白色方块。

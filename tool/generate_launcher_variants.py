@@ -9,12 +9,23 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import struct
 
 ROOT = Path(__file__).resolve().parents[1]
 START = '        <!-- LAUNCHER_ICON_ALIASES_START -->'
 END = '        <!-- LAUNCHER_ICON_ALIASES_END -->'
+ORDER_PREFIX = re.compile(r'^\d+[.．、_\-\s]\s*')
+
+
+def label_for(image: Path) -> str:
+    """Display name; a leading number such as ``3.`` only controls the order."""
+    return ORDER_PREFIX.sub('', image.stem).strip() or image.stem
+
+
+def sort_key(image: Path) -> list[object]:
+    return [int(part) if part.isdigit() else part for part in re.split(r'(\d+)', image.name.casefold())]
 
 
 def generate(root: Path = ROOT) -> list[dict[str, str]]:
@@ -22,19 +33,22 @@ def generate(root: Path = ROOT) -> list[dict[str, str]]:
     manifest = root / 'android/app/src/main/AndroidManifest.xml'
     catalog_path = root / 'android/app/src/main/assets/launcher_icons.json'
     mipmap_dir = root / 'android/app/src/main/res/mipmap-nodpi'
-    all_icons = sorted(icons_dir.glob('*.png'), key=lambda path: path.name.casefold())
+    all_icons = sorted(icons_dir.glob('*.png'), key=sort_key)
+    labels = [label_for(image) for image in all_icons]
+    if len(set(labels)) != len(labels):
+        raise ValueError(f'Launcher icon labels must be unique: {labels}')
+    if any(label.casefold() == 'default' for label in labels):
+        raise ValueError('The default icon is assets/icon.png; rename launcher_icons/default.png')
     entries: list[dict[str, str]] = []
-    for image in all_icons:
+    for image, label in zip(all_icons, labels):
         data = image.read_bytes()
         if len(data) < 24 or not data.startswith(b'\x89PNG\r\n\x1a\n') or data[12:16] != b'IHDR':
             raise ValueError(f'Not a PNG: {image.name}')
         width, height = struct.unpack('>II', data[16:24])
         if width != height or width < 192 or width > 4096:
             raise ValueError(f'Icon {image.name} must be square, 192..4096 px (actual: {width}x{height})')
-        if image.stem.casefold() == 'default':
-            raise ValueError('The default icon is assets/icon.png; rename launcher_icons/default.png')
         ident = 'alt_' + hashlib.sha256(image.name.encode('utf-8')).hexdigest()[:12]
-        entries.append({'id': ident, 'label': image.stem, 'preview': f'assets/launcher_icons/{image.name}'})
+        entries.append({'id': ident, 'label': label, 'preview': f'assets/launcher_icons/{image.name}'})
 
     current_manifest = manifest.read_text(encoding='utf-8')
     if current_manifest.count(START) != 1 or current_manifest.count(END) != 1:

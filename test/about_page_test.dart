@@ -91,6 +91,19 @@ void main() {
     expect(find.byType(LicensePage), findsOneWidget);
   });
 
+  testWidgets('about logo uses the dedicated transparent artwork', (
+    tester,
+  ) async {
+    await showAbout(tester);
+    final logo = tester.widget<Image>(
+      find.descendant(
+        of: find.byKey(const ValueKey('about-logo-easter-egg')),
+        matching: find.byType(Image),
+      ),
+    );
+    expect((logo.image as AssetImage).assetName, 'assets/about.png');
+  });
+
   testWidgets('seven taps unlock a constellation that can close and reopen', (
     tester,
   ) async {

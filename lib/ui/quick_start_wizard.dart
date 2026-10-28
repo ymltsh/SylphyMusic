@@ -141,6 +141,9 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
     final theme = Theme.of(context);
     final sourceBusy = _sourceWorking || _saving || widget.app.busy;
     return Scaffold(
+      backgroundColor: _step == 0 && theme.brightness == Brightness.light
+          ? const Color(0xFFF7F9FE)
+          : null,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -172,10 +175,11 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                  child: _buttons(_saving),
-                ),
+                if (_step != 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                    child: _buttons(_saving),
+                  ),
               ],
             ),
           ),
@@ -184,21 +188,64 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
     );
   }
 
-  /// The first page intentionally has only the brand icon and slogan.
-  Widget _welcome(ThemeData theme) => Center(
+  /// A spacious welcome composition inspired by the introductory mockup.
+  /// All spacing is flexible so the same page fits small phones and desktops.
+  Widget _welcome(ThemeData theme) => LayoutBuilder(
     key: const ValueKey('quick-start-welcome'),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.air_rounded, size: 92, color: theme.colorScheme.primary),
-        const SizedBox(height: 24),
-        Text(
-          '让音乐，轻盈相随',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium,
+    builder: (context, constraints) {
+      final compact = constraints.maxHeight < 700;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          children: [
+            const Spacer(flex: 8),
+            Icon(
+              Icons.air_rounded,
+              size: compact ? 76 : 92,
+              color: theme.colorScheme.primary,
+            ),
+            SizedBox(height: compact ? 16 : 20),
+            Text(
+              '让音乐，轻盈相随',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontSize: compact ? 24 : 28,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: compact ? 18 : 24),
+            Text(
+              '欢迎使用风灵音乐！\n'
+              '连接你的私人音乐库，享受纯净听歌\n'
+              '体验，离线也能自在聆听。',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: compact ? 13 : 14,
+                height: 1.5,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(flex: 7),
+            IconButton.filled(
+              key: const ValueKey('quick-start-next'),
+              tooltip: '开始使用',
+              onPressed: _saving ? null : () => _go(1),
+              style: IconButton.styleFrom(
+                fixedSize: Size.square(compact ? 70 : 76),
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+              ),
+              icon: const Icon(Icons.arrow_forward_rounded, size: 38),
+            ),
+            const Spacer(flex: 5),
+          ],
         ),
-      ],
-    ),
+      );
+    },
   );
 
   Widget _sources(ThemeData theme, bool busy) => ListView(
@@ -311,15 +358,6 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
   );
 
   Widget _buttons(bool busy) {
-    if (_step == 0) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: busy ? null : () => _go(1),
-          child: const Text('开始使用'),
-        ),
-      );
-    }
     if (_step == 1) {
       return Row(
         children: [

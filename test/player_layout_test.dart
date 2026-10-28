@@ -247,6 +247,54 @@ void main() {
     expect(restored.bounds(restored.elements.first, wide), isNot(wideBounds));
   });
 
+  test('lyrics default color mode round-trips and reads older layouts', () {
+    final layout = playerTemplate();
+    final lyrics = layout.elements.firstWhere(
+      (e) => e.type == PlayerPart.lyrics,
+    );
+    expect(lyrics.lyricFollowSystemColor, isTrue);
+    expect(lyrics.color, isNull);
+
+    PlayerElement restoredLyric(PlayerLayout source) =>
+        source.elements.firstWhere((e) => e.type == PlayerPart.lyrics);
+    expect(
+      restoredLyric(PlayerLayout.decode(layout.encode()))
+          .lyricFollowSystemColor,
+      isTrue,
+    );
+
+    final oldJson = jsonDecode(layout.encode()) as Map<String, dynamic>;
+    final elements = oldJson['elements'] as List<dynamic>;
+    final lyricJson = elements.cast<Map<String, dynamic>>().firstWhere(
+      (e) => e['type'] == 'lyrics',
+    );
+    (lyricJson['props'] as Map<String, dynamic>).remove(
+      'lyricFollowSystemColor',
+    );
+    expect(
+      restoredLyric(PlayerLayout.decode(jsonEncode(oldJson)))
+          .lyricFollowSystemColor,
+      isTrue,
+    );
+
+    final theme = lyrics.copyWith(lyricFollowSystemColor: false);
+    expect(
+      PlayerElement.fromJson(theme.toJson()).lyricFollowSystemColor,
+      isFalse,
+    );
+    final preset = lyrics.copyWith(
+      color: 0xff82c7e4,
+      lyricFollowSystemColor: false,
+    );
+    expect(PlayerElement.fromJson(preset.toJson()).color, 0xff82c7e4);
+    final backToDefault = preset.copyWith(
+      clearColor: true,
+      lyricFollowSystemColor: true,
+    );
+    expect(backToDefault.color, isNull);
+    expect(backToDefault.lyricFollowSystemColor, isTrue);
+  });
+
   test(
     'malformed v2 files, future versions and duplicate components are rejected',
     () {
@@ -266,6 +314,7 @@ void main() {
         (j) => j['elements'][0]['props']['controlSpacing'] = -1,
         (j) => j['elements'][0]['props']['lyricLineHeight'] = .5,
         (j) => j['elements'][0]['props']['lyricLineHeight'] = 3,
+        (j) => j['elements'][0]['props']['lyricFollowSystemColor'] = 'yes',
         (j) => j['elements'].add(j['elements'][0]),
         (j) => j['elements'][0]['props']['opacity'] = '1',
       ]) {

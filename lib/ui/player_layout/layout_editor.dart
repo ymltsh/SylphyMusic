@@ -753,10 +753,23 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                     ),
                   ],
                   if (e.type != PlayerPart.cover &&
-                      e.type != PlayerPart.favorite)
+                      e.type != PlayerPart.favorite) ...[
                     Wrap(
                       spacing: 4,
                       children: [
+                        if (e.type == PlayerPart.lyrics)
+                          ChoiceChip(
+                            key: const ValueKey('editor-lyric-default-color'),
+                            label: const Text('默认'),
+                            selected:
+                                e.color == null && e.lyricFollowSystemColor,
+                            onSelected: (_) => draft.update(
+                              e.copyWith(
+                                clearColor: true,
+                                lyricFollowSystemColor: true,
+                              ),
+                            ),
+                          ),
                         for (final c in <int?>[
                           null,
                           0xffffffff,
@@ -768,13 +781,27 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                             label: c == null
                                 ? const Text('主题')
                                 : Icon(Icons.circle, color: Color(c), size: 18),
-                            selected: e.color == c,
+                            selected: c == null
+                                ? e.color == null &&
+                                      (e.type != PlayerPart.lyrics ||
+                                          !e.lyricFollowSystemColor)
+                                : e.color == c,
                             onSelected: (_) => draft.update(
-                              e.copyWith(color: c, clearColor: c == null),
+                              e.copyWith(
+                                color: c,
+                                clearColor: c == null,
+                                lyricFollowSystemColor: false,
+                              ),
                             ),
                           ),
                       ],
                     ),
+                    if (e.type == PlayerPart.lyrics)
+                      const Text(
+                        '默认颜色随系统切换：浅色为黑色，深色为白色。',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                  ],
                 ],
               ),
             ),

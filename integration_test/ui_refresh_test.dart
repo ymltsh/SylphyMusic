@@ -95,8 +95,17 @@ void main() {
         await tester.pumpWidget(shell());
         await tester.pumpAndSettle();
         expect(find.text('让音乐，轻盈相随'), findsOneWidget);
+        expect(find.textContaining('欢迎使用风灵音乐！'), findsOneWidget);
+        expect(find.byTooltip('开始使用'), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_forward_rounded), findsOneWidget);
         await capture('welcome-mobile');
-        await tester.tap(find.text('开始使用'));
+        tester.view.physicalSize = const Size(320, 640);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await capture('welcome-small');
+        tester.view.physicalSize = const Size(360, 800);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('开始使用'));
         await tester.pumpAndSettle();
         expect(find.text('选择歌曲来源'), findsOneWidget);
         expect(find.text('Navidrome / OpenSubsonic'), findsOneWidget);

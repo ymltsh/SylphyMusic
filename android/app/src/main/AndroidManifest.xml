@@ -43,11 +43,11 @@
         </activity-alias>
         <!-- LAUNCHER_ICON_ALIASES_START -->
         <activity-alias
-            android:name=".LauncherIcon_alt_23b9bc0a7733"
+            android:name=".LauncherIcon_alt_ba18c34f010d"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_23b9bc0a7733"
+            android:icon="@mipmap/ic_launcher_alt_ba18c34f010d"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -55,11 +55,11 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LauncherIcon_alt_c33c7b802bcc"
+            android:name=".LauncherIcon_alt_2ccaaaead9d9"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_c33c7b802bcc"
+            android:icon="@mipmap/ic_launcher_alt_2ccaaaead9d9"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -67,11 +67,11 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LauncherIcon_alt_36ca5d8fd2af"
+            android:name=".LauncherIcon_alt_752a74c44a78"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_36ca5d8fd2af"
+            android:icon="@mipmap/ic_launcher_alt_752a74c44a78"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -79,11 +79,11 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LauncherIcon_alt_fb06e5aff996"
+            android:name=".LauncherIcon_alt_a644bb7bced9"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_fb06e5aff996"
+            android:icon="@mipmap/ic_launcher_alt_a644bb7bced9"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -91,11 +91,11 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LauncherIcon_alt_8492f8a3df98"
+            android:name=".LauncherIcon_alt_cf98829dea87"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_8492f8a3df98"
+            android:icon="@mipmap/ic_launcher_alt_cf98829dea87"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -103,11 +103,11 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".LauncherIcon_alt_8a2553adc66a"
+            android:name=".LauncherIcon_alt_675dec0e3a30"
             android:targetActivity=".MainActivity"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_alt_8a2553adc66a"
+            android:icon="@mipmap/ic_launcher_alt_675dec0e3a30"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

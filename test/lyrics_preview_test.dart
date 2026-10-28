@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sylphy_music/core/player_layout.dart';
 import 'package:sylphy_music/ui/lyrics_view.dart';
+import 'package:sylphy_music/ui/player_layout/layout_renderer.dart';
 
 void main() {
   Widget view(
@@ -27,6 +29,52 @@ void main() {
       ),
     ),
   );
+  testWidgets('default lyric color follows the system, not the accent', (
+    tester,
+  ) async {
+    const lyrics = PlayerElement(
+      id: 'lyrics',
+      type: PlayerPart.lyrics,
+      frame: Rect.fromLTWH(0, 0, .5, .5),
+    );
+
+    Future<Color?> resolve(Brightness brightness, PlayerElement element) async {
+      Color? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.light(),
+          home: MediaQuery(
+            data: MediaQueryData(platformBrightness: brightness),
+            child: Builder(
+              builder: (context) {
+                result = PlayerWidgetRegistry.lyricHighlightColor(
+                  context,
+                  element,
+                );
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      );
+      return result;
+    }
+
+    expect(await resolve(Brightness.light, lyrics), Colors.black);
+    expect(await resolve(Brightness.dark, lyrics), Colors.white);
+    expect(
+      await resolve(
+        Brightness.dark,
+        lyrics.copyWith(lyricFollowSystemColor: false),
+      ),
+      isNull,
+    );
+    expect(
+      await resolve(Brightness.dark, lyrics.copyWith(color: 0xff82c7e4)),
+      const Color(0xff82c7e4),
+    );
+  });
+
   testWidgets(
     'line height changes actual lyric spacing and visible neighbours',
     (tester) async {

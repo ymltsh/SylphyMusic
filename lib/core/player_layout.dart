@@ -47,6 +47,7 @@ class PlayerElement {
     this.lyricLineHeight = 1.5,
     this.align = 'center',
     this.color,
+    this.lyricFollowSystemColor = true,
   });
   final String id;
   final PlayerPart type;
@@ -61,6 +62,10 @@ class PlayerElement {
   final double lyricLineHeight;
   final String align;
   final int? color;
+
+  /// Only the lyrics preview uses this flag. It selects system black/white
+  /// instead of the usual theme accent when no explicit color is set.
+  final bool lyricFollowSystemColor;
 
   PlayerElement copyWith({
     Rect? frame,
@@ -77,6 +82,7 @@ class PlayerElement {
     String? align,
     int? color,
     bool clearColor = false,
+    bool? lyricFollowSystemColor,
   }) => PlayerElement(
     id: id,
     type: type,
@@ -93,6 +99,8 @@ class PlayerElement {
     lyricLineHeight: lyricLineHeight ?? this.lyricLineHeight,
     align: align ?? this.align,
     color: clearColor ? null : color ?? this.color,
+    lyricFollowSystemColor:
+        lyricFollowSystemColor ?? this.lyricFollowSystemColor,
   );
 
   Map<String, Object?> toJson() => {
@@ -112,6 +120,8 @@ class PlayerElement {
       'lyricLineHeight': lyricLineHeight,
       'align': align,
       if (color != null) 'color': color,
+      if (type == PlayerPart.lyrics)
+        'lyricFollowSystemColor': lyricFollowSystemColor,
     },
   };
 
@@ -126,8 +136,8 @@ class PlayerElement {
     if (color != null && (color is! int || color < 0 || color > 0xffffffff)) {
       throw const FormatException('无效颜色');
     }
-    bool flag(String key) {
-      final v = props[key] ?? false;
+    bool flag(String key, {bool defaultValue = false}) {
+      final v = props[key] ?? defaultValue;
       if (v is! bool) throw const FormatException('无效属性');
       return v;
     }
@@ -150,6 +160,10 @@ class PlayerElement {
       radius: _number(props['radius'] ?? 24, 0, 64),
       align: align as String,
       color: color as int?,
+      lyricFollowSystemColor: flag(
+        'lyricFollowSystemColor',
+        defaultValue: true,
+      ),
     );
   }
 }

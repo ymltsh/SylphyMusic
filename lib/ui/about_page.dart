@@ -359,7 +359,7 @@ class _AboutLogoEasterEggState extends State<_AboutLogoEasterEgg> {
                     ),
                   ],
                 ),
-                child: Image.asset('assets/icon.png', fit: BoxFit.contain),
+                child: Image.asset('assets/about.png', fit: BoxFit.contain),
               ),
             ),
             if (_tapCount > 0) ...[

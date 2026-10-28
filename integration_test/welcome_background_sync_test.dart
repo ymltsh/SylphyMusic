@@ -76,8 +76,8 @@ void main() {
           tester.view.devicePixelRatio = 1;
           tester.view.physicalSize = const Size(360, 800);
           await tester.pumpWidget(MaterialApp(home: SylphyShell(app: app)));
-          await waitUntil(() => find.text('开始使用').evaluate().isNotEmpty);
-          await tester.tap(find.text('开始使用'));
+          await waitUntil(() => find.byTooltip('开始使用').evaluate().isNotEmpty);
+          await tester.tap(find.byTooltip('开始使用'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('WebDAV'));
           await tester.pumpAndSettle();

@@ -736,3 +736,27 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时停止，恢复时保留并跳过已完成标签（lease-timeout-android.log）；真实慢速缓存与同步并行，播放 / 暂停、Home / 熄屏 / 移除最近任务后 Dart 心跳及 SQLite 写入继续，双方分别暂停不释放另一租约，重新打开 Activity 保持同一引擎且 Dart 仅启动一次，最终全部释放（lease-overlap-android.log）。可复跑工具 tool/check_android_fgs.py 仅允许 SylphyTest_API35，临时时限已恢复为原值 null。Windows 原生 WebDAV 标签 / 封面 / 歌词持久化及离线重启通过（lease-windows-webdav.log）。
 
 本轮仅修改并验证本地源码，未提交、推送、发布或重新生成 Release 安装包；线上仍为 0.2.5-beta+8。真机厂商后台策略、强停后恢复及 Linux 未在本轮验收。普通暂停仍有 60 秒无回执兜底；系统超时 / 进程死亡不承诺清理代码一定执行，恢复依靠原子索引和已提交标签。
+
+## 2026-10-28 更换 7 个应用图标与关于页 Logo
+
+按用户新提供的 `logo/` 素材替换全部 7 个图标：默认改为「微风与低音」（`assets/icon.png`），备用图标改为高气压、春风拂面、杨柳依依、点阵白、点阵黑、风精灵（`assets/launcher_icons/`）。源图按最长边缩放到 512×512（两张点阵原图 384×384 保持原尺寸）；关于页 Logo 改用透明底的 `assets/about.png`，不再复用桌面默认图标。原生默认选项标签同步为「微风与低音（默认）」，旧 alias、旧 nodpi 资源和旧预览图已移除。
+
+生成链路保持零第三方依赖：新增 `tool/png_raster.py`（8 位 PNG 读写、三角滤波缩放、多尺寸 ICO），`tool/generate_icons.py` 改为从 `assets/icon.png` 派生 Android 五档 mipmap 与 Windows `app_icon.ico`（16–256 px 共 9 档）；`tool/generate_launcher_variants.py` 新增文件名数字前缀排序（显示时去掉前缀）与标签唯一性校验。
+
+验证：`dart format` 全仓库无改动；`flutter analyze --no-pub` 无问题；全量单元 / Widget 测试 **235 项通过、5 项私密联调默认跳过**（`build/test_logs/icon-refresh-full-suite.log`）；新增 `test/test_icon_tools.py` 7 项 Python 测试通过；`test/about_page_test.dart` 新增关于页 Logo 资源断言。Android Debug APK 构建成功，`aapt` 确认 7 个 launcher alias（默认 + 6 备用）、五档 mipmap 与 6 张 nodpi 备用图标，APK 内含 `assets/about.png`；Windows Debug 构建成功，`app_icon.ico` 经 `rc.exe` 编译通过，生成的 EXE 内嵌新图标。Windows 原生 UI 集成测试通过，关于页截图 `build/test_logs/ui/about-mobile.png` 确认透明 Logo 正常显示。未在 Android 真机 / 模拟器验证图标切换和关于页渲染，未重新生成 Release 安装包；Linux 验收继续暂缓。
+
+## 2026-10-28 应用歌词预览系统深浅色补丁
+
+应用用户提供的 `sylphymusic-lyrics-preview-system-color.patch`：`PlayerElement` 新增 `lyricFollowSystemColor`（默认 `true`，仅在歌词预览的 props 中序列化，旧模板按 `true` 读取）；编辑器歌词颜色新增「默认」选项，与「主题」及预设色互斥，并显示颜色说明。`PlayerWidgetRegistry.lyricHighlightColor` 统一加载指示器与歌词高亮取色：显式颜色优先，其次按 `MediaQuery.platformBrightness` 使用黑 / 白，未启用默认模式时回退主题主色。
+
+文档补充默认 / 主题 / 预设色行为与 `props.lyricFollowSystemColor` 兼容规则。验证：`dart format` 仅调整补丁排版；`flutter analyze --no-pub` 无问题；全量测试 **237 项通过、5 项私密联调默认跳过**（`build/test_logs/lyrics-system-color-full-suite.log`）；补丁新增 2 项测试覆盖序列化往返、旧模板回读、非法值拒绝，以及系统浅 / 深色、关闭默认模式和显式颜色的取色结果。Windows 原生 UI 集成测试与播放器布局集成测试通过（`build/test_logs/lyrics-system-color-windows-ui.log`、`build/test_logs/lyrics-system-color-layout-ui.log`），编辑器截图 `build/test_logs/layout/editor-lyrics-spacing-mobile.png` 确认「默认 / 主题 / 预设色」和说明文字布局正常。
+
+注意：默认模式按系统 `platformBrightness` 取色，而播放页底色跟随应用内浅 / 深色设置；在应用内强制深浅色与系统相反时，默认歌词颜色可能与底色同色，可改用「主题」或预设色。未在 Android 真机 / 模拟器验证；未重新生成 Release 安装包。
+
+## 2026-10-28 应用欢迎页重设计补丁
+
+应用用户提供的 `sylphymusic-welcome-redesign.patch`：首次引导第 1 步改为浅色留白欢迎页（浅色主题使用 `#F7F9FE` 背景，深色沿用主题底色），包含风形图标、标语、三行简介和圆形箭头按钮，移除底部「开始使用」按钮；`LayoutBuilder` 按可用高度切换图标、字号与间距，320×640 与 360×800 均无溢出。第 2、3 步的进度头、底部按钮和原有流程不变。
+
+同步适配 `integration_test/welcome_background_sync_test.dart`，改用 `find.byTooltip('开始使用')` 触发（旧文字按钮已移除）；`ui_refresh_test.dart` 增加简介、箭头按钮和 320×640 截图断言。文档更新首次引导描述。
+
+验证：`dart format` 通过；`flutter analyze --no-pub` 无问题；全量测试 **237 项通过、5 项私密联调默认跳过**（`build/test_logs/welcome-redesign-full-suite.log`）；Windows 原生 `ui_refresh_test.dart` 与 `welcome_background_sync_test.dart`（保存 / 跳过 API 两条路径）通过（`build/test_logs/welcome-redesign-ui.log`、`build/test_logs/welcome-redesign-sync.log`）；截图 `build/test_logs/ui/welcome-mobile.png`、`welcome-small.png` 确认布局与按钮位置。深色欢迎页仅核对主题取色路径，未单独截图；未在 Android 真机 / 模拟器验证；未重新生成 Release 安装包。

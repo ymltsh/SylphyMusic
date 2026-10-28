@@ -140,12 +140,21 @@ class PlayerWidgetRegistry {
     child: builders[element.type]!(context, element, data),
   );
 
+  static Color? lyricHighlightColor(BuildContext context, PlayerElement e) {
+    if (e.color != null) return Color(e.color!);
+    if (!e.lyricFollowSystemColor) return null;
+    return MediaQuery.platformBrightnessOf(context) == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+  }
+
   static Widget _lyrics(
     BuildContext context,
     PlayerElement e,
     PlayerWidgetContext data,
   ) {
     final scheme = Theme.of(context).colorScheme;
+    final highlightColor = lyricHighlightColor(context, e);
     Widget message(String text) => Center(
       child: Text(
         text,
@@ -167,7 +176,7 @@ class PlayerWidgetRegistry {
                     dimension: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: e.color == null ? null : Color(e.color!),
+                      color: highlightColor,
                     ),
                   ),
                 );
@@ -191,7 +200,7 @@ class PlayerWidgetRegistry {
                 position: data.app.playback.position,
                 fontSize: data.app.appearance.miniLyricFontSize,
                 lineHeight: e.lyricLineHeight,
-                highlightColor: e.color == null ? null : Color(e.color!),
+                highlightColor: highlightColor,
               );
             },
           );
