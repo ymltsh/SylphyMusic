@@ -155,3 +155,5 @@ Android 系统栏由 `ui/system_bars.dart` 在应用启动和 MaterialApp.builde
 WebDAV 的 `WebDavTags` 由 SylphyApp 共享给 ArtworkStore / LyricsStore：按来源、曲目、资源版本和代次合并有界 Range 读取，最多三个并发；完整缓存可离线提取，解析在 isolate 执行。内嵌封面与歌词优先于旁置文件，手动歌词仍最高；结果沿用 MediaAssetStore 原子落盘。停用来源取消匹配请求，应用退出先关闭标签生产者，再等待资源消费者并关闭数据库。目录同步仍只读取目录属性，不为标签遍历下载全库。
 
 WebDAV 文本标签通过 WebDavTags.onTags 回调交给 AppDb 事务保存；SQLite v7 新增 webdav_track_tags，并为索引暂存补充 resource_version。commitIndex 仅合并匹配资源版本的标签，避免 PROPFIND 重扫覆盖已解析的艺术家 / 专辑。WebDavMetadataEnricher 在进程内按 50 首分页渐进补全，可见曲目优先，catalogRevision 最多每两秒通知；退出时先停止补全生产，再取消标签读取，等待遍历与可见任务后关闭 SQLite。
+
+手动同步通过 SyncForeground / SyncForegroundService 管理 dataSync 通知与取消；Android UI 引擎由 SylphyApplication 持有并与 audio_service 缓存共用，Activity 解绑不销毁引擎。缓存生命周期 Channel 同样由 Application 注册。Windows 同步复用相同业务入口，桥接不调用 Android Channel。退出等待前台同步 future 与标签遍历后关闭数据库；详见 [Android 同步服务](ANDROID_SYNC_FGS.md)。

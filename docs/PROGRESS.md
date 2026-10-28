@@ -574,3 +574,9 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 源码提交 `fa59a50`，测试版标签 `v0.2.4-beta2+7`，beta 清单提交 `ba33bc4`。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta2%2B7 。正式渠道保持 0.2.3+5，beta 历史保留 0.2.4-beta+6。
 
 三份 APK 与 SHA256SUMS.txt 已公开，远端四个资产的大小与 SHA-256 均与本地一致；arm64 原始和配置加速下载链接返回 HTTP 200。arm64-v8a 31.51 MiB、armeabi-v7a 28.62 MiB、x86_64 33.71 MiB；versionName 0.2.4-beta2，versionCode 分别为 2007 / 1007 / 4007。签名与现有测试版本相同，凭据扫描通过。自建 Android API35 模拟器从 beta+6 Release 覆盖安装 beta2+7 并启动成功。仍为测试签名，尚待 Android 真机验收，Linux 验收继续暂缓。
+
+## 2026-10-28 Android 前台同步补丁及双端测试更新准备
+
+应用用户提供的 Android FGS sync 补丁，适配当前控制器上下文；新增手动同步通知、进度 / 暂停、WebDAV 只补全入口和 Application 引擎持有。补充 audio_service 缓存身份与引擎释放兼容、服务启动确认、取消在线读取和退出等待。准备 0.2.5-beta+8 Android / Windows 测试渠道更新。Android API35 模拟器已验证移除 Activity 后继续同步、系统短时限终止服务、重开 Activity 继续标签补全并跳过已完成网络读取；模拟器设置已恢复。真机 / 厂商后台策略仍待验证。
+
+本轮验证：flutter analyze 无问题；全量串行 201 项测试通过、5 项私密测试默认跳过；Android API35 同步前台服务集成与 Windows 全界面原生集成通过。新桥接测试覆盖启动失败 / 重试、进度节流、原生暂停 / 超时事件与桌面空实现。

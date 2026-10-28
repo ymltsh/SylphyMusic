@@ -18,6 +18,9 @@ class CacheJobs {
     }
   }
   static const _lifecycle = MethodChannel('music.sylphy/cache_lifecycle');
+  static const _permissions = MethodChannel(
+    'music.sylphy/notification_permission',
+  );
   final AppDb db;
   final CacheManager cache;
   final Set<String> _busy = {};
@@ -72,6 +75,11 @@ class CacheJobs {
       );
       if (pending.isEmpty) return;
       if (Platform.isAndroid) {
+        try {
+          await _permissions.invokeMethod<void>('request');
+        } on MissingPluginException {
+          // The auto-resume path may run before MainActivity is attached.
+        }
         await _lifecycle.invokeMethod<void>('start');
         lifecycleStarted = true;
       }

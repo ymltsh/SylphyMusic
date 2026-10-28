@@ -17,4 +17,4 @@
 
 本地回归测试：`flutter test test/webdav_test.dart test/webdav_tags_test.dart`；原生端到端测试：`flutter test integration_test/webdav_test.dart -d windows`（或 Android 设备）。真实服务器只读测试通过环境变量 `SYLPHY_WEBDAV_CREDENTIAL_FILE` 指向私密的三行 URL / 用户名 / 密码文件；测试不会输出地址、密码、曲目名称或歌词。
 
-文本标签在 SQLite v7 的 `webdav_track_tags` 中按来源、曲目和资源版本保存；同版本重扫合并已解析标签，版本变化重新补全。来源停用拒绝过期写入，删除来源同步清除记录。补全仅在应用进程内运行，退出后停止；不提供 Android 系统后台持续任务、网络类型策略或手动进度 UI。
+文本标签在 SQLite v7 的 `webdav_track_tags` 中按来源、曲目和资源版本保存；同版本重扫合并已解析标签，版本变化重新补全。来源停用拒绝过期写入，删除来源同步清除记录。自动补全在应用进程内机会式执行；音乐源管理中的手动同步、只补全标签可在 Android 使用 dataSync 前台通知，显示进度并暂停。Application 持有共享引擎，移除 Activity 后可继续，但强停、进程死亡、系统时限仍会中断；不提供跨进程持续执行或网络类型策略。

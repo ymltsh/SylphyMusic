@@ -1038,7 +1038,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           runSpacing: 8,
           children: [
             OutlinedButton.icon(
-              onPressed: app.busy ? null : () => _act(app.syncAll),
+              onPressed: app.busy ? null : () => _act(app.syncAllForeground),
               icon: const Icon(Icons.sync),
               label: const Text('同步所有来源'),
             ),
@@ -1090,9 +1090,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   trailing: PopupMenuButton<String>(
                     onSelected: (v) async {
                       if (v == 'sync') {
-                        await _act(() => app.syncSource(s));
+                        await _act(() => app.syncSourceForeground(s));
                       }
-                      if (v == 'cancel_sync') app.index.cancel(s.id);
+                      if (v == 'tags') {
+                        await _act(() => app.enrichSourceForeground(s));
+                      }
+                      if (v == 'cancel_sync') app.cancelActiveSync(s.id);
                       if (v == 'edit') await _editSource(s);
                       if (v == 'scan') await _act(() => app.rescanLocal(s));
                       if (v == 'delete' &&
@@ -1128,6 +1131,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                         const PopupMenuItem(
                           value: 'sync',
                           child: Text('同步此来源'),
+                        ),
+                      if (s.kind == SourceKind.webdav)
+                        const PopupMenuItem(
+                          value: 'tags',
+                          child: Text('只补全 WebDAV 标签（前台通知）'),
                         ),
                       PopupMenuItem(
                         value: 'toggle',

@@ -110,3 +110,7 @@ flutter build apk --debug
 ## WebDAV 元数据测试更新 0.2.4-beta2+7
 
 本轮新增音乐标签标题 / 艺术家 / 专辑等文本字段，数据库前向迁移到 v7，重新同步保留匹配版本的标签；在应用运行时渐进补全并优先读取可见歌曲。已发布 [0.2.4-beta2+7](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta2%2B7)，更新 beta 清单，保留既有测试签名，正式渠道不变。三个 APK 与摘要均已校验，Android 模拟器原生与 Release 覆盖安装验证通过。
+
+## 0.2.5-beta+8 双端测试更新
+
+本轮包含 Android 手动同步前台通知、WebDAV 只补标签、暂停 / 超时恢复和引擎生命周期修复；提供三种 ABI APK、Windows 安装 EXE 与便携 ZIP。Android 沿用现有测试签名，Windows 未做代码签名；测试渠道发布，正式渠道保持当前版本。

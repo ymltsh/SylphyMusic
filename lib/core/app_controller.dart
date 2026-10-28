@@ -26,6 +26,7 @@ import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lyrics_store.dart';
 import '../services/webdav_tags.dart';
+import '../services/sync_foreground.dart';
 import '../services/webdav_metadata_enricher.dart';
 import '../services/library_sync.dart';
 import '../services/source_connections.dart';
@@ -70,7 +71,12 @@ class SylphyApp extends ChangeNotifier {
   Set<String> blacklist = {};
   int _busyOperations = 0;
   Timer? _catalogRefreshTimer;
-  bool get busy => _busyOperations > 0;
+  bool _foregroundSyncRunning = false;
+  Future<void>? _foregroundSyncTask;
+  bool _foregroundSyncCancelled = false;
+  String? _foregroundSourceId;
+  late final syncForeground = SyncForeground(_interruptForegroundSync);
+  bool get busy => _busyOperations > 0 || _foregroundSyncRunning;
   bool _disposed = false;
   String? message;
   DesktopControls? desktop;
@@ -246,6 +252,12 @@ class SylphyApp extends ChangeNotifier {
   }
 
   void _indexChanged() {
+    if (_foregroundSyncRunning && _foregroundSourceId != null) {
+      final progress = index.progress[_foregroundSourceId];
+      if (progress != null && progress.active) {
+        unawaited(syncForeground.update('风灵音乐 · 同步索引', progress.message));
+      }
+    }
     if (!_disposed) notifyListeners();
   }
 
@@ -289,9 +301,117 @@ class SylphyApp extends ChangeNotifier {
       adapter.close();
     }
     await reload();
-    // A failed initial index never erases an old snapshot.
-    await syncSource(source);
+    // Connection creation is an explicit user action: protect the first index.
+    await syncSourceForeground(source);
   }
+
+  void _interruptForegroundSync() {
+    _foregroundSyncCancelled = true;
+    final id = _foregroundSourceId;
+    if (id != null) {
+      index.cancel(id);
+      metadataEnricher.cancel(id);
+    }
+  }
+
+  void cancelActiveSync(String sourceId) {
+    if (_foregroundSourceId == sourceId) {
+      _interruptForegroundSync();
+    } else {
+      index.cancel(sourceId);
+    }
+  }
+
+  Future<void> _runForegroundSync(
+    List<SourceProfile> selected, {
+    bool rescanDirectories = true,
+    bool includeCloud = false,
+  }) {
+    if (_disposed) return Future.error(StateError('应用已关闭'));
+    if (_foregroundSyncRunning) return Future.error(StateError('已有前台同步任务正在运行'));
+    final task = _performForegroundSync(
+      selected,
+      rescanDirectories: rescanDirectories,
+      includeCloud: includeCloud,
+    );
+    _foregroundSyncTask = task;
+    return task;
+  }
+
+  Future<void> _performForegroundSync(
+    List<SourceProfile> selected, {
+    bool rescanDirectories = true,
+    bool includeCloud = false,
+  }) async {
+    if (_foregroundSyncRunning) throw StateError('已有前台同步任务正在运行');
+    if (selected.isEmpty) return;
+    _foregroundSyncRunning = true;
+    _foregroundSyncCancelled = false;
+    notifyListeners();
+    try {
+      // Must start from a visible, explicit user action; Android 12+ forbids
+      // background-initiated FGS starts. Never silently fall back on failure.
+      await syncForeground.start();
+      for (final source in selected) {
+        if (_foregroundSyncCancelled || _disposed) break;
+        if (!source.enabled || source.kind == SourceKind.local) continue;
+        _foregroundSourceId = source.id;
+        await syncForeground.update(
+          '风灵音乐 · 同步索引',
+          '正在读取 ${source.name}',
+          force: true,
+        );
+        if (rescanDirectories) await syncSource(source);
+        if (_foregroundSyncCancelled || _disposed) break;
+        if (source.kind == SourceKind.webdav &&
+            (!rescanDirectories ||
+                index.progress[source.id]?.state == 'completed')) {
+          await syncForeground.update(
+            '风灵音乐 · 补全标签',
+            '${source.name}：准备读取标签',
+            force: true,
+          );
+          await metadataEnricher.complete(
+            source,
+            onProgress: (done, total) {
+              if (_foregroundSyncCancelled || _disposed) return;
+              unawaited(
+                syncForeground.update(
+                  '风灵音乐 · 补全标签',
+                  '${source.name} · $done / $total 首',
+                  done: done,
+                  total: total,
+                ),
+              );
+            },
+          );
+        }
+      }
+      if (includeCloud && !_foregroundSyncCancelled && !_disposed) {
+        _foregroundSourceId = null;
+        await syncForeground.update('风灵音乐 · 同步歌单', '正在同步远程歌单', force: true);
+        await cloud.syncAll();
+      }
+    } finally {
+      _foregroundSourceId = null;
+      await syncForeground.stop();
+      _foregroundSyncRunning = false;
+      if (!_disposed) await reload();
+    }
+  }
+
+  Future<void> syncSourceForeground(SourceProfile source) =>
+      _runForegroundSync([source]);
+
+  Future<void> enrichSourceForeground(SourceProfile source) {
+    if (source.kind != SourceKind.webdav) {
+      throw StateError('仅支持 WebDAV 标签补全');
+    }
+    return _runForegroundSync([source], rescanDirectories: false);
+  }
+
+  Future<void> syncAllForeground() =>
+      _runForegroundSync([...sources], includeCloud: true);
 
   Future<void> syncSource(SourceProfile source) async {
     await busyRun(() async {
@@ -611,6 +731,9 @@ class SylphyApp extends ChangeNotifier {
   Future<void> disposeAsync() async {
     if (_disposed) return;
     _disposed = true;
+    _interruptForegroundSync();
+    await syncForeground.stop();
+    syncForeground.dispose();
     final metadataStopped = metadataEnricher.shutdown();
     _catalogRefreshTimer?.cancel();
     _sleepLifecycle?.dispose();
@@ -629,6 +752,7 @@ class SylphyApp extends ChangeNotifier {
     await cache.shutdown();
     await webDavTags.shutdown();
     await metadataStopped;
+    await _foregroundSyncTask?.catchError((Object _) {});
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();

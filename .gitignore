@@ -25,3 +25,5 @@ android/key.properties
 android/.gradle/
 __pycache__/
 *.pyc
+
+android/.kotlin/
