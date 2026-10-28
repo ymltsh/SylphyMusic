@@ -1,4 +1,16 @@
 {
-  "latest": null,
+  "latest": {
+    "version": "0.2.4-beta",
+    "build": 6,
+    "name": "风灵音乐 0.2.4-beta（测试签名）",
+    "date": "2026-10-28",
+    "notes": "风灵音乐 0.2.4-beta+6（Android 测试签名）\n\n- WebDAV 主动读取音乐标签内的封面与歌词，无需等待整首歌缓存。\n- 支持 MP3 ID3v2、FLAC 与 M4A / MP4 内嵌封面、歌词；修复中文和 UTF-16 歌词，支持毫秒 SYLT 时间轴。\n- 封面优先内嵌正面图片，缺失或损坏时回退目录图片；手动歌词保持最高优先级。\n- 封面 / 歌词按曲目与资源版本持久缓存，避免同目录封面串用；重启可离线复用。\n- 标签读取合并请求、限制并发与流量，停用来源立即取消。\n\n验证：192 项本地测试通过；Windows、Android API35 模拟器原生测试通过；真实 WebDAV 源只读获取及图片解码通过。尚待 Android 真机测试。\n\n使用现有 Android 测试证书，可覆盖安装同包名、同签名的旧版本。仅供测试，不是生产签名正式版。应用内检查更新请启用测试版渠道。\n",
+    "urls": {
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.4-beta%2B6/sylphy-music-0.2.4-beta-6-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.4-beta%2B6/sylphy-music-0.2.4-beta-6-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.4-beta%2B6/sylphy-music-0.2.4-beta-6-x86_64.apk"
+    },
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta%2B6"
+  },
   "history": []
 }
