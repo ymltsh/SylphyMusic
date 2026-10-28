@@ -588,3 +588,15 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 六个资产（含摘要）远端大小和 SHA-256 均与本地一致，Android arm64、Windows EXE / ZIP 加速下载均返回 HTTP 200，默认加速 beta 清单已指向新版本。Android arm64 31.51 MiB、32 位 ARM 28.64 MiB、x86_64 33.71 MiB；Windows 安装 EXE 19.03 MiB、便携 ZIP 22.65 MiB。APK 证书与旧测试版一致，构建号为 2008 / 1008 / 4008；从 beta2+7 Release 覆盖安装并启动成功。Windows 可执行文件版本为 0.2.5-beta+8，ZIP 完整性、主程序与 flutter_windows / libmpv 运行依赖校验通过。
 
 全部安装资产和输入完成凭据扫描；仍是测试版本，Android 使用测试证书、Windows 未代码签名。Windows 安装 / 卸载未在用户环境实际执行；Android 真机及厂商电源策略、Linux 验收仍待完成。
+
+## 2026-10-28 按讨论修正 audio_service / dataSync 生命周期兼容
+
+参考用户提供的共享讨论及此前 patch/3 兼容性资料，替换 0.2.5-beta+8 的销毁拦截 / 异步恢复缓存实现。SylphyApplication 只取得 audio_service 创建的引擎；同步与缓存通过 EngineLeaseManager 共享媒体服务绑定，各服务实例独立持有租约，等待连接及引擎身份确认后开始工作，最后租约释放后允许插件正常销毁引擎。绑定失败 / 断开有取消及停止兜底，不创建第二个 Dart main。
+
+普通暂停等待索引、标签遍历、可见行读取或缓存 worker 与数据库状态清理完成，经 Dart 回执后停服；清理过程中的 stop 调用不提前释放租约，避免回执死锁。系统超时立即停止服务，保留已提交记录供恢复。补充每引擎 Dart 启动计数、引擎身份 / 缓存一致性、绑定 / 租约及 Dart 心跳诊断。标签进度区分成功、失败、已缓存跳过，并取消已缓存行的逐首延迟。
+
+验证：格式检查及 flutter analyze 无问题；全量串行测试 203 项通过、5 项私密联调默认跳过（build/test_logs/lease-unit-suite.log）。新增异步暂停回执等待、按来源取消可见任务并等待，以及成功 / 失败 / 缓存跳过与真实数据库记录一致性测试。
+
+Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时停止，恢复时保留并跳过已完成标签（lease-timeout-android.log）；真实慢速缓存与同步并行，播放 / 暂停、Home / 熄屏 / 移除最近任务后 Dart 心跳及 SQLite 写入继续，双方分别暂停不释放另一租约，重新打开 Activity 保持同一引擎且 Dart 仅启动一次，最终全部释放（lease-overlap-android.log）。可复跑工具 tool/check_android_fgs.py 仅允许 SylphyTest_API35，临时时限已恢复为原值 null。Windows 原生 WebDAV 标签 / 封面 / 歌词持久化及离线重启通过（lease-windows-webdav.log）。
+
+本轮仅修改并验证本地源码，未提交、推送、发布或重新生成 Release 安装包；线上仍为 0.2.5-beta+8。真机厂商后台策略、强停后恢复及 Linux 未在本轮验收。普通暂停仍有 60 秒无回执兜底；系统超时 / 进程死亡不承诺清理代码一定执行，恢复依靠原子索引和已提交标签。

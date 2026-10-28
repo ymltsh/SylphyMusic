@@ -28,6 +28,22 @@ class WaitingTags extends WebDavTags {
   }
 }
 
+class FixtureTags extends WebDavTags {
+  FixtureTags(this.db) : super(AdapterFactory(MemoryVault()));
+  final AppDb db;
+  @override
+  Future<EmbeddedTags> load(
+    SourceProfile source,
+    Track track, {
+    bool force = false,
+  }) async {
+    if (track.ref.id == 'failed.mp3') throw const HttpException('fixture');
+    const result = EmbeddedTags(title: 'persisted fixture');
+    await db.putWebDavTags(track, result);
+    return result;
+  }
+}
+
 List<int> be(int n, int width) => [
   for (var i = width - 1; i >= 0; i--) (n >> (i * 8)) & 255,
 ];
@@ -50,6 +66,60 @@ List<int> atomData(List<int> bytes) =>
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'walk reports persisted success, failure and cached skip separately',
+    () async {
+      final folder = await Directory.systemTemp.createTemp('dav-stats-');
+      final db = AppDb(folder);
+      await db.open();
+      final tags = FixtureTags(db);
+      final enricher = WebDavMetadataEnricher(db, tags);
+      addTearDown(() async {
+        await enricher.shutdown();
+        await tags.shutdown();
+        await db.close();
+        await folder.delete(recursive: true);
+      });
+      const source = SourceProfile(
+        id: 'dav',
+        name: 'fixture',
+        kind: SourceKind.webdav,
+        url: 'https://example.invalid',
+        username: 'u',
+      );
+      final tracks = [
+        for (final id in ['cached.mp3', 'failed.mp3', 'success.mp3'])
+          Track(
+            ref: TrackRef('dav', id),
+            title: 'original',
+            artist: '',
+            album: '',
+          ),
+      ];
+      await db.putSource(source);
+      await db.replaceSourceTracks(source.id, tracks);
+      await db.putWebDavTags(
+        tracks.first,
+        const EmbeddedTags(title: 'cached fixture'),
+      );
+      late MetadataProgress stats;
+      await enricher.complete(source, onStats: (value) => stats = value);
+      expect(
+        [
+          stats.processed,
+          stats.total,
+          stats.succeeded,
+          stats.failed,
+          stats.skipped,
+        ],
+        [3, 3, 1, 1, 1],
+      );
+      expect((await db.track(tracks.last.ref))!.title, 'persisted fixture');
+      expect((await db.track(tracks[1].ref))!.title, 'original');
+      expect((await db.db.query('webdav_track_tags')).length, 2);
+    },
+  );
 
   test(
     'v6 migration preserves tracks; disable and deletion reject pending tags',
@@ -110,13 +180,14 @@ void main() {
       enricher.prioritize([second]);
       await reader.started.future;
       var stopped = false;
-      final shutdown = enricher.shutdown().then((_) {
+      final shutdown = enricher.cancelAndWait(source.id).then((_) {
         stopped = true;
       });
       await Future<void>.delayed(Duration.zero);
       expect(stopped, isFalse);
       reader.finish.complete();
       await shutdown;
+      await enricher.shutdown();
       await reader.shutdown();
       await db.removeSourceData(source.id);
       expect(await db.db.query('webdav_track_tags'), isEmpty);

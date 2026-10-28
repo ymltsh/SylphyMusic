@@ -8,7 +8,7 @@ import android.content.Intent
 import android.os.Build
 
 class MainActivity : AudioServiceActivity() {
-    // Engine lifetime is app-owned: removing the Activity does not stop a sync.
+    // audio_service owns the engine; active dataSync leases keep it bound.
     override fun provideFlutterEngine(context: Context): FlutterEngine =
         (application as SylphyApplication).engine()
     override fun shouldDestroyEngineWithHost(): Boolean = false

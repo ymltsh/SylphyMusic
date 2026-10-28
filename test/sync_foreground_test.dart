@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/services/sync_foreground.dart';
@@ -76,5 +78,30 @@ void main() {
     await service.update('title', 'detail');
     await service.stop();
     expect(calls, isEmpty);
+  });
+  test('native pause acknowledgement waits for asynchronous cleanup', () async {
+    service.dispose();
+    final cleaning = Completer<void>(), cleaned = Completer<void>();
+    service = SyncForeground(() async {
+      cleaning.complete();
+      await cleaned.future;
+      await service.stop();
+    }, android: true);
+    await service.start();
+    var acknowledged = false;
+    final message = messenger.handlePlatformMessage(
+      'music.sylphy/sync_lifecycle',
+      const StandardMethodCodec().encodeMethodCall(const MethodCall('pause')),
+      (_) {
+        acknowledged = true;
+      },
+    );
+    await cleaning.future;
+    expect(acknowledged, isFalse);
+    expect(running, isTrue);
+    cleaned.complete();
+    await message;
+    expect(acknowledged, isTrue);
+    expect(running, isFalse);
   });
 }

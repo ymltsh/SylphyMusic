@@ -75,7 +75,7 @@ class SylphyApp extends ChangeNotifier {
   Future<void>? _foregroundSyncTask;
   bool _foregroundSyncCancelled = false;
   String? _foregroundSourceId;
-  late final syncForeground = SyncForeground(_interruptForegroundSync);
+  late final syncForeground = SyncForeground(_pauseForegroundSync);
   bool get busy => _busyOperations > 0 || _foregroundSyncRunning;
   bool _disposed = false;
   String? message;
@@ -255,7 +255,13 @@ class SylphyApp extends ChangeNotifier {
     if (_foregroundSyncRunning && _foregroundSourceId != null) {
       final progress = index.progress[_foregroundSourceId];
       if (progress != null && progress.active) {
-        unawaited(syncForeground.update('风灵音乐 · 同步索引', progress.message));
+        unawaited(
+          syncForeground.update(
+            '风灵音乐 · 同步索引',
+            progress.message,
+            done: progress.count,
+          ),
+        );
       }
     }
     if (!_disposed) notifyListeners();
@@ -312,6 +318,18 @@ class SylphyApp extends ChangeNotifier {
       index.cancel(id);
       metadataEnricher.cancel(id);
     }
+  }
+
+  Future<void> _pauseForegroundSync() async {
+    final id = _foregroundSourceId;
+    _interruptForegroundSync();
+    if (id != null) {
+      await Future.wait([
+        index.cancelAndWait(id),
+        metadataEnricher.cancelAndWait(id),
+      ]);
+    }
+    await _foregroundSyncTask?.catchError((Object _) {});
   }
 
   void cancelActiveSync(String sourceId) {
@@ -373,14 +391,15 @@ class SylphyApp extends ChangeNotifier {
           );
           await metadataEnricher.complete(
             source,
-            onProgress: (done, total) {
+            onStats: (stats) {
               if (_foregroundSyncCancelled || _disposed) return;
               unawaited(
                 syncForeground.update(
                   '风灵音乐 · 补全标签',
-                  '${source.name} · $done / $total 首',
-                  done: done,
-                  total: total,
+                  '${source.name} · ${stats.processed} / ${stats.total} 首'
+                      '（成功 ${stats.succeeded}，失败 ${stats.failed}，已缓存 ${stats.skipped}）',
+                  done: stats.processed,
+                  total: stats.total,
                 ),
               );
             },
@@ -393,10 +412,17 @@ class SylphyApp extends ChangeNotifier {
         await cloud.syncAll();
       }
     } finally {
+      final interruptedSource = _foregroundSourceId;
+      if (_foregroundSyncCancelled && interruptedSource != null) {
+        await metadataEnricher.cancelAndWait(interruptedSource);
+      }
       _foregroundSourceId = null;
-      await syncForeground.stop();
       _foregroundSyncRunning = false;
-      if (!_disposed) await reload();
+      try {
+        if (!_disposed) await reload();
+      } finally {
+        await syncForeground.stop();
+      }
     }
   }
 
@@ -732,8 +758,6 @@ class SylphyApp extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
     _interruptForegroundSync();
-    await syncForeground.stop();
-    syncForeground.dispose();
     final metadataStopped = metadataEnricher.shutdown();
     _catalogRefreshTimer?.cancel();
     _sleepLifecycle?.dispose();
@@ -760,5 +784,7 @@ class SylphyApp extends ChangeNotifier {
     await playerLayouts.shutdown();
     await diagnostics.shutdown();
     await db.close();
+    await syncForeground.stop();
+    syncForeground.dispose();
   }
 }

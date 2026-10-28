@@ -4,6 +4,12 @@ import '../core/models.dart';
 import '../data/app_db.dart';
 import 'webdav_tags.dart';
 
+class MetadataProgress {
+  const MetadataProgress(this.total, this.succeeded, this.failed, this.skipped);
+  final int total, succeeded, failed, skipped;
+  int get processed => succeeded + failed + skipped;
+}
+
 /// Progressive enrichment. User-triggered syncs can hold a notification-backed
 /// Android foreground service while awaiting this bounded, de-duplicated walk.
 /// The versioned SQLite cache permits safe retry after a process kill.
@@ -18,8 +24,11 @@ class WebDavMetadataEnricher {
   final Map<String, void Function(int, int)> _progressObservers = {};
   final Map<String, int> _processed = {};
   final Map<String, int> _totals = {};
+  final Map<String, MetadataProgress> _stats = {};
+  final Map<String, void Function(MetadataProgress)> _statsObservers = {};
   final Set<String> _visible = {};
   final Set<Future<void>> _visibleTasks = {};
+  final Map<Future<void>, String> _visibleSources = {};
   bool _closed = false;
 
   Future<void> _enrich(Track track) async {
@@ -54,7 +63,13 @@ class WebDavMetadataEnricher {
         }
       }();
       _visibleTasks.add(task);
-      unawaited(task.whenComplete(() => _visibleTasks.remove(task)));
+      _visibleSources[task] = track.ref.sourceId;
+      unawaited(
+        task.whenComplete(() {
+          _visibleTasks.remove(task);
+          _visibleSources.remove(task);
+        }),
+      );
     }
   }
 
@@ -83,7 +98,13 @@ class WebDavMetadataEnricher {
   Future<void> complete(
     SourceProfile source, {
     void Function(int processed, int total)? onProgress,
+    void Function(MetadataProgress)? onStats,
   }) async {
+    if (onStats != null) {
+      _statsObservers[source.id] = onStats;
+      final previous = _stats[source.id];
+      if (previous != null) onStats(previous);
+    }
     if (onProgress != null) {
       _progressObservers[source.id] = onProgress;
       onProgress(_processed[source.id] ?? 0, _totals[source.id] ?? 0);
@@ -100,20 +121,29 @@ class WebDavMetadataEnricher {
       await _walks[source.id];
     } finally {
       if (onProgress != null) _progressObservers.remove(source.id);
+      if (onStats != null) _statsObservers.remove(source.id);
     }
   }
 
   Future<void> _walk(SourceProfile source, int epoch) async {
     var cursor = '';
-    var processed = 0;
+    var succeeded = 0, failed = 0, skipped = 0;
     try {
       final counts = await db.db.rawQuery(
         'SELECT COUNT(*) AS n FROM tracks WHERE source_id=? AND missing=0',
         [source.id],
       );
       final total = counts.single['n'] as int;
+      void report() {
+        final stats = MetadataProgress(total, succeeded, failed, skipped);
+        _stats[source.id] = stats;
+        _processed[source.id] = stats.processed;
+        _progressObservers[source.id]?.call(stats.processed, total);
+        _statsObservers[source.id]?.call(stats);
+      }
+
       _totals[source.id] = total;
-      _progressObservers[source.id]?.call(processed, total);
+      report();
       while (!_closed && epoch == (_epochs[source.id] ?? 0)) {
         final rows = await db.db.query(
           'tracks',
@@ -127,16 +157,23 @@ class WebDavMetadataEnricher {
           if (_closed || epoch != (_epochs[source.id] ?? 0)) return;
           final track = Track.fromRow(row);
           cursor = track.ref.id;
+          final cached = await db.hasWebDavTags(track);
           try {
-            await _enrich(track);
+            if (!cached) await _enrich(track);
           } catch (_) {
             // Retry next application session, without blocking other songs.
           }
-          processed++;
-          _processed[source.id] = processed;
-          _progressObservers[source.id]?.call(processed, total);
+          if (_closed || epoch != (_epochs[source.id] ?? 0)) return;
+          if (cached) {
+            skipped++;
+          } else if (await db.hasWebDavTags(track)) {
+            succeeded++;
+          } else {
+            failed++;
+          }
+          report();
           // Keep bulk scans behind user-driven playback and cover requests.
-          if (!_closed) {
+          if (!_closed && !cached) {
             await Future<void>.delayed(const Duration(milliseconds: 250));
           }
         }
@@ -146,12 +183,26 @@ class WebDavMetadataEnricher {
     } finally {
       _processed.remove(source.id);
       _totals.remove(source.id);
+      _stats.remove(source.id);
     }
   }
 
   void cancel(String sourceId) {
     _epochs[sourceId] = (_epochs[sourceId] ?? 0) + 1;
     tags.suspendSource(sourceId);
+  }
+
+  Future<void> cancelAndWait(String sourceId) async {
+    final pending = [
+      if (_walks[sourceId] != null) _walks[sourceId]!,
+      ..._visibleSources.entries
+          .where((entry) => entry.value == sourceId)
+          .map((entry) => entry.key),
+    ];
+    cancel(sourceId);
+    await Future.wait(
+      pending.map((future) => future.catchError((Object _) {})),
+    );
   }
 
   Future<void> shutdown() async {

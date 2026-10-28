@@ -4,56 +4,30 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
-import android.os.IBinder
 
 /** Only user-initiated index/tag work may start this dataSync FGS.
- * The service protects the app-owned FlutterEngine process and renders progress;
+ * The service leases the audio_service engine and renders progress;
  * network/SQLite work stays in Dart. Never auto-restart after process death.
  */
-class SyncForegroundService : Service() {
+class SyncForegroundService : LeasedDataSyncService() {
+    override val owner = "sync"
+    override val notificationId = 43
+    override fun registerInstance() { instance = this }
+    override fun clearInstance() { if (instance === this) instance = null }
+    override fun notification(): Notification {
+        notifications = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 26) notifications.createNotificationChannel(NotificationChannel(CHANNEL, "音乐库同步", NotificationManager.IMPORTANCE_LOW))
+        return buildNotification("风灵音乐 · 正在同步", "正在读取音乐库", 0, 0)
+    }
     companion object {
         @Volatile var instance: SyncForegroundService? = null
-        var onEvent: ((String) -> Unit)? = null
         private const val CHANNEL = "sylphy_library_sync"
         private const val ID = 43
     }
 
     private lateinit var notifications: NotificationManager
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "pause") {
-            onEvent?.invoke("pause")
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        if (instance != null) return START_NOT_STICKY
-        notifications = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= 26) {
-            notifications.createNotificationChannel(
-                NotificationChannel(CHANNEL, "音乐库同步", NotificationManager.IMPORTANCE_LOW)
-            )
-        }
-        try {
-            val notification = buildNotification("风灵音乐 · 正在同步", "正在读取音乐库", 0, 0)
-            if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            } else {
-                startForeground(ID, notification)
-            }
-            instance = this
-        } catch (_: RuntimeException) {
-            onEvent?.invoke("unavailable")
-            stopSelf()
-        }
-        return START_NOT_STICKY
-    }
-
     private fun buildNotification(title: String, detail: String, done: Int, total: Int): Notification {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -82,19 +56,9 @@ class SyncForegroundService : Service() {
     }
 
     fun updateNotification(title: String, detail: String, done: Int, total: Int) {
-        if (instance !== this) return
+        if (instance !== this || !ready()) return
+        android.util.Log.d("SylphyLifecycle", "sync_progress done=$done total=$total")
         notifications.notify(ID, buildNotification(title, detail, done, total))
     }
 
-    /** Android 15+: stop immediately or the OS throws RemoteServiceException. */
-    override fun onTimeout(startId: Int, fgsType: Int) {
-        onEvent?.invoke("timeout")
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
-    }
-
-    override fun onDestroy() {
-        if (instance === this) instance = null
-        super.onDestroy()
-    }
 }

@@ -3,101 +3,74 @@ package com.ymltsh.sylphymusic
 import android.app.Application
 import android.content.Intent
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
+import android.util.Log
+import com.ryanheise.audioservice.AudioServicePlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
-import com.ryanheise.audioservice.AudioServicePlugin
-import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
 
-/** Owns the one UI + sync FlutterEngine independently of the Activity lifecycle.
- * A foreground Service can then keep the Dart HTTP/SQLite work alive when the
- * user leaves Recents. It does not survive a process kill / force-stop.
- */
 class SylphyApplication : Application() {
-    private var storedEngine: FlutterEngine? = null
+    val leases by lazy { EngineLeaseManager(this) }
+    private var installedEngine: FlutterEngine? = null
+    private val channels = mutableMapOf<String, MethodChannel>()
+    private var dartStarts = 0
 
     @Synchronized
     fun engine(): FlutterEngine {
-        storedEngine?.let {
-            FlutterEngineCache.getInstance().put(AudioServicePlugin.getFlutterEngineId(), it)
-            return it
-        }
-        // audio_service normally destroys its cached engine when playback's
-        // Service stops without an Activity. Sync/cache still need this engine.
-        val engine = object : FlutterEngine(this) {
-            override fun destroy() {
-                // audio_service removes the cache entry after this callback.
-                // Restore it on the next main-loop turn; keep sync/cache alive.
-                val retained = this
-                Handler(Looper.getMainLooper()).post {
-                    FlutterEngineCache.getInstance().put(AudioServicePlugin.getFlutterEngineId(), retained)
-                }
+        val engine = AudioServicePlugin.getFlutterEngine(this)
+        check(FlutterEngineCache.getInstance().get(AudioServicePlugin.getFlutterEngineId()) === engine)
+        if (installedEngine === engine) return engine
+        installedEngine = engine
+        dartStarts = 0
+        Log.i("SylphyLifecycle", "engine_attached engine=${System.identityHashCode(engine)} pid=${android.os.Process.myPid()}")
+        for (owner in listOf("sync", "cache")) {
+            val name = if (owner == "sync") "sync_lifecycle" else "cache_lifecycle"
+            val channel = MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/$name")
+            channels[owner] = channel
+            channel.setMethodCallHandler { call, result ->
+                try {
+                    val service = if (owner == "sync") SyncForegroundService.instance else CacheForegroundService.instance
+                    when (call.method) {
+                        "start" -> {
+                            val type = if (owner == "sync") SyncForegroundService::class.java else CacheForegroundService::class.java
+                            val intent = Intent(this, type)
+                            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                            result.success(null)
+                        }
+                        "status" -> result.success(service?.ready() == true)
+                        "stop" -> { service?.stopFromDart(); result.success(null) }
+                        "pause" -> { service?.requestPause(); result.success(null) }
+                        "heartbeat" -> { leases.heartbeat(owner); result.success(null) }
+                        "diagnostics" -> result.success(leases.snapshot(installedEngine) + mapOf("dartStarts" to dartStarts))
+                        "update" -> {
+                            (service as? SyncForegroundService)?.updateNotification(
+                                call.argument<String>("title") ?: "正在同步音乐库",
+                                call.argument<String>("detail") ?: "读取远程索引",
+                                call.argument<Int>("done") ?: 0,
+                                call.argument<Int>("total") ?: 0)
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                } catch (_: Exception) { result.error("foreground_unavailable", "无法启动或更新前台任务，请回到应用后重试", null) }
             }
         }
-        FlutterEngineCache.getInstance().put(AudioServicePlugin.getFlutterEngineId(), engine)
-        val channel = MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/sync_lifecycle")
-        SyncForegroundService.onEvent = { event ->
-            Handler(Looper.getMainLooper()).post { channel.invokeMethod(event, null) }
+        MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/engine_lifecycle").setMethodCallHandler { call, result ->
+            if (call.method == "dart_started") {
+                dartStarts++
+                Log.i("SylphyLifecycle", "dart_started engine=${System.identityHashCode(engine)} count=$dartStarts")
+                result.success(null)
+            } else result.notImplemented()
         }
-        channel.setMethodCallHandler { call, result ->
-            try {
-                when (call.method) {
-                    "start" -> {
-                        val intent = Intent(this, SyncForegroundService::class.java)
-                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent)
-                        else startService(intent)
-                        result.success(null)
-                    }
-                    "update" -> {
-                        SyncForegroundService.instance?.updateNotification(
-                            call.argument<String>("title") ?: "正在同步音乐库",
-                            call.argument<String>("detail") ?: "读取远程索引",
-                            call.argument<Int>("done") ?: 0,
-                            call.argument<Int>("total") ?: 0
-                        )
-                        result.success(null)
-                    }
-                    "stop" -> {
-                        stopService(Intent(this, SyncForegroundService::class.java))
-                        result.success(null)
-                    }
-                    "status" -> result.success(SyncForegroundService.instance != null)
-                    else -> result.notImplemented()
-                }
-            } catch (error: Exception) {
-                result.error("sync_foreground_unavailable", error.message ?: "无法启动前台同步服务", null)
-            }
-        }
-        // The cache worker also needs an Activity-independent channel: its
-        // notification pause button must keep working after Recents dismissal.
-        val cacheChannel = MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/cache_lifecycle")
-        CacheForegroundService.onPause = {
-            Handler(Looper.getMainLooper()).post { cacheChannel.invokeMethod("pause", null) }
-        }
-        cacheChannel.setMethodCallHandler { call, result ->
-            try {
-                when (call.method) {
-                    "status" -> result.success(CacheForegroundService.running)
-                    "start" -> {
-                        val intent = Intent(this, CacheForegroundService::class.java)
-                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent)
-                        else startService(intent)
-                        result.success(null)
-                    }
-                    "stop" -> {
-                        stopService(Intent(this, CacheForegroundService::class.java))
-                        result.success(null)
-                    }
-                    else -> result.notImplemented()
-                }
-            } catch (error: Exception) {
-                result.error("background_restricted", error.message ?: "无法启动后台缓存", null)
-            }
-        }
-        storedEngine = engine
-        engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         return engine
+    }
+    fun event(owner: String, event: String, acknowledged: () -> Unit) {
+        val channel = channels[owner]
+        if (channel == null) { acknowledged(); return }
+        channel.invokeMethod(event, null, object : MethodChannel.Result {
+            override fun success(result: Any?) { acknowledged() }
+            override fun error(code: String, message: String?, details: Any?) { acknowledged() }
+            override fun notImplemented() { acknowledged() }
+        })
     }
 }

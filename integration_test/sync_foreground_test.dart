@@ -9,8 +9,11 @@ import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:path_provider/path_provider.dart';
 import 'package:sylphy_music/core/app_controller.dart';
 import 'package:sylphy_music/core/models.dart';
+import 'package:sylphy_music/services/native_lifecycle.dart';
+import 'package:sylphy_music/services/local_library.dart';
 
 import '../test/live_emby_test.dart' show MemoryVault;
+import '../test/playback_native_test.dart' show wav;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +21,7 @@ void main() {
     'Android sync foreground service, background timeout, resume and audio engine',
     (tester) async {
       if (!Platform.isAndroid) return;
+      await recordDartStartup();
       MediaKit.ensureInitialized();
       final base = await getApplicationSupportDirectory();
       final testBase = await Directory('${base.path}/fgs-fixture')
@@ -57,6 +61,21 @@ void main() {
       ];
       final hits = <String, int>{};
       server.listen((request) async {
+        if (request.uri.path.endsWith('cache.bin')) {
+          request.response.contentLength = 1048576;
+          request.response.headers.set('ETag', '"v1"');
+          try {
+            for (var i = 0; i < 256; i++) {
+              request.response.add(List<int>.filled(4096, 0));
+              await request.response.flush();
+              await Future<void>.delayed(const Duration(milliseconds: 100));
+            }
+            await request.response.close();
+          } catch (_) {
+            /* paused download */
+          }
+          return;
+        }
         final range = RegExp(r'bytes=(\d+)-(\d+)')
             .firstMatch(request.headers.value('range')!)!;
         final start = int.parse(range[1]!), end = int.parse(range[2]!);
@@ -75,6 +94,17 @@ void main() {
         }
       });
       const channel = MethodChannel('music.sylphy/sync_lifecycle');
+      const cacheChannel = MethodChannel('music.sylphy/cache_lifecycle');
+      Future<Map<Object?, Object?>> diagnostics() async =>
+          (await channel.invokeMapMethod<Object?, Object?>('diagnostics'))!;
+      Future<void> waitFor(bool Function(Map<Object?, Object?>) check) async {
+        for (var i = 0; i < 100; i++) {
+          if (check(await diagnostics())) return;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        fail('Lifecycle state did not settle: ${await diagnostics()}');
+      }
+
       try {
         await tester.pumpWidget(
           const MaterialApp(home: Scaffold(body: Text('FGS fixture'))),
@@ -114,7 +144,93 @@ void main() {
         }
         expect(await channel.invokeMethod<bool>('status'), isTrue);
         expect(app.busy, isTrue);
-        if (const bool.fromEnvironment('SYLPHY_FGS_TIMEOUT_TEST')) {
+        if (const bool.fromEnvironment('SYLPHY_FGS_OVERLAP_TEST')) {
+          final initial = await diagnostics();
+          expect(initial['dartStarts'], 1);
+          const local = SourceProfile(
+            id: 'local',
+            name: 'fixture',
+            kind: SourceKind.local,
+            url: 'file:///',
+            username: '',
+          );
+          await app.db.putSource(local);
+          final audio = await LocalLibrary(root)
+              .read(await wav(root, 'fgs-audio'), local.id);
+          await app.db.replaceSourceTracks(local.id, [audio]);
+          await app.playback.setVolume(0);
+          await app.playback.setQueue([audio.ref]);
+          if (!app.playback.player.state.playing) {
+            await app.playback.player.stream.playing
+                .firstWhere((playing) => playing)
+                .timeout(const Duration(seconds: 5));
+          }
+          await app.playback.pause();
+          final cacheTrack = Track(
+            ref: TrackRef(source.id, 'cache.bin'),
+            title: 'cache fixture',
+            artist: '',
+            album: '',
+            remote: {'size': 1048576, 'etag': '"v1"'},
+          );
+          // Append without re-indexing or touching the active metadata cursor.
+          await app.db.db.insert('tracks', cacheTrack.toRow());
+          await app.jobs.schedule('Synthetic cache', [cacheTrack.ref]);
+          await waitFor((state) => state['leaseCount'] == 2);
+          final before = (await app.db.db.query('webdav_track_tags')).length;
+          debugPrint('FGS_OVERLAP_BACKGROUND');
+          await Future<void>.delayed(const Duration(seconds: 4));
+          var state = await diagnostics();
+          expect(state['engineId'], initial['engineId']);
+          expect(state['engineCached'], true);
+          expect(state['audioBound'], true);
+          expect(state['leaseCount'], 2);
+          expect(state['dartStarts'], 1);
+          expect(state['syncHeartbeats'] as int, greaterThan(0));
+          expect(state['cacheHeartbeats'] as int, greaterThan(0));
+          expect(state['syncDartAgeMs'] as int, lessThan(3500));
+          await app.playback.play();
+          await app.playback.pause();
+          expect(
+            (await app.db.db.query('webdav_track_tags')).length,
+            greaterThan(before),
+          );
+          await channel.invokeMethod<void>('pause');
+          await work;
+          await waitFor(
+            (state) => state['sync'] == false && state['cache'] == true,
+          );
+          final saved = (await app.db.db.query('webdav_track_tags')).length;
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          expect((await app.db.db.query('webdav_track_tags')).length, saved);
+          state = await diagnostics();
+          expect(state['engineId'], initial['engineId']);
+          expect(state['audioBound'], true);
+          debugPrint('FGS_OVERLAP_RESTORE');
+          await Future<void>.delayed(const Duration(seconds: 3));
+          // Reverse order: release cache while resumed sync still owns a lease.
+          final resumed = app.enrichSourceForeground(source);
+          await waitFor((state) => state['leaseCount'] == 2);
+          await cacheChannel.invokeMethod<void>('pause');
+          await waitFor(
+            (state) => state['cache'] == false && state['sync'] == true,
+          );
+          expect(app.jobs.paused, true);
+          expect(
+            (await app.db.db.query('cache_job_items')).single['state'],
+            'pending',
+          );
+          state = await diagnostics();
+          expect(state['engineId'], initial['engineId']);
+          expect(state['engineCached'], true);
+          await resumed;
+          await waitFor((state) => state['leaseCount'] == 0);
+          state = await diagnostics();
+          expect(state['engineId'], initial['engineId']);
+          expect(state['dartStarts'], 1);
+          expect(state['engineCached'], true);
+          debugPrint('FGS_OVERLAP_VERIFIED');
+        } else if (const bool.fromEnvironment('SYLPHY_FGS_TIMEOUT_TEST')) {
           debugPrint('FGS_READY_BACKGROUND');
           for (var i = 0; i < 200 && !completed; i++) {
             await Future<void>.delayed(const Duration(milliseconds: 100));

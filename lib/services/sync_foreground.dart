@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:async';
+
+import 'native_lifecycle.dart';
 
 import 'package:flutter/services.dart';
 
 /// Notification-backed, user-triggered Android dataSync session.
-/// The persistent FlutterEngine belongs to SylphyApplication, not MainActivity.
+/// The audio_service engine stays bound until all dataSync workers finish.
 class SyncForeground {
   SyncForeground(this.onInterrupted, {bool? android})
     : _android = android ?? Platform.isAndroid {
@@ -13,7 +16,7 @@ class SyncForeground {
             call.method == 'timeout' ||
             call.method == 'unavailable') {
           _interrupted = true;
-          onInterrupted();
+          await onInterrupted();
         }
       });
     }
@@ -23,7 +26,8 @@ class SyncForeground {
   static const _permission = MethodChannel(
     'music.sylphy/notification_permission',
   );
-  final void Function() onInterrupted;
+  final FutureOr<void> Function() onInterrupted;
+  late final _heartbeat = NativeHeartbeat(_channel);
   final bool _android;
   bool _interrupted = false;
   bool _running = false;
@@ -57,6 +61,7 @@ class SyncForeground {
     }
     _lastUpdate = null;
     _lastMessage = null;
+    _heartbeat.start();
   }
 
   Future<void> update(
@@ -90,6 +95,7 @@ class SyncForeground {
   }
 
   Future<void> stop() async {
+    _heartbeat.stop();
     if (!_android || !_running) return;
     _running = false;
     try {
@@ -104,6 +110,7 @@ class SyncForeground {
   }
 
   void dispose() {
+    _heartbeat.stop();
     if (_android) _channel.setMethodCallHandler(null);
   }
 }

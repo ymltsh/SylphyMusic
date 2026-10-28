@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'core/app_controller.dart';
+import 'services/native_lifecycle.dart';
 import 'ui/app_identity.dart';
 import 'ui/app_shell.dart';
 import 'ui/system_bars.dart';
@@ -9,6 +10,7 @@ import 'ui/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await recordDartStartup();
   await configureSystemBars();
   MediaKit.ensureInitialized();
   runApp(const _Bootstrap());

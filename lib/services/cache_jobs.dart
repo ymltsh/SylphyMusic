@@ -8,12 +8,15 @@ import 'package:uuid/uuid.dart';
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'cache.dart';
+import 'native_lifecycle.dart';
 
 class CacheJobs {
   CacheJobs(this.db, this.cache) {
     if (Platform.isAndroid) {
       _lifecycle.setMethodCallHandler((call) async {
-        if (call.method == 'pause') await pause();
+        if (['pause', 'timeout', 'unavailable'].contains(call.method)) {
+          await pause();
+        }
       });
     }
   }
@@ -23,6 +26,7 @@ class CacheJobs {
   );
   final AppDb db;
   final CacheManager cache;
+  final _heartbeat = NativeHeartbeat(_lifecycle);
   final Set<String> _busy = {};
   bool _stopping = false;
   bool _pumping = false;
@@ -82,6 +86,14 @@ class CacheJobs {
         }
         await _lifecycle.invokeMethod<void>('start');
         lifecycleStarted = true;
+        var ready = false;
+        for (var i = 0; i < 60; i++) {
+          ready = await _lifecycle.invokeMethod<bool>('status') ?? false;
+          if (ready || paused || _stopping) break;
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        if (!ready) throw PlatformException(code: 'cache_service_not_ready');
+        _heartbeat.start();
       }
       do {
         _requested = false;
@@ -99,6 +111,7 @@ class CacheJobs {
     } on PlatformException {
       paused = true;
     } finally {
+      _heartbeat.stop();
       try {
         if (lifecycleStarted) await _lifecycle.invokeMethod<void>('stop');
       } finally {
@@ -339,6 +352,7 @@ class CacheJobs {
 
   Future<void> pause() async {
     paused = true;
+    final idle = _idle;
     final items = await db.db.query(
       'cache_job_items',
       where: "state='running'",
@@ -346,6 +360,7 @@ class CacheJobs {
     for (final item in items) {
       await cache.cancel(TrackRef.parse(item['track_key'] as String));
     }
+    await idle?.future;
   }
 
   Future<void> resume() async {
