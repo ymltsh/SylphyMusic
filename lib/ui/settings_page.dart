@@ -618,120 +618,61 @@ class _SettingsPageState extends State<SettingsPage> {
     ],
   };
   Future<void> _editApiUrl({required bool quote}) async {
-    final controller = TextEditingController(
-      text: quote ? app.apiSettings.quoteUrl : app.apiSettings.githubMirror,
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _ApiValueDialog(
+        title: quote ? '每日一言 API' : 'GitHub 加速 API',
+        initial: quote
+            ? app.apiSettings.quoteUrl
+            : app.apiSettings.githubMirror,
+        label: 'HTTPS URL',
+        helper: quote
+            ? '返回 hitokoto/text/content 字段的 JSON'
+            : '例如 https://hub.wgen.top/ （GitHub URL 前缀）',
+      ),
     );
-    try {
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(quote ? '每日一言 API' : 'GitHub 加速 API'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(
-              labelText: 'HTTPS URL',
-              helperText: quote
-                  ? '返回 hitokoto/text/content 字段的 JSON'
-                  : '例如 https://hub.wgen.top/ （GitHub URL 前缀）',
-              helperMaxLines: 2,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      );
-      if (value == null) return;
-      await _act(
-        () => quote
-            ? app.apiSettings.setQuoteUrl(value)
-            : app.apiSettings.setGitHubMirror(value),
-      );
-    } finally {
-      controller.dispose();
-    }
+    if (value == null || !mounted) return;
+    await _act(
+      () => quote
+          ? app.apiSettings.setQuoteUrl(value)
+          : app.apiSettings.setGitHubMirror(value),
+    );
   }
 
   Future<void> _editLrcApiUrl() async {
-    final controller = TextEditingController(text: app.apiSettings.lrcApiUrl);
-    try {
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('LrcApi 接口地址'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              labelText: 'HTTP(S) URL',
-              helperText: '公开接口默认 https://api.lrc.cx/lyrics；自部署可填写服务根地址、/lyrics 或 /jsonapi',
-              helperMaxLines: 3,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      );
-      if (value != null) await _act(() => app.apiSettings.setLrcApiUrl(value));
-    } finally {
-      controller.dispose();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _ApiValueDialog(
+        title: 'LrcApi 接口地址',
+        initial: app.apiSettings.lrcApiUrl,
+        label: 'HTTP(S) URL',
+        helper:
+            '公开接口默认 https://api.lrc.cx/lyrics；自部署可填写服务根地址、/lyrics 或 /jsonapi',
+      ),
+    );
+    if (value != null && mounted) {
+      await _act(() => app.apiSettings.setLrcApiUrl(value));
     }
   }
 
   Future<void> _editLrcApiToken() async {
-    final controller = TextEditingController();
-    try {
-      final value = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('LrcApi 鉴权密钥'),
-          content: TextField(
-            controller: controller,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '鉴权密钥（可选）',
-              helperText: '保存空值会清除已保存的密钥',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      );
-      if (value == null) return;
-      await _act(() async {
-        if (value.trim().isEmpty) {
-          await app.vault.delete('lrcapi');
-        } else {
-          await app.vault.write('lrcapi', 'token', value.trim());
-        }
-      });
-    } finally {
-      controller.dispose();
-    }
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ApiValueDialog(
+        title: 'LrcApi 鉴权密钥',
+        label: '鉴权密钥（可选）',
+        helper: '保存空值会清除已保存的密钥',
+        secret: true,
+      ),
+    );
+    if (value == null || !mounted) return;
+    await _act(() async {
+      if (value.trim().isEmpty) {
+        await app.vault.delete('lrcapi');
+      } else {
+        await app.vault.write('lrcapi', 'token', value.trim());
+      }
+    });
   }
 
   Future<void> _chooseThemeColor() async {
@@ -839,4 +780,53 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ) ??
       false;
+}
+
+/// Own the controller until the dialog's reverse transition has unmounted it.
+class _ApiValueDialog extends StatefulWidget {
+  const _ApiValueDialog({
+    required this.title,
+    required this.label,
+    required this.helper,
+    this.initial = '',
+    this.secret = false,
+  });
+  final String title, label, helper, initial;
+  final bool secret;
+  @override
+  State<_ApiValueDialog> createState() => _ApiValueDialogState();
+}
+
+class _ApiValueDialogState extends State<_ApiValueDialog> {
+  late final controller = TextEditingController(text: widget.initial);
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      controller: controller,
+      obscureText: widget.secret,
+      keyboardType: widget.secret ? TextInputType.text : TextInputType.url,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        helperText: widget.helper,
+        helperMaxLines: 3,
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, controller.text),
+        child: const Text('保存'),
+      ),
+    ],
+  );
 }

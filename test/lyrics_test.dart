@@ -91,6 +91,25 @@ void main() {
     );
   });
 
+  test('Emby instrumental cue with reversed end stays active', () {
+    const srt =
+        '1\n00:00:00,000 --> 00:00:01,000\n作词 : 无\n\n'
+        '2\n00:00:01,000 --> 00:00:05,000\n作曲 : 阿鲲\n\n'
+        '3\n00:00:05,000 --> 00:00:00,000\n纯音乐，请欣赏';
+    final normalized = normalizeSubtitleLyrics(srt);
+    expect(
+      normalized,
+      '[00:00.000]作词 : 无\n'
+      '[00:01.000]作曲 : 阿鲲\n'
+      '[00:05.000]纯音乐，请欣赏',
+    );
+    final lines = parseLrc(normalized);
+    expect(lines, hasLength(3));
+    expect(
+      lines[activeLrcIndex(lines, const Duration(seconds: 12))].text,
+      '纯音乐，请欣赏',
+    );
+  });
   test('plain text and existing LRC remain intact', () {
     expect(
       normalizeSubtitleLyrics('Only text\nSecond line'),

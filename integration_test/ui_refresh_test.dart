@@ -595,6 +595,53 @@ void main() {
         await capture('settings-cache-mobile');
         await tester.pageBack();
         await tester.pumpAndSettle();
+        await openSetting('API 设置');
+        final lrcToggle = find.byKey(const ValueKey('api-lrc-enabled'));
+        expect(tester.widget<SwitchListTile>(lrcToggle).value, isFalse);
+        await tester.tap(lrcToggle);
+        await tester.pumpAndSettle();
+        expect(app.apiSettings.lrcApiEnabled, isTrue);
+        await tester.tap(find.byKey(const ValueKey('api-lrc-url')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byType(TextField),
+          'http://127.0.0.1:28883',
+        );
+        await tester.tap(find.text('保存'));
+        await tester.pumpAndSettle();
+        expect(app.apiSettings.lrcApiUrl, 'http://127.0.0.1:28883/lyrics');
+        final auth = find.byKey(const ValueKey('api-lrc-auth'));
+        await tester.ensureVisible(auth);
+        await tester.pumpAndSettle();
+        await tester.tap(auth);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(find.byType(TextField)).obscureText,
+          isTrue,
+        );
+        await tester.enterText(
+          find.byType(TextField),
+          'synthetic-lrc-test-token',
+        );
+        await tester.tap(find.text('保存'));
+        await tester.pumpAndSettle();
+        expect(
+          await app.vault.read('lrcapi', 'token'),
+          'synthetic-lrc-test-token',
+        );
+        await tester.tap(auth);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('保存'));
+        await tester.pumpAndSettle();
+        expect(await app.vault.read('lrcapi', 'token'), isNull);
+        await capture('settings-lrcapi-mobile');
+        await tester.ensureVisible(lrcToggle);
+        await tester.pumpAndSettle();
+        await tester.tap(lrcToggle);
+        await tester.pumpAndSettle();
+        expect(app.apiSettings.lrcApiEnabled, isFalse);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
         await openSetting('检查更新');
         expect(find.text('仅在点击时检查更新，下载后由你手动安装。'), findsOneWidget);
         expect(find.text('正在检查…'), findsNothing);
