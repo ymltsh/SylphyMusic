@@ -2,7 +2,7 @@
 
 参考 Mfuns Flutter 的发布体系，接入手动检查更新、分渠道清单、Android 分 ABI APK、Windows 安装程序 / 便携 ZIP、SHA-256 与 GitHub Release。发布工具为根目录 `release.py`，Python 部分仅依赖标准库。
 
-**正式渠道当前为 0.2.3+5，最新测试渠道为 [0.2.7-beta+10](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.7-beta%2B10)。** beta 清单同时提供 Android 分架构 APK、Windows 安装程序与便携 ZIP，历史保留之前测试版。Android 沿用本机测试证书，Windows 未代码签名；这些包用于测试，正式发布仍需通过发布门槛。
+**正式渠道当前为 0.2.3+5，最新测试渠道为 [0.2.8-beta+11](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.8-beta%2B11)。** beta 清单同时提供 Android 分架构 APK、Windows 安装程序与便携 ZIP，历史保留之前测试版。Android 沿用本机测试证书，Windows 未代码签名；这些包用于测试，正式发布仍需通过发布门槛。
 
 ## App 手动检查更新
 
@@ -126,3 +126,9 @@ flutter build apk --debug
 包含圆角卡片音乐源管理、独立连接表单与三步引导；同时修复首次通知授权后同步通知不可见，新增歌词预览行距，并将设置中的「音乐与存储」置顶。源码提交 `0890782`，beta 清单提交 `b1dde80`。Android 提供三个 ABI APK，Windows 提供安装 EXE 与便携 ZIP，另附 SHA256SUMS.txt；继续沿用测试签名，正式渠道不变。
 
 本轮通过 209 项应用测试、11 项发布工具测试、静态分析和 Windows 原生界面回归。安装资产完成凭据扫描、签名兼容及摘要检查；Android 专用模拟器从 0.2.6-beta+9 覆盖升级后保留引导完成状态并启动到首页。Windows 安装器安装 / 卸载和 Android 真机未在本轮执行。测试包构建脚本增加可选 `-ReleaseVersion`，传入 beta 版本名时让 Windows 运行时也保留测试版标记。
+
+## 已发布 0.2.8-beta+11 双端测试更新
+
+修复 Emby SRT 异常结束时间与旧缓存读取；新增默认关闭的 LrcApi 补充和播放页艺术家 / 专辑跳转，并修复引导等待来源同步、API 设置弹窗输入控制器生命周期。源码提交 `ce2e694`，beta 清单提交 `72e4b6c`，正式渠道保持 0.2.3+5。提供 Android 三种 ABI、Windows 安装程序 / 便携 ZIP 及摘要。
+
+全量应用 224 项、发布工具 11 项及 Windows 原生 4 项回归通过；Android 专用模拟器从上版直接覆盖安装，保留引导状态。资产完成私密内容扫描、签名兼容、包身份和 SHA-256 核验，远端六个文件与本地一致，默认加速清单已更新。仍使用 Android 测试签名，Windows 未代码签名；真机、Linux 与 Windows 安装器实际安装 / 卸载本轮未验收。

@@ -1,5 +1,15 @@
 # 实施与验证记录
 
+## 2026-10-28 发布 0.2.8-beta+11 Android / Windows 测试更新
+
+已发布 https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.8-beta%2B11 ，源码提交 `ce2e694`，beta 清单提交 `72e4b6c`。包含 Emby SRT 结束时间兼容与旧缓存读取、默认关闭的 LrcApi 补充、API 设置弹窗生命周期修复、播放页艺术家 / 专辑跳转和引导后台同步期间继续导航。
+
+发布前格式与静态分析通过；全量应用测试 224 项通过、5 项私密联调默认跳过，发布工具测试 11 项通过，Windows 原生界面 / LrcApi 设置、播放页布局 / 跳转和引导后台同步共 4 项通过。Android 三份 APK 身份 / 构建号 / 签名校验、与 0.2.7 测试证书一致性、Windows 文件版本 / ZIP 完整性及运行依赖、输入与安装产物凭据内容扫描均通过。Android 专用 API35 模拟器从 0.2.7-beta+10 直接覆盖安装 0.2.8-beta+11，未卸载，保留引导完成状态并进入首页。
+
+发布后核对六个远端资产（含摘要文件）的大小与 GitHub SHA-256 均和本地一致；测试版清单与默认加速清单均指向 0.2.8-beta+11，历史保留 0.2.7-beta+10，正式渠道保持 0.2.3+5。安装资产位于 build/releases/0.2.8-beta-11/，核验记录为 published-verification.json，日志位于 build/test_logs/release-0.2.8-*。
+
+Android arm64-v8a 31.58 MiB、armeabi-v7a 28.72 MiB、x86_64 33.77 MiB；Windows 安装 EXE 19.06 MiB、便携 ZIP 22.69 MiB。Android 沿用测试签名，Windows 未代码签名；Windows 安装器实际安装 / 卸载、Android 真机及 Linux 本轮未验收，未请求真实公共 LrcApi 或私人音源。
+
 ## 2026-10-28 SRT 结束时间修复与 0.2.8-beta+11 更新准备
 
 核对 sylphymusic-srt-end-time-fix.patch：零时长 / 倒置结束时间的处理与旧 Emby 缓存归一化已由此前修复覆盖，本次新增补丁中的完整三段字幕用例，验证纯音乐提示在 12 秒时仍高亮，不生成错误清空标记。此次测试版更新同时包含上次发布后的引导后台同步导航、播放页艺术家 / 专辑跳转及默认关闭的 LrcApi 补充。
