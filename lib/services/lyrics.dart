@@ -109,8 +109,15 @@ String normalizeSubtitleLyrics(String source) {
     while (i + 1 < raw.length && raw[i + 1].trim().isNotEmpty) {
       lines.add(clean(raw[++i]));
     }
-    if (at == null || end == null || end <= at) continue;
-    cues.add((at: at, end: end, text: lines, order: cues.length));
+    if (at == null || end == null) continue;
+    // Emby may produce a zero or reversed end time for instrumental notices.
+    // Keep the start time and text, but do not synthesize a clear marker.
+    cues.add((
+      at: at,
+      end: end > at ? end : at,
+      text: lines,
+      order: cues.length,
+    ));
   }
   if (cues.isEmpty) return text;
   cues.sort((a, b) {
@@ -139,7 +146,8 @@ String normalizeSubtitleLyrics(String source) {
       output.add('${stamp(cue.at)}$line');
     }
     // Do not keep the last sung line highlighted through an instrumental gap.
-    if (i + 1 == grouped.length || grouped[i + 1].at > cue.end) {
+    if (cue.end > cue.at &&
+        (i + 1 == grouped.length || grouped[i + 1].at > cue.end)) {
       output.add(stamp(cue.end));
     }
   }

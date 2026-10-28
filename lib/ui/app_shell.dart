@@ -14,6 +14,7 @@ import 'cover_art.dart';
 import 'cover_flow.dart';
 import 'library_browser.dart';
 import 'track_lookup.dart';
+import 'track_actions.dart';
 import 'home_page.dart';
 import 'search_page.dart';
 import 'app_background.dart';
@@ -537,55 +538,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     return sourceId;
   }
 
-  Future<void> _trackAction(String action, Track track) async {
-    if (action == 'favorite') {
-      await _act(() => app.toggleFavorite(track));
-    }
-    if (action == 'cache') {
-      await _act(() => app.cacheTrack(track));
-    }
-    if (action == 'next') {
-      await _act(() => app.playback.enqueue(track.ref, next: true));
-    }
-    if (action == 'enqueue') {
-      await _act(() => app.playback.enqueue(track.ref));
-    }
-    if (action == 'block') {
-      await _act(() => app.toggleBlacklist(track));
-    }
-    if (action == 'playlist') await _choosePlaylist(track);
-  }
-
-  Future<void> _choosePlaylist(Track track) async {
-    final candidates = app.playlists
-        .where(
-          (p) =>
-              p.kind != PlaylistKind.cloud || p.sourceId == track.ref.sourceId,
-        )
-        .toList();
-    final chosen = await showDialog<PlaylistModel>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('添加到歌单'),
-        children: candidates
-            .map(
-              (p) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, p),
-                child: Text(
-                  '${p.name}${p.kind == PlaylistKind.cloud ? ' · 云端' : ''}',
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-    if (chosen == null) return;
-    await _act(() async {
-      final keys = await app.db.playlistKeys(chosen.id);
-      keys.add(track.ref.key);
-      await app.setPlaylistKeys(chosen, keys);
-    });
-  }
+  Future<void> _trackAction(String action, Track track) =>
+      _act(() => performTrackAction(context, app, action, track));
 
   Widget _playlists() => Column(
     children: [

@@ -150,7 +150,12 @@ class LyricsStore {
       forceRefresh: force,
       ttl: const Duration(hours: 6),
     );
-    return asset?.file.readAsString();
+    if (asset == null) return null;
+    final text = await asset.file.readAsString();
+    // Also normalize already-cached Emby SRT responses from older builds.
+    return source.kind == SourceKind.emby
+        ? normalizeSubtitleLyrics(text)
+        : text;
   }
 
   Future<void> importFile(Track track, File file) async {

@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-10-28 应用 Emby SRT 异常结束时间修复
+
+应用 sylphymusic-emby-srt-fix.patch：零时长或结束时间倒置的字幕保留起始时间与提示文字，不合成清空标记；LyricsStore 读取 Emby 自动缓存时归一化旧 SRT，手动导入保持原文与优先级。此前播放页艺术家 / 专辑跳转及其他未提交改动均保留。
+
+验证：dart format、flutter analyze 和 35 项歌词解析 / 缓存 / Emby 请求 / 歌词页及预览测试通过，补充零时长与已缓存倒置 SRT 的离线读取断言，验证不发网络请求、不改写缓存原文、手动导入保持原文。本轮使用合成数据与本机服务器，未连接真实 Emby，未执行设备验收、打包或发布。
+
+## 2026-10-28 播放页艺术家与专辑跳转
+
+播放页「歌手 / 专辑」组件拆为独立点击区域，分别打开统一音乐库对应艺术家或专辑的歌曲列表；沿用 SQL 分组规则（专辑含专辑艺术家）、分页、播放全部和歌曲菜单。返回保留播放页，浏览不改变当前队列或播放状态。默认与自定义布局共用入口，编辑器预览禁用跳转，空元数据不跳转；短组件框继续缩放与省略显示。歌曲菜单操作提取为共享 UI 方法，保持云歌单来源约束。
+
+验证：flutter analyze 无问题；元数据文本、布局和目录查询相关 23 项测试通过。Windows 原生 integration_test/player_layout_test.dart 通过，新增两类入口、分组参数、实际歌曲列表、返回及暂停状态断言，并通过既有编辑器 / 响应式回归，日志 build/test_logs/player-metadata-navigation.log。原生测试使用 .private/native-temp 避开系统临时目录权限限制。本轮未执行 Android / Linux 原生验收，未打包或发布更新。
+
+## 2026-10-28 引导导航不等待后台来源同步
+
+修复 QuickStartWizard 将来源操作与导航 / 保存共用 busy 条件的问题：连接 / 导入任务继续防重入，但下一步、完成设置和跳过 API 配置只受引导自身保存状态约束。开始后台处理后显示可继续提示；离开并销毁引导 Widget 不等待或取消来源同步，现有应用级任务持有、通知和退出清理保持原行为。
+
+flutter analyze 和格式检查通过；Windows 原生 integration_test/welcome_background_sync_test.dart 两项回归通过（build/test_logs/welcome-background-sync.log）。测试从引导真实添加合成 WebDAV 来源，将首次目录扫描 HTTP 请求保持未完成，分别验证保存 API 和跳过 API 都能进入首页、持久化完成状态，同时扫描仍 active；随后释放请求，索引正常完成，无销毁后 setState 异常。本轮未追加安装验收或生成 / 发布新 Release 包。
+
 ## 2026-10-28 发布 0.2.7-beta+10 Android / Windows 测试更新
 
 已发布 https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.7-beta%2B10 ，源码提交 `0890782`，beta 清单提交 `b1dde80`。包含音乐源卡片管理、独立连接表单、三步引导、首次扫描通知授权等待 / 立即显示、歌词预览行距和设置顺序调整。提供 Android 三个 ABI APK、Windows 安装 EXE、便携 ZIP 和摘要文件；正式渠道保持 0.2.3+5。

@@ -12,6 +12,7 @@ import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/core/player_layout.dart';
 import 'package:sylphy_music/core/player_layout_store.dart';
 import 'package:sylphy_music/ui/now_playing.dart';
+import 'package:sylphy_music/ui/library_browser.dart';
 import 'package:sylphy_music/ui/player_cover.dart';
 import 'package:sylphy_music/ui/lyrics_view.dart';
 import 'package:sylphy_music/ui/player_layout/layout_editor.dart';
@@ -133,6 +134,34 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        for (final album in [false, true]) {
+          await tester.tap(
+            find.byKey(
+              ValueKey(album ? 'player-open-album' : 'player-open-artist'),
+            ),
+          );
+          await waitFor(find.byType(LibraryBrowser));
+          await waitFor(find.text('1'));
+          await tester.pumpAndSettle();
+          final browser = tester.widget<LibraryBrowser>(
+            find.byType(LibraryBrowser),
+          );
+          expect(browser.query.groupKind, album ? 'album' : 'artist');
+          expect(
+            browser.query.groupKey,
+            album ? 'sylphy studio|绿野来信' : 'sylphy studio',
+          );
+          expect(
+            find.widgetWithText(AppBar, album ? '绿野来信' : 'Sylphy Studio'),
+            findsOneWidget,
+          );
+          expect(find.text(track.title), findsOneWidget);
+          expect(app.playback.currentRef, track.ref);
+          expect(app.playback.playing, isFalse);
+          await tester.pageBack();
+          await tester.pumpAndSettle();
+          expect(find.byType(NowPlayingPage), findsOneWidget);
+        }
         expect(find.byTooltip('播放模式：列表循环'), findsOneWidget);
         expect(find.byTooltip('随机播放'), findsNothing);
         await tester.tap(find.byTooltip('播放模式：列表循环'));

@@ -13,6 +13,7 @@ import '../player_visuals.dart';
 import '../player_favorite.dart';
 import '../player_quick_actions.dart';
 import 'metadata_text.dart';
+import 'metadata_links.dart';
 
 class PlayerWidgetContext {
   const PlayerWidgetContext({
@@ -61,12 +62,21 @@ class PlayerWidgetRegistry {
     ),
     PlayerPart.title: (context, e, data) =>
         _text(context, e, data.track?.title ?? '风穿过森林', bold: true),
-    PlayerPart.artist: (context, e, data) => _text(
-      context,
-      e,
-      data.track == null
-          ? 'Sylphy Studio · 绿野来信'
-          : '${data.track!.artist} · ${data.track!.album}',
+    PlayerPart.artist: (context, e, data) => PlayerMetadataLinks(
+      app: data.app,
+      track: data.track,
+      preview: data.preview,
+      textAlign: e.align == 'left'
+          ? TextAlign.left
+          : e.align == 'right'
+          ? TextAlign.right
+          : TextAlign.center,
+      style: TextStyle(
+        fontSize: e.fontSize,
+        color: e.color == null
+            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: .68)
+            : Color(e.color!),
+      ),
     ),
     PlayerPart.lyrics: (context, e, data) => _lyrics(context, e, data),
     PlayerPart.progress: (context, e, data) => Center(

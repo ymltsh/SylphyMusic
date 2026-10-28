@@ -98,6 +98,34 @@ void main() {
     await root.delete(recursive: true);
   });
   group('Emby lyric cache upgrade', () {
+    test(
+      'cached reversed SRT normalizes offline while manual imports stay intact',
+      () async {
+        const subtitle = '1\n00:00:05,000 --> 00:00:00,000\nInstrumental';
+        await app.assets.put(
+          track.ref.sourceId,
+          app.lyrics.key(track),
+          'lyrics',
+          track.resourceVersion,
+          utf8.encode(subtitle),
+          ttl: const Duration(hours: 6),
+        );
+        status = 503;
+        expect(await app.loadLyrics(track), '[00:05.000]Instrumental');
+        expect(hits, 0);
+        final cached = await app.assets.read(
+          track.ref.sourceId,
+          app.lyrics.key(track),
+        );
+        expect(await cached!.file.readAsString(), subtitle);
+        final manual = await File('${root.path}/manual.srt')
+            .writeAsString(subtitle);
+        await app.importLyricsFile(track, manual);
+        expect(await app.loadLyrics(track), subtitle);
+        expect(hits, 0);
+      },
+    );
+
     test('cleared migrated lyrics are not silently reimported from the recovery copy', () async {
       await legacy().parent.create(recursive: true);
       await legacy().writeAsString('[00:01.00]Recovery copy');

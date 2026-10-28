@@ -66,6 +66,31 @@ void main() {
       expect(lines.last.at, const Duration(seconds: 5));
     },
   );
+  test('reversed Emby SRT end keeps the instrumental notice only', () {
+    const subtitle = '1\n00:00:05,000 --> 00:00:00,000\n纯音乐，请欣赏';
+    final normalized = normalizeSubtitleLyrics(subtitle);
+    expect(normalized, '[00:05.000]纯音乐，请欣赏');
+    final lines = parseLrc(normalized);
+    expect(lines, hasLength(1));
+    expect(lines.single.at, const Duration(seconds: 5));
+    expect(lines.single.text, '纯音乐，请欣赏');
+  });
+
+  test('zero-duration notice remains visible until the next cue', () {
+    final lines = parseLrc(
+      normalizeSubtitleLyrics(
+        '1\n00:00:05,000 --> 00:00:05,000\nInstrumental\n\n'
+        '2\n00:00:10,000 --> 00:00:12,000\nNext line',
+      ),
+    );
+    expect(lines.map((line) => line.at.inSeconds), [5, 10, 12]);
+    expect(lines.map((line) => line.text), ['Instrumental', 'Next line', '']);
+    expect(
+      lines[activeLrcIndex(lines, const Duration(seconds: 8))].text,
+      'Instrumental',
+    );
+  });
+
   test('plain text and existing LRC remain intact', () {
     expect(
       normalizeSubtitleLyrics('Only text\nSecond line'),

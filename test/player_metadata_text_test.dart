@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/core/player_layout.dart';
+import 'package:sylphy_music/core/app_controller.dart';
+import 'package:sylphy_music/ui/player_layout/metadata_links.dart';
 import 'package:sylphy_music/ui/player_layout/metadata_text.dart';
 
 const longTitle = '14. Contemplation in Snow 白皑中的冥想 · 特别收录版本';
@@ -34,7 +36,40 @@ Widget view({
   ),
 );
 
+class _PreviewApp extends Fake implements SylphyApp {}
+
 void main() {
+  testWidgets('metadata links fit short frames and stay inactive in preview', (
+    tester,
+  ) async {
+    for (final size in [const Size(240, 32), const Size(90, 12)]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox.fromSize(
+                size: size,
+                child: PlayerMetadataLinks(
+                  app: _PreviewApp(),
+                  track: null,
+                  preview: true,
+                  style: const TextStyle(fontSize: 22),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (final key in ['player-open-artist', 'player-open-album']) {
+        final link = find.byKey(ValueKey(key));
+        expect(tester.widget<GestureDetector>(link).onTap, isNull);
+        await tester.tap(link);
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   testWidgets('title uses only complete lines and ellipsizes the remainder', (
     tester,
   ) async {
