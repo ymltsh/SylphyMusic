@@ -4,7 +4,7 @@
 
 ## 身份与文件布局
 
-SQLite v6 新增 `media_assets` 和 `media_asset_migrations`，v1–v5 通过前向迁移升级，保留曲库、音频、队列和歌单。
+当前数据库为 v7（新增 WebDAV 文本标签持久表）；v6 新增 `media_assets` 和 `media_asset_migrations`，v1–v5 通过前向迁移升级，保留曲库、音频、队列和歌单。
 
 - 主键是来源 ID 与资源 key，不使用 Token、随机盐、播放票据或完整认证 URL。
 - 封面 key 为实际图片 ID、类型和渲染参数（Primary / 800 / 90 / 版本）。有图片 tag 时只用该 tag 判断版本，不因其他歌曲元数据变化而失效；无 tag 时使用 ETag / 修改时间等线索。

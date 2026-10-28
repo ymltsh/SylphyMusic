@@ -38,7 +38,7 @@ void main() {
     await root.delete(recursive: true);
   });
   test(
-    'v1 to v6 upgrade preserves playlist, queue and cache version baseline',
+    'v1 to v7 upgrade preserves playlist, queue and cache version baseline',
     () async {
       await db.replaceSourceTracks(source.id, [a]);
       await db.putPlaylist(
@@ -64,6 +64,7 @@ void main() {
       await db.db.execute('ALTER TABLE cache DROP COLUMN metadata_version');
       await db.db.execute('DROP TABLE media_assets');
       await db.db.execute('DROP TABLE media_asset_migrations');
+      await db.db.execute('DROP TABLE webdav_track_tags');
       await db.db.execute('PRAGMA user_version=1');
       await db.close();
       db = AppDb(root);

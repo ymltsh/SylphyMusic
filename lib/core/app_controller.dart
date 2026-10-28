@@ -26,6 +26,7 @@ import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lyrics_store.dart';
 import '../services/webdav_tags.dart';
+import '../services/webdav_metadata_enricher.dart';
 import '../services/library_sync.dart';
 import '../services/source_connections.dart';
 import 'models.dart';
@@ -68,12 +69,20 @@ class SylphyApp extends ChangeNotifier {
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};
   int _busyOperations = 0;
+  Timer? _catalogRefreshTimer;
   bool get busy => _busyOperations > 0;
   bool _disposed = false;
   String? message;
   DesktopControls? desktop;
   late final assets = MediaAssetStore(db, root);
-  late final webDavTags = WebDavTags(factory, cache: cache);
+  late final webDavTags = WebDavTags(
+    factory,
+    cache: cache,
+    onTags: (track, tags) async {
+      if (await db.putWebDavTags(track, tags)) _scheduleCatalogRefresh();
+    },
+  );
+  late final metadataEnricher = WebDavMetadataEnricher(db, webDavTags);
   late final artwork = ArtworkStore(
     db,
     factory,
@@ -195,6 +204,11 @@ class SylphyApp extends ChangeNotifier {
       }
       await cloud.syncAll();
       await reload();
+      for (final source in sources) {
+        if (source.enabled && source.kind == SourceKind.webdav) {
+          metadataEnricher.start(source);
+        }
+      }
     } catch (_) {}
   }
 
@@ -210,6 +224,16 @@ class SylphyApp extends ChangeNotifier {
         } catch (_) {}
       }
     }
+  }
+
+  void _scheduleCatalogRefresh() {
+    if (_disposed || _catalogRefreshTimer != null) return;
+    _catalogRefreshTimer = Timer(const Duration(seconds: 2), () {
+      _catalogRefreshTimer = null;
+      if (_disposed) return;
+      catalogRevision++;
+      notifyListeners();
+    });
   }
 
   Future<void> reload() async {
@@ -276,6 +300,11 @@ class SylphyApp extends ChangeNotifier {
       artwork.invalidate();
       await cloud.refreshCloudForSource(source);
     });
+    if (!_disposed &&
+        index.progress[source.id]?.state == 'completed' &&
+        source.kind == SourceKind.webdav) {
+      metadataEnricher.start(source);
+    }
   }
 
   Future<void> updateConnection(
@@ -362,6 +391,7 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<void> _suspendSource(SourceProfile source) async {
+    metadataEnricher.cancel(source.id);
     playback.invalidateSource(source.id);
     if (playback.currentRef?.sourceId == source.id) await playback.pause();
     index.cancel(source.id);
@@ -581,6 +611,8 @@ class SylphyApp extends ChangeNotifier {
   Future<void> disposeAsync() async {
     if (_disposed) return;
     _disposed = true;
+    final metadataStopped = metadataEnricher.shutdown();
+    _catalogRefreshTimer?.cancel();
     _sleepLifecycle?.dispose();
     await sleepTimer.shutdown();
     desktop?.dispose();
@@ -596,6 +628,7 @@ class SylphyApp extends ChangeNotifier {
     await proxy.dispose();
     await cache.shutdown();
     await webDavTags.shutdown();
+    await metadataStopped;
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();

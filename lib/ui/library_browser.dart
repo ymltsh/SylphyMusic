@@ -84,6 +84,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             setState(() {
               pending.remove(start);
               batches[start] = result.rows;
+              widget.app.metadataEnricher.prioritize(
+                result.rows.map((row) => row.track),
+              );
               while (batches.length > 6) {
                 batches.remove(batches.keys.first);
               }
@@ -110,7 +113,12 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   Future<CatalogPage> _load() async {
     final query = widget.query, requestedGeneration = generation;
     final result = await widget.app.catalog.page(query);
-    if (mounted && requestedGeneration == generation) batches[0] = result.rows;
+    if (mounted && requestedGeneration == generation) {
+      batches[0] = result.rows;
+      widget.app.metadataEnricher.prioritize(
+        result.rows.map((row) => row.track),
+      );
+    }
     return result;
   }
 

@@ -70,6 +70,10 @@ void main() {
     await store.shutdown();
     await db.db.execute('DROP TABLE media_assets');
     await db.db.execute('DROP TABLE media_asset_migrations');
+    await db.db.execute('DROP TABLE webdav_track_tags');
+    await db.db.execute(
+      'ALTER TABLE index_tracks DROP COLUMN resource_version',
+    );
     await db.db.execute('PRAGMA user_version=5');
     await db.close();
     db = AppDb(root);
@@ -79,7 +83,7 @@ void main() {
     expect((await db.source('one'))?.username, 'test');
     expect(
       (await db.db.rawQuery('PRAGMA user_version')).single.values.single,
-      6,
+      7,
     );
     expect(await db.db.query('media_assets'), isEmpty);
   });

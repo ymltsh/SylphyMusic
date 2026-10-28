@@ -4,7 +4,7 @@
 
 当前支持 HTTP Basic 认证；按 WebDAV [RFC 4918](https://www.rfc-editor.org/rfc/rfc4918.html) 的 `PROPFIND Depth: 1` 递归读取目录。扫描只读取目录属性，不下载整首音乐。中文、空格、#、%、& 等文件名会编码处理。服务器返回的资源须属于配置的同一站点和目录，未经验证的跳转会被拒绝。
 
-- 支持与本地导入相同的音乐扩展名；首次索引用文件名作标题、上级目录作专辑、再上一级目录作艺术家。目录同步不逐首下载音频；封面显示或读取歌词时，主动通过 Range 读取音频标签区。
+- 支持与本地导入相同的音乐扩展名；首次索引用文件名作标题、上级目录作专辑、再上一级目录作艺术家。目录同步不逐首下载音频；应用运行时每批 50 首渐进补全标题、艺术家、专辑、专辑艺术家、年份、曲号与碟号，可见列表最多优先调度 24 首，复用有界 Range 读取。
 - 播放和拖动进度复用应用的音频代理与 Range 读取；完整缓存、自动缓存、缓存任务、来源停用和重新启用复用现有流程。
 - 歌词优先手动导入，再读取内嵌标签，最后回退同目录同名 `.lrc` 或 `.txt`（同步时识别实际大小写）。支持 MP3 的 ID3v2.2/2.3/2.4 USLT、TXXX 歌词和以毫秒计时的 SYLT；支持 UTF-8、UTF-16 LE/BE 与 Latin-1，保留内嵌 LRC 时间轴。FLAC 支持 Vorbis 评论歌词，M4A / MP4 支持 `©lyr`。
 - 封面优先音频内嵌 APIC / PIC、FLAC PICTURE 或 M4A / MP4 `covr`，优先正面封面。缺失、损坏或服务器不支持 Range 时回退同名 jpg/png、目录 cover/folder/front 的 jpg/png 或 cover.webp。同目录歌曲按曲目区分封面，避免共用目录图片身份覆盖内嵌图片。
@@ -16,3 +16,5 @@
 建议服务器支持音频 GET/HEAD 与 HTTP Range，以便流畅拖动和缓存。HTTP 地址会在来源列表标注「未加密」。
 
 本地回归测试：`flutter test test/webdav_test.dart test/webdav_tags_test.dart`；原生端到端测试：`flutter test integration_test/webdav_test.dart -d windows`（或 Android 设备）。真实服务器只读测试通过环境变量 `SYLPHY_WEBDAV_CREDENTIAL_FILE` 指向私密的三行 URL / 用户名 / 密码文件；测试不会输出地址、密码、曲目名称或歌词。
+
+文本标签在 SQLite v7 的 `webdav_track_tags` 中按来源、曲目和资源版本保存；同版本重扫合并已解析标签，版本变化重新补全。来源停用拒绝过期写入，删除来源同步清除记录。补全仅在应用进程内运行，退出后停止；不提供 Android 系统后台持续任务、网络类型策略或手动进度 UI。

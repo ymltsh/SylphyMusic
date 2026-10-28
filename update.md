@@ -106,3 +106,7 @@ flutter build apk --debug
 ## 2026-10-28 WebDAV 测试更新
 
 已发布 [0.2.4-beta+6](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta%2B6)，使用与现有内部版本一致的 Android 测试签名，按 ABI 提供三个 APK；仅更新测试渠道 `version-beta.json`，正式渠道仍为 0.2.3+5。设置 → 检查更新中启用测试版渠道后可发现更新。该版本新增 WebDAV 内嵌封面 / 歌词主动读取与持久缓存，已通过只读真实源与 Windows / Android 模拟器原生验证，Android 真机兼容性待测试。不作为正式生产签名发布。
+
+## WebDAV 元数据测试更新 0.2.4-beta2+7
+
+本轮新增音乐标签标题 / 艺术家 / 专辑等文本字段，数据库前向迁移到 v7，重新同步保留匹配版本的标签；在应用运行时渐进补全并优先读取可见歌曲。准备更新 beta 清单，保留既有测试签名，正式渠道不变。

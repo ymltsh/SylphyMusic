@@ -4,9 +4,32 @@ import 'dart:typed_data';
 /// Only complete, bounded metadata regions are passed here, never audio cache
 /// fragments. Parsing is independent of filenames and network credentials.
 class EmbeddedTags {
-  const EmbeddedTags({this.cover, this.lyrics});
+  const EmbeddedTags({
+    this.cover,
+    this.lyrics,
+    this.title,
+    this.artist,
+    this.album,
+    this.albumArtist,
+    this.year,
+    this.trackNumber,
+    this.discNumber,
+  });
   final Uint8List? cover;
   final String? lyrics;
+  final String? title, artist, album, albumArtist;
+  final int? year, trackNumber, discNumber;
+
+  bool get hasMusicMetadata =>
+      [
+        title,
+        artist,
+        album,
+        albumArtist,
+      ].any((s) => s?.trim().isNotEmpty == true) ||
+      year != null ||
+      trackNumber != null ||
+      discNumber != null;
 }
 
 int tagUint(List<int> b, int p, int n, {bool syncSafe = false}) {
@@ -70,7 +93,8 @@ EmbeddedTags parseId3Tags(Uint8List input) {
   }
   Uint8List? cover;
   var front = false;
-  String? plain, timed;
+  String? plain, timed, title, artist, album, albumArtist;
+  int? year, trackNumber, discNumber;
   final header = version == 2 ? 6 : 10;
   while (p + header <= b.length && b[p] != 0) {
     final id = latin1.decode(b.sublist(p, p + (version == 2 ? 3 : 4)));
@@ -139,6 +163,38 @@ EmbeddedTags parseId3Tags(Uint8List input) {
         final name = _text(frame.sublist(1, q), enc).toUpperCase();
         if (['LYRICS', 'UNSYNCEDLYRICS', 'UNSYNCED LYRICS'].contains(name)) {
           plain ??= _text(frame.sublist(q), enc);
+        } else if (name == 'ALBUMARTIST' || name == 'ALBUM ARTIST') {
+          albumArtist ??= _text(frame.sublist(q), enc);
+        }
+      } else if (id.startsWith('T')) {
+        final value = _text(frame.sublist(1), enc);
+        if (value.isEmpty) continue;
+        switch (id) {
+          case 'TIT2':
+          case 'TT2':
+            title = value;
+          case 'TPE1':
+          case 'TP1':
+            artist = value;
+          case 'TPE2':
+          case 'TP2':
+            albumArtist = value;
+          case 'TALB':
+          case 'TAL':
+            album = value;
+          case 'TYER':
+          case 'TYE':
+          case 'TDRC':
+          case 'TDR':
+            year = int.tryParse(
+              RegExp(r'\d{4}').firstMatch(value)?.group(0) ?? '',
+            );
+          case 'TRCK':
+          case 'TRK':
+            trackNumber = int.tryParse(value.split('/').first.trim());
+          case 'TPOS':
+          case 'TPA':
+            discNumber = int.tryParse(value.split('/').first.trim());
         }
       }
     } on FormatException {
@@ -147,12 +203,23 @@ EmbeddedTags parseId3Tags(Uint8List input) {
       /* Ignore malformed optional frames. */
     }
   }
-  return EmbeddedTags(cover: cover, lyrics: timed ?? plain);
+  return EmbeddedTags(
+    cover: cover,
+    lyrics: timed ?? plain,
+    title: title,
+    artist: artist,
+    album: album,
+    albumArtist: albumArtist,
+    year: year,
+    trackNumber: trackNumber,
+    discNumber: discNumber,
+  );
 }
 
 EmbeddedTags parseFlacTags(Uint8List b) {
   Uint8List? cover;
-  String? lyrics;
+  String? lyrics, title, artist, album, albumArtist;
+  int? year, trackNumber, discNumber;
   var p = 4, front = false;
   while (p + 4 <= b.length) {
     final type = b[p] & 127, last = b[p] & 128 != 0;
@@ -174,13 +241,35 @@ EmbeddedTags parseFlacTags(Uint8List b) {
         final eq = text.indexOf('=');
         if (eq < 0) continue;
         final name = text.substring(0, eq).toUpperCase();
+        final value = text.substring(eq + 1).trim();
+        switch (name) {
+          case 'TITLE':
+            title ??= value;
+          case 'ARTIST':
+            artist ??= value;
+          case 'ALBUM':
+            album ??= value;
+          case 'ALBUMARTIST':
+          case 'ALBUM_ARTIST':
+          case 'ALBUM ARTIST':
+            albumArtist ??= value;
+          case 'DATE':
+          case 'YEAR':
+            year ??= int.tryParse(
+              RegExp(r'\d{4}').firstMatch(value)?.group(0) ?? '',
+            );
+          case 'TRACKNUMBER':
+            trackNumber ??= int.tryParse(value.split('/').first.trim());
+          case 'DISCNUMBER':
+            discNumber ??= int.tryParse(value.split('/').first.trim());
+        }
         if ([
           'LYRICS',
           'UNSYNCEDLYRICS',
           'UNSYNCED LYRICS',
           'SYNCEDLYRICS',
         ].contains(name)) {
-          lyrics = text.substring(eq + 1).trim();
+          lyrics = value;
         }
         if (name == 'METADATA_BLOCK_PICTURE') {
           cover ??= _flacPicture(
@@ -198,7 +287,17 @@ EmbeddedTags parseFlacTags(Uint8List b) {
     p = end;
     if (last) break;
   }
-  return EmbeddedTags(cover: cover, lyrics: lyrics);
+  return EmbeddedTags(
+    cover: cover,
+    lyrics: lyrics,
+    title: title,
+    artist: artist,
+    album: album,
+    albumArtist: albumArtist,
+    year: year,
+    trackNumber: trackNumber,
+    discNumber: discNumber,
+  );
 }
 
 ({int type, Uint8List bytes}) _flacPicture(Uint8List b) {
@@ -213,7 +312,8 @@ EmbeddedTags parseFlacTags(Uint8List b) {
 
 EmbeddedTags parseMp4Tags(Uint8List b) {
   Uint8List? cover;
-  String? lyrics;
+  String? lyrics, title, artist, album, albumArtist;
+  int? year, trackNumber, discNumber;
   void walk(int start, int end, int depth, [String? parent]) {
     if (depth > 12) throw const FormatException('MP4 标签嵌套过深');
     for (var p = start; p + 8 <= end;) {
@@ -229,13 +329,51 @@ EmbeddedTags parseMp4Tags(Uint8List b) {
       }
       final data = p + head, next = p + size;
       if (type == 'data' && next >= data + 8) {
+        final valueStart = data + 8;
         if (parent == 'covr') {
-          cover ??= Uint8List.fromList(b.sublist(data + 8, next));
+          cover ??= Uint8List.fromList(b.sublist(valueStart, next));
+        } else if (parent == 'trkn' || parent == 'disk') {
+          // iTunes trkn/disk: 2 reserved bytes, then 16-bit number.
+          if (next >= valueStart + 4) {
+            final number = tagUint(b, valueStart + 2, 2);
+            if (parent == 'trkn') trackNumber = number;
+            if (parent == 'disk') discNumber = number;
+          }
+        } else {
+          final value = utf8
+              .decode(b.sublist(valueStart, next), allowMalformed: true)
+              .trim();
+          switch (parent) {
+            case '©lyr':
+              lyrics = value;
+            case '©nam':
+              title = value;
+            case '©ART':
+              artist = value;
+            case 'aART':
+              albumArtist = value;
+            case '©alb':
+              album = value;
+            case '©day':
+              year = int.tryParse(
+                RegExp(r'\d{4}').firstMatch(value)?.group(0) ?? '',
+              );
+          }
         }
-        if (parent == '©lyr') {
-          lyrics = utf8.decode(b.sublist(data + 8, next)).trim();
-        }
-      } else if (['moov', 'udta', 'ilst', 'covr', '©lyr'].contains(type)) {
+      } else if ([
+        'moov',
+        'udta',
+        'ilst',
+        'covr',
+        '©lyr',
+        '©nam',
+        '©ART',
+        'aART',
+        '©alb',
+        '©day',
+        'trkn',
+        'disk',
+      ].contains(type)) {
         walk(data, next, depth + 1, type);
       } else if (type == 'meta') {
         walk(data + 4, next, depth + 1, type);
@@ -245,5 +383,15 @@ EmbeddedTags parseMp4Tags(Uint8List b) {
   }
 
   walk(0, b.length, 0);
-  return EmbeddedTags(cover: cover, lyrics: lyrics);
+  return EmbeddedTags(
+    cover: cover,
+    lyrics: lyrics,
+    title: title,
+    artist: artist,
+    album: album,
+    albumArtist: albumArtist,
+    year: year,
+    trackNumber: trackNumber,
+    discNumber: discNumber,
+  );
 }

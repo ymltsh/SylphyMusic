@@ -50,6 +50,13 @@ class LocalLibrary {
       return EmbeddedTags(
         cover: metadata.pictures.isEmpty ? null : metadata.pictures.first.bytes,
         lyrics: metadata.lyrics,
+        title: metadata.title,
+        artist: metadata.artist,
+        album: metadata.album,
+        albumArtist: metadata.albumArtist,
+        year: metadata.year?.year,
+        trackNumber: metadata.trackNumber,
+        discNumber: metadata.discNumber,
       );
     } catch (_) {
       return const EmbeddedTags();

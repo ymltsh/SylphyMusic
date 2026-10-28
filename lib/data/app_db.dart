@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/models.dart';
+import '../services/embedded_tags.dart';
 
 class AppDb {
   static const _assetsTable = '''CREATE TABLE media_assets(
@@ -21,6 +22,12 @@ class AppDb {
       'CREATE TABLE media_asset_migrations(source_id TEXT NOT NULL,asset_key TEXT NOT NULL,PRIMARY KEY(source_id,asset_key))';
   static const _indexRuns =
       'CREATE TABLE index_runs(source_id TEXT PRIMARY KEY,run_id TEXT NOT NULL)';
+  static const _webDavTagsTable = '''CREATE TABLE webdav_track_tags(
+    source_id TEXT NOT NULL,track_id TEXT NOT NULL,
+    resource_version TEXT NOT NULL,title TEXT,artist TEXT,album TEXT,
+    album_artist TEXT,year INTEGER,disc INTEGER,number INTEGER,
+    status TEXT NOT NULL,updated_at INTEGER NOT NULL,
+    PRIMARY KEY(source_id,track_id))''';
   static Future<void> _catalogSchema(DatabaseExecutor d) async {
     await d.execute(
       "ALTER TABLE blacklist ADD COLUMN source_id TEXT NOT NULL DEFAULT ''",
@@ -46,7 +53,8 @@ class AppDb {
   static const _trackColumns =
       'source_id,id,title,artist,album,album_artist,duration_ms,cover_id,year,disc,number,remote_json,missing';
   static const _stageTable = '''CREATE TABLE index_tracks AS
-    SELECT CAST('' AS TEXT) AS run_id, tracks.* FROM tracks WHERE 0''';
+    SELECT CAST('' AS TEXT) AS run_id, tracks.*,
+      CAST('' AS TEXT) AS resource_version FROM tracks WHERE 0''';
   static const _stageIndex =
       'CREATE UNIQUE INDEX idx_index_identity ON index_tracks(run_id,source_id,id)';
   static bool _desktopInitialized = false;
@@ -68,7 +76,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 6,
+      version: 7,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -113,6 +121,15 @@ class AppDb {
           await database.execute(_assetsIndex);
           await database.execute(_assetMigrations);
         }
+        if (oldVersion < 7) {
+          // v5/v6 have the old index_tracks shape; v1-v4 created the new one.
+          if (oldVersion >= 5) {
+            await database.execute(
+              "ALTER TABLE index_tracks ADD COLUMN resource_version TEXT NOT NULL DEFAULT ''",
+            );
+          }
+          await database.execute(_webDavTagsTable);
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -136,6 +153,7 @@ class AppDb {
           _assetsTable,
           _assetsIndex,
           _assetMigrations,
+          _webDavTagsTable,
         ]) {
           await d.execute(sql);
         }
@@ -224,7 +242,11 @@ class AppDb {
     await db.transaction((tx) async {
       final batch = tx.batch();
       for (final track in page) {
-        batch.insert('index_tracks', {'run_id': runId, ...track.toRow()});
+        batch.insert('index_tracks', {
+          'run_id': runId,
+          ...track.toRow(),
+          'resource_version': track.resourceVersion,
+        });
       }
       await batch.commit(noResult: true);
     });
@@ -254,8 +276,27 @@ class AppDb {
         where: 'source_id=?',
         whereArgs: [original.id],
       );
+      // Merge verified embedded tags with the new directory snapshot. A normal
+      // PROPFIND rescan must never reset resolved artist/album names.
       await tx.rawInsert(
-        'INSERT OR REPLACE INTO tracks ($_trackColumns) SELECT $_trackColumns FROM index_tracks WHERE run_id=?',
+        '''
+        INSERT OR REPLACE INTO tracks ($_trackColumns)
+        SELECT i.source_id,i.id,
+          COALESCE(NULLIF(m.title,''),i.title),
+          COALESCE(NULLIF(m.artist,''),i.artist),
+          COALESCE(NULLIF(m.album,''),i.album),
+          COALESCE(NULLIF(m.album_artist,''),i.album_artist),
+          i.duration_ms,i.cover_id,
+          COALESCE(m.year,i.year),
+          COALESCE(m.disc,i.disc),
+          COALESCE(m.number,i.number),
+          i.remote_json,i.missing
+        FROM index_tracks i
+        LEFT JOIN webdav_track_tags m
+          ON m.source_id=i.source_id AND m.track_id=i.id
+         AND m.resource_version=i.resource_version AND m.status='done'
+        WHERE i.run_id=?
+      ''',
         [runId],
       );
       await tx.update(
@@ -265,6 +306,92 @@ class AppDb {
         whereArgs: [original.id],
       );
       await tx.delete('index_tracks', where: 'run_id=?', whereArgs: [runId]);
+    });
+  }
+
+  /// Only completed metadata for the exact file version may suppress a fetch.
+  Future<bool> hasWebDavTags(Track track) async {
+    final rows = await db.query(
+      'webdav_track_tags',
+      columns: ['status'],
+      where: 'source_id=? AND track_id=? AND resource_version=?',
+      whereArgs: [track.ref.sourceId, track.ref.id, track.resourceVersion],
+      limit: 1,
+    );
+    return rows.isNotEmpty && rows.single['status'] == 'done';
+  }
+
+  /// Persist and project tags atomically. A source disable, deletion or a new
+  /// PROPFIND snapshot invalidates a stale in-flight Range response.
+  Future<bool> putWebDavTags(Track requested, EmbeddedTags tags) async {
+    if (!tags.hasMusicMetadata) return false;
+    String? clean(String? s) => s?.trim().isNotEmpty == true ? s!.trim() : null;
+    return db.transaction((tx) async {
+      final sources = await tx.query(
+        'sources',
+        columns: ['kind', 'enabled'],
+        where: 'id=?',
+        whereArgs: [requested.ref.sourceId],
+        limit: 1,
+      );
+      if (sources.isEmpty ||
+          sources.single['kind'] != 'webdav' ||
+          sources.single['enabled'] != 1) {
+        return false;
+      }
+      final rows = await tx.query(
+        'tracks',
+        where: 'source_id=? AND id=? AND missing=0',
+        whereArgs: [requested.ref.sourceId, requested.ref.id],
+        limit: 1,
+      );
+      if (rows.isEmpty) return false;
+      final current = Track.fromRow(rows.single);
+      if (current.resourceVersion != requested.resourceVersion) return false;
+      final already = await tx.query(
+        'webdav_track_tags',
+        columns: ['resource_version', 'status'],
+        where: 'source_id=? AND track_id=?',
+        whereArgs: [requested.ref.sourceId, requested.ref.id],
+        limit: 1,
+      );
+      if (already.isNotEmpty &&
+          already.single['resource_version'] == requested.resourceVersion &&
+          already.single['status'] == 'done') {
+        return false;
+      }
+      final updates = <String, Object?>{
+        if (clean(tags.title) != null) 'title': clean(tags.title),
+        if (clean(tags.artist) != null) 'artist': clean(tags.artist),
+        if (clean(tags.album) != null) 'album': clean(tags.album),
+        if (clean(tags.albumArtist) != null)
+          'album_artist': clean(tags.albumArtist),
+        if (tags.year != null) 'year': tags.year,
+        if (tags.discNumber != null) 'disc': tags.discNumber,
+        if (tags.trackNumber != null) 'number': tags.trackNumber,
+      };
+      if (updates.isEmpty) return false;
+      await tx.insert('webdav_track_tags', {
+        'source_id': requested.ref.sourceId,
+        'track_id': requested.ref.id,
+        'resource_version': requested.resourceVersion,
+        'title': clean(tags.title),
+        'artist': clean(tags.artist),
+        'album': clean(tags.album),
+        'album_artist': clean(tags.albumArtist),
+        'year': tags.year,
+        'disc': tags.discNumber,
+        'number': tags.trackNumber,
+        'status': 'done',
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await tx.update(
+        'tracks',
+        updates,
+        where: 'source_id=? AND id=?',
+        whereArgs: [requested.ref.sourceId, requested.ref.id],
+      );
+      return true;
     });
   }
 
@@ -452,6 +579,11 @@ class AppDb {
     await db.transaction((tx) async {
       await tx.delete('sources', where: 'id=?', whereArgs: [id]);
       await tx.delete('tracks', where: 'source_id=?', whereArgs: [id]);
+      await tx.delete(
+        'webdav_track_tags',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
       final blockedRows = await tx.query('blacklist');
       for (final row in blockedRows) {
         try {

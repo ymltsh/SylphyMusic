@@ -554,3 +554,17 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 - 按用户最新授权已发布 0.2.4-beta+6 Android 测试签名更新，使用 beta 清单；正式渠道保持 0.2.3+5。未做 Android 真机验收；Linux 继续暂缓。
 
 发布证据：源码提交 `5f14e0f`，测试版标签 `v0.2.4-beta+6`；beta 清单提交 `ac48377`。Release 提供三份 APK 和 SHA256SUMS.txt，远端四个资产的大小 / SHA-256 与本地一致；arm64 原始及配置加速下载链接均返回 HTTP 200。arm64-v8a 31.45 MiB、armeabi-v7a 28.59 MiB、x86_64 33.71 MiB，三个 APK 验签通过，证书与 0.2.3+5 相同；versionName 0.2.4-beta，versionCode 分别为 2006 / 1006 / 4006。x86_64 Release 在自建模拟器覆盖安装并启动成功。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta%2B6 。
+
+## 2026-10-28 应用 WebDAV Artist / Album 元数据补丁
+
+应用用户提供的 SylphyMusic-WebDAV-metadata.patch，并适配现有测试与格式规范：提取 ID3 / FLAC / MP4 文本标签，SQLite 升级至 v7，按资源版本持久化并在重扫时合并；新增进程内分页渐进补全及可见曲目优先调度，分组刷新使用两秒节流。
+
+补充修复：旧版数据库测试正确构造 v1 / v5 结构；退出时先停止补全生产并等待可见任务，异步查询后复核取消代次。增加真实 v6→v7 迁移、来源停用 / 删除后拒绝过期标签、可见任务退出等待的回归覆盖。
+
+验证：flutter analyze 无问题；全量串行测试 197 项通过、5 项私密测试默认跳过；Windows 原生集成验证内嵌标题 / 艺术家 / 专辑落库、封面 / 歌词与离线重启复用。此次未重新运行 Android / Linux 原生测试，未生成或发布新版本安装包；当前发布包仍为 0.2.4-beta+6。
+
+## 2026-10-28 WebDAV 元数据测试更新准备
+
+按用户授权准备 0.2.4-beta2+7，发布到 beta 渠道，Android 使用已有测试签名及三个 ABI 的 Release 包。包含本节前的元数据补丁与 v7 迁移修复；正式渠道保持 0.2.3+5。
+
+本轮复核：flutter analyze 无问题，全量测试 197 项通过、5 项默认跳过；Android API35 模拟器原生集成通过，验证内嵌标题 / 艺术家 / 专辑持久化与离线重启复用。模拟器安装集成测试 Debug 包时因版本号低于上轮按 ABI Release 包，由 Flutter 工具卸载重装自建 AVD 内的测试应用；不涉及真机或用户数据目录。

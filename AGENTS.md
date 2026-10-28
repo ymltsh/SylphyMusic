@@ -39,7 +39,7 @@
 ## 修改与验证
 
 - 使用 `dart format`，延续现有风格。新增来源检查工厂、能力标记、UI 选项、连接生命周期、缓存版本和对应测试。
-- 数据库当前 v6；持久化结构变更提供前向迁移并验证旧数据，不能用删除用户数据库代替迁移。封面和歌词共用 MediaAssetStore，手动歌词不参加普通缓存淘汰，详见 [媒体资源缓存](docs/MEDIA_ASSETS.md)。
+- 数据库当前 v7；持久化结构变更提供前向迁移并验证旧数据，不能用删除用户数据库代替迁移。封面和歌词共用 MediaAssetStore，手动歌词不参加普通缓存淘汰，详见 [媒体资源缓存](docs/MEDIA_ASSETS.md)。
 - 行为变更运行对应测试和 `flutter analyze`；仅文档变更检查链接、路径与描述，不必重建平台。命令见 [CONTRIBUTING](CONTRIBUTING.md)。
 - 网络、缓存、索引、同步变更优先验证失败、取消、权限错误和数据保留；原生能力变更运行对应设备测试。
 - 验收包用 `tool/build_review.ps1`：Android Release 按 ABI 拆分，Windows ZIP 保留运行依赖。集成测试会覆盖输出，打包前重新构建普通 `lib/main.dart` 入口，不手改插件注册生成文件。

@@ -58,6 +58,9 @@ void main() {
         ...data,
       ];
       final payload = [
+        ...frame('TIT2', [3, ...utf8.encode('Embedded title')]),
+        ...frame('TPE1', [3, ...utf8.encode('Embedded artist')]),
+        ...frame('TALB', [3, ...utf8.encode('Embedded album')]),
         ...frame('USLT', [
           3,
           ...ascii.encode('eng'),
@@ -123,6 +126,10 @@ void main() {
         expect(parseLrc(lyrics!).first.at.inMilliseconds, 1000);
         expect(lyrics, contains('Native cached lyrics'));
         expect(await app.cache.find(track.ref), isNull);
+        final enriched = await app.db.track(track.ref);
+        expect(enriched!.title, 'Embedded title');
+        expect(enriched.artist, 'Embedded artist');
+        expect(enriched.album, 'Embedded album');
         final before = requests;
         await app.disposeAsync();
         app = null;
@@ -137,6 +144,8 @@ void main() {
         final restored = Track.fromRow(
           (await app.db.db.query('tracks')).single,
         );
+        expect(restored.artist, 'Embedded artist');
+        expect(restored.album, 'Embedded album');
         expect((await app.artwork.load(restored))!.path, cover!.path);
         expect(await app.loadLyrics(restored), lyrics);
         expect(requests, before);

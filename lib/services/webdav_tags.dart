@@ -19,9 +19,13 @@ Future<EmbeddedTags> _parseTags(
 /// Bounded range reads for visible/playing WebDAV tracks. This service never
 /// writes partial audio into CacheManager or marks it READY.
 class WebDavTags {
-  WebDavTags(this.factory, {this.cache});
+  WebDavTags(this.factory, {this.cache, this.onTags});
   final AdapterFactory factory;
   final CacheManager? cache;
+
+  /// Invoked after a successful read (including an already-cached audio file).
+  /// A database failure must never prevent artwork or lyrics from loading.
+  final Future<void> Function(Track track, EmbeddedTags tags)? onTags;
   final Map<String, Future<EmbeddedTags>> _pending = {};
   final Map<String, ({EmbeddedTags tags, DateTime until})> _recent = {};
   final Map<HttpClient, String> _clients = {};
@@ -57,6 +61,15 @@ class WebDavTags {
     return _pending.putIfAbsent(key, () async {
       try {
         final tags = await _load(source, track, epoch);
+        if (tags.hasMusicMetadata &&
+            !_stopped &&
+            epoch == (_epochs[source.id] ?? 0)) {
+          try {
+            await onTags?.call(track, tags);
+          } catch (_) {
+            // Metadata persistence must not hide cover/lyrics results.
+          }
+        }
         if (!_stopped && epoch == (_epochs[source.id] ?? 0)) {
           // At most two covers retained between the independent artwork and
           // lyric consumers. Persistent bytes live in MediaAssetStore.
@@ -106,7 +119,9 @@ class WebDavTags {
             if (_stopped || epoch != (_epochs[source.id] ?? 0)) {
               return const EmbeddedTags();
             }
-            if (embedded.cover != null || embedded.lyrics?.isNotEmpty == true) {
+            if (embedded.cover != null ||
+                embedded.lyrics?.isNotEmpty == true ||
+                embedded.hasMusicMetadata) {
               return embedded;
             }
           }
@@ -248,6 +263,13 @@ class WebDavTags {
         lyrics: utf8.encode(tags.lyrics ?? '').length <= 1024 * 1024
             ? tags.lyrics
             : null,
+        title: tags.title,
+        artist: tags.artist,
+        album: tags.album,
+        albumArtist: tags.albumArtist,
+        year: tags.year,
+        trackNumber: tags.trackNumber,
+        discNumber: tags.discNumber,
       );
     } finally {
       if (client != null) {
