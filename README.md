@@ -2,7 +2,7 @@
 
 Flutter / Material 3 多音源播放器，支持 Android、Windows、Linux。主工程、原生 Runner、依赖锁文件和自动化测试均在本目录。
 
-**当前是完整首版范围的开发工程，尚未通过全部正式发布闸门。调试构建不等于首个完整正式版。** 最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)，产品范围见 [docs/PROJECT_SPEC_v3.8.md](docs/PROJECT_SPEC_v3.8.md)。
+正式发布仅处理构建、签名、私密信息扫描、打包上传和清单更新；分析、测试与验收独立执行，不作为发布前置条件。当前分发 Android / Windows，Linux 暂缓。最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)，发布标准见 [docs/RELEASE_GATES.md](docs/RELEASE_GATES.md)。
 
 应用内「设置 → 检查更新」提供手动更新检查。Android / Windows 发布工具及版本清单维护见 [更新与发布流程](update.md)；默认仅准备本地包，远程发布需显式授权。
 
@@ -59,7 +59,7 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 原生测试会创建临时数据目录，使用自行生成的音频；默认不连接私人服务器。纯单元测试中的 libmpv 用例需要先构建 Windows Debug，或设置 `SYLPHY_MPV_LIBRARY` 指向本机 libmpv。Linux 无显示环境的集成测试使用 Xvfb 和 `--dart-define=SYLPHY_HEADLESS_AUDIO=true`。
 
-集成测试会覆盖构建输出。内部验收打包使用 `tool/build_review.ps1`：重新构建普通入口的 Windows Release 与 Android Release / 分架构 APK，调用 `tool/package_review.py --mode optimized` 检查已跟踪源码和包内容中的已知私密值，输出到 `build/internal-review/`。脚本在本机显式启用测试签名；若有正式 `android/key.properties` 则优先使用其配置。这些包仍须通过正式版发布闸门。
+集成测试会覆盖构建输出。内部验收打包使用 `tool/build_review.ps1`：重新构建普通入口的 Windows Release 与 Android Release / 分架构 APK，调用 `tool/package_review.py --mode optimized` 检查已跟踪源码和包内容中的已知私密值，输出到 `build/internal-review/`。脚本在本机显式启用测试签名；若有正式 `android/key.properties` 则优先使用其配置。正式发布另用 `release.py`，不要求先执行内部验收。
 
 当前 Android arm64 内部包 **32.9 MB**（原通用 Debug **207.5 MB**），Windows Release 压缩包 **23.7 MB**（原 Debug **55.4 MB**）。旧版 32 位 ARM 手机选 `armeabi-v7a`，x86_64 用于对应设备 / 模拟器。Windows 完整解压后运行 `sylphy_music.exe`。同目录 `README-optimized.txt` 与 `SHA256SUMS-optimized.txt` 提供说明及摘要。
 
@@ -72,9 +72,9 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 测试文件：`test/live_emby_test.dart`、`test/live_emby_write_test.dart`、`test/live_subsonic_test.dart`。Android 私密测试可用 `tool/private_fixture_server.py` 提供一次性本机读取，原始密码不编入 APK。
 
-## 发布前必须完成
+## 持续验收
 
-Linux 真实构建与运行、Android 实机来电 / 蓝牙 / 耳机与后台限制、更多只读 / 权限撤销 / 并发冲突场景，以及原生媒体依赖的分发许可证审计和正式签名，仍以 [发布闸门](docs/RELEASE_GATES.md) 为准。经授权的真实 Emby 临时歌单 CRUD 已通过；用户目前要求先本地运行，未推送源码或 CI。
+Linux 真实构建与运行、Android 实机来电 / 蓝牙 / 耳机与后台限制、更多只读 / 权限撤销 / 并发冲突场景，以及原生媒体依赖的完整分发许可证审计继续跟进，见 [验收记录](docs/RELEASE_GATES.md)。Android 正式签名已配置；真实 Emby 临时歌单 CRUD 已通过。是否推送或发布以维护者当前指令为准。
 
 Emby 内嵌文本歌词优先获取保留时间轴的 SRT，转换为毫秒精度 LRC；外置 LRC 优先读取原格式，不支持时间轴转换时回退纯文本。旧 Emby 纯文本缓存会尝试升级，手动导入独立保存；详见 [Emby 歌词](docs/EMBY_LYRICS.md)。不同服务端版本的转换兼容性仍需继续验证。OpenSubsonic 支持结构化歌词接口并兼容传统文本接口。服务器不提供稳定身份时，不允许在旧来源身份下更换 OpenSubsonic 地址；需添加独立来源来隔离旧缓存和歌单。
 

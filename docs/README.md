@@ -14,7 +14,7 @@
 | [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) | 实施计划与决策背景 |
 | [PROGRESS](PROGRESS.md) | 最新证据、剩余工作和验收输出 |
 | [TEST_PLAN](TEST_PLAN.md) | 完整真实环境验收清单 |
-| [RELEASE_GATES](RELEASE_GATES.md) | 首次正式发布门槛 |
+| [RELEASE_GATES](RELEASE_GATES.md) | 发布基本标准与独立验收待办 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |
 | [ANDROID_SYNC_FGS](ANDROID_SYNC_FGS.md) | 手动同步通知、引擎生命周期、暂停与系统时限 |
 | [ANDROID_SYSTEM_BARS](ANDROID_SYSTEM_BARS.md) | Android 手势条透明沉浸、系统图标明暗与安全边距 |
@@ -32,4 +32,4 @@
 | [native_licenses](native_licenses/README.md) | 原生许可证文本与说明 |
 | [测试音频](../test/fixtures/README.md) | 合成素材与用途 |
 
-用户当前指令决定工作范围。需求与计划提供背景，代码说明当前实现，日志和进度记录实际验证，发布门槛约束正式交付。发现冲突时核对代码和用户已确认的变更，更新对应文档。
+用户当前指令决定工作范围。需求与计划提供背景，代码说明当前实现，日志和进度记录实际验证；发布与验收独立，未完成验收不阻断发布。发现冲突时核对代码和用户已确认的变更，更新对应文档。

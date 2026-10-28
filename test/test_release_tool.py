@@ -154,13 +154,24 @@ class ReleaseTests(unittest.TestCase):
             release.publish(SimpleNamespace(no_push_manifest=False), record, output, 'v0.3.0-beta+3', latest)
         self.assertFalse(any(m != 'GET' for m, _, _ in calls))
 
-    def test_formal_gates_block_remote_calls(self):
-        output, record = self.record()
-        record['version'] = '0.3.0'
+    def test_pending_followups_do_not_block_stable_publication(self):
+        output, record, latest, calls, api, run = self.publish_fixture()
+        record['version'] = latest['version'] = '1.0.0'
         (self.root / 'docs').mkdir()
-        (self.root / 'docs/RELEASE_GATES.md').write_text('- [ ] Pending verification\n')
+        gates = self.root / 'docs/RELEASE_GATES.md'
+        gates.write_text('- [ ] Pending follow-up\n')
+        with patch.object(release, 'api', side_effect=api), patch.object(release, 'run', side_effect=run), patch.object(release, 'token_from_environment', return_value='synthetic-test-token'), redirect_stdout(io.StringIO()):
+            release.publish(SimpleNamespace(no_push_manifest=False), record, output, 'v1.0.0+3', latest)
+        create = next(body for method, path, body in calls if method == 'POST' and path.endswith('/releases'))
+        self.assertFalse(create['prerelease'])
+        self.assertEqual(calls[-1][1], '/repos/ymltsh/SylphyMusic/contents/version.json')
+        self.assertEqual(gates.read_text(), '- [ ] Pending follow-up\n')
+
+    def test_unchecked_build_cannot_be_published(self):
+        output, record = self.record()
+        record['checks_passed'] = False
         with patch.object(release, 'run', return_value=SimpleNamespace(stdout='')), patch.object(release, 'api') as api, self.assertRaises(ValueError):
-            release.publish(SimpleNamespace(no_push_manifest=False), record, output, 'v0.3.0+3', {})
+            release.publish(SimpleNamespace(no_push_manifest=False), record, output, 'v1.0.0+3', {})
         api.assert_not_called()
 
 
