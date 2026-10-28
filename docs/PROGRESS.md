@@ -551,4 +551,6 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 - 修复 USLT 中文、UTF-8 / UTF-16 LE / BE 歌词解码，支持毫秒 SYLT 转 LRC；内嵌图片优先正面封面。缺失或损坏时回退旁置文件，手动导入歌词始终优先。
 - 封面和歌词按资源版本持久化，目录共用图片不再导致不同曲目内嵌封面串用；完整音频缓存可离线提取。读取最多三个并发、累计 12 MiB / 64 请求，校验 Range / 长度 / 版本，来源停用和退出取消任务。
 - 验证：flutter analyze 无问题；全量串行测试 192 项通过、5 项私密测试默认跳过；提供的 WebDAV 测试源完成只读 Range、内嵌歌词及图片解码验证；Windows / Android API35 模拟器原生测试均验证提取前无 READY、封面显示与服务 / 数据库重启后离线复用。
-- 按用户最新授权准备 0.2.4-beta+6 Android 测试签名更新，使用 beta 清单；正式渠道保持 0.2.3+5。未做 Android 真机验收；Linux 继续暂缓。
+- 按用户最新授权已发布 0.2.4-beta+6 Android 测试签名更新，使用 beta 清单；正式渠道保持 0.2.3+5。未做 Android 真机验收；Linux 继续暂缓。
+
+发布证据：源码提交 `5f14e0f`，测试版标签 `v0.2.4-beta+6`；beta 清单提交 `ac48377`。Release 提供三份 APK 和 SHA256SUMS.txt，远端四个资产的大小 / SHA-256 与本地一致；arm64 原始及配置加速下载链接均返回 HTTP 200。arm64-v8a 31.45 MiB、armeabi-v7a 28.59 MiB、x86_64 33.71 MiB，三个 APK 验签通过，证书与 0.2.3+5 相同；versionName 0.2.4-beta，versionCode 分别为 2006 / 1006 / 4006。x86_64 Release 在自建模拟器覆盖安装并启动成功。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta%2B6 。
