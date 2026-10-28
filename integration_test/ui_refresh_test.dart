@@ -11,6 +11,8 @@ import 'package:sylphy_music/core/app_controller.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/core/appearance.dart';
 import 'package:sylphy_music/services/app_updates.dart';
+import 'package:sylphy_music/services/api_settings.dart';
+import 'package:sylphy_music/ui/music_source_connection_page.dart';
 import 'package:sylphy_music/ui/app_shell.dart';
 import 'package:sylphy_music/ui/lyrics_view.dart';
 import 'package:sylphy_music/ui/now_playing.dart';
@@ -94,8 +96,57 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('让音乐，轻盈相随'), findsOneWidget);
         await capture('welcome-mobile');
-        await tester.tap(find.text('稍后设置，先进入首页'));
+        await tester.tap(find.text('开始使用'));
         await tester.pumpAndSettle();
+        expect(find.text('选择歌曲来源'), findsOneWidget);
+        expect(find.text('Navidrome / OpenSubsonic'), findsOneWidget);
+        await capture('welcome-sources-mobile');
+        await tester.tap(find.text('WebDAV'));
+        await tester.pumpAndSettle();
+        expect(find.byType(MusicSourceConnectionPage), findsOneWidget);
+        expect(
+          tester
+              .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'WebDAV'))
+              .selected,
+          true,
+        );
+        await capture('source-connection-mobile');
+        tester.view.physicalSize = const Size(320, 640);
+        await tester.pumpAndSettle();
+        await capture('source-connection-small');
+        expect(tester.takeException(), isNull);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = const Size(360, 800);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('本地音乐'));
+        await tester.pumpAndSettle();
+        expect(find.text('导入本地音频文件'), findsOneWidget);
+        expect(find.text('添加本地音乐文件夹'), findsOneWidget);
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('下一步：API 配置'));
+        await tester.pumpAndSettle();
+        final quoteInput = find.widgetWithText(TextFormField, '每日一言 API');
+        final mirrorInput = find.widgetWithText(TextFormField, 'GitHub 加速 API');
+        await tester.enterText(quoteInput, 'https://example.invalid/json');
+        await tester.enterText(mirrorInput, 'http://example.invalid/');
+        await tester.tap(find.text('完成设置'));
+        await tester.pumpAndSettle();
+        expect(app.apiSettings.quoteUrl, ApiSettings.defaultQuoteUrl);
+        expect(find.text('API 配置'), findsOneWidget);
+        await tester.enterText(quoteInput, ApiSettings.defaultQuoteUrl);
+        await tester.enterText(mirrorInput, 'https://example.invalid/proxy/');
+        await tester.pumpAndSettle();
+        expect(find.text('GitHub 加速 API 需要有效的 HTTPS 前缀地址'), findsNothing);
+        await capture('welcome-api-mobile');
+        await tester.tap(find.text('完成设置'));
+        await tester.pumpAndSettle();
+        final persistedApi = ApiSettings(app.db);
+        await persistedApi.initialize();
+        expect(persistedApi.githubMirror, 'https://example.invalid/proxy/');
+        persistedApi.dispose();
+        await app.apiSettings.setGitHubMirror(ApiSettings.defaultGitHubMirror);
         expect(find.byType(NavigationDestination), findsNWidgets(4));
         expect(tester.getSize(find.byType(NavigationBar)).height, 54);
         expect(find.byTooltip('设置'), findsOneWidget);
@@ -590,14 +641,20 @@ void main() {
         await tester.pumpAndSettle();
         tester.view.physicalSize = const Size(360, 800);
         await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.text('音乐源管理'),
-          -200,
-          scrollable: find.byType(Scrollable).last,
-        );
+        tester
+            .state<ScrollableState>(find.byType(Scrollable).last)
+            .position
+            .jumpTo(0);
+        await tester.pumpAndSettle();
         await tester.tap(find.text('音乐源管理'));
         await tester.pumpAndSettle();
-        expect(find.text('同步所有来源'), findsOneWidget);
+        expect(find.text('同步全部'), findsOneWidget);
+        expect(find.text('已连接的音乐源'), findsOneWidget);
+        await tester.tap(find.text('添加音乐源'));
+        await tester.pumpAndSettle();
+        expect(find.byType(MusicSourceConnectionPage), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
         await capture('sources-mobile');
         await tester.tap(find.text('本地音乐').first);
         await tester.pumpAndSettle();

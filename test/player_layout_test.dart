@@ -128,6 +128,8 @@ void main() {
               playHeight: 80,
               controlSpacing: 20,
             )
+          else if (e.type == PlayerPart.lyrics)
+            e.copyWith(lyricLineHeight: 2.25)
           else
             e,
       ],
@@ -141,6 +143,22 @@ void main() {
     expect(controls.playWidth, 88);
     expect(controls.playHeight, 80);
     expect(controls.controlSpacing, 20);
+    expect(
+      restored.elements
+          .firstWhere((e) => e.type == PlayerPart.lyrics)
+          .lyricLineHeight,
+      2.25,
+    );
+    final old = jsonDecode(base.encode()) as Map<String, dynamic>;
+    for (final element in old['elements'] as List) {
+      (element['props'] as Map).remove('lyricLineHeight');
+    }
+    expect(
+      PlayerLayout.fromJson(old).elements
+          .firstWhere((e) => e.type == PlayerPart.lyrics)
+          .lyricLineHeight,
+      1.5,
+    );
     expect(restored.elements.any((e) => e.type == PlayerPart.lyrics), isTrue);
     expect(
       PlayerLayout.fromJson(jsonDecode(base.encode())).toJson()['version'],
@@ -246,6 +264,8 @@ void main() {
         (j) => j['elements'][0]['props']['fontSize'] = -1,
         (j) => j['elements'][0]['props']['playHeight'] = 200,
         (j) => j['elements'][0]['props']['controlSpacing'] = -1,
+        (j) => j['elements'][0]['props']['lyricLineHeight'] = .5,
+        (j) => j['elements'][0]['props']['lyricLineHeight'] = 3,
         (j) => j['elements'].add(j['elements'][0]),
         (j) => j['elements'][0]['props']['opacity'] = '1',
       ]) {
@@ -346,7 +366,19 @@ void main() {
       await root.delete(recursive: true);
     });
     test('save, select default and restart retain templates', () async {
-      await store.save(playerTemplate(), asNew: true);
+      final base = playerTemplate();
+      await store.save(
+        base.copyWith(
+          elements: [
+            for (final element in base.elements)
+              if (element.type == PlayerPart.lyrics)
+                element.copyWith(lyricLineHeight: 2.25)
+              else
+                element,
+          ],
+        ),
+        asNew: true,
+      );
       final id = store.active!.id;
       await store.save(playerTemplate(lyrics: true), asNew: true);
       expect(store.templates.length, 2);
@@ -354,6 +386,12 @@ void main() {
       final restored = PlayerLayoutStore(db);
       await restored.initialize();
       expect(restored.active!.id, id);
+      expect(
+        restored.active!.elements
+            .firstWhere((e) => e.type == PlayerPart.lyrics)
+            .lyricLineHeight,
+        2.25,
+      );
       await restored.select(null);
       expect(restored.active, isNull);
       expect(restored.templates.length, 2);

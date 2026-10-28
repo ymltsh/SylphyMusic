@@ -59,6 +59,21 @@ void main() {
     expect(running, isTrue);
     await service.stop();
   });
+  test(
+    'first scan waits until the notification permission prompt finishes',
+    () async {
+      final decision = Completer<void>();
+      messenger.setMockMethodCallHandler(permission, (_) => decision.future);
+      final start = service.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(running, false);
+      expect(calls, isEmpty);
+      decision.complete();
+      await start;
+      expect(running, true);
+      await service.stop();
+    },
+  );
   test('native pause and timeout interrupt the controller', () async {
     await service.start();
     for (final event in ['pause', 'timeout', 'unavailable']) {

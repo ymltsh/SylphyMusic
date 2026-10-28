@@ -20,6 +20,9 @@ import 'app_background.dart';
 import 'app_identity.dart';
 import 'player_cover.dart';
 import 'settings_page.dart';
+import 'music_sources_panel.dart';
+import 'music_source_connection_page.dart';
+import 'quick_start_wizard.dart';
 import '../data/library_catalog.dart';
 
 class SylphyShell extends StatefulWidget {
@@ -406,77 +409,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     }
   }
 
-  Widget _welcome() => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.all(28),
-            children: [
-              Icon(
-                Icons.air_rounded,
-                size: 76,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '让音乐，轻盈相随',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                '欢迎使用风灵音乐\n连接私人音乐库，收藏喜欢的声音，离线也能自在聆听。',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              const ListTile(
-                leading: Icon(Icons.link),
-                title: Text('01  连接音乐来源'),
-                subtitle: Text('Emby · Navidrome / OpenSubsonic · WebDAV'),
-              ),
-              FilledButton.icon(
-                onPressed: app.busy
-                    ? null
-                    : () async {
-                        await _addSource();
-                        if (app.sources.isNotEmpty) await _finishWelcome();
-                      },
-                icon: const Icon(Icons.add_link),
-                label: const Text('连接我的音乐库'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: app.busy
-                    ? null
-                    : () async {
-                        await _act(app.importLocalFiles);
-                        if (app.sources.isNotEmpty) await _finishWelcome();
-                      },
-                icon: const Icon(Icons.folder_open),
-                label: const Text('导入本地音乐'),
-              ),
-              if (app.busy) ...[
-                const SizedBox(height: 16),
-                const LinearProgressIndicator(),
-                const Text('正在验证连接并初始化音乐库…', textAlign: TextAlign.center),
-              ],
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: app.busy ? null : _finishWelcome,
-                child: const Text('稍后设置，先进入首页'),
-              ),
-              const Text(
-                '以后可在右上角「设置 → 音乐源管理」中继续添加。',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
+  Widget _welcome() => QuickStartWizard(
+    app: app,
+    onConnect: (kind) => _addSource(initialKind: kind),
+    onImportFiles: () => _act(app.importLocalFiles),
+    onImportFolder: () => _act(app.importLocalFolder),
+    onFinish: _finishWelcome,
   );
 
   Widget _personal() => ListView(
@@ -1066,279 +1004,75 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     }
   }
 
-  Widget _sources() => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: app.busy ? null : () => _act(app.syncAllForeground),
-              icon: const Icon(Icons.sync),
-              label: const Text('同步所有来源'),
-            ),
-            FilledButton.icon(
-              onPressed: _addSource,
-              icon: const Icon(Icons.add),
-              label: const Text('添加服务器'),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: () => _act(app.importLocalFiles),
-              icon: const Icon(Icons.folder_open),
-              label: const Text('导入本地文件'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _act(app.importLocalFolder),
-              icon: const Icon(Icons.create_new_folder_outlined),
-              label: const Text('添加音乐文件夹'),
-            ),
-          ],
-        ),
-      ),
-      Expanded(
-        child: ListView(
-          children: app.sources
-              .map(
-                (s) => ListTile(
-                  leading: Icon(
-                    s.kind == SourceKind.emby
-                        ? Icons.storage
-                        : s.kind == SourceKind.subsonic ||
-                              s.kind == SourceKind.webdav
-                        ? Icons.cloud
-                        : Icons.folder,
-                  ),
-                  title: Text(s.name),
-                  onTap: () => setState(() {
-                    sourceFilter = s.id;
-                    tab = 1;
-                    libraryView = 0;
-                    Navigator.pop(context);
-                  }),
-                  subtitle: Text(
-                    s.kind == SourceKind.local
-                        ? '本地音乐'
-                        : '${s.url}${s.url.startsWith('http:') ? ' · 未加密' : ''}'
-                              '${app.index.progress[s.id] == null ? '' : '\n${app.index.progress[s.id]!.message}'}',
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (v) async {
-                      if (v == 'sync') {
-                        await _act(() => app.syncSourceForeground(s));
-                      }
-                      if (v == 'tags') {
-                        await _act(() => app.enrichSourceForeground(s));
-                      }
-                      if (v == 'cancel_sync') app.cancelActiveSync(s.id);
-                      if (v == 'edit') await _editSource(s);
-                      if (v == 'scan') await _act(() => app.rescanLocal(s));
-                      if (v == 'delete' &&
-                          await _confirm(
-                            '删除 ${s.name} 及本机管理的相关数据？不会删除服务器上的音乐。',
-                          )) {
-                        await _act(() => app.deleteSource(s));
-                      }
-                      if (v == 'cache') {
-                        await _act(() => app.clearCache(sourceId: s.id));
-                      }
-                      if (v == 'toggle') {
-                        await _act(() => app.toggleSource(s));
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      if (app.index.progress[s.id]?.state == 'reading')
-                        const PopupMenuItem(
-                          value: 'cancel_sync',
-                          child: Text('取消索引同步'),
-                        ),
-                      if (s.kind != SourceKind.local)
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Text('编辑连接 / 重新登录'),
-                        ),
-                      if (s.kind == SourceKind.local && s.url != 'file:///')
-                        const PopupMenuItem(
-                          value: 'scan',
-                          child: Text('重新扫描文件夹'),
-                        ),
-                      if (s.kind != SourceKind.local)
-                        const PopupMenuItem(
-                          value: 'sync',
-                          child: Text('同步此来源'),
-                        ),
-                      if (s.kind == SourceKind.webdav)
-                        const PopupMenuItem(
-                          value: 'tags',
-                          child: Text('只补全 WebDAV 标签（前台通知）'),
-                        ),
-                      PopupMenuItem(
-                        value: 'toggle',
-                        child: Text(s.enabled ? '停用来源' : '重新启用'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'cache',
-                        child: Text('清除此来源缓存'),
-                      ),
-                      const PopupMenuItem(value: 'delete', child: Text('删除来源')),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    ],
+  Widget _sources() => MusicSourcesPanel(
+    app: app,
+    onAdd: () => _addSource(),
+    onSyncAll: () => _act(app.syncAllForeground),
+    onImportFiles: () => _act(app.importLocalFiles),
+    onImportFolder: () => _act(app.importLocalFolder),
+    onSelect: (source) => setState(() {
+      sourceFilter = source.id;
+      tab = 1;
+      libraryView = 0;
+      Navigator.pop(context);
+    }),
+    onAction: _handleSourceAction,
   );
-  Future<void> _addSource() async {
-    final name = TextEditingController(),
-        url = TextEditingController(),
-        username = TextEditingController(),
-        password = TextEditingController();
-    var kind = SourceKind.emby;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, refresh) => AlertDialog(
-          title: const Text('添加服务器连接'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<SourceKind>(
-                  initialValue: kind,
-                  items: const [
-                    DropdownMenuItem(
-                      value: SourceKind.emby,
-                      child: Text('Emby'),
-                    ),
-                    DropdownMenuItem(
-                      value: SourceKind.subsonic,
-                      child: Text('Navidrome / OpenSubsonic'),
-                    ),
-                    DropdownMenuItem(
-                      value: SourceKind.webdav,
-                      child: Text('WebDAV'),
-                    ),
-                  ],
-                  onChanged: (v) => refresh(() => kind = v ?? SourceKind.emby),
-                ),
-                if (kind == SourceKind.webdav)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      '递归读取音乐目录；支持本地歌单、同名 .lrc / .txt 歌词及 cover / folder 封面。',
-                    ),
-                  ),
-                TextField(
-                  controller: name,
-                  decoration: const InputDecoration(labelText: '连接名称'),
-                ),
-                TextField(
-                  controller: url,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                    labelText: '服务器 URL（包含反向代理路径）',
-                  ),
-                ),
-                TextField(
-                  controller: username,
-                  decoration: const InputDecoration(labelText: '用户名'),
-                ),
-                TextField(
-                  controller: password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: '密码'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('连接并同步'),
-            ),
-          ],
-        ),
+
+  Future<void> _handleSourceAction(SourceProfile source, String action) async {
+    if (action == 'cancel_sync') {
+      app.cancelActiveSync(source.id);
+    } else if (action == 'sync') {
+      await _act(() => app.syncSourceForeground(source));
+    } else if (action == 'tags') {
+      await _act(() => app.enrichSourceForeground(source));
+    } else if (action == 'edit') {
+      await _editSource(source);
+    } else if (action == 'scan') {
+      await _act(() => app.rescanLocal(source));
+    } else if (action == 'toggle') {
+      await _act(() => app.toggleSource(source));
+    } else if (action == 'cache') {
+      await _act(() => app.clearCache(sourceId: source.id));
+    } else if (action == 'delete' &&
+        await _confirm('删除 ${source.name} 及本机管理的相关数据？不会删除服务器上的音乐。')) {
+      await _act(() => app.deleteSource(source));
+    }
+  }
+
+  Future<void> _addSource({SourceKind initialKind = SourceKind.emby}) async {
+    final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
+      MaterialPageRoute(
+        builder: (_) => MusicSourceConnectionPage(initialKind: initialKind),
       ),
     );
-    if (result == true) {
-      await _act(
-        () => app.addSource(
-          kind: kind,
-          name: name.text.trim(),
-          url: url.text.trim(),
-          username: username.text.trim(),
-          password: password.text,
-        ),
-      );
-    }
-    name.dispose();
-    url.dispose();
-    username.dispose();
-    password.dispose();
+    if (!mounted || draft == null) return;
+    await _act(
+      () => app.addSource(
+        kind: draft.kind,
+        name: draft.name,
+        url: draft.url,
+        username: draft.username,
+        password: draft.password,
+      ),
+    );
   }
 
   Future<void> _editSource(SourceProfile source) async {
-    final name = TextEditingController(text: source.name),
-        url = TextEditingController(text: source.url),
-        password = TextEditingController();
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('更新来源连接'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('账号：${source.username}'),
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: '连接名称'),
-              ),
-              TextField(
-                controller: url,
-                decoration: const InputDecoration(labelText: '服务器 URL'),
-              ),
-              TextField(
-                controller: password,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: '重新验证密码'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('验证并保存'),
-          ),
-        ],
+    final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
+      MaterialPageRoute(
+        builder: (_) => MusicSourceConnectionPage(source: source),
       ),
     );
-    if (accepted == true) {
-      await _act(
-        () => app.updateConnection(
-          source,
-          name: name.text,
-          url: url.text,
-          password: password.text,
-        ),
-      );
-    }
-    name.dispose();
-    url.dispose();
-    password.dispose();
+    if (!mounted || draft == null) return;
+    await _act(
+      () => app.updateConnection(
+        source,
+        name: draft.name,
+        url: draft.url,
+        password: draft.password,
+      ),
+    );
   }
 
   Future<bool> _confirm(String message) async =>

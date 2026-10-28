@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 
 class MainActivity : AudioServiceActivity() {
+    private val notificationRequests = mutableListOf<MethodChannel.Result>()
     // audio_service owns the engine; active dataSync leases keep it bound.
     override fun provideFlutterEngine(context: Context): FlutterEngine =
         (application as SylphyApplication).engine()
@@ -23,9 +24,12 @@ class MainActivity : AudioServiceActivity() {
                     if (Build.VERSION.SDK_INT >= 33 &&
                         checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                         android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 42)
+                        val requesting = notificationRequests.isNotEmpty()
+                        notificationRequests.add(result)
+                        if (!requesting) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 42)
+                    } else {
+                        result.success(null)
                     }
-                    result.success(null)
                 }
             }
         val iconManager = LauncherIconManager(this)
@@ -51,7 +55,20 @@ class MainActivity : AudioServiceActivity() {
             }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 42) completeNotificationRequests()
+    }
+
+    private fun completeNotificationRequests() {
+        val pending = notificationRequests.toList()
+        notificationRequests.clear()
+        pending.forEach { it.success(null) }
+    }
+
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        // Activity detach must not leave Dart awaiting a permission result.
+        completeNotificationRequests()
         // The engine survives this Activity; do not retain a dead Activity in
         // icon/permission channel handlers after swiping it from Recents.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/launcher_icons")

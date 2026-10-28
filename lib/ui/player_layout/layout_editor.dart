@@ -456,8 +456,11 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     double value,
     double min,
     double max,
-    ValueChanged<double> update,
-  ) => Row(
+    ValueChanged<double> update, {
+    String? valueLabel,
+    int? steps,
+    Key? sliderKey,
+  }) => Row(
     children: [
       SizedBox(
         width: 64,
@@ -465,17 +468,20 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
       ),
       Expanded(
         child: Slider(
+          key: sliderKey,
           value: value.clamp(min, max),
           min: min,
           max: max,
+          divisions: steps,
+          label: valueLabel,
           onChangeStart: (_) => draft.begin(),
           onChangeEnd: (_) => draft.commit(),
           onChanged: update,
         ),
       ),
       SizedBox(
-        width: 36,
-        child: Text(value.toStringAsFixed(value <= 1 ? 2 : 0)),
+        width: valueLabel == null ? 36 : 48,
+        child: Text(valueLabel ?? value.toStringAsFixed(value <= 1 ? 2 : 0)),
       ),
     ],
   );
@@ -687,6 +693,20 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                     ),
                     const Text(
                       '字号自动保存；完整歌词字号在歌词页内调整。',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    _slider(
+                      '歌词行距',
+                      e.lyricLineHeight,
+                      1,
+                      2.5,
+                      (v) => draft.update(e.copyWith(lyricLineHeight: v)),
+                      steps: 30,
+                      sliderKey: const ValueKey('editor-lyric-line-height'),
+                      valueLabel: '${e.lyricLineHeight.toStringAsFixed(2)}×',
+                    ),
+                    const Text(
+                      '行距随布局保存；空间不足时优先完整显示当前句。',
                       style: TextStyle(fontSize: 12),
                     ),
                   ],

@@ -13,6 +13,7 @@ import 'package:sylphy_music/core/player_layout.dart';
 import 'package:sylphy_music/core/player_layout_store.dart';
 import 'package:sylphy_music/ui/now_playing.dart';
 import 'package:sylphy_music/ui/player_cover.dart';
+import 'package:sylphy_music/ui/lyrics_view.dart';
 import 'package:sylphy_music/ui/player_layout/layout_editor.dart';
 
 import '../test/live_emby_test.dart' show MemoryVault;
@@ -258,6 +259,30 @@ void main() {
         expect(app.playback.position, position);
         expect(app.playback.current!.ref, ref);
         expect(app.playback.playing, isFalse);
+        await tester.tap(find.byKey(const ValueKey('edit-lyrics')));
+        await tester.pumpAndSettle();
+        final lineHeightSlider = find.byKey(
+          const ValueKey('editor-lyric-line-height'),
+        );
+        await tester.ensureVisible(lineHeightSlider);
+        await tester.pumpAndSettle();
+        await tester.drag(lineHeightSlider, const Offset(35, 0));
+        await tester.pumpAndSettle();
+        final chosenLineHeight = tester.widget<Slider>(lineHeightSlider).value;
+        expect(chosenLineHeight, isNot(1.5));
+        expect(
+          tester
+              .widget<LyricsPreview>(find.byType(LyricsPreview).first)
+              .lineHeight,
+          chosenLineHeight,
+        );
+        await tester.tap(find.byTooltip('撤销'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Slider>(lineHeightSlider).value, 1.5);
+        await tester.tap(find.byTooltip('重做'));
+        await tester.pumpAndSettle();
+        expect(tester.widget<Slider>(lineHeightSlider).value, chosenLineHeight);
+        await capture('editor-lyrics-spacing-mobile');
         await tester.tap(find.byTooltip('预览布局'));
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('edit-progress')), findsNothing);
@@ -270,6 +295,18 @@ void main() {
         await waitFor(find.byType(NowPlayingPage));
         await tester.pumpAndSettle();
         expect(app.playerLayouts.active, isNotNull);
+        expect(
+          app.playerLayouts.active!.elements
+              .firstWhere((e) => e.type == PlayerPart.lyrics)
+              .lyricLineHeight,
+          chosenLineHeight,
+        );
+        expect(
+          tester
+              .widget<LyricsPreview>(find.byType(LyricsPreview).first)
+              .lineHeight,
+          chosenLineHeight,
+        );
         expect(app.appearance.disc, isTrue);
         expect(find.bySemanticsLabel('唱片封面'), findsOneWidget);
         expect(

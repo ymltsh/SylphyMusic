@@ -1,5 +1,29 @@
 # 实施与验证记录
 
+## 2026-10-28 应用音乐源管理与三步引导 UI 修改
+
+应用用户提供的 sylphy_ui_redesign.zip：新增 MusicSourcesPanel 圆角来源卡片与状态开关、MusicSourceConnectionPage 独立连接 / 编辑表单、共享协议图标和 QuickStartWizard 三步引导（标语 → 来源选择 → 公共 API 配置）。Shell 保留实际登录、前台同步、账号身份校验、本地导入、缓存清理与删除入口。可选端口覆盖保留 URL 路径与查询，密码独立传递；编辑锁定协议和账号。API 校验错误在用户改正输入后自动清除。
+
+此前未提交的通知权限 / 立即显示修复、设置页「音乐与存储」置顶和歌词行距修改均已保留。压缩包应用脚本先检查基线再运行，只改动预期 Shell 方法并加入四个 UI 文件；输入包保留在已忽略的 .private/ 目录中，没有覆盖业务服务、数据库或平台 Runner。
+
+验证：格式检查及 flutter analyze 无问题；全量串行测试 209 项通过、5 项私密联调默认跳过（build/test_logs/redesign-unit.log）。新增连接表单测试覆盖可选端口 / 反向代理路径 / 查询保留、错误地址与端口、密码显隐、账号只读和取消返回。Windows 原生界面回归通过（redesign-native-ui.log），覆盖三步引导、取消连接后返回、本地导入方式选择、API 无效时不写配置 / 改正后提示清除 / 保存并重开读取、再次启动不显示引导、音乐源管理 / 添加 / 查看曲库以及原有设置和播放流程。已查看 320×640 / 360×800 的连接表单、来源选择、API 页和音乐源管理截图，位于 build/test_logs/ui/。Android 普通 lib/main.dart 入口 Debug 编译通过（redesign-android-build.log）。
+
+本轮未在 Android 设备执行新界面流程，未运行 Linux 验收；Debug APK 仅用于编译检查，未生成新的 Release 交付包，未提交、推送或发布更新。
+
+## 2026-10-28 播放页歌词预览行距
+
+编辑播放页选中「歌词预览」后新增「歌词行距」滑块：1.00～2.50 倍、步进 0.05，默认 1.50。渲染和文字测量共用此行高，长句换行同时生效，空间不足时优先保留当前句并减少邻句。参数按组件保存在布局 JSON，支持实时预览、撤销 / 重做、保存应用、导入导出和重启恢复；旧 v1 / v2 布局缺少此属性时维持原有 1.50 倍。完整歌词页与全局字号保持原行为，不涉及数据库迁移。
+
+验证：格式与 flutter analyze 检查通过；歌词预览、歌词页、布局模型 / 存储相关 26 项测试通过（build/test_logs/lyric-spacing-unit.log），覆盖实际文字间距、窄高度保留当前句、旧属性兼容、非法数值拒绝及持久化重开。Windows 原生编辑器回归通过（lyric-spacing-native.log）：实际拖动滑块、撤销 / 重做、预览值同步、保存后播放页应用，并保留原有编辑 / 播放隔离和响应式布局检查。已查看 build/test_logs/layout/editor-lyrics-spacing-mobile.png。未运行 Android / Linux 原生验证或生成 / 发布新安装包。
+
+## 2026-10-28 首次授权后同步通知不可见修复
+
+针对添加音源后的首次扫描反馈，确认入口已走前台同步，但原生通知权限 Channel 发起弹窗后立即返回，可能在用户点允许前启动并完成扫描。改为等待 onRequestPermissionsResult，合并并发权限请求，Activity 解绑时结束等待。同步与缓存通知在 Android 12+ 设置立即显示，避免短任务被系统延迟展示；渠道保持静默，不覆盖用户关闭通知 / 渠道的选择。原生诊断补充通知总开关、渠道启用与对应通知是否已提交。
+
+验证：flutter analyze 无问题；通知桥接 6 项测试通过，新增权限选择未结束时不启动同步的回归。Android API35 专用 AVD 两组原生测试通过：从 addSource 登录合成 WebDAV，未选择权限时只有登录请求、没有开始扫描；实际点击允许后展开通知栏确认「风灵音乐 · 同步索引」可见，结束后通知移除；实际点击拒绝后仍完成首次扫描并停服。日志为 build/test_logs/lease-notification-android.log 与 lease-notification-denied-android.log，已查看通知栏截图 lease-notification-android.png。专用 AVD 的临时时限已恢复。
+
+本轮未运行全量套件、Windows / Linux 原生回归或真机验证，未重新生成 Release 包、提交、推送或发布；已发布版本仍为 0.2.6-beta+9。
+
 ## 2026-10-28 发布 0.2.6-beta+9 Android / Windows 测试更新
 
 在 0.2.5-beta+8 之后发布测试渠道更新，包含专辑 / 歌单 Cover Flow、歌单页靠左圆角「新建歌单」、搜索胶囊筛选，以及此前已提交的 Android 前台同步与 WebDAV 标签改动。Android 沿用现有测试证书，Windows 未代码签名；正式渠道保持 0.2.3+5。

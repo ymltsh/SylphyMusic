@@ -138,6 +138,8 @@ Android 以 `AudioServiceActivity` 承载媒体服务，另有缓存前台服务
 
 `SylphyShell` 提供首页、音乐库、歌单、我的四个主入口；宽屏切换为 NavigationRail。歌曲、专辑和艺术家成为音乐库内部分类，继续使用 SQL 分页与来源过滤。右上角进入设置，音乐源管理由设置打开。首次未配置来源且未跳过引导时展示欢迎页；是否显示引导取决于来源配置和 `ui_onboarded`，不取决于网络是否可用。
 
+`QuickStartWizard` 管理欢迎、来源选择和公共 API 配置三步引导；公共配置通过 ApiSettings 校验与保存。`MusicSourcesPanel` 展示来源卡片和状态操作，`MusicSourceConnectionPage` 只收集并校验连接表单，将协议、URL 与独立凭据返回 Shell；实际登录、来源身份核对、前台同步与文件导入仍经 SylphyApp 原有入口。可选端口只修改 URI 的端口，保留反向代理路径；编辑已有来源不允许切换协议或账号。
+
 `Appearance` 在既有 settings 表存储主题模式、全局封面 / 唱片形状与旋转、完整歌词字号、迷你歌词字号、纯色背景、播放页封面模糊开关和实验性磨砂选项。`ListeningHistory` 监听播放器已经开始的播放，按 TrackRef 保存最近 50 首去重身份，串行写入 settings；恢复暂停队列不生成历史。读取历史时忽略已删除或停用来源，移除监听并等待待写任务后再关闭数据库。两者由 SylphyApp 装配和释放，不改变数据库版本或来源协议。
 
 `HomePage` 只取 SQL 中最多 8 个专辑代表行，历史页面最多解析 50 个身份；不为首页加载完整曲库。迷你播放器与全屏播放页复用同一 PlaybackCoordinator。默认播放页与自定义模板统一为一份全画布 `PlayerLayout`：绝对坐标、可选独立宽屏坐标，没有封面 / 歌词 / 控制区域；`PlayerLayoutRenderer` 与编辑器共用同一组件注册表和实际窗口比例。`PlayerCover` 统一方形封面与黑胶唱片，形状和旋转来自全局 `Appearance`；RotatingCover 仅在可见、播放中且允许动画时旋转，不改变播放内核。完整歌词只有一个 `LyricsPage`，由播放页右向左滑动、歌词预览或菜单打开；`PlayerScene` 同时提供播放页内迷你歌词区的直接缩放手柄。布局 v1 的 JSON 在读取时迁移到 v2，settings key 不变；按钮圆角 / 宽度等仍作为布局属性保存。具体界面范围与保留项见 [UI_REFRESH](UI_REFRESH.md)、[播放页布局编辑器](PLAYER_LAYOUT_EDITOR.md)。

@@ -44,6 +44,7 @@ class PlayerElement {
     this.playWidth = 64,
     this.playHeight = 64,
     this.controlSpacing = 12,
+    this.lyricLineHeight = 1.5,
     this.align = 'center',
     this.color,
   });
@@ -57,6 +58,7 @@ class PlayerElement {
   final Rect? wideFrame;
   final bool locked, hidden;
   final double fontSize, opacity, radius, playWidth, playHeight, controlSpacing;
+  final double lyricLineHeight;
   final String align;
   final int? color;
 
@@ -71,6 +73,7 @@ class PlayerElement {
     double? playWidth,
     double? playHeight,
     double? controlSpacing,
+    double? lyricLineHeight,
     String? align,
     int? color,
     bool clearColor = false,
@@ -87,6 +90,7 @@ class PlayerElement {
     playWidth: playWidth ?? this.playWidth,
     playHeight: playHeight ?? this.playHeight,
     controlSpacing: controlSpacing ?? this.controlSpacing,
+    lyricLineHeight: lyricLineHeight ?? this.lyricLineHeight,
     align: align ?? this.align,
     color: clearColor ? null : color ?? this.color,
   );
@@ -105,6 +109,7 @@ class PlayerElement {
       'playWidth': playWidth,
       'playHeight': playHeight,
       'controlSpacing': controlSpacing,
+      'lyricLineHeight': lyricLineHeight,
       'align': align,
       if (color != null) 'color': color,
     },
@@ -139,6 +144,7 @@ class PlayerElement {
       playWidth: _number(props['playWidth'] ?? 64, 56, 96),
       playHeight: _number(props['playHeight'] ?? 64, 48, 96),
       controlSpacing: _number(props['controlSpacing'] ?? 12, 0, 32),
+      lyricLineHeight: _number(props['lyricLineHeight'] ?? 1.5, 1, 2.5),
       fontSize: _number(props['fontSize'] ?? 22, 12, 40),
       opacity: _number(props['opacity'] ?? 1, .1, 1),
       radius: _number(props['radius'] ?? 24, 0, 64),

@@ -180,6 +180,7 @@ class PlayerWidgetRegistry {
                 text: text,
                 position: data.app.playback.position,
                 fontSize: data.app.appearance.miniLyricFontSize,
+                lineHeight: e.lyricLineHeight,
                 highlightColor: e.color == null ? null : Color(e.color!),
               );
             },

@@ -2,6 +2,8 @@
 
 音乐源管理的「同步所有来源」「同步此来源」以及 WebDAV「只补全 WebDAV 标签（前台通知）」在用户点击后启动 dataSync 前台通知，索引与标签阶段分别显示进度，通知支持暂停。自动恢复 / 过期刷新仍是机会式任务，不从普通后台状态主动启动新 FGS。
 
+添加音源后的首次扫描同样走前台同步入口。Android 13+ 首次申请通知权限时，原生 Channel 等待真实权限选择回调后才返回，避免在用户授权前完成短扫描；Activity 解绑时结束等待，避免悬挂请求。拒绝权限仍允许同步，但系统不会在通知栏展示同步通知。Android 12+ 同步和缓存通知设置 FOREGROUND_SERVICE_IMMEDIATE；渠道保持低重要性，显示在通知栏的静默分组，不弹横幅或播放提示音。用户关闭应用通知或对应渠道时不强行覆盖系统设置。
+
 引擎由 audio_service 0.18.19 创建、缓存和销毁；SylphyApplication 通过插件的 getFlutterEngine 获取同一个实例，按引擎实例注册生命周期 Channel，不单独执行 Dart main，也不拦截 destroy 或异步恢复缓存。Activity 只持有图标及通知权限请求，移除时清理其 handler。
 
 EngineLeaseManager 为同步、缓存分别记录服务实例的租约，共享一个到 AudioService 的显式绑定。必须收到 onServiceConnected 且缓存身份 / Dart 执行状态一致才确认任务可用；失败、断开和空绑定会通知 Dart 取消，并有停止兜底。只释放对应实例的租约，最后一个任务退出才解绑。AudioService 仍由插件正常管理：没有 Activity、播放或任务租约后允许销毁引擎。
@@ -19,8 +21,12 @@ Android 13+ 通知权限拒绝不阻断前台服务；Android 12+ 后台启动�
 ```powershell
 python tool/check_android_fgs.py --scenario timeout --device emulator-5580
 python tool/check_android_fgs.py --scenario overlap --device emulator-5580
+python tool/check_android_fgs.py --scenario notification --device emulator-5580
+python tool/check_android_fgs.py --scenario notification-denied --device emulator-5580
 ```
 
 工具使用合成音频 / 本地 HTTP 服务，临时设置 dataSync 时限并在 finally 恢复，不修改 compat 覆盖。timeout 场景 Home 后等待真实系统回调，保留 Activity 以便测试 isolate 检查数据并恢复；overlap 场景覆盖播放 / 暂停、同步与慢速缓存并行、Home / 熄屏 / 移除最近任务、双方分别暂停后保留另一租约、重新打开 Activity 后同引擎 / 单次 Dart 启动，以及最终释放全部租约。工具拒绝其他 AVD / 真机。移除任务后最后一个租约释放可能正常销毁测试 isolate，因此恢复 Activity 后才释放最后租约。
+
+notification / notification-denied 使用 integration_test/first_sync_notification_test.dart，从真实 addSource 入口登录合成 WebDAV 源，撤销 AVD 中测试应用的通知权限，验证未选择时没有启动扫描，并操作真实权限弹窗。允许后展开系统通知栏检查同步标题并保存截图；拒绝后检查扫描仍可完成。两者都检查结束后服务和通知移除。专用 AVD 的测试应用权限由该场景重置，不操作用户真机。
 
 参考：[Android FGS 超时](https://developer.android.com/develop/background-work/services/fgs/timeout)、[Flutter 缓存引擎](https://docs.flutter.dev/add-to-app/android/add-flutter-screen)。

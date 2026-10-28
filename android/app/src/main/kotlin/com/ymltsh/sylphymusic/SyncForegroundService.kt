@@ -50,6 +50,7 @@ class SyncForegroundService : LeasedDataSyncService() {
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, "暂停同步", pause).build())
+        if (Build.VERSION.SDK_INT >= 31) builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         if (total > 0) builder.setProgress(total, done.coerceIn(0, total), false)
         else builder.setProgress(0, 0, true)
         return builder.build()

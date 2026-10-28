@@ -1,6 +1,7 @@
 package com.ymltsh.sylphymusic
 
 import android.app.Application
+import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
 import android.util.Log
@@ -41,7 +42,7 @@ class SylphyApplication : Application() {
                         "stop" -> { service?.stopFromDart(); result.success(null) }
                         "pause" -> { service?.requestPause(); result.success(null) }
                         "heartbeat" -> { leases.heartbeat(owner); result.success(null) }
-                        "diagnostics" -> result.success(leases.snapshot(installedEngine) + mapOf("dartStarts" to dartStarts))
+                        "diagnostics" -> result.success(leases.snapshot(installedEngine) + notificationState(owner) + mapOf("dartStarts" to dartStarts))
                         "update" -> {
                             (service as? SyncForegroundService)?.updateNotification(
                                 call.argument<String>("title") ?: "正在同步音乐库",
@@ -63,6 +64,18 @@ class SylphyApplication : Application() {
             } else result.notImplemented()
         }
         return engine
+    }
+    private fun notificationState(owner: String): Map<String, Any> {
+        val manager = getSystemService(NotificationManager::class.java)
+        val id = if (owner == "sync") 43 else 42
+        val channel = if (owner == "sync") "sylphy_library_sync" else "sylphy_cache"
+        val note = manager.activeNotifications.firstOrNull { it.id == id }?.notification
+        return mapOf(
+            "notificationsEnabled" to manager.areNotificationsEnabled(),
+            "notificationChannelEnabled" to (Build.VERSION.SDK_INT < 26 ||
+                (manager.getNotificationChannel(channel)?.importance ?: NotificationManager.IMPORTANCE_NONE) != NotificationManager.IMPORTANCE_NONE),
+            "notificationPosted" to (note != null)
+        )
     }
     fun event(owner: String, event: String, acknowledged: () -> Unit) {
         val channel = channels[owner]

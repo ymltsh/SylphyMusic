@@ -185,6 +185,22 @@ class _SettingsPageState extends State<SettingsPage> {
   );
 
   List<Widget> _directory(BuildContext context) => [
+    _group('音乐与存储', [
+      ListTile(
+        leading: _entryIcon(Icons.dns_outlined),
+        title: const Text('音乐源管理'),
+        subtitle: Text('${app.sources.length} 个来源 · 连接与同步'),
+        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: widget.onSources,
+      ),
+      _entry(
+        Icons.storage_outlined,
+        '下载与缓存',
+        '缓存上限 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB · 任务与清理',
+        _Section.cache,
+      ),
+    ]),
     _group('播放与阅读', [
       _entry(
         Icons.tune_rounded,
@@ -229,22 +245,6 @@ class _SettingsPageState extends State<SettingsPage> {
           '选择桌面启动图标 · 仅 Android',
           _Section.icon,
         ),
-    ]),
-    _group('音乐与存储', [
-      ListTile(
-        leading: _entryIcon(Icons.dns_outlined),
-        title: const Text('音乐源管理'),
-        subtitle: Text('${app.sources.length} 个来源 · 连接与同步'),
-        trailing: const Icon(Icons.chevron_right),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        onTap: widget.onSources,
-      ),
-      _entry(
-        Icons.storage_outlined,
-        '下载与缓存',
-        '缓存上限 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB · 任务与清理',
-        _Section.cache,
-      ),
     ]),
     _group('网络与接口', [
       _entry(Icons.api_outlined, 'API 设置', '每日一言 · GitHub 加速', _Section.api),

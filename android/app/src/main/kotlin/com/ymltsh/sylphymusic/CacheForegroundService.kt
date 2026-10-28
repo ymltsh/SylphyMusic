@@ -20,6 +20,7 @@ class CacheForegroundService : LeasedDataSyncService() {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val pause = PendingIntent.getService(this, 1, Intent(this, CacheForegroundService::class.java).setAction("pause"), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val builder = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, "sylphy_cache") else Notification.Builder(this)
+        if (Build.VERSION.SDK_INT >= 31) builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         return builder.setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("风灵音乐 · 正在缓存歌单")
             .setContentText("完整歌曲保存在应用缓存中；可随时暂停")

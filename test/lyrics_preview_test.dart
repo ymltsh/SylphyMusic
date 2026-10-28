@@ -4,24 +4,55 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/ui/lyrics_view.dart';
 
 void main() {
-  Widget view(String text, Duration position, {double height = 108}) =>
-      MaterialApp(
-        theme: ThemeData.dark(),
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 320,
-              height: height,
-              child: LyricsPreview(
-                text: text,
-                position: position,
-                fontSize: 24,
-                highlightColor: Colors.orange,
-              ),
-            ),
+  Widget view(
+    String text,
+    Duration position, {
+    double height = 108,
+    double lineHeight = 1.5,
+  }) => MaterialApp(
+    theme: ThemeData.dark(),
+    home: Scaffold(
+      body: Center(
+        child: SizedBox(
+          width: 320,
+          height: height,
+          child: LyricsPreview(
+            text: text,
+            position: position,
+            fontSize: 24,
+            lineHeight: lineHeight,
+            highlightColor: Colors.orange,
           ),
         ),
+      ),
+    ),
+  );
+  testWidgets(
+    'line height changes actual lyric spacing and visible neighbours',
+    (tester) async {
+      const lrc = '[00:00]第一句\n[00:01]第二句\n[00:02]第三句\n[00:03]第四句\n[00:04]第五句';
+      await tester.pumpWidget(
+        view(lrc, const Duration(seconds: 2), height: 300, lineHeight: 1),
       );
+      final compact =
+          tester.getCenter(find.text('第四句')).dy -
+          tester.getCenter(find.text('第三句')).dy;
+      await tester.pumpWidget(
+        view(lrc, const Duration(seconds: 2), height: 300, lineHeight: 2.5),
+      );
+      final loose =
+          tester.getCenter(find.text('第四句')).dy -
+          tester.getCenter(find.text('第三句')).dy;
+      expect(loose, greaterThan(compact));
+      expect(loose, closeTo(compact * 2.5, .1));
+      await tester.pumpWidget(
+        view(lrc, const Duration(seconds: 2), height: 108, lineHeight: 2.5),
+      );
+      expect(find.text('第三句'), findsOneWidget);
+      expect(find.byType(Text), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'small previews show at most three lines around the active lyric',
     (tester) async {

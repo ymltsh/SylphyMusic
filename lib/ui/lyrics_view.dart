@@ -383,11 +383,13 @@ class LyricsPreview extends StatelessWidget {
     required this.text,
     required this.position,
     this.fontSize = 24,
+    this.lineHeight = 1.5,
     this.highlightColor,
   });
   final String text;
   final Duration position;
   final double fontSize;
+  final double lineHeight;
   final Color? highlightColor;
 
   @override
@@ -416,7 +418,7 @@ class LyricsPreview extends StatelessWidget {
             .merge(
               (theme.textTheme.titleLarge ?? const TextStyle()).copyWith(
                 fontSize: fontSize,
-                height: 1.5,
+                height: lineHeight,
                 fontWeight: index == current
                     ? FontWeight.w600
                     : FontWeight.w400,
