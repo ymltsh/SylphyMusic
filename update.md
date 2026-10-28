@@ -2,7 +2,7 @@
 
 参考 Mfuns Flutter 的发布体系，接入手动检查更新、分渠道清单、Android 分 ABI APK、Windows 安装程序 / 便携 ZIP、SHA-256 与 GitHub Release。发布工具为根目录 `release.py`，Python 部分仅依赖标准库。
 
-**正式渠道当前为 0.2.3+5，最新测试渠道为 [0.2.5-beta+8](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.5-beta%2B8)。** beta 清单同时提供 Android 分架构 APK、Windows 安装程序与便携 ZIP，历史保留之前测试版。Android 沿用本机测试证书，Windows 未代码签名；这些包用于测试，正式发布仍需通过发布门槛。
+**正式渠道当前为 0.2.3+5，最新测试渠道为 [0.2.6-beta+9](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.6-beta%2B9)。** beta 清单同时提供 Android 分架构 APK、Windows 安装程序与便携 ZIP，历史保留之前测试版。Android 沿用本机测试证书，Windows 未代码签名；这些包用于测试，正式发布仍需通过发布门槛。
 
 ## App 手动检查更新
 
@@ -114,3 +114,9 @@ flutter build apk --debug
 ## 已发布 0.2.5-beta+8 双端测试更新
 
 本轮包含 Android 手动同步前台通知、WebDAV 只补标签、暂停 / 超时恢复和引擎生命周期修复；提供三种 ABI APK、Windows 安装 EXE 与便携 ZIP。Android 沿用现有测试签名，Windows 未做代码签名；测试渠道发布，正式渠道保持当前版本。
+
+## 已发布 0.2.6-beta+9 双端测试更新
+
+本轮新增专辑 / 歌单 Cover Flow、歌单页靠左 12 dp 圆角「新建歌单」和搜索胶囊筛选，并包含此前的 Android 前台同步与 WebDAV 标签改动。提供三种 ABI APK、Windows 安装 EXE 与便携 ZIP；Android 沿用现有测试签名，Windows 未代码签名，仅更新测试渠道，正式渠道保持 0.2.3+5。
+
+源码提交 `b17c244`，标签 `v0.2.6-beta+9`，beta 清单提交 `ab1b56d`；发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.6-beta%2B9 。六个资产（含摘要）的远端大小与 SHA-256 已核对，默认加速的 Android / Windows / 便携下载均返回 HTTP 200，测试版清单已指向 0.2.6-beta+9。未在 Android 设备安装验证，未执行 Windows 安装器安装 / 卸载验证。

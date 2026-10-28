@@ -1,5 +1,15 @@
 # 实施与验证记录
 
+## 2026-10-28 发布 0.2.6-beta+9 Android / Windows 测试更新
+
+在 0.2.5-beta+8 之后发布测试渠道更新，包含专辑 / 歌单 Cover Flow、歌单页靠左圆角「新建歌单」、搜索胶囊筛选，以及此前已提交的 Android 前台同步与 WebDAV 标签改动。Android 沿用现有测试证书，Windows 未代码签名；正式渠道保持 0.2.3+5。
+
+源码提交 `b17c244`，标签 `v0.2.6-beta+9`，beta 清单提交 `ab1b56d`；发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.6-beta%2B9 。发布源码上通过 `flutter analyze --no-pub`、完整 `flutter test --no-pub`（204 项通过、5 项私密测试跳过）以及两项 Windows 原生界面回归（`build/test_logs/coverflow-release-ui.log`、`coverflow-release-playlist.log`）。构建使用测试签名与 `SYLPHY_RELEASE_VERSION=0.2.6-beta`，三种 APK 构建号为 2009 / 1009 / 4009，证书与 0.2.5 测试包一致。
+
+六个远端资产（含 SHA256SUMS）的大小与 GitHub `digest` 均与本地记录一致；Android arm64 31.51 MiB、armeabi-v7a 28.65 MiB、x86_64 33.71 MiB，Windows EXE 19.04 MiB、便携 ZIP 22.66 MiB。默认加速地址的 Android / Windows / 便携 HEAD 均返回 HTTP 200，测试版清单与默认加速清单均指向 0.2.6-beta+9，正式清单仍为 0.2.3+5。Windows 可执行文件版本为 0.2.6-beta+9，便携 ZIP 包含 `sylphy_music.exe`、`flutter_windows.dll`、`data/icudtl.dat` 与许可证，`testzip` 无错误。本地记录与核验结果在 `build/releases/0.2.6-beta-9/`。
+
+未在 Android 设备安装 / 覆盖升级，未执行 Windows 安装器安装 / 卸载验证；Android 仍为测试签名、Windows 未代码签名，不作为正式发布。
+
 ## 2026-10-28 专辑与歌单封面流（Cover Flow）
 
 应用用户提供的 `sylphymusic-coverflow.patch`，新增不依赖第三方库的 `CoverFlowView`：中央封面按距离缩放 / 旋转 / 淡化，只构建当前位置附近最多约 7 项；水平拖动和点击共用同一个 `PageController`，点击中央项打开详情，点击侧边项先移动选中。音乐库专辑视图的筛选栏右侧增加 Cover Flow 图标切换，歌单页头增加网格 / 封面流切换；两者只保留在当前会话，不写入设置。专辑封面流继续使用现有每批 100 行的 SQL 分页和最多六批缓存，歌单封面取首曲封面，空歌单显示类型图标。说明见 [封面流](COVER_FLOW.md)。
