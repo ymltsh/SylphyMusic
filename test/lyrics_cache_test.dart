@@ -23,9 +23,10 @@ void main() {
   late HttpServer server;
   var hits = 0, status = 200;
   var plainOnly = false;
+  var lrcHits = 0, lrcStatus = 200;
   const track = Track(
     ref: TrackRef('fixture', 'song'),
-    title: '',
+    title: 'Synthetic song',
     artist: '',
     album: '',
   );
@@ -39,8 +40,17 @@ void main() {
     hits = 0;
     status = 200;
     plainOnly = false;
+    lrcHits = 0;
+    lrcStatus = 200;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((r) async {
+      if (r.uri.path == '/lyrics') {
+        lrcHits++;
+        r.response.statusCode = lrcStatus;
+        r.response.write('[00:02.00]Supplement');
+        await r.response.close();
+        return;
+      }
       hits++;
       r.response.statusCode = status;
       if (r.uri.path.endsWith('/Users/u/Items/song')) {
@@ -98,6 +108,77 @@ void main() {
     await root.delete(recursive: true);
   });
   group('Emby lyric cache upgrade', () {
+    test(
+      'online fallback is opt in, source lyrics win and cache works offline',
+      () async {
+        await app.apiSettings.setLrcApiUrl(
+          'http://127.0.0.1:${server.port}/lyrics',
+        );
+        status = 403;
+        await expectLater(app.loadLyrics(track), throwsA(isA<HttpFailure>()));
+        expect(lrcHits, 0);
+        await app.apiSettings.setLrcApiEnabled(true);
+        expect(
+          await app.loadLyrics(track, forceRefresh: true),
+          '[00:02.00]Supplement',
+        );
+        expect(lrcHits, 1);
+        status = 503;
+        final before = hits;
+        expect(await app.loadLyrics(track), '[00:02.00]Supplement');
+        expect(hits, before);
+        expect(lrcHits, 1);
+        status = 200;
+        expect(
+          await app.loadLyrics(track, forceRefresh: true),
+          contains('Timed line'),
+        );
+        expect(lrcHits, 1);
+      },
+    );
+
+    test(
+      'local lyrics precede fallback and empty local lyrics use it',
+      () async {
+        await app.apiSettings.setLrcApiUrl(
+          'http://127.0.0.1:${server.port}/lyrics',
+        );
+        await app.apiSettings.setLrcApiEnabled(true);
+        await app.db.putSource(
+          const SourceProfile(
+            id: 'local',
+            name: 'local',
+            kind: SourceKind.local,
+            url: 'file:///',
+            username: '',
+          ),
+        );
+        final audio = File('${root.path}/local.wav');
+        final local = Track(
+          ref: TrackRef('local', audio.path),
+          title: 'Synthetic',
+          artist: '',
+          album: '',
+        );
+        expect(await app.loadLyrics(local), '[00:02.00]Supplement');
+        expect(lrcHits, 1);
+        await File('${root.path}/local.lrc').writeAsString('[00:01]Local');
+        expect(await app.loadLyrics(local), '[00:01]Local');
+        expect(lrcHits, 1);
+      },
+    );
+
+    test('failed supplement preserves the primary error', () async {
+      await app.apiSettings.setLrcApiUrl(
+        'http://127.0.0.1:${server.port}/lyrics',
+      );
+      await app.apiSettings.setLrcApiEnabled(true);
+      status = 403;
+      lrcStatus = 503;
+      await expectLater(app.loadLyrics(track), throwsA(isA<HttpFailure>()));
+      expect(lrcHits, 1);
+    });
+
     test(
       'cached reversed SRT normalizes offline while manual imports stay intact',
       () async {

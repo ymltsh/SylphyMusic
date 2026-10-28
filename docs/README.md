@@ -24,6 +24,7 @@
 | [LAUNCHER_ICONS](LAUNCHER_ICONS.md) | Android 备用桌面图标、activity-alias 切换与资源生成 |
 | [WEBDAV](WEBDAV.md) | 连接、扫描、歌词 / 封面与限制 |
 | [EMBY_TEST_SETUP](EMBY_TEST_SETUP.md) | 专用测试账号与临时歌单验证边界 |
+| [LRC_API](LRC_API.md) | 可选在线歌词补充、配置与缓存边界 |
 | [EMBY_LYRICS](EMBY_LYRICS.md) | Emby 带时间歌词格式、旧缓存升级与手动导入优先级 |
 | [NATIVE_DEPENDENCIES](NATIVE_DEPENDENCIES.md) | libmpv / FFmpeg 来源、许可与待办 |
 | [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.txt) | 已解析 Dart 依赖许可证 |

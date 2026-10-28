@@ -13,12 +13,15 @@ class ApiSettings extends ChangeNotifier {
 
   static const defaultQuoteUrl = 'https://v1.hitokoto.cn/?encode=json';
   static const defaultGitHubMirror = 'https://hub.wgen.top/';
+  static const defaultLrcApiUrl = 'https://api.lrc.cx/lyrics';
   static const fallbackQuote = '音乐随心，聆听自在。';
   final AppDb db;
   final http.Client Function() _clientFactory;
 
   String quoteUrl = defaultQuoteUrl;
   String githubMirror = defaultGitHubMirror;
+  bool lrcApiEnabled = false;
+  String lrcApiUrl = defaultLrcApiUrl;
   String quote = fallbackQuote;
   String _quoteDay = '';
   int _requestId = 0;
@@ -53,6 +56,26 @@ class ApiSettings extends ChangeNotifier {
     return '${uri.toString().replaceFirst(RegExp(r'/+$'), '')}/';
   }
 
+  static String validateLrcApiUrl(String value) {
+    final candidate = value.trim().isEmpty ? defaultLrcApiUrl : value.trim();
+    final uri = Uri.tryParse(candidate);
+    if (uri == null ||
+        (uri.scheme != 'https' && uri.scheme != 'http') ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw const FormatException('LrcApi 需要有效的 HTTP(S) 地址，且不能包含凭据、查询参数或片段');
+    }
+    final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    final endpoint = path.isEmpty
+        ? '/lyrics'
+        : (path.endsWith('/lyrics') || path.endsWith('/jsonapi')
+              ? path
+              : '$path/lyrics');
+    return uri.replace(path: endpoint).toString();
+  }
+
   static String parseQuote(String response) {
     final value = jsonDecode(response);
     if (value is String && value.trim().isNotEmpty) return value.trim();
@@ -84,6 +107,12 @@ class ApiSettings extends ChangeNotifier {
     } on FormatException {
       githubMirror = defaultGitHubMirror;
     }
+    try {
+      lrcApiUrl = validateLrcApiUrl(await db.setting('api_lrc_url') ?? '');
+    } on FormatException {
+      lrcApiUrl = defaultLrcApiUrl;
+    }
+    lrcApiEnabled = await db.setting('api_lrc_enabled') == 'true';
     _quoteDay = await db.setting('api_quote_day') ?? '';
     final cached = await db.setting('api_quote_text');
     quote = cached != null && cached.trim().isNotEmpty ? cached : fallbackQuote;
@@ -106,6 +135,19 @@ class ApiSettings extends ChangeNotifier {
     final next = validateGitHubMirror(value);
     await db.setSetting('api_github_mirror', next);
     githubMirror = next;
+    notifyListeners();
+  }
+
+  Future<void> setLrcApiUrl(String value) async {
+    final next = validateLrcApiUrl(value);
+    await db.setSetting('api_lrc_url', next);
+    lrcApiUrl = next;
+    notifyListeners();
+  }
+
+  Future<void> setLrcApiEnabled(bool value) async {
+    await db.setSetting('api_lrc_enabled', value.toString());
+    lrcApiEnabled = value;
     notifyListeners();
   }
 

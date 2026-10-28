@@ -59,6 +59,9 @@ void main() {
         await api.initialize();
         await api.setQuoteUrl('https://quotes.example/api');
         await api.setGitHubMirror('https://mirror.example/prefix');
+        expect(api.lrcApiEnabled, isFalse);
+        await api.setLrcApiUrl('http://127.0.0.1:28883/prefix');
+        await api.setLrcApiEnabled(true);
         expect(api.quote, '每一天都值得歌唱');
         expect(api.quoteUrl, 'https://quotes.example/api');
         expect(api.githubMirror, 'https://mirror.example/prefix/');
@@ -67,6 +70,8 @@ void main() {
         expect(requests, previous); // Same calendar day: no re-fetch.
         final restored = ApiSettings(db, clientFactory: createClient);
         await restored.initialize();
+        expect(restored.lrcApiEnabled, isTrue);
+        expect(restored.lrcApiUrl, 'http://127.0.0.1:28883/prefix/lyrics');
         expect(restored.quote, '每一天都值得歌唱');
         expect(restored.quoteUrl, api.quoteUrl);
         expect(restored.githubMirror, api.githubMirror);

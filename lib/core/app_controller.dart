@@ -24,6 +24,7 @@ import '../services/desktop.dart';
 import '../services/local_library.dart';
 import '../services/artwork.dart';
 import '../services/media_assets.dart';
+import '../services/lrc_api.dart';
 import '../services/lyrics_store.dart';
 import '../services/webdav_tags.dart';
 import '../services/sync_foreground.dart';
@@ -65,6 +66,7 @@ class SylphyApp extends ChangeNotifier {
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
   late final apiSettings = ApiSettings(db);
+  late final lrcApi = LrcApiClient(apiSettings, vault);
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   List<PlaylistModel> playlists = [];
@@ -102,6 +104,7 @@ class SylphyApp extends ChangeNotifier {
     assets,
     cache,
     root,
+    lrcApi: lrcApi,
     tags: webDavTags,
   );
   late final index = LibrarySync(db, factory);
@@ -765,6 +768,7 @@ class SylphyApp extends ChangeNotifier {
     desktop?.dispose();
     history.removeListener(_indexChanged);
     apiSettings.removeListener(_apiChanged);
+    lrcApi.dispose();
     apiSettings.dispose();
     await history.shutdown();
     index.removeListener(_indexChanged);

@@ -247,7 +247,12 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
     ]),
     _group('网络与接口', [
-      _entry(Icons.api_outlined, 'API 设置', '每日一言 · GitHub 加速', _Section.api),
+      _entry(
+        Icons.api_outlined,
+        'API 设置',
+        '每日一言 · GitHub 加速 · 在线歌词',
+        _Section.api,
+      ),
     ]),
     _group('应用与支持', [
       ListTile(
@@ -517,9 +522,37 @@ class _SettingsPageState extends State<SettingsPage> {
         trailing: const Icon(Icons.edit_outlined),
         onTap: () => _editApiUrl(quote: false),
       ),
+      const Divider(height: 1),
+      SwitchListTile(
+        key: const ValueKey('api-lrc-enabled'),
+        secondary: const Icon(Icons.lyrics_outlined),
+        title: const Text('LrcApi 在线歌词补充'),
+        subtitle: const Text('现有来源无歌词时，将歌名、艺术家和专辑发送至所配置接口'),
+        value: app.apiSettings.lrcApiEnabled,
+        onChanged: (value) =>
+            _act(() => app.apiSettings.setLrcApiEnabled(value)),
+      ),
+      ListTile(
+        key: const ValueKey('api-lrc-url'),
+        leading: const Icon(Icons.link_outlined),
+        title: const Text('LrcApi 接口地址'),
+        subtitle: Text(app.apiSettings.lrcApiUrl),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLrcApiUrl,
+      ),
+      ListTile(
+        key: const ValueKey('api-lrc-auth'),
+        leading: const Icon(Icons.key_outlined),
+        title: const Text('LrcApi 鉴权密钥'),
+        subtitle: const Text('可选；保存在系统安全存储中'),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLrcApiToken,
+      ),
       const Padding(
         padding: EdgeInsets.all(16),
-        child: Text('使用 HTTPS 链接，留空保存即可恢复默认。更新检查、安装包下载和发布页都将通过加速地址访问。'),
+        child: Text(
+          'GitHub 加速地址使用 HTTPS。LrcApi 默认使用 HTTPS；自部署支持 HTTP，带鉴权密钥时仅允许 HTTPS 或本机回环地址。',
+        ),
       ),
     ],
     _Section.diagnostics => [
@@ -622,6 +655,80 @@ class _SettingsPageState extends State<SettingsPage> {
             ? app.apiSettings.setQuoteUrl(value)
             : app.apiSettings.setGitHubMirror(value),
       );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _editLrcApiUrl() async {
+    final controller = TextEditingController(text: app.apiSettings.lrcApiUrl);
+    try {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('LrcApi 接口地址'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'HTTP(S) URL',
+              helperText: '公开接口默认 https://api.lrc.cx/lyrics；自部署可填写服务根地址、/lyrics 或 /jsonapi',
+              helperMaxLines: 3,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      );
+      if (value != null) await _act(() => app.apiSettings.setLrcApiUrl(value));
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _editLrcApiToken() async {
+    final controller = TextEditingController();
+    try {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('LrcApi 鉴权密钥'),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: '鉴权密钥（可选）',
+              helperText: '保存空值会清除已保存的密钥',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      );
+      if (value == null) return;
+      await _act(() async {
+        if (value.trim().isEmpty) {
+          await app.vault.delete('lrcapi');
+        } else {
+          await app.vault.write('lrcapi', 'token', value.trim());
+        }
+      });
     } finally {
       controller.dispose();
     }

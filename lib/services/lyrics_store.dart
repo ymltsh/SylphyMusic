@@ -9,6 +9,7 @@ import '../core/models.dart';
 import '../data/app_db.dart';
 import 'cache.dart';
 import 'lyrics.dart';
+import 'lrc_api.dart';
 import 'media_assets.dart';
 import 'sources.dart';
 import 'webdav_tags.dart';
@@ -21,9 +22,11 @@ class LyricsStore {
     this.cache,
     this.root, {
     WebDavTags? tags,
+    this.lrcApi,
   }) : tags = tags ?? WebDavTags(factory, cache: cache),
        _ownsTags = tags == null;
   final WebDavTags tags;
+  final LrcApiClient? lrcApi;
   final bool _ownsTags;
   final AppDb db;
   final AdapterFactory factory;
@@ -63,6 +66,7 @@ class LyricsStore {
 
   Future<String?> _load(Track track, bool force) async {
     final epoch = _epochs[track.ref.sourceId] ?? 0;
+    final lrcApi = this.lrcApi;
     final source = await db.source(track.ref.sourceId);
     if (source == null || !source.enabled || _stopped) return null;
     var manual = await assets.read(source.id, manualKey(track));
@@ -86,9 +90,11 @@ class LyricsStore {
           '.lrc',
         ),
       );
-      return await lrc.exists()
-          ? lrc.readAsString()
+      final localText = await lrc.exists()
+          ? await lrc.readAsString()
           : track.remote['lyrics']?.toString();
+      if (localText?.trim().isNotEmpty == true) return localText;
+      if (lrcApi == null || !lrcApi.settings.lrcApiEnabled) return localText;
     }
     // Old remote files are imported lazily. Plain Emby text is deliberately
     // stale once, so a timed upgrade runs in the background without hiding it.
@@ -128,24 +134,55 @@ class LyricsStore {
           : track.resourceVersion,
       (previous) async {
         if (_stopped) return null;
+        Object? primaryError;
+        StackTrace? primaryStack;
         if (source.kind == SourceKind.webdav) {
-          final embedded = await tags.load(source, track, force: force);
-          if (embedded.lyrics?.trim().isNotEmpty == true) {
-            return AssetPayload(utf8.encode(embedded.lyrics!));
+          try {
+            final embedded = await tags.load(source, track, force: force);
+            if (embedded.lyrics?.trim().isNotEmpty == true) {
+              return AssetPayload(utf8.encode(embedded.lyrics!));
+            }
+          } catch (error, stack) {
+            primaryError = error;
+            primaryStack = stack;
           }
         }
         if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
-        final adapter = factory.create(source);
-        _adapters[adapter] = source.id;
-        try {
-          final text = await adapter.lyrics(track);
-          return text?.trim().isNotEmpty == true
-              ? AssetPayload(utf8.encode(text!))
-              : null;
-        } finally {
-          adapter.close();
-          _adapters.remove(adapter);
+        if (source.kind != SourceKind.local) {
+          final adapter = factory.create(source);
+          _adapters[adapter] = source.id;
+          try {
+            final text = await adapter.lyrics(track);
+            if (text?.trim().isNotEmpty == true) {
+              return AssetPayload(utf8.encode(text!));
+            }
+          } catch (error, stack) {
+            primaryError ??= error;
+            primaryStack ??= stack;
+          } finally {
+            adapter.close();
+            _adapters.remove(adapter);
+          }
         }
+        if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
+        if (lrcApi != null && lrcApi.settings.lrcApiEnabled) {
+          try {
+            final text = await lrcApi.fetch(track);
+            if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
+            if (text?.trim().isNotEmpty == true) {
+              return AssetPayload(utf8.encode(text!));
+            }
+          } catch (_) {
+            if (primaryError != null) {
+              Error.throwWithStackTrace(primaryError, primaryStack!);
+            }
+            return null;
+          }
+        }
+        if (primaryError != null) {
+          Error.throwWithStackTrace(primaryError, primaryStack!);
+        }
+        return null;
       },
       forceRefresh: force,
       ttl: const Duration(hours: 6),
@@ -174,6 +211,7 @@ class LyricsStore {
 
   void suspendSource(String id) {
     tags.suspendSource(id);
+    lrcApi?.suspendSource(id);
     _epochs[id] = (_epochs[id] ?? 0) + 1;
     for (final entry in _adapters.entries.toList()) {
       if (entry.value == id) entry.key.close();
