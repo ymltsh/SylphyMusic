@@ -48,6 +48,8 @@ App 使用“API 设置”中的 GitHub 加速 API 前缀请求清单、下载�
 
 Android Release 必须已有 `android/key.properties` 与对应私有签名密钥；脚本拒绝测试签名 / unsigned 环境开关，不生成或记录密钥。签名文件继续由 `.gitignore` 排除。Windows 安装程序定义在 `installer/windows/SylphyMusic.iss`，按当前用户安装到 `%LOCALAPPDATA%\Programs\Sylphy Music`，提供开始菜单、可选桌面快捷方式和卸载项；安装 / 卸载不删除应用数据目录。便携 ZIP 保留全部运行依赖。
 
+2026-10-28 已在本机配置独立 Android 正式密钥，详见 [正式签名与备份](docs/ANDROID_SIGNING.md)。`release.py` 新准备的 APK 必须通过公共证书匹配校验。此前线上包仍使用测试证书，不能直接覆盖安装本轮正式签名 APK；首次正式发布前须确定并验证迁移方案。
+
 ```powershell
 # 纯预览，不改版本、不构建、不访问 GitHub
 python release.py --version 0.2.1 --build 3 --dry-run

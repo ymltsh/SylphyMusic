@@ -1,5 +1,17 @@
 # 实施与验证记录
 
+## 2026-10-28 签名准备提交与测试版迁移范围确认
+
+用户确认测试版未实际安装使用，允许直接提交并推送签名准备改动；本次切换按全新安装处理，不再以测试版数据迁移作为阻碍。更新签名说明与对应发布门槛，不改变旧证书无法直接覆盖的约束，也不将其他未验收项目标记为通过。私钥、密码与本机恢复副本仍只保留在 Git 忽略路径。
+
+## 2026-10-28 Android 正式签名准备
+
+按用户要求仅准备 Android 正式签名，Windows 代码签名暂缓。生成独立 RSA-3072 / PKCS#12 私钥（有效期 10000 天），存于已忽略的 `.private/android-signing/`，配置 `android/key.properties`，目录和配置 ACL 限制为当前用户与 SYSTEM。公共证书及 SHA-256 指纹纳入源码，更新本地配置示例；增加 `tool/verify_android_signing.py` 并接入 `release.py` 本地准备流程，校验 APK 签名与固定正式证书。
+
+三种 ABI 的普通主入口 Release APK 构建及实际证书匹配通过；旧 0.2.8-beta+11 测试签名 APK 被校验工具拒绝。签名密码、私钥 / 配置文件的源码与 APK 内容扫描通过，私密路径 Git 忽略及 ACL 核对通过；发布工具 11 项测试与静态分析通过。构建日志为 `build/test_logs/android-production-signing-build.log`。
+
+产物保留当前 0.2.8-beta+11 版本，只用于签名链路核验，不替换同版本线上测试包。未安装、卸载或改动设备数据，未提交、推送或发布。私钥独立离线备份与恢复演练尚待维护者执行；旧测试证书不能直接覆盖升级，迁移方案仍待确定和验收。详见 [Android 正式签名](ANDROID_SIGNING.md)。
+
 ## 2026-10-28 发布 0.2.8-beta+11 Android / Windows 测试更新
 
 已发布 https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.8-beta%2B11 ，源码提交 `ce2e694`，beta 清单提交 `72e4b6c`。包含 Emby SRT 结束时间兼容与旧缓存读取、默认关闭的 LrcApi 补充、API 设置弹窗生命周期修复、播放页艺术家 / 专辑跳转和引导后台同步期间继续导航。

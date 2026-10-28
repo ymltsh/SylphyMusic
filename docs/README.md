@@ -5,6 +5,7 @@
 | 文档 | 用途 |
 |---|---|
 | [更新与发布流程](../update.md) | 手动更新、正式 / 测试版清单、本地打包与显式 GitHub 发布 |
+| [Android 正式签名](ANDROID_SIGNING.md) | 正式证书、私钥备份、验签与测试版迁移限制 |
 | [项目 README](../README.md) | 运行、构建、功能与内部验收包 |
 | [AGENTS](../AGENTS.md) | 协作约定、工程边界与私密数据 |
 | [ARCH 入口](../ARCH.md) / [架构正文](ARCHITECTURE.md) | 模块、来源能力、数据流与生命周期 |

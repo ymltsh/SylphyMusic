@@ -182,6 +182,7 @@ def prepare(args, version, build, output):
     apks = [ROOT / f'build/app/outputs/flutter-apk/app-{abi}-release.apk' for abi in ABIS]
     if not (windows / 'sylphy_music.exe').is_file() or not all(p.is_file() for p in apks):
         raise ValueError('Expected release binaries are missing.')
+    run([sys.executable, 'tool/verify_android_signing.py', *apks])
     scan_inputs(windows, apks, args.credentials_file)
     output.mkdir(parents=True, exist_ok=True)
     artifacts = {}

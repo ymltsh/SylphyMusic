@@ -1,5 +1,7 @@
 # Copy to key.properties locally; never commit your keystore or credentials.
-storeFile=/absolute/path/to/release-upload.jks
+# Relative paths resolve from android/. Use forward slashes on Windows.
+# Restore the existing production key; do not generate a replacement for updates.
+storeFile=../.private/android-signing/sylphy-release.p12
 storePassword=REPLACE_LOCALLY
-keyAlias=upload
+keyAlias=sylphy-release
 keyPassword=REPLACE_LOCALLY
