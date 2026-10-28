@@ -2,7 +2,7 @@
 
 参考 Mfuns Flutter 的发布体系，接入手动检查更新、分渠道清单、Android 分 ABI APK、Windows 安装程序 / 便携 ZIP、SHA-256 与 GitHub Release。发布工具为根目录 `release.py`，Python 部分仅依赖标准库。
 
-**最新测试签名版本 0.2.3+5 已于 2026-10-28 发布到 GitHub Release。** `version.json` 指向该版本的三个 Android APK，`history` 保留 0.2.2+4 与 0.2.1+3；`version-beta.json` 的 `latest` 仍为 `null`。这些版本使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布。正式发布仍需生产签名并通过发布门槛；后续切换到生产签名可能需要卸载重装。现有内部验收继续用 `tool/build_review.ps1`。
+**正式渠道当前为 0.2.3+5，最新测试渠道为 [0.2.5-beta+8](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.5-beta%2B8)。** beta 清单同时提供 Android 分架构 APK、Windows 安装程序与便携 ZIP，历史保留之前测试版。Android 沿用本机测试证书，Windows 未代码签名；这些包用于测试，正式发布仍需通过发布门槛。
 
 ## App 手动检查更新
 
@@ -111,6 +111,6 @@ flutter build apk --debug
 
 本轮新增音乐标签标题 / 艺术家 / 专辑等文本字段，数据库前向迁移到 v7，重新同步保留匹配版本的标签；在应用运行时渐进补全并优先读取可见歌曲。已发布 [0.2.4-beta2+7](https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta2%2B7)，更新 beta 清单，保留既有测试签名，正式渠道不变。三个 APK 与摘要均已校验，Android 模拟器原生与 Release 覆盖安装验证通过。
 
-## 0.2.5-beta+8 双端测试更新
+## 已发布 0.2.5-beta+8 双端测试更新
 
 本轮包含 Android 手动同步前台通知、WebDAV 只补标签、暂停 / 超时恢复和引擎生命周期修复；提供三种 ABI APK、Windows 安装 EXE 与便携 ZIP。Android 沿用现有测试签名，Windows 未做代码签名；测试渠道发布，正式渠道保持当前版本。

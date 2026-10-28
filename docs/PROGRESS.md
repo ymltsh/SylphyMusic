@@ -580,3 +580,11 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 应用用户提供的 Android FGS sync 补丁，适配当前控制器上下文；新增手动同步通知、进度 / 暂停、WebDAV 只补全入口和 Application 引擎持有。补充 audio_service 缓存身份与引擎释放兼容、服务启动确认、取消在线读取和退出等待。准备 0.2.5-beta+8 Android / Windows 测试渠道更新。Android API35 模拟器已验证移除 Activity 后继续同步、系统短时限终止服务、重开 Activity 继续标签补全并跳过已完成网络读取；模拟器设置已恢复。真机 / 厂商后台策略仍待验证。
 
 本轮验证：flutter analyze 无问题；全量串行 201 项测试通过、5 项私密测试默认跳过；Android API35 同步前台服务集成与 Windows 全界面原生集成通过。新桥接测试覆盖启动失败 / 重试、进度节流、原生暂停 / 超时事件与桌面空实现。
+
+## 2026-10-28 发布 0.2.5-beta+8 Android / Windows 测试更新
+
+源码提交 `a4c7b96`，标签 `v0.2.5-beta+8`，beta 清单提交 `7d4c105`；发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.5-beta%2B8 。测试渠道同时提供 Android 三个 ABI、Windows 安装程序及便携 ZIP，正式渠道保持 0.2.3+5。
+
+六个资产（含摘要）远端大小和 SHA-256 均与本地一致，Android arm64、Windows EXE / ZIP 加速下载均返回 HTTP 200，默认加速 beta 清单已指向新版本。Android arm64 31.51 MiB、32 位 ARM 28.64 MiB、x86_64 33.71 MiB；Windows 安装 EXE 19.03 MiB、便携 ZIP 22.65 MiB。APK 证书与旧测试版一致，构建号为 2008 / 1008 / 4008；从 beta2+7 Release 覆盖安装并启动成功。Windows 可执行文件版本为 0.2.5-beta+8，ZIP 完整性、主程序与 flutter_windows / libmpv 运行依赖校验通过。
+
+全部安装资产和输入完成凭据扫描；仍是测试版本，Android 使用测试证书、Windows 未代码签名。Windows 安装 / 卸载未在用户环境实际执行；Android 真机及厂商电源策略、Linux 验收仍待完成。
