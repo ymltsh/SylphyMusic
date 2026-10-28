@@ -568,3 +568,9 @@ EmbyAdapter 改为文本流优先 SRT 转换，外置 LRC 仍优先原格式；�
 按用户授权准备 0.2.4-beta2+7，发布到 beta 渠道，Android 使用已有测试签名及三个 ABI 的 Release 包。包含本节前的元数据补丁与 v7 迁移修复；正式渠道保持 0.2.3+5。
 
 本轮复核：flutter analyze 无问题，全量测试 197 项通过、5 项默认跳过；Android API35 模拟器原生集成通过，验证内嵌标题 / 艺术家 / 专辑持久化与离线重启复用。模拟器安装集成测试 Debug 包时因版本号低于上轮按 ABI Release 包，由 Flutter 工具卸载重装自建 AVD 内的测试应用；不涉及真机或用户数据目录。
+
+## 2026-10-28 发布 0.2.4-beta2+7 Android 测试更新
+
+源码提交 `fa59a50`，测试版标签 `v0.2.4-beta2+7`，beta 清单提交 `ba33bc4`。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.4-beta2%2B7 。正式渠道保持 0.2.3+5，beta 历史保留 0.2.4-beta+6。
+
+三份 APK 与 SHA256SUMS.txt 已公开，远端四个资产的大小与 SHA-256 均与本地一致；arm64 原始和配置加速下载链接返回 HTTP 200。arm64-v8a 31.51 MiB、armeabi-v7a 28.62 MiB、x86_64 33.71 MiB；versionName 0.2.4-beta2，versionCode 分别为 2007 / 1007 / 4007。签名与现有测试版本相同，凭据扫描通过。自建 Android API35 模拟器从 beta+6 Release 覆盖安装 beta2+7 并启动成功。仍为测试签名，尚待 Android 真机验收，Linux 验收继续暂缓。
