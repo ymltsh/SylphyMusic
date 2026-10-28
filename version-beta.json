@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "0.2.6-beta",
-    "build": 9,
-    "name": "风灵音乐 0.2.6-beta（测试签名）",
+    "version": "0.2.7-beta",
+    "build": 10,
+    "name": "风灵音乐 0.2.7-beta（测试签名）",
     "date": "2026-10-28",
-    "notes": "风灵音乐 0.2.6-beta+9（Android / Windows 测试更新）\n\n- 音乐库专辑视图新增 Cover Flow：中央封面按距离缩放、旋转并显示倒影，左右拖动或点击侧边封面切换，点击中央封面进入专辑。\n- 歌单页新增网格 / 封面流切换，按歌单首曲封面浏览；没有曲目时显示歌单类型图标。\n- 封面流只构建当前附近项目，继续复用 SQLite 每批 100 行的查询与缓存，不一次读取整个曲库。\n- 歌单页「新建歌单」改为靠左的 12 dp 圆角矩形按钮，云同步图标位于同一行右侧。\n- 搜索页「歌曲 / 专辑 / 艺术家」改为与音乐库一致的胶囊标签切换控件。\n- 保留现有播放、缓存、云歌单、同步和更新检查能力。\n\n验证：本地静态分析、Cover Flow Widget 测试、Windows 原生界面与歌单回归通过；Android 真机未在本轮验收。\n\nAndroid 沿用现有测试签名，可覆盖安装同签名旧包；Windows 未做代码签名。仅供测试，不是正式签名发布版。应用内检查更新请启用测试版渠道。\n",
+    "notes": "风灵音乐 0.2.7-beta+10（Android / Windows 测试更新）\n\n- 音乐源管理改为圆角卡片与状态开关，保留同步、标签补全、编辑、缓存清理与删除。\n- 新增独立音乐源连接表单，支持可选端口、密码显隐及反向代理路径；编辑时保护原协议与账号身份。\n- 首次使用改为三步引导：欢迎、选择音乐来源、每日一言 / GitHub 加速 API 配置；可以跳过来源或 API 配置。\n- 修复首次通知授权尚未选择就开始扫描的问题；首次扫描等待授权选择，同步与缓存通知立即显示。\n- 播放页编辑器的歌词预览新增 1.00～2.50 倍行距，支持实时预览、撤销重做、随布局保存与恢复。\n- 设置页“音乐与存储”移到最顶部。\n\n验证：静态分析、完整本地测试与 Windows 原生界面回归通过；Android API35 已验证首次允许 / 拒绝通知权限及通知栏实际显示。新界面完成 Android 编译，真机界面与厂商后台策略仍待测试。\n\nAndroid 沿用现有测试签名，Windows 未代码签名，仅供测试。应用内检查更新请启用测试版渠道。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-x86_64.apk",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-windows-0.2.6-beta-9.zip",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-setup-0.2.6-beta-9.exe"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.7-beta%2B10/sylphy-music-0.2.7-beta-10-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.7-beta%2B10/sylphy-music-0.2.7-beta-10-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.7-beta%2B10/sylphy-music-0.2.7-beta-10-x86_64.apk",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.7-beta%2B10/sylphy-music-windows-0.2.7-beta-10.zip",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.7-beta%2B10/sylphy-music-setup-0.2.7-beta-10.exe"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.6-beta%2B9"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.7-beta%2B10"
   },
   "history": [
+    {
+      "version": "0.2.6-beta",
+      "build": 9,
+      "name": "风灵音乐 0.2.6-beta（测试签名）",
+      "date": "2026-10-28",
+      "notes": "风灵音乐 0.2.6-beta+9（Android / Windows 测试更新）\n\n- 音乐库专辑视图新增 Cover Flow：中央封面按距离缩放、旋转并显示倒影，左右拖动或点击侧边封面切换，点击中央封面进入专辑。\n- 歌单页新增网格 / 封面流切换，按歌单首曲封面浏览；没有曲目时显示歌单类型图标。\n- 封面流只构建当前附近项目，继续复用 SQLite 每批 100 行的查询与缓存，不一次读取整个曲库。\n- 歌单页「新建歌单」改为靠左的 12 dp 圆角矩形按钮，云同步图标位于同一行右侧。\n- 搜索页「歌曲 / 专辑 / 艺术家」改为与音乐库一致的胶囊标签切换控件。\n- 保留现有播放、缓存、云歌单、同步和更新检查能力。\n\n验证：本地静态分析、Cover Flow Widget 测试、Windows 原生界面与歌单回归通过；Android 真机未在本轮验收。\n\nAndroid 沿用现有测试签名，可覆盖安装同签名旧包；Windows 未做代码签名。仅供测试，不是正式签名发布版。应用内检查更新请启用测试版渠道。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-0.2.6-beta-9-x86_64.apk",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-windows-0.2.6-beta-9.zip",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.6-beta%2B9/sylphy-music-setup-0.2.6-beta-9.exe"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.6-beta%2B9"
+    },
     {
       "version": "0.2.5-beta",
       "build": 8,
