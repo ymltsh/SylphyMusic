@@ -9,24 +9,40 @@ import '../core/models.dart';
 import '../data/app_db.dart';
 import 'media_assets.dart';
 import 'sources.dart';
+import 'webdav_tags.dart';
 
 class ArtworkStore {
-  ArtworkStore(this.db, this.factory, this.root, {MediaAssetStore? assets})
-    : assets = assets ?? MediaAssetStore(db, root),
-      _ownsAssets = assets == null;
+  ArtworkStore(
+    this.db,
+    this.factory,
+    this.root, {
+    MediaAssetStore? assets,
+    WebDavTags? tags,
+  }) : assets = assets ?? MediaAssetStore(db, root),
+       _ownsAssets = assets == null,
+       tags = tags ?? WebDavTags(factory),
+       _ownsTags = tags == null;
   final AppDb db;
   final AdapterFactory factory;
   final Directory root;
   final MediaAssetStore assets;
   final bool _ownsAssets;
+  final WebDavTags tags;
+  final bool _ownsTags;
   final Map<HttpClient, String> _clients = {};
   final List<Completer<void>> _waiting = [];
   final Set<Future<File?>> _loads = {};
   final Map<String, int> _epochs = {};
   int _readers = 0;
   bool _stopped = false;
-  String key(Track track) =>
-      jsonEncode(['cover', track.artworkIdentity, 'Primary', 800, 90, 1]);
+  String key(Track track) => jsonEncode([
+    'cover',
+    track.remote.containsKey('format') ? track.ref.key : track.artworkIdentity,
+    'Primary',
+    800,
+    90,
+    track.remote.containsKey('format') ? 2 : 1,
+  ]);
   int revision(Track track) => assets.revision(track.ref.sourceId, key(track));
   void retain(Track track) => assets.retain(track.ref.sourceId, key(track));
   void release(Track track) => assets.release(track.ref.sourceId, key(track));
@@ -40,6 +56,7 @@ class ArtworkStore {
 
   String _hash(String value) => sha256.convert(utf8.encode(value)).toString();
   Future<File?> _load(Track track, bool force) async {
+    final epoch = _epochs[track.ref.sourceId] ?? 0;
     final source = await db.source(track.ref.sourceId);
     if (source == null || !source.enabled || _stopped) return null;
     if (source.kind == SourceKind.local) {
@@ -71,6 +88,18 @@ class ArtworkStore {
       'cover',
       track.artworkVersion,
       (previous) async {
+        if (source.kind == SourceKind.webdav) {
+          final embedded = await tags.load(source, track, force: force);
+          if (embedded.cover != null) {
+            try {
+              await assets.validate('cover', embedded.cover!);
+              return AssetPayload(embedded.cover!);
+            } catch (_) {
+              /* An invalid embedded picture must not hide a sidecar. */
+            }
+          }
+        }
+        if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
         if (previous == null && !force && await legacy.exists()) {
           final bytes = await legacy.readAsBytes();
           // Validation is performed by the shared store; bad legacy files fall
@@ -179,6 +208,7 @@ class ArtworkStore {
   }
 
   void suspendSource(String id) {
+    tags.suspendSource(id);
     _epochs[id] = (_epochs[id] ?? 0) + 1;
     assets.suspendSource(id);
     for (final entry in _clients.entries.toList()) {
@@ -196,6 +226,7 @@ class ArtworkStore {
   void invalidate() {} // Persistent freshness is driven by the selected image version.
   Future<void> shutdown() async {
     _stopped = true;
+    if (_ownsTags) await tags.shutdown();
     for (final client in _clients.keys.toList()) {
       client.close(force: true);
     }

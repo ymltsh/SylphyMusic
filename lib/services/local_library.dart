@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:crypto/crypto.dart';
@@ -9,6 +10,7 @@ import 'dart:convert';
 import 'package:path/path.dart' as p;
 
 import '../core/models.dart';
+import 'embedded_tags.dart';
 
 const audioExtensions = {
   '.mp3',
@@ -26,13 +28,35 @@ class LocalLibrary {
   LocalLibrary(this.root);
   final Directory root;
 
-  static Future<String?> embeddedLyrics(File file) => Isolate.run(() {
+  static Future<EmbeddedTags> embeddedAssets(File file) => Isolate.run(() {
     try {
-      return readMetadata(file).lyrics;
+      final reader = file.openSync();
+      try {
+        final header = reader.readSync(10);
+        if (header.length == 10 &&
+            ascii.decode(header.sublist(0, 3), allowInvalid: true) == 'ID3') {
+          final size = tagUint(header, 6, 4, syncSafe: true);
+          if (size > 12 * 1024 * 1024 || size + 10 > reader.lengthSync()) {
+            return const EmbeddedTags();
+          }
+          return parseId3Tags(
+            Uint8List.fromList([...header, ...reader.readSync(size)]),
+          );
+        }
+      } finally {
+        reader.closeSync();
+      }
+      final metadata = readMetadata(file, getImage: true);
+      return EmbeddedTags(
+        cover: metadata.pictures.isEmpty ? null : metadata.pictures.first.bytes,
+        lyrics: metadata.lyrics,
+      );
     } catch (_) {
-      return null;
+      return const EmbeddedTags();
     }
   });
+  static Future<String?> embeddedLyrics(File file) async =>
+      (await embeddedAssets(file)).lyrics;
 
   Future<Track> read(File file, String sourceId) =>
       Isolate.run(() => _read(file, sourceId));

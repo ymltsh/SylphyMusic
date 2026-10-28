@@ -25,6 +25,7 @@ import '../services/local_library.dart';
 import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lyrics_store.dart';
+import '../services/webdav_tags.dart';
 import '../services/library_sync.dart';
 import '../services/source_connections.dart';
 import 'models.dart';
@@ -72,8 +73,22 @@ class SylphyApp extends ChangeNotifier {
   String? message;
   DesktopControls? desktop;
   late final assets = MediaAssetStore(db, root);
-  late final artwork = ArtworkStore(db, factory, root, assets: assets);
-  late final lyrics = LyricsStore(db, factory, assets, cache, root);
+  late final webDavTags = WebDavTags(factory, cache: cache);
+  late final artwork = ArtworkStore(
+    db,
+    factory,
+    root,
+    assets: assets,
+    tags: webDavTags,
+  );
+  late final lyrics = LyricsStore(
+    db,
+    factory,
+    assets,
+    cache,
+    root,
+    tags: webDavTags,
+  );
   late final index = LibrarySync(db, factory);
   late final connections = SourceConnections(
     db,
@@ -580,6 +595,7 @@ class SylphyApp extends ChangeNotifier {
     await playback.shutdown();
     await proxy.dispose();
     await cache.shutdown();
+    await webDavTags.shutdown();
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();

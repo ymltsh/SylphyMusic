@@ -8,13 +8,23 @@ import 'package:path/path.dart' as p;
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'cache.dart';
-import 'local_library.dart';
 import 'lyrics.dart';
 import 'media_assets.dart';
 import 'sources.dart';
+import 'webdav_tags.dart';
 
 class LyricsStore {
-  LyricsStore(this.db, this.factory, this.assets, this.cache, this.root);
+  LyricsStore(
+    this.db,
+    this.factory,
+    this.assets,
+    this.cache,
+    this.root, {
+    WebDavTags? tags,
+  }) : tags = tags ?? WebDavTags(factory, cache: cache),
+       _ownsTags = tags == null;
+  final WebDavTags tags;
+  final bool _ownsTags;
   final AppDb db;
   final AdapterFactory factory;
   final MediaAssetStore assets;
@@ -113,21 +123,15 @@ class LyricsStore {
       source,
       key(track),
       'lyrics',
-      track.resourceVersion,
+      source.kind == SourceKind.webdav
+          ? 'embedded-v1:${track.resourceVersion}'
+          : track.resourceVersion,
       (previous) async {
         if (_stopped) return null;
         if (source.kind == SourceKind.webdav) {
-          cache.lease(track.ref);
-          try {
-            final ready = await cache.find(track.ref);
-            if (ready != null) {
-              final embedded = await LocalLibrary.embeddedLyrics(ready.file);
-              if (embedded?.trim().isNotEmpty == true) {
-                return AssetPayload(utf8.encode(embedded!));
-              }
-            }
-          } finally {
-            cache.release(track.ref);
+          final embedded = await tags.load(source, track, force: force);
+          if (embedded.lyrics?.trim().isNotEmpty == true) {
+            return AssetPayload(utf8.encode(embedded.lyrics!));
           }
         }
         if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
@@ -164,6 +168,7 @@ class LyricsStore {
   }
 
   void suspendSource(String id) {
+    tags.suspendSource(id);
     _epochs[id] = (_epochs[id] ?? 0) + 1;
     for (final entry in _adapters.entries.toList()) {
       if (entry.value == id) entry.key.close();
@@ -180,6 +185,7 @@ class LyricsStore {
 
   Future<void> shutdown() async {
     _stopped = true;
+    if (_ownsTags) await tags.shutdown();
     for (final adapter in _adapters.keys.toList()) {
       adapter.close();
     }

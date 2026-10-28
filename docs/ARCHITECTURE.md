@@ -151,3 +151,5 @@ Android 系统栏由 `ui/system_bars.dart` 在应用启动和 MaterialApp.builde
 
 
 睡眠定时由 `SylphyApp.sleepTimer` 持有 `PlaybackSleepTimer`，不依赖播放页路由生命周期。使用应用会话内截止时间调用同一 `PlaybackCoordinator.pause()`，更换 / 取消定时清理旧任务，恢复前台复核截止时间；`disposeAsync()` 在关闭播放服务前取消并等待正在执行的定时任务，不保存跨进程定时设置。
+
+WebDAV 的 `WebDavTags` 由 SylphyApp 共享给 ArtworkStore / LyricsStore：按来源、曲目、资源版本和代次合并有界 Range 读取，最多三个并发；完整缓存可离线提取，解析在 isolate 执行。内嵌封面与歌词优先于旁置文件，手动歌词仍最高；结果沿用 MediaAssetStore 原子落盘。停用来源取消匹配请求，应用退出先关闭标签生产者，再等待资源消费者并关闭数据库。目录同步仍只读取目录属性，不为标签遍历下载全库。
