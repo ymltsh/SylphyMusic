@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.0",
-    "build": 12,
-    "name": "风灵音乐 v1.0.0",
+    "version": "1.0.1",
+    "build": 13,
+    "name": "风灵音乐 v1.0.1",
     "date": "2026-10-28",
-    "notes": "风灵音乐 1.0 正式版\n\n- 多音源音乐库：Emby、Navidrome / OpenSubsonic、WebDAV 和本地音乐。\n- 本地与云端歌单、收藏、搜索筛选、播放队列和离线缓存。\n- 封面、同步歌词、可选在线歌词补充，以及自定义播放器布局和外观。\n- Android 媒体通知与后台任务；Windows 托盘、媒体键和安装程序 / 便携包。\n- Android 从本版起使用固定正式签名。\n\n下载：常见 Android 手机选 arm64-v8a，旧 32 位设备选 armeabi-v7a，x86_64 用于对应设备或模拟器。Windows 选安装 EXE，或完整解压便携 ZIP 后运行。\n\n说明：Android 正式证书与此前测试包不同，不能直接覆盖安装；测试版未实际部署，本次按全新安装发布。Windows 暂未代码签名，系统可能显示发布者提示。Linux 本次不提供安装包。Android 真机长期兼容性、Windows 安装 / 卸载全面验收及原生依赖完整分发审计仍在持续跟进，详见仓库验收记录。\n",
+    "notes": "风灵音乐 1.0.1\n\n- 修复后台歌词加载：选中或恢复歌曲时自动加载歌词，临近下一首时提前预取，不必先打开歌词页；加载失败不会影响播放。\n- 新增独立“关于风灵音乐”页面：项目介绍、官方网站、GitHub 仓库、版本下载、安装版本和开源许可证。\n- 连续点击关于页图标七次解锁天琴座星图，支持关闭后再次触发，适配横屏和大字体。\n- Android 沿用 1.0 正式签名，提供三个 ABI APK；Windows 提供安装程序和便携包，暂未代码签名。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-x86_64.apk",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-windows-1.0.0-12.zip",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-setup-1.0.0-12.exe"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.1%2B13/sylphy-music-1.0.1-13-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.1%2B13/sylphy-music-1.0.1-13-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.1%2B13/sylphy-music-1.0.1-13-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.1%2B13/sylphy-music-setup-1.0.1-13.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.1%2B13/sylphy-music-windows-1.0.1-13.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.0+12"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.1+13"
   },
   "history": [
+    {
+      "version": "1.0.0",
+      "build": 12,
+      "name": "风灵音乐 v1.0.0",
+      "date": "2026-10-28",
+      "notes": "风灵音乐 1.0 正式版\n\n- 多音源音乐库：Emby、Navidrome / OpenSubsonic、WebDAV 和本地音乐。\n- 本地与云端歌单、收藏、搜索筛选、播放队列和离线缓存。\n- 封面、同步歌词、可选在线歌词补充，以及自定义播放器布局和外观。\n- Android 媒体通知与后台任务；Windows 托盘、媒体键和安装程序 / 便携包。\n- Android 从本版起使用固定正式签名。\n\n下载：常见 Android 手机选 arm64-v8a，旧 32 位设备选 armeabi-v7a，x86_64 用于对应设备或模拟器。Windows 选安装 EXE，或完整解压便携 ZIP 后运行。\n\n说明：Android 正式证书与此前测试包不同，不能直接覆盖安装；测试版未实际部署，本次按全新安装发布。Windows 暂未代码签名，系统可能显示发布者提示。Linux 本次不提供安装包。Android 真机长期兼容性、Windows 安装 / 卸载全面验收及原生依赖完整分发审计仍在持续跟进，详见仓库验收记录。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-x86_64.apk",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-windows-1.0.0-12.zip",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-setup-1.0.0-12.exe"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.0+12"
+    },
     {
       "version": "0.2.3",
       "build": 5,
