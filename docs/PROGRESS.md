@@ -1,5 +1,15 @@
 # 实施与验证记录
 
+## 2026-10-28 发布 0.2.7-beta+10 Android / Windows 测试更新
+
+已发布 https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.7-beta%2B10 ，源码提交 `0890782`，beta 清单提交 `b1dde80`。包含音乐源卡片管理、独立连接表单、三步引导、首次扫描通知授权等待 / 立即显示、歌词预览行距和设置顺序调整。提供 Android 三个 ABI APK、Windows 安装 EXE、便携 ZIP 和摘要文件；正式渠道保持 0.2.3+5。
+
+发布前静态分析、格式、209 项应用测试与 11 项发布工具测试通过；Windows 原生界面 / 歌词编辑器与 Android 通知权限回归证据见前述记录。本轮构建脚本增加 ReleaseVersion 参数，Windows 文件版本为 0.2.7-beta+10，并通过构建参数保留运行时 beta 标记。安装资产完成凭据内容扫描、SHA-256、应用身份与旧版测试证书一致性校验；Android 构建号为 2010 / 1010 / 4010。自建 API35 模拟器从 0.2.6-beta+9 覆盖安装 0.2.7-beta+10，无卸载，保留引导完成状态并进入首页。
+
+发布后核对六个远端资产的大小和 GitHub digest 均与本地一致；测试版清单及默认加速清单均已指向 0.2.7-beta+10，历史保留 0.2.6-beta+9，正式渠道版本不变。核验记录为 build/releases/0.2.7-beta-10/published-verification.json。
+
+arm64-v8a 31.51 MiB、armeabi-v7a 28.70 MiB、x86_64 33.77 MiB，Windows 安装 EXE 19.06 MiB、便携 ZIP 22.68 MiB。产物与发布记录位于 build/releases/0.2.7-beta-10/，构建 / 检查日志位于 build/test_logs/release-0.2.7-*。Android 仍使用测试证书，Windows 未代码签名；Windows 安装器实际安装 / 卸载、Android 真机和 Linux 本轮未验收。
+
 ## 2026-10-28 应用音乐源管理与三步引导 UI 修改
 
 应用用户提供的 sylphy_ui_redesign.zip：新增 MusicSourcesPanel 圆角来源卡片与状态开关、MusicSourceConnectionPage 独立连接 / 编辑表单、共享协议图标和 QuickStartWizard 三步引导（标语 → 来源选择 → 公共 API 配置）。Shell 保留实际登录、前台同步、账号身份校验、本地导入、缓存清理与删除入口。可选端口覆盖保留 URL 路径与查询，密码独立传递；编辑锁定协议和账号。API 校验错误在用户改正输入后自动清除。
