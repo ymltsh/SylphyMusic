@@ -1,5 +1,17 @@
 # 实施与验证记录
 
+## 2026-10-28 关于页更新与 1.0.1 发布准备
+
+应用 `sylphy-about-page-bundle.zip`，设置入口改为独立关于页，包含项目介绍、官网 / 仓库 / 发布链接、实际安装版本和许可证；加入七连击天琴座星图。适配当前设置构造参数，修复彩蛋退出后不能再次打开和横屏大字体溢出；保留后台歌词预热修复。
+
+关于页六项 Widget 测试和静态分析通过，Windows 原生主界面回归通过，覆盖设置入口、实际版本、许可证和星图横竖屏；截图位于 `build/test_logs/ui/about-*.png`，日志为 `about-page-tests.log`、`about-page-analyze.log`、`about-page-native.log`。后台歌词相关 46 项测试已通过。本次按用户授权发布 `1.0.1+13`，复用上述检查，使用 `--skip-checks` 直接构建和发布，不重复运行验收。
+
+## 2026-10-28 应用后台歌词预热修复
+
+应用 `SylphyMusic-background-lyrics.patch`：播放服务在选中 / 恢复曲目及临近下一首预取时，通过应用装配的 LyricsStore 回调后台加载歌词，不再依赖先打开歌词页。同一 TrackRef 会话内去重，来源失效清除对应记录；同步异常和异步失败均隔离，不阻塞音频打开。沿用歌词缓存、来源取消和退出等待边界，在线歌词补充保持默认关闭。
+
+相关播放 / 歌词 / 在线补充 / 预览测试 46 项通过，包含真实 Windows libmpv 下的无歌词页面预热、慢加载不阻塞、去重与来源失效重试、同步 / 异步错误隔离，以及恢复队列后自动写入歌词缓存且保持暂停。静态分析与格式检查通过。日志为 `build/test_logs/background-lyrics-tests.log` 和 `background-lyrics-analyze.log`。仅用合成音频和本机服务器，未运行 Android 设备检查，未生成安装包、提交、推送或发布新版本。
+
 ## 2026-10-28 发布 1.0 正式版并对齐参考发布流程
 
 已发布 [1.0.0+12](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.0%2B12)，源码提交 `3041023`，正式清单提交 `f849ab2`。提供 Android 三个 ABI 的正式签名 APK、Windows 未签名安装 EXE / 便携 ZIP 和 SHA256SUMS.txt。六个远端资产的大小与 SHA-256 和本地一致，正式清单及默认加速清单均指向 1.0.0+12，旧正式版保留在 history，测试清单保持 0.2.8-beta+11。Android 包身份 / 构建号 / 正式证书、Windows 版本与运行依赖、包内容扫描通过；未执行本轮设备安装或人工验收，Linux 不分发。

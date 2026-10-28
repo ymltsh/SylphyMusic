@@ -2,7 +2,7 @@
 
 Flutter / Material 3 多音源播放器，支持 Android、Windows、Linux。主工程、原生 Runner、依赖锁文件和自动化测试均在本目录。
 
-已发布 [1.0 正式版](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.0%2B12)，提供 Android / Windows，Linux 暂缓。最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)。
+已发布 [正式版](https://github.com/ymltsh/SylphyMusic/releases/latest)，提供 Android / Windows，Linux 暂缓。最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)。
 
 应用内「设置 → 检查更新」提供手动更新检查。按 [更新与发布流程](update.md) 一条命令完成构建、打包、发布和清单推送；源码提交单独处理，人工与设备验收不阻断发布。
 

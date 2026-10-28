@@ -11,9 +11,9 @@ import '../core/appearance.dart';
 import 'cache_storage.dart';
 import 'app_update_page.dart';
 import 'launcher_icon_picker.dart';
-import '../services/app_updates.dart';
 import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
+import 'about_page.dart';
 
 enum _Section {
   playback,
@@ -67,11 +67,13 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _open(_Section section) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsPage._(
-          app: app,
-          onSources: widget.onSources,
-          section: section,
-        ),
+        builder: (_) => section == _Section.about
+            ? const AboutPage()
+            : SettingsPage._(
+                app: app,
+                onSources: widget.onSources,
+                section: section,
+              ),
       ),
     );
     if (mounted) setState(() {});
@@ -593,29 +595,7 @@ class _SettingsPageState extends State<SettingsPage> {
         },
       ),
     ],
-    _Section.about => [
-      FutureBuilder<AppVersion>(
-        future: AppVersion.installed(),
-        builder: (context, snapshot) => ListTile(
-          title: const Text('应用版本'),
-          subtitle: Text(snapshot.hasData ? '${snapshot.data}' : '正在读取版本…'),
-        ),
-      ),
-      const ListTile(
-        title: Text('风灵音乐 / Sylphy Music'),
-        subtitle: Text(
-          'Flutter · Material 3 · media_kit/libmpv\n本地优先 · 多音乐源 · 开源项目',
-        ),
-      ),
-      ListTile(
-        title: const Text('开源许可证'),
-        leading: const Icon(Icons.article_outlined),
-        onTap: () => showLicensePage(
-          context: context,
-          applicationName: '风灵音乐 · Sylphy Music',
-        ),
-      ),
-    ],
+    _Section.about => const [],
   };
   Future<void> _editApiUrl({required bool quote}) async {
     final value = await showDialog<String>(

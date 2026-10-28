@@ -109,6 +109,35 @@ void main() {
   });
   group('Emby lyric cache upgrade', () {
     test(
+      'restored track caches lyrics without opening a lyrics widget',
+      () async {
+        await app.db.replaceSourceTracks('fixture', [track]);
+        app.playback.snapshot = QueueSnapshot(
+          tracks: [track.ref.key],
+          order: const [0],
+        );
+        final vault = app.vault;
+        await app.disposeAsync();
+        app = await SylphyApp.bootstrap(
+          dataRoot: root,
+          credentialVault: vault,
+          resumeBackground: false,
+          platformIntegration: false,
+        );
+        var cached = await app.assets.read('fixture', app.lyrics.key(track));
+        for (var i = 0; i < 200 && cached == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+          cached = await app.assets.read('fixture', app.lyrics.key(track));
+        }
+        expect(cached, isNotNull);
+        expect(await cached!.file.readAsString(), contains('Timed line'));
+        expect(hits, greaterThan(0));
+        expect(app.playback.currentRef, track.ref);
+        expect(app.playback.playing, isFalse);
+      },
+    );
+
+    test(
       'online fallback is opt in, source lyrics win and cache works offline',
       () async {
         await app.apiSettings.setLrcApiUrl(

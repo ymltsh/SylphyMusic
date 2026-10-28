@@ -52,7 +52,33 @@ class PlaybackCoordinator extends ChangeNotifier {
   AudioSession? _session;
   TrackRef? _leased;
   final Set<String> _reloadSources = {};
-  void invalidateSource(String id) => _reloadSources.add(id);
+  Future<String?> Function(Track)? _lyricsLoader;
+  final Set<TrackRef> _lyricsWarmupRequested = {};
+
+  /// Install the app-owned lyrics loader after its stores/settings are ready.
+  /// The current track may already have been restored during initialization.
+  void setLyricsLoader(Future<String?> Function(Track) loader) {
+    _lyricsLoader = loader;
+    final track = current;
+    if (track != null) _warmLyrics(track);
+  }
+
+  void _warmLyrics(Track track) {
+    final loader = _lyricsLoader;
+    if (loader == null || !_lyricsWarmupRequested.add(track.ref)) return;
+    // Lyrics are best-effort background work: a failed lookup must not affect
+    // opening or playing the audio, and must not become an unhandled error.
+    unawaited(
+      Future<String?>.sync(() => loader(track))
+          .then<void>((_) {}, onError: (Object _, StackTrace _) {}),
+    );
+  }
+
+  void invalidateSource(String id) {
+    _reloadSources.add(id);
+    _lyricsWarmupRequested.removeWhere((ref) => ref.sourceId == id);
+  }
+
   SylphyAudioHandler? handler;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
@@ -332,6 +358,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> _prepareCurrent() async {
     final ref = currentRef;
     current = ref == null ? null : await db.track(ref);
+    if (current != null) _warmLyrics(current!);
     position = Duration(milliseconds: snapshot.positionMs);
     notifyListeners();
     _publish();
@@ -401,6 +428,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       final source = await db.source(ref.sourceId);
       if (source == null) throw StateError('来源已删除');
       if (!source.enabled) throw StateError('来源已停用');
+      _warmLyrics(current!);
       diagnostics?.record(
         'playback',
         'source_resolved',
@@ -516,6 +544,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (t == null) return;
       final source = await db.source(t.ref.sourceId);
       if (source == null) return;
+      _warmLyrics(t);
       await cache.prefetchNext(
         t,
         source,
@@ -944,6 +973,8 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> shutdown() async {
     _playRequested = false;
+    _lyricsLoader = null;
+    _lyricsWarmupRequested.clear();
     _publish();
     _detachNotificationArtwork();
     for (final subscription in _subscriptions) {

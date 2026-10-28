@@ -666,13 +666,40 @@ void main() {
         await tester.pageBack();
         await tester.pumpAndSettle();
         await openSetting('关于风灵音乐');
+        expect(
+          find.byKey(const ValueKey('about-logo-easter-egg')),
+          findsOneWidget,
+        );
+        await capture('about-mobile');
         final installed = await AppVersion.installed();
         expect(installed.build, greaterThan(0));
+        await tester.scrollUntilVisible(find.text('$installed'), 250);
+        await tester.pumpAndSettle();
         await waitFor(find.text('$installed'));
+        await tester.scrollUntilVisible(find.text('开源许可证'), 150);
+        await tester.pumpAndSettle();
         await tester.tap(find.text('开源许可证'));
         await tester.pumpAndSettle();
         expect(find.byType(LicensePage), findsOneWidget);
         await tester.pageBack();
+        await tester.pumpAndSettle();
+        final aboutLogo = find.byKey(const ValueKey('about-logo-easter-egg'));
+        await tester.scrollUntilVisible(aboutLogo, -300);
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 7; i++) {
+          await tester.tap(aboutLogo);
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        await tester.pump(const Duration(seconds: 7));
+        expect(find.text('天琴座'), findsOneWidget);
+        await capture('about-constellation-mobile');
+        tester.view.physicalSize = const Size(800, 360);
+        await tester.pump();
+        await capture('about-constellation-landscape');
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.byTooltip('关闭星图'));
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = const Size(360, 800);
         await tester.pumpAndSettle();
         await tester.pageBack();
         await tester.pumpAndSettle();

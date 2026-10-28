@@ -184,6 +184,7 @@ class SylphyApp extends ChangeNotifier {
     await app.history.initialize();
     app.history.addListener(app._indexChanged);
     await app.reload();
+    app.playback.setLyricsLoader((track) => app.loadLyrics(track));
     if (platformIntegration) {
       if (Platform.isAndroid) {
         playback.attachNotificationArtwork(app.artwork);

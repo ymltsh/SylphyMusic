@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -80,6 +81,65 @@ void main() {
     await app.disposeAsync();
     await root.delete(recursive: true);
   });
+
+  test(
+    'lyrics warm up when playback selects a track without opening the lyrics page',
+    () async {
+      final requested = <TrackRef>[];
+      app.playback.setLyricsLoader((track) async {
+        requested.add(track.ref);
+        return null;
+      });
+      await app.playback.setQueue([tracks.first.ref], autoplay: false);
+      expect(requested, contains(tracks.first.ref));
+    },
+    skip: !available ? 'Build Windows debug or set SYLPHY_MPV_LIBRARY' : false,
+  );
+
+  test(
+    'pending lyrics do not block selection and source invalidation allows retry',
+    () async {
+      final pending = Completer<String?>();
+      addTearDown(() {
+        if (!pending.isCompleted) pending.complete(null);
+      });
+      final requested = <TrackRef>[];
+      app.playback.setLyricsLoader((track) {
+        requested.add(track.ref);
+        return pending.future;
+      });
+      for (var i = 0; i < 2; i++) {
+        await app.playback
+            .setQueue([tracks.first.ref], autoplay: false)
+            .timeout(const Duration(seconds: 5));
+      }
+      expect(requested, [tracks.first.ref]);
+      app.playback.invalidateSource('local');
+      await app.playback.setQueue([tracks.first.ref], autoplay: false);
+      expect(requested, [tracks.first.ref, tracks.first.ref]);
+      pending.complete(null);
+    },
+    skip: !available ? 'Build Windows debug or set SYLPHY_MPV_LIBRARY' : false,
+  );
+
+  test(
+    'synchronous and asynchronous lyrics failures do not fail audio selection',
+    () async {
+      app.playback.setLyricsLoader((track) {
+        if (track.ref == tracks.first.ref) {
+          throw StateError('Synthetic failure');
+        }
+        return Future<String?>.error(StateError('Synthetic async failure'));
+      });
+      for (final track in tracks.take(2)) {
+        await app.playback.setQueue([track.ref], autoplay: false);
+        await Future<void>.delayed(Duration.zero);
+        expect(app.playback.currentRef, track.ref);
+        expect(app.playback.error, isNull);
+      }
+    },
+    skip: !available ? 'Build Windows debug or set SYLPHY_MPV_LIBRARY' : false,
+  );
 
   test(
     'real libmpv local audio, seek, next, queue removal, paused restore',
