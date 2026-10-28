@@ -1,18 +1,33 @@
 {
   "latest": {
-    "version": "0.2.3",
-    "build": 5,
-    "name": "风灵音乐 v0.2.3（测试签名）",
+    "version": "1.0.0",
+    "build": 12,
+    "name": "风灵音乐 v1.0.0",
     "date": "2026-10-28",
-    "notes": "风灵音乐 v0.2.3（测试签名）\n\n- 首页横幅新增每日一言：默认使用 hitokoto，同日成功获取后缓存；失败保留已有文案。\n- 首页“探索音乐库”改为随机打乱曲库队列后开始播放，并跳到音乐库。\n- 设置 → 网络与接口 → API 设置：可修改每日一言 API 和 GitHub 加速前缀；留空恢复默认，仅允许 HTTPS。\n- 更新检查、APK / Windows 下载和发布页统一使用配置的 GitHub 加速前缀；清单请求失败不再回退 GitHub 原始地址。\n- 歌单页移除“我的歌单”标题，云同步按钮移到“新建歌单”左侧。\n- Android 默认图标改为新线条蓝图标；保留 6 个备用桌面图标。\n- 继续包含诊断日志、媒体通知封面、后台播放和测试签名发布流程。\n\n本版本仍使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布版。后续切换到生产签名可能需要卸载重装。旧包 music.sylphy.sylphy_music 不会自动升级，旧数据不会自动迁移。\n\n每日一言、加速下载、随机播放和默认图标切换尚未在 Android 真机做完整网络/启动器兼容性验收。",
+    "notes": "风灵音乐 1.0 正式版\n\n- 多音源音乐库：Emby、Navidrome / OpenSubsonic、WebDAV 和本地音乐。\n- 本地与云端歌单、收藏、搜索筛选、播放队列和离线缓存。\n- 封面、同步歌词、可选在线歌词补充，以及自定义播放器布局和外观。\n- Android 媒体通知与后台任务；Windows 托盘、媒体键和安装程序 / 便携包。\n- Android 从本版起使用固定正式签名。\n\n下载：常见 Android 手机选 arm64-v8a，旧 32 位设备选 armeabi-v7a，x86_64 用于对应设备或模拟器。Windows 选安装 EXE，或完整解压便携 ZIP 后运行。\n\n说明：Android 正式证书与此前测试包不同，不能直接覆盖安装；测试版未实际部署，本次按全新安装发布。Windows 暂未代码签名，系统可能显示发布者提示。Linux 本次不提供安装包。Android 真机长期兼容性、Windows 安装 / 卸载全面验收及原生依赖完整分发审计仍在持续跟进，详见仓库验收记录。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-x86_64.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-1.0.0-12-x86_64.apk",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-windows-1.0.0-12.zip",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.0%2B12/sylphy-music-setup-1.0.0-12.exe"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.3%2B5"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.0+12"
   },
   "history": [
+    {
+      "version": "0.2.3",
+      "build": 5,
+      "name": "风灵音乐 v0.2.3（测试签名）",
+      "date": "2026-10-28",
+      "notes": "风灵音乐 v0.2.3（测试签名）\n\n- 首页横幅新增每日一言：默认使用 hitokoto，同日成功获取后缓存；失败保留已有文案。\n- 首页“探索音乐库”改为随机打乱曲库队列后开始播放，并跳到音乐库。\n- 设置 → 网络与接口 → API 设置：可修改每日一言 API 和 GitHub 加速前缀；留空恢复默认，仅允许 HTTPS。\n- 更新检查、APK / Windows 下载和发布页统一使用配置的 GitHub 加速前缀；清单请求失败不再回退 GitHub 原始地址。\n- 歌单页移除“我的歌单”标题，云同步按钮移到“新建歌单”左侧。\n- Android 默认图标改为新线条蓝图标；保留 6 个备用桌面图标。\n- 继续包含诊断日志、媒体通知封面、后台播放和测试签名发布流程。\n\n本版本仍使用本机 Android Debug 测试证书，仅用于内部测试和自用更新，不是正式签名发布版。后续切换到生产签名可能需要卸载重装。旧包 music.sylphy.sylphy_music 不会自动升级，旧数据不会自动迁移。\n\n每日一言、加速下载、随机播放和默认图标切换尚未在 Android 真机做完整网络/启动器兼容性验收。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.3%2B5/sylphy-music-0.2.3-5-x86_64.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.3%2B5"
+    },
     {
       "version": "0.2.2",
       "build": 4,
