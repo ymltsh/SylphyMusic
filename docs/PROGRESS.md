@@ -759,4 +759,15 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 
 同步适配 `integration_test/welcome_background_sync_test.dart`，改用 `find.byTooltip('开始使用')` 触发（旧文字按钮已移除）；`ui_refresh_test.dart` 增加简介、箭头按钮和 320×640 截图断言。文档更新首次引导描述。
 
-验证：`dart format` 通过；`flutter analyze --no-pub` 无问题；全量测试 **237 项通过、5 项私密联调默认跳过**（`build/test_logs/welcome-redesign-full-suite.log`）；Windows 原生 `ui_refresh_test.dart` 与 `welcome_background_sync_test.dart`（保存 / 跳过 API 两条路径）通过（`build/test_logs/welcome-redesign-ui.log`、`build/test_logs/welcome-redesign-sync.log`）；截图 `build/test_logs/ui/welcome-mobile.png`、`welcome-small.png` 确认布局与按钮位置。深色欢迎页仅核对主题取色路径，未单独截图；未在 Android 真机 / 模拟器验证；未重新生成 Release 安装包。
+验证：`dart format` 通过；`flutter analyze --no-pub` 无问题；全量测试 **237 项通过、5 项私密联调默认跳过**（`build/test_logs/welcome-redesign-full-suite.log`）；Windows 原生 `ui_refresh_test.dart` 与 `welcome_background_sync_test.dart`（保存 / 跳过 API 两条路径）通过（`build/test_logs/welcome-redesign-ui.log`、`build/test_logs/welcome-redesign-sync.log`）；截图 `build/test_logs/ui/welcome-mobile.png`、`welcome-small.png` 确认布局与按钮位置。深色欢迎页仅核对主题取色路径，未单独截图；未在 Android 真机 / 模拟器验证。相关变更已随 1.0.2 正式版发布，见下节。
+
+## 2026-10-28 发布 1.0.2 正式更新
+
+源码提交 `438aa40`，标签 `v1.0.2+14`，清单提交 `a0e0ab3`。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.2%2B14
+
+- 包含全套新图标（默认「微风与低音」+ 6 款备用）、关于页透明 Logo、歌词预览系统深浅色「默认」选项和欢迎页重设计。
+- 六个资产已公开：arm64-v8a 29.80 MiB、armeabi-v7a 26.98 MiB、x86_64 32.05 MiB；Windows 安装 EXE 18.18 MiB、便携 ZIP 21.81 MiB；SHA256SUMS.txt。远端资产大小和 SHA-256 与本地一致，三个 APK 签名校验通过且证书摘要一致，凭据扫描通过。
+- `aapt` 核对 versionName 1.0.2、versionCode 2014 / 1014 / 4014；Windows EXE FileVersion 1.0.2+14，安装程序 1.0.2.14。
+- 正式清单 `version.json` 的 latest 为 1.0.2+14，history 保留 1.0.1+13、1.0.0+12、0.2.3+5；GitHub raw 与加速地址均返回新版本，五个下载链接 HTTP 200。
+- 发布过程：`flutter analyze` 无问题，全量测试 237 项通过、5 项私密默认跳过；本轮仅设置 HTTPS 代理并排除 127.0.0.1，避免 Flutter 测试本地服务被代理拦截。
+- 仍待完成：Android 真机 / 模拟器验收（图标切换、关于页、欢迎页）；Windows 安装 / 卸载未在用户环境执行；Windows 未代码签名。
