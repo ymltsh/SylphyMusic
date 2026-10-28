@@ -1,6 +1,6 @@
 # 开发与验证指南
 
-先读 [AGENTS](AGENTS.md) 和 [架构说明](docs/ARCHITECTURE.md)。本文的分析、测试与验收独立于 [发布流程](update.md)，不作为发布前置条件；发布只处理版本、构建、签名、扫描、打包上传与清单。
+先读 [AGENTS](AGENTS.md) 和 [架构说明](docs/ARCHITECTURE.md)。人工与设备验收独立进行；[发布工具](update.md) 只保留可用 `--skip-checks` 跳过的基础 analyze/test，不设置额外验收阻断。
 
 ## 环境
 

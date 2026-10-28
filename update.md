@@ -1,44 +1,78 @@
-# 更新与发布
+# 更新发布流程
 
-发布与验收独立。`release.py` 只处理版本、构建、签名、私密内容扫描、打包上传和清单更新；不执行分析、测试、启动冒烟或设备验收，也不读取验收复选框阻断发布。验证命令见 [CONTRIBUTING](CONTRIBUTING.md)，后续事项见 [独立验收待办](docs/RELEASE_GATES.md)，历史证据见 [PROGRESS](docs/PROGRESS.md)。
+默认构建 Android APK、Windows 安装程序和便携包，创建 GitHub Release，更新并只提交推送对应的版本清单。源码提交单独处理。
 
-1.0 分发 Android 三种 ABI APK、Windows 安装 EXE 和便携 ZIP，Linux 暂缓。Android 使用固定正式证书，Windows 暂未代码签名。维护者确认测试版未实装，本次按全新安装处理；旧测试签名与正式证书不同，不能直接覆盖安装。
+## 一、检查更新接口
 
-## 发布三步
+| 项目 | 地址 |
+| --- | --- |
+| 正式清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
+| 加速地址（默认） | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
+| 测试清单 | 将文件名换为 version-beta.json |
+| 发布页 | https://github.com/ymltsh/SylphyMusic/releases/latest |
 
-在工程根目录执行。先装好 Flutter、Python 3.11+、Android SDK / JDK、Visual Studio C++ 工具和 Inno Setup 6，并配置 Git 作者及 GitHub 凭据。退出运行中的播放器，脚本不会强行结束用户进程。Android 本机密钥配置见 [正式签名与备份](docs/ANDROID_SIGNING.md)；密钥、密码和 `.private/` 内容不要加入 Git。
+App 启动不主动检查；用户在“设置 → 检查更新”读取清单，比较安装包版本号和构建号，展示更新说明和下载按钮。加速前缀可在 API 设置修改，失败不回退原始地址。
 
-```powershell
-# 1. 构建、签名核验、扫描、打包；替换本次版本、构建号和说明文件
-python release.py --version 1.0.0 --build 12 --notes-file .private/release-1.0-notes.txt
-# 2. 提交推送；新增源码 / 文档也须显式 git add
-git add -u
-git commit -m "release: prepare 1.0.0"
-git push origin main
-# 3. 复用产物，发布正式 Release 并更新正式清单
-python release.py --version 1.0.0 --build 12 --skip-build --publish --notes-file .private/release-1.0-notes.txt
-```
+清单包含 `latest` 和 `history`。`latest` 使用 `version`、`build`、`name`、`date`、`notes`、`urls`、`page`；下载字段为 `android_arm64`、`android_armv7`、`android_x64`、`windows`、`windows_portable`。旧版 latest 自动进入 history。
 
-默认只准备本地包，`--publish` 才写 GitHub。已有本次发布授权时直接完成，不重复确认。`--dry-run` 纯预览；无参数则交互输入。测试版在准备与发布命令中均增加 `--beta` 或 `--beta2`。新版本构建号必须递增，版本分量和 build 上限为 65535。
+## 二、版本发布流程
 
-## 产物与上传
+前提：Git 能推送 main；Flutter、Android SDK / JDK、Visual Studio C++ 和 Inno Setup 6 已安装；Android 正式签名已配置。签名文件按 [ANDROID_SIGNING](docs/ANDROID_SIGNING.md) 保留在本机。
 
-输出为 `build/releases/<version>-<build>/`：三份 APK、EXE、ZIP、`SHA256SUMS.txt`、本地 record 和候选清单。只上传五个安装资产和摘要文件。record 记录源码指纹、文件摘要和构建输入检查，不能代表功能验收通过。`--skip-build` 仅复用完全匹配的产物；源码变化须重新准备。`--skip-checks` 仅供跳过依赖检查 / 许可收集作本地排查，这类包不能发布。
+### 0. 一键发布
 
-使用过测试凭据时，准备和发布均为每份文件增加 `--credentials-file 文件路径`，仅做源码与包内容扫描，不输出或打包凭据。不要把密码放进参数或 `--dart-define`。Android 必须通过公共证书匹配，拒绝测试签名 / unsigned 环境开关。Windows ZIP 保留运行依赖；安装目录为 `%LOCALAPPDATA%\Programs\Sylphy Music`，卸载不删除应用数据。
+根目录 `release.py` 自动执行：
 
-发布要求工作区干净、源码已推送；脚本不自动提交源码。Token 从 `GH_TOKEN` / `GITHUB_TOKEN` 或已有 Git 凭据读取，不接受命令行 Token。Tag 如 `v1.0.0+12`：先草稿上传，全部成功后公开，再更新所选渠道清单。发布后核对六个远端资产的大小 / SHA-256 和清单，再 `git pull --ff-only` 同步清单提交。
-
-失败不盲目重试；核对草稿和本地产物后恢复，只补缺失资产，不覆盖已有文件：
+更新版本 → analyze/test（可跳过）→ 构建 Android / Windows → 打包 EXE / ZIP → 上传 GitHub Release → 更新版本清单 → 只提交并推送清单。
 
 ```powershell
-python release.py --version 1.0.0 --build 12 --skip-build --publish --resume --notes-file .private/release-1.0-notes.txt
+# 引导模式
+python release.py
+
+# CLI 模式
+python release.py --version 1.0.1 --build 13 --notes "更新说明"
+python release.py --version 1.0.1 --build 13 --beta --notes "测试版"
+python release.py --version 1.0.1 --build 13 --skip-checks --notes "更新说明"
+python release.py --version 1.0.1 --build 13 --dry-run
 ```
 
-源码、标签、资产摘要或清单冲突会停止。`--no-push-manifest` 只发布资产，不推进 App 更新提示。
+| 参数 | 说明 |
+| --- | --- |
+| --version / --build | 版本号和构建号，建议显式指定 build |
+| --beta / --beta2 | 预发布，更新 version-beta.json |
+| --name / --notes | 标题 / 发布说明；--notes-file 可读取多行说明 |
+| --dry-run | 只预览 |
+| --skip-build | 复用本版本已生成的 APK / EXE / ZIP |
+| --skip-checks | 跳过 analyze/test，仍可正常发布 |
+| --no-push | 发布资产并更新本地清单，不提交推送清单 |
 
-## App 手动更新
+Flutter 或 Inno 不在 PATH 时可设置 `FLUTTER_BIN` / `INNO_SETUP_COMPILER`。Token 自动使用 Git 凭据或 `GH_TOKEN` / `GITHUB_TOKEN`。关闭运行中的播放器，避免 Windows EXE 被占用。人工与设备验收不在发布流程中。
 
-设置 → 应用与支持 → 检查更新；启动和进入页面不主动检查。清单分别为 [正式版](https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json) 与 [测试版](https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-beta.json)，历史记录由工具保留。版本来自安装包，按三段数字、beta → beta2 → 正式版、构建号比较；Windows 预发布通过 `SYLPHY_RELEASE_VERSION` 保留后缀。
+### 1. 更新版本号
 
-清单和下载使用 API 设置中的 GitHub 加速前缀，默认 `https://hub.wgen.top/`，失败不回退原始地址。请求限时 12 秒、清单上限 1 MiB，不发送音源凭据；下载打开浏览器，不静默安装。下载和发布页仅接受本项目 GitHub Release 下的 HTTPS 地址。
+工具更新 `pubspec.yaml`，如 `version: 1.0.1+13`。App 直接读取安装包版本，不维护第二套常量。新版本使用递增构建号。
+
+### 2. 构建和打包
+
+```powershell
+flutter build apk --release --split-per-abi
+flutter build windows --release
+```
+
+工具随后打包便携 ZIP，并调用 `installer/windows/SylphyMusic.iss` 生成安装程序。产物在 `build/releases/<version>-<build>/`：三个 ABI APK、Windows 安装 EXE、便携 ZIP 和 SHA256SUMS.txt。`--skip-build` 复用这些文件，不重新打包。
+
+### 3. 创建 GitHub Release
+
+Tag 如 `v1.0.1+13`，上传上述资产。Android 使用正式签名，Windows 当前未代码签名。上传失败保留草稿，不推进清单。
+
+### 4. 更新版本清单
+
+正式版更新 `version.json`，Beta / Beta2 更新 `version-beta.json`；旧 latest 放入 history 头部。工具仅提交并推送该清单，不提交源码、签名文件或其他改动。
+
+### 5. 查看更新接口
+
+```powershell
+Invoke-RestMethod "https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json"
+```
+
+确认 latest 是新版本、下载链接对应已上传资产即可。

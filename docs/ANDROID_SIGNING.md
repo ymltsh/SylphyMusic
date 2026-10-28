@@ -29,7 +29,7 @@ flutter build apk --release --split-per-abi
 python tool/verify_android_signing.py build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/app-x86_64-release.apk
 ```
 
-校验工具先调用 SDK 的 `apksigner verify` 验证签名，再要求唯一签名者匹配仓库公共证书。SDK 从 PATH、Android 环境变量或 `android/local.properties` 定位，也可传入 `--apksigner`。`release.py` 本地准备阶段已加入同样的核验，避免将错误证书签名的 APK 打包为发布资产。
+校验工具先调用 SDK 的 `apksigner verify` 验证签名，再要求唯一签名者匹配仓库公共证书。SDK 从 PATH、Android 环境变量或 `android/local.properties` 定位，也可传入 `--apksigner`。`release.py` 上传前自动执行同样的核验。
 
 本轮产物仍为 `0.2.8-beta+11`，只证明正式签名链路可用。版本、发布清单和远端资产均未调整；不可与此前公开的同版本测试签名 APK 混用。构建日志为 `build/test_logs/android-production-signing-build.log`；未执行设备安装。
 
@@ -37,6 +37,6 @@ python tool/verify_android_signing.py build/app/outputs/flutter-apk/app-arm64-v8
 
 此前公开的 Android 包使用另一张调试证书。本轮没有配置证书轮换谱系，因此这些测试版不能直接覆盖安装当前正式密钥签名的 APK。不要在更新提示中宣称可以无损直接升级，也不要为绕过证书冲突自行卸载用户应用。
 
-2026-10-28 维护者确认测试版未实际安装使用，因此本次切换按全新安装处理，无需开发旧测试版数据迁移功能。此决定不改变证书不兼容的技术约束；如有人另行安装过旧测试包，仍不能直接覆盖安装。项目当前未实现或验证整库导出与恢复。后续发布按 [发布标准](RELEASE_GATES.md) 执行，验收独立开展。
+2026-10-28 维护者确认测试版未实际安装使用，因此本次切换按全新安装处理，无需开发旧测试版数据迁移功能。此决定不改变证书不兼容的技术约束；如有人另行安装过旧测试包，仍不能直接覆盖安装。项目当前未实现或验证整库导出与恢复。后续发布按 [update.md](../update.md) 执行，验收独立开展。
 
 Android 的证书约束和密钥备份要求见 [Android 官方应用签名说明](https://developer.android.com/studio/publish/app-signing)。Windows 代码签名不在本轮范围。
