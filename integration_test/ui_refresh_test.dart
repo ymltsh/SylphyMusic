@@ -276,6 +276,22 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('风穿过森林'), findsOneWidget);
         expect(find.text('1'), findsOneWidget);
+        expect(find.byType(SegmentedButton<int>), findsNothing);
+        for (var index = 0; index < 3; index++) {
+          final chip = tester.widget<ChoiceChip>(
+            find.byKey(ValueKey('search-filter-$index')),
+          );
+          expect(
+            chip.shape,
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          );
+        }
+        expect(
+          tester
+              .widget<ChoiceChip>(find.byKey(const ValueKey('search-filter-0')))
+              .selected,
+          isTrue,
+        );
         await capture('search-mobile');
         await tester.enterText(find.byType(TextField), '无匹配关键词');
         await tester.pump(const Duration(milliseconds: 300));
@@ -299,6 +315,27 @@ void main() {
           isTrue,
         );
         expect(find.text('绿野来信'), findsOneWidget);
+        final albumFlowToggle = find.byKey(
+          const ValueKey('album-cover-flow-toggle'),
+        );
+        expect(albumFlowToggle, findsOneWidget);
+        await tester.tap(albumFlowToggle);
+        await tester.pumpAndSettle();
+        final albumFlow = find.byKey(const ValueKey('album-cover-flow'));
+        expect(albumFlow, findsOneWidget);
+        expect(find.text('绿野来信'), findsOneWidget);
+        await capture('library-albums-cover-flow-mobile');
+        await tester.tapAt(tester.getCenter(albumFlow));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: find.byType(AppBar), matching: find.text('绿野来信')),
+          findsOneWidget,
+        );
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('切换到列表'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('album-cover-flow')), findsNothing);
         // Hold SQLite long enough to observe a real in-flight category query.
         final filterBounds = tester.getRect(filters);
         final summaryBounds = tester.getRect(summary);
@@ -399,6 +436,16 @@ void main() {
         await tester.tap(find.text('歌单').first);
         await tester.pumpAndSettle();
         expect(find.text('新建歌单'), findsOneWidget);
+        final newPlaylist = find.byKey(const ValueKey('new-playlist'));
+        expect(tester.getTopLeft(newPlaylist).dx, 16);
+        expect(
+          tester.widget<FilledButton>(newPlaylist).style?.shape?.resolve({}),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        );
+        expect(
+          tester.getCenter(find.byTooltip('同步云歌单')).dx,
+          greaterThan(tester.getCenter(newPlaylist).dx),
+        );
         expect(tester.takeException(), isNull);
         await tester.tap(find.byTooltip('设置'));
         await tester.pumpAndSettle();

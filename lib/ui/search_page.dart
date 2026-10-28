@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../data/library_catalog.dart';
+import 'capsule_toggle.dart';
 import 'library_browser.dart';
 
 class SearchPage extends StatefulWidget {
@@ -80,21 +81,31 @@ class _SearchPageState extends State<SearchPage> {
     body: Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
           child: Row(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 0, label: Text('歌曲')),
-                      ButtonSegment(value: 1, label: Text('专辑')),
-                      ButtonSegment(value: 2, label: Text('艺术家')),
-                    ],
-                    selected: {view},
-                    onSelectionChanged: (v) => setState(() => view = v.first),
-                  ),
+                child: CapsuleToggle<int>(
+                  keyPrefix: 'search-filter',
+                  selected: view,
+                  onChanged: (value) => setState(() => view = value),
+                  options: const [
+                    CapsuleOption(
+                      value: 0,
+                      label: '歌曲',
+                      icon: Icons.music_note_outlined,
+                    ),
+                    CapsuleOption(
+                      value: 1,
+                      label: '专辑',
+                      icon: Icons.album_outlined,
+                    ),
+                    CapsuleOption(
+                      value: 2,
+                      label: '艺术家',
+                      icon: Icons.person_outline,
+                    ),
+                  ],
                 ),
               ),
               PopupMenuButton<String>(

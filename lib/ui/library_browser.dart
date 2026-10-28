@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../data/library_catalog.dart';
+import 'cover_flow.dart';
 import 'cover_art.dart';
 
 class LibraryBrowser extends StatefulWidget {
@@ -13,6 +14,7 @@ class LibraryBrowser extends StatefulWidget {
     required this.onAction,
     this.songActions,
     this.viewControls,
+    this.coverFlow = false,
     this.selected,
     this.onSelection,
   });
@@ -21,6 +23,7 @@ class LibraryBrowser extends StatefulWidget {
   final Future<void> Function(String, Track) onAction;
   final Widget? songActions;
   final Widget? viewControls;
+  final bool coverFlow;
   final Set<String>? selected;
   final void Function(Track, bool)? onSelection;
   @override
@@ -145,6 +148,18 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     super.dispose();
   }
 
+  CatalogRow? _coverFlowRow(int index) {
+    final start = index ~/ 100 * 100;
+    final rows = batches.remove(start);
+    if (rows != null) {
+      batches[start] = rows;
+      final at = index - start;
+      return at < rows.length ? rows[at] : null;
+    }
+    if (!failed.contains(start)) _request(start);
+    return null;
+  }
+
   Future<void> _act(Future<void> Function() work) async {
     try {
       await work();
@@ -246,6 +261,59 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     );
   }
 
+  Widget _coverFlowCover(BuildContext context, int index, double size) {
+    final row = _coverFlowRow(index);
+    if (row == null) {
+      final scheme = Theme.of(context).colorScheme;
+      final failedBatch = failed.contains(index ~/ 100 * 100);
+      return ColoredBox(
+        color: scheme.surfaceContainerHigh,
+        child: Center(
+          child: failedBatch
+              ? Icon(Icons.refresh_rounded, color: scheme.onSurfaceVariant)
+              : const SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+        ),
+      );
+    }
+    return CoverArt(
+      app: widget.app,
+      track: row.track,
+      size: size,
+      borderRadius: 8,
+    );
+  }
+
+  String _coverFlowTitle(int index) {
+    final row = _coverFlowRow(index);
+    if (row == null) {
+      return failed.contains(index ~/ 100 * 100) ? '加载失败' : '正在加载…';
+    }
+    return row.track.album.isEmpty ? '未知专辑' : row.track.album;
+  }
+
+  String _coverFlowSubtitle(int index) {
+    final row = _coverFlowRow(index);
+    if (row == null) return '';
+    final artist = row.track.albumArtist.isEmpty
+        ? row.track.artist
+        : row.track.albumArtist;
+    return '$artist · ${row.count} 首 · ${row.sources} 个来源';
+  }
+
+  void _activateCoverFlow(int index) {
+    final start = index ~/ 100 * 100;
+    if (failed.contains(start)) {
+      setState(() => failed.remove(start));
+      _request(start);
+      return;
+    }
+    final row = _coverFlowRow(index);
+    if (row != null) _group(row);
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
@@ -279,6 +347,20 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         return _withViewControls(
           result.total == 0
               ? Center(child: Text(emptyMessage))
+              : widget.coverFlow &&
+                    widget.query.view == 1 &&
+                    widget.selected == null &&
+                    !widget.query.blocked
+              ? CoverFlowView(
+                  key: const ValueKey('album-cover-flow'),
+                  itemCount: result.total,
+                  coverBuilder: _coverFlowCover,
+                  titleBuilder: _coverFlowTitle,
+                  subtitleBuilder: _coverFlowSubtitle,
+                  onActivate: _activateCoverFlow,
+                  bottomPadding: 84,
+                  emptyMessage: emptyMessage,
+                )
               : ListView.builder(
                   key: ValueKey('${widget.query.signature}:$generation'),
                   padding: const EdgeInsets.only(bottom: 96),

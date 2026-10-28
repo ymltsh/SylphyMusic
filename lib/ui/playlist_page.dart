@@ -179,6 +179,95 @@ class _PlaylistPreview {
   final Track? cover;
 }
 
+/// Loads the first track's artwork for a playlist Cover Flow item.
+class PlaylistCoverFlowArt extends StatefulWidget {
+  const PlaylistCoverFlowArt({
+    super.key,
+    required this.app,
+    required this.playlist,
+    required this.size,
+  });
+
+  final SylphyApp app;
+  final PlaylistModel playlist;
+  final double size;
+
+  @override
+  State<PlaylistCoverFlowArt> createState() => _PlaylistCoverFlowArtState();
+}
+
+class _PlaylistCoverFlowArtState extends State<PlaylistCoverFlowArt> {
+  late Future<Track?> cover = _loadCover();
+
+  Future<Track?> _loadCover() async {
+    final info = await widget.app.db.playlistPreview(widget.playlist.id);
+    if (info.firstKey == null) return null;
+    return widget.app.db.track(TrackRef.parse(info.firstKey!));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.app.addListener(_refresh);
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() => cover = _loadCover());
+  }
+
+  @override
+  void didUpdateWidget(covariant PlaylistCoverFlowArt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app) {
+      oldWidget.app.removeListener(_refresh);
+      widget.app.addListener(_refresh);
+    }
+    if (oldWidget.app != widget.app ||
+        oldWidget.playlist.id != widget.playlist.id) {
+      cover = _loadCover();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.app.removeListener(_refresh);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Track?>(
+    future: cover,
+    builder: (context, snapshot) {
+      final track = snapshot.data;
+      final scheme = Theme.of(context).colorScheme;
+      return SizedBox.square(
+        dimension: widget.size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: track == null
+              ? ColoredBox(
+                  color: scheme.surfaceContainerHigh,
+                  child: Center(
+                    child: Icon(
+                      _playlistIcon(widget.playlist.kind),
+                      size: widget.size * .34,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : CoverArt(
+                  app: widget.app,
+                  track: track,
+                  size: widget.size,
+                  borderRadius: 0,
+                ),
+        ),
+      );
+    },
+  );
+}
+
 IconData _playlistIcon(PlaylistKind kind) => switch (kind) {
   PlaylistKind.favorites => Icons.favorite_outline_rounded,
   PlaylistKind.local => Icons.queue_music_rounded,

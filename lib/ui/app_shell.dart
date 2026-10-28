@@ -9,7 +9,9 @@ import 'cache_storage.dart';
 import 'playlist_page.dart';
 import 'player_bar.dart';
 import 'playback_notice.dart';
+import 'capsule_toggle.dart';
 import 'cover_art.dart';
+import 'cover_flow.dart';
 import 'library_browser.dart';
 import 'track_lookup.dart';
 import 'home_page.dart';
@@ -30,6 +32,8 @@ class SylphyShell extends StatefulWidget {
 class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
   int libraryView = 0;
+  bool albumCoverFlow = false;
+  bool playlistCoverFlow = false;
   bool playerCollapsed = false;
   bool? onboarding;
   String? sourceFilter;
@@ -284,57 +288,53 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _libraryFilterBar() {
-    final scheme = Theme.of(context).colorScheme;
-    Widget chip(int value, String label, IconData icon) {
-      final selected = libraryView == value;
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          key: ValueKey('library-filter-$value'),
-          selected: selected,
-          onSelected: (_) => setState(() => libraryView = value),
-          showCheckmark: false,
-          avatar: Icon(
-            icon,
-            size: 16,
-            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+  Widget _libraryFilterBar() => Align(
+    key: const ValueKey('library-filter-bar'),
+    alignment: Alignment.centerLeft,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: CapsuleToggle<int>(
+              keyPrefix: 'library-filter',
+              selected: libraryView,
+              onChanged: (value) => setState(() => libraryView = value),
+              options: const [
+                CapsuleOption(
+                  value: 0,
+                  label: '歌曲',
+                  icon: Icons.music_note_outlined,
+                ),
+                CapsuleOption(
+                  value: 1,
+                  label: '专辑',
+                  icon: Icons.album_outlined,
+                ),
+                CapsuleOption(
+                  value: 2,
+                  label: '艺术家',
+                  icon: Icons.person_outline,
+                ),
+              ],
+            ),
           ),
-          label: Text(label),
-          labelStyle: TextStyle(
-            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          ),
-          backgroundColor: scheme.surfaceContainerHighest.withValues(
-            alpha: .72,
-          ),
-          selectedColor: scheme.primary,
-          side: BorderSide.none,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          visualDensity: VisualDensity.compact,
-        ),
-      );
-    }
-
-    return Align(
-      key: const ValueKey('library-filter-bar'),
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              chip(0, '歌曲', Icons.music_note_outlined),
-              chip(1, '专辑', Icons.album_outlined),
-              chip(2, '艺术家', Icons.person_outline),
-            ],
-          ),
-        ),
+          if (libraryView == 1)
+            IconButton(
+              key: const ValueKey('album-cover-flow-toggle'),
+              tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
+              isSelected: albumCoverFlow,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
+              icon: const Icon(Icons.view_carousel_outlined),
+              selectedIcon: const Icon(Icons.view_list_rounded),
+            ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 
   Widget _sourceFilterControl() => PopupMenuButton<String>(
     tooltip: '音乐来源',
@@ -392,6 +392,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             descending: descending,
           ),
           onAction: _trackAction,
+          coverFlow: libraryView == 1 && albumCoverFlow,
           viewControls: _libraryFilterBar(),
           songActions: Row(
             mainAxisSize: MainAxisSize.min,
@@ -654,7 +655,26 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Row(
           children: [
+            FilledButton.icon(
+              key: const ValueKey('new-playlist'),
+              style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: _newPlaylist,
+              icon: const Icon(Icons.add),
+              label: const Text('新建歌单'),
+            ),
             const Spacer(),
+            IconButton(
+              tooltip: playlistCoverFlow ? '切换到歌单网格' : '切换到歌单 Cover Flow',
+              isSelected: playlistCoverFlow,
+              onPressed: () =>
+                  setState(() => playlistCoverFlow = !playlistCoverFlow),
+              icon: const Icon(Icons.view_carousel_outlined),
+              selectedIcon: const Icon(Icons.grid_view_rounded),
+            ),
             IconButton(
               tooltip: '同步云歌单',
               onPressed: app.busy
@@ -664,12 +684,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                       await app.reload();
                     }),
               icon: const Icon(Icons.cloud_sync_outlined),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: _newPlaylist,
-              icon: const Icon(Icons.add),
-              label: const Text('新建歌单'),
             ),
           ],
         ),
@@ -691,6 +705,29 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     const Text('创建一个歌单，收纳喜欢的音乐。'),
                   ],
                 ),
+              )
+            : playlistCoverFlow
+            ? CoverFlowView(
+                key: const ValueKey('playlist-cover-flow'),
+                itemCount: app.playlists.length,
+                coverBuilder: (context, index, size) => PlaylistCoverFlowArt(
+                  app: app,
+                  playlist: app.playlists[index],
+                  size: size,
+                ),
+                titleBuilder: (index) => app.playlists[index].name,
+                subtitleBuilder: (index) {
+                  final playlist = app.playlists[index];
+                  return switch (playlist.kind) {
+                    PlaylistKind.favorites => '我的收藏',
+                    PlaylistKind.local => '本地歌单',
+                    PlaylistKind.cloud =>
+                      '云端 · ${_sourceName(playlist.sourceId ?? '')}',
+                  };
+                },
+                onActivate: (index) => _playlistDetails(app.playlists[index]),
+                bottomPadding: 84,
+                emptyMessage: '还没有歌单',
               )
             : LayoutBuilder(
                 builder: (context, constraints) {

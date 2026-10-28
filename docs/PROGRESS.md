@@ -1,5 +1,19 @@
 # 实施与验证记录
 
+## 2026-10-28 专辑与歌单封面流（Cover Flow）
+
+应用用户提供的 `sylphymusic-coverflow.patch`，新增不依赖第三方库的 `CoverFlowView`：中央封面按距离缩放 / 旋转 / 淡化，只构建当前位置附近最多约 7 项；水平拖动和点击共用同一个 `PageController`，点击中央项打开详情，点击侧边项先移动选中。音乐库专辑视图的筛选栏右侧增加 Cover Flow 图标切换，歌单页头增加网格 / 封面流切换；两者只保留在当前会话，不写入设置。专辑封面流继续使用现有每批 100 行的 SQL 分页和最多六批缓存，歌单封面取首曲封面，空歌单显示类型图标。说明见 [封面流](COVER_FLOW.md)。
+
+原补丁的筛选栏 `SegmentedButton` 与当前胶囊筛选栏、窄屏布局及“分类切换不抽动”回归冲突，因此改为筛选栏右侧 40 dp 图标按钮：高度与胶囊一致，选中时切换图标，Tooltip 提示目标视图；其余补丁按原结构应用。修正补丁测试中 `WidgetTester.drag` 不支持的 `duration` 参数，改用 `timedDrag`。
+
+验证：`flutter analyze --no-pub` 无问题；`test/cover_flow_test.dart` 1 项通过；Windows 原生 `integration_test/ui_refresh_test.dart`、`integration_test/playlist_refresh_test.dart` 通过（`build/test_logs/coverflow-ui.log`、`build/test_logs/coverflow-playlist-ui.log`），新增断言覆盖专辑封面流开启 / 中央点击进入专辑 / 切回列表，以及歌单封面流开启 / 中央点击进入歌单 / 切回网格。已查看 360×800 截图 `build/test_logs/ui/library-albums-cover-flow-mobile.png`、`build/test_logs/ui/playlists-cover-flow-mobile.png`。未执行 Android 设备验证或重新打包 APK。
+
+## 2026-10-28 歌单页新建按钮与搜索分类胶囊栏
+
+按用户要求，歌单页「新建歌单」改为 12 dp 圆角矩形并靠左放置，云同步图标保留在同一行右侧；搜索页「歌曲 / 专辑 / 艺术家」的分类切换由连接式 `SegmentedButton` 改为音乐库同款胶囊标签栏。抽出共享 `CapsuleToggle` / `CapsuleOption`（`lib/ui/capsule_toggle.dart`），音乐库沿用 `library-filter-*` 键、8 dp 圆角、16 dp 左对齐和横向滚动；搜索页使用 `search-filter-*` 键，选中态、图标和半透明底色与音乐库一致。
+
+验证：`flutter analyze --no-pub` 无问题；Windows 原生 `integration_test/ui_refresh_test.dart` 与 `integration_test/playlist_refresh_test.dart` 通过（`build/test_logs/playlist-search-capsule-ui.log`、`build/test_logs/playlist-header-capsule-ui.log`）。新增断言验证搜索页不再有 `SegmentedButton`、3 枚 8 dp 圆角胶囊标签默认选中歌曲；歌单页「新建歌单」左距 16 dp、12 dp 圆角，云同步图标位于其右侧。已查看 360×800 搜索结果与歌单页截图 `build/test_logs/ui/search-mobile.png`、`build/test_logs/ui/playlists-grid-mobile.png` 及 320×640 双倍字号 `playlists-grid-large-text.png`。未执行 Android 设备验证或重新打包 APK。
+
 ## 2026-10-28 更新检查与本地发布工具
 
 参考用户提供的 Mfuns Flutter `update.md`，新增设置页手动检查更新、实际安装包版本读取、正式 / 测试版独立清单、更新说明和平台下载入口。仅点击检查时发请求，加速地址失败回退 GitHub，12 秒 / 次、1 MiB 上限、同版 / 旧版不提示更新，下载链接限于本项目 HTTPS GitHub Release。新增 package_info_plus / url_launcher 并锁定依赖，重新生成插件注册与 Dart 许可证清单。
