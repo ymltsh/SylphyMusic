@@ -28,7 +28,8 @@ class QuickStartWizard extends StatefulWidget {
 
 class _QuickStartWizardState extends State<QuickStartWizard> {
   int _step = 0;
-  bool _working = false;
+  bool _sourceWorking = false;
+  bool _saving = false;
   late final TextEditingController _quote;
   late final TextEditingController _mirror;
   final _apiForm = GlobalKey<FormState>();
@@ -56,15 +57,15 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
     );
   }
 
-  Future<void> _run(Future<void> Function() action) async {
-    if (_working || widget.app.busy) return;
-    setState(() => _working = true);
+  Future<void> _runSource(Future<void> Function() action) async {
+    if (_sourceWorking || _saving || widget.app.busy) return;
+    setState(() => _sourceWorking = true);
     try {
       await action();
     } catch (error) {
       _showError(error);
     } finally {
-      if (mounted) setState(() => _working = false);
+      if (mounted) setState(() => _sourceWorking = false);
     }
   }
 
@@ -90,24 +91,32 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
         ),
       ),
     );
-    if (selection == 'files') await _run(widget.onImportFiles);
-    if (selection == 'folder') await _run(widget.onImportFolder);
+    if (selection == 'files') await _runSource(widget.onImportFiles);
+    if (selection == 'folder') await _runSource(widget.onImportFolder);
   }
 
-  Future<void> _complete({bool saveApi = false}) => _run(() async {
-    if (saveApi) {
-      if (!_apiForm.currentState!.validate()) return;
-      final settings = widget.app.apiSettings;
-      // Validate both before persisting either, avoiding partial config changes.
-      final quote = ApiSettings.validateQuoteUrl(_quote.text);
-      final mirror = ApiSettings.validateGitHubMirror(_mirror.text);
-      if (quote != settings.quoteUrl) await settings.setQuoteUrl(quote);
-      if (mirror != settings.githubMirror) {
-        await settings.setGitHubMirror(mirror);
+  Future<void> _complete({bool saveApi = false}) async {
+    if (_saving) return;
+    if (saveApi && !_apiForm.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      if (saveApi) {
+        final settings = widget.app.apiSettings;
+        // Validate both before persisting either, avoiding partial config changes.
+        final quote = ApiSettings.validateQuoteUrl(_quote.text);
+        final mirror = ApiSettings.validateGitHubMirror(_mirror.text);
+        if (quote != settings.quoteUrl) await settings.setQuoteUrl(quote);
+        if (mirror != settings.githubMirror) {
+          await settings.setGitHubMirror(mirror);
+        }
       }
+      await widget.onFinish();
+    } catch (error) {
+      _showError(error);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    await widget.onFinish();
-  });
+  }
 
   String? _validateQuote(String? value) {
     try {
@@ -130,7 +139,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final busy = _working || widget.app.busy;
+    final sourceBusy = _sourceWorking || _saving || widget.app.busy;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -158,14 +167,14 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                     duration: const Duration(milliseconds: 220),
                     child: switch (_step) {
                       0 => _welcome(theme),
-                      1 => _sources(theme, busy),
+                      1 => _sources(theme, sourceBusy),
                       _ => _api(theme),
                     },
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                  child: _buttons(busy),
+                  child: _buttons(_saving),
                 ),
               ],
             ),
@@ -199,6 +208,11 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
       Text('选择歌曲来源', style: theme.textTheme.headlineSmall),
       const SizedBox(height: 6),
       Text('选择一种来源连接，之后仍可添加多个音乐库。', style: theme.textTheme.bodyMedium),
+      if (widget.app.busy)
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text('音乐库正在后台处理，可继续下一步。'),
+        ),
       const SizedBox(height: 24),
       ...musicSourceOptions.map((option) {
         final connected = widget.app.sources.any((s) => s.kind == option.kind);
@@ -228,7 +242,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                   ? null
                   : () => option.kind == SourceKind.local
                         ? _localSource()
-                        : _run(() => widget.onConnect(option.kind)),
+                        : _runSource(() => widget.onConnect(option.kind)),
             ),
           ),
         );
