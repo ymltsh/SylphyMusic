@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.8",
-    "build": 20,
-    "name": "风灵音乐 v1.0.8",
-    "date": "2026-10-29",
-    "notes": "风灵音乐 1.0.8\n\n- 修复来电、蓝牙与耳机插拔中断播放后不再自动恢复的问题：焦点恢复后先确认播放状态稳定，再继续播放。\n- 避免通知音、视频片段等短暂抢占音频焦点时反复启停；未能获得音频焦点时给出提示，不再跳过歌曲。\n- 闪避音量结束后正确恢复原音量，通话期间调整音量也会保留。\n",
+    "version": "1.0.9",
+    "build": 21,
+    "name": "风灵音乐 v1.0.9",
+    "date": "2026-10-30",
+    "notes": "风灵音乐 1.0.9\n\n- 提前预取后两首歌曲的封面、歌词和音频，改善连续播放与切歌衔接。\n- 修复部分 Emby 歌词时间标签显示异常，正确识别附带结束标记的时间轴。\n- 播放页更多菜单增加加入歌单和歌曲黑名单操作，打开与关闭播放页改为上下滑动动画。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.9%2B21/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.9%2B21/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.9%2B21/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.9%2B21/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.9%2B21/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.8+20"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.9+21"
   },
   "history": [
+    {
+      "version": "1.0.8",
+      "build": 20,
+      "name": "风灵音乐 v1.0.8",
+      "date": "2026-10-29",
+      "notes": "风灵音乐 1.0.8\n\n- 修复来电、蓝牙与耳机插拔中断播放后不再自动恢复的问题：焦点恢复后先确认播放状态稳定，再继续播放。\n- 避免通知音、视频片段等短暂抢占音频焦点时反复启停；未能获得音频焦点时给出提示，不再跳过歌曲。\n- 闪避音量结束后正确恢复原音量，通话期间调整音量也会保留。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.8+20"
+    },
     {
       "version": "1.0.7",
       "build": 19,
