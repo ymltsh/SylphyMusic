@@ -165,11 +165,10 @@ def prepare(args, version, build, output):
         raise ValueError('Expected release binaries are missing.')
     scan_inputs(windows, apks, args.credentials_file)
     output.mkdir(parents=True, exist_ok=True)
-    suffix = f'{version}-{build}'
     for abi in ABIS:
-        target = output / f'sylphy-music-{suffix}-{abi}.apk'
+        target = output / f'sylphy-music-{abi}.apk'
         shutil.copyfile(ROOT / f'build/app/outputs/flutter-apk/app-{abi}-release.apk', target)
-    portable = output / f'sylphy-music-windows-{suffix}.zip'
+    portable = output / 'sylphy-music-windows.zip'
     with zipfile.ZipFile(portable, 'w', zipfile.ZIP_DEFLATED) as package:
         for path in sorted(windows.rglob('*')):
             if path.is_file() and path.suffix.lower() not in ('.pdb', '.zip'):
@@ -181,19 +180,18 @@ def prepare(args, version, build, output):
                 package.write(path, path.relative_to(ROOT))
     # Inno packages the same scanned directory plus license documents.
     run([iscc, f'/DAppVersion={version}', f'/DAppNumericVersion={version.split("-")[0]}.{build}',
-         f'/DReleaseSuffix={suffix}', f'/DSourceDir={windows}', f'/DOutputDir={output}',
+         f'/DSourceDir={windows}', f'/DOutputDir={output}',
          ROOT / 'installer/windows/SylphyMusic.iss'])
-    installer = output / f'sylphy-music-setup-{suffix}.exe'
+    installer = output / 'sylphy-music-setup.exe'
     if not installer.is_file():
         raise ValueError('Installer compiler did not produce the expected EXE.')
     return existing_packages(output, version, build)
 
 
 def existing_packages(output, version, build):
-    suffix = f'{version}-{build}'
-    artifacts = {key: f'sylphy-music-{suffix}-{abi}.apk' for abi, key in ABIS.items()}
-    artifacts.update(windows=f'sylphy-music-setup-{suffix}.exe',
-                     windows_portable=f'sylphy-music-windows-{suffix}.zip')
+    artifacts = {key: f'sylphy-music-{abi}.apk' for abi, key in ABIS.items()}
+    artifacts.update(windows='sylphy-music-setup.exe',
+                     windows_portable='sylphy-music-windows.zip')
     if not all((output / name).is_file() for name in artifacts.values()):
         raise ValueError('Expected APK, Windows installer or portable ZIP is missing; build first.')
     hashes = {name: digest(output / name) for name in artifacts.values()}

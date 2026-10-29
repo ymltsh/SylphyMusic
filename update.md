@@ -61,6 +61,18 @@ flutter build windows --release
 
 工具随后打包便携 ZIP，并调用 `installer/windows/SylphyMusic.iss` 生成安装程序。产物在 `build/releases/<version>-<build>/`：三个 ABI APK、Windows 安装 EXE、便携 ZIP 和 SHA256SUMS.txt。`--skip-build` 复用这些文件，不重新打包。
 
+各版本目录和 Release Tag 继续保留版本号，上传附件统一使用固定名称：
+
+| 平台 | 附件名称 |
+| --- | --- |
+| Android ARM64 | `sylphy-music-arm64-v8a.apk` |
+| Android ARMv7 | `sylphy-music-armeabi-v7a.apk` |
+| Android x86_64 | `sylphy-music-x86_64.apk` |
+| Windows 安装版 | `sylphy-music-setup.exe` |
+| Windows 便携版 | `sylphy-music-windows.zip` |
+
+网站可使用 [Android ARM64 最新版](https://github.com/ymltsh/SylphyMusic/releases/latest/download/sylphy-music-arm64-v8a.apk) 和 [Windows 安装版最新版](https://github.com/ymltsh/SylphyMusic/releases/latest/download/sylphy-music-setup.exe) 的固定下载链接；需先发布包含这些附件的新正式 Release。现有历史附件不重命名。应用版本清单仍使用各自 Tag 下的固定文件名地址，避免历史版本链接跟随最新版变化；摘要文件记录实际固定名称。`--skip-build` 同样要求该版本目录下已有上述固定文件名。
+
 ### 3. 创建 GitHub Release
 
 Tag 如 `v1.0.1+13`，上传上述资产。Android 使用正式签名，Windows 当前未代码签名。上传失败保留草稿，不推进清单。

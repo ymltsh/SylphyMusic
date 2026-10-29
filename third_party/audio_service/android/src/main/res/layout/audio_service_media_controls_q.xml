@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 10 only. The platform still supplies the media header, cover and
+     artwork-derived notification colors; only these action glyphs stay white. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/audio_service_media_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/audio_service_media_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="start|center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/audio_service_media_action_0"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/audio_service_media_action_1"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:tint="#FFFFFFFF" />
+
+        <ImageButton
+            android:id="@+id/audio_service_media_action_2"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:tint="#FFFFFFFF" />
+    </LinearLayout>
+</LinearLayout>

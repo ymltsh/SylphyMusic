@@ -8,6 +8,7 @@ import 'lyrics_page.dart';
 import 'player_layout/layout_editor.dart';
 import 'player_scene.dart';
 import 'player_visuals.dart';
+import 'song_info_sheet.dart';
 import 'system_bars.dart';
 
 class NowPlayingPage extends StatefulWidget {
@@ -192,24 +193,15 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     if (_dragOffset != 0) setState(() => _dragOffset = 0);
   }
 
-  String _quality(Track track) {
-    final details = [
-      track.remote['format'],
-      if (track.remote['sampleRate'] != null)
-        '${track.remote['sampleRate']} Hz',
-      if (track.remote['bitrate'] != null) '${track.remote['bitrate']} bps',
-    ].whereType<Object>().join(' · ');
-    return details.isEmpty ? '暂无音质信息' : details;
-  }
-
-  void _showQuality(Track track) => showModalBottomSheet<void>(
+  void _showSongInfo(Track track) => showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(_quality(track)),
-      ),
+    builder: (_) => SongInfoSheet(
+      track: track,
+      source: widget.app.sources
+          .where((source) => source.id == track.ref.sourceId)
+          .firstOrNull,
     ),
   );
 
@@ -311,7 +303,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                                         _openLyrics(track, theme, layout),
                                     onOpenEditor: () =>
                                         _openEditor(track, theme, layout),
-                                    onQuality: () => _showQuality(track),
+                                    onQuality: () => _showSongInfo(track),
                                   ),
                                 ),
                               ),

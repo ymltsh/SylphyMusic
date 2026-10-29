@@ -143,6 +143,21 @@ class PlaylistSyncService {
     );
   }
 
+  Future<void> removeEntry(String playlistId, String entryId) async {
+    if (busy.contains(playlistId)) throw StateError('歌单正在同步，请稍后再编辑');
+    final playlist = await db.playlist(playlistId);
+    if (playlist == null) throw StateError('歌单不存在');
+    if (playlist.kind == PlaylistKind.cloud) {
+      final source = await db.source(playlist.sourceId!);
+      if (playlist.status == SyncStatus.readonly ||
+          source == null ||
+          !source.kind.cloudPlaylistWritable) {
+        throw StateError('服务器只读；请先复制为本地歌单');
+      }
+    }
+    await db.removePlaylistEntry(playlist, entryId);
+  }
+
   Future<void> renameLocal(String id, String name) async {
     if (busy.contains(id)) throw StateError('歌单正在同步，请稍后再编辑');
     final playlist = await db.playlist(id);

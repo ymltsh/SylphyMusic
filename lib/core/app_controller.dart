@@ -611,6 +611,18 @@ class SylphyApp extends ChangeNotifier {
     }
   }
 
+  Future<void> removePlaylistEntry(
+    PlaylistModel playlist,
+    String entryId,
+  ) async {
+    await cloud.removeEntry(playlist.id, entryId);
+    await reload();
+    if (playlist.kind == PlaylistKind.cloud) {
+      await cloud.syncOne(playlist.id);
+      await reload();
+    }
+  }
+
   Future<void> syncPlaylist(PlaylistModel playlist) async {
     await cloud.syncOne(playlist.id);
     await reload();

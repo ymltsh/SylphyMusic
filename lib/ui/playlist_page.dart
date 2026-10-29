@@ -125,15 +125,23 @@ class _PlaylistGridCardState extends State<PlaylistGridCard> {
                           top: 6,
                           right: 6,
                           child: Material(
-                            color: scheme.surface.withValues(alpha: .88),
-                            shape: const CircleBorder(),
+                            color: Colors.transparent,
                             child: PopupMenuButton<String>(
                               tooltip: '歌单操作',
                               onSelected: widget.onAction,
                               padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.more_vert, size: 21),
-                              itemBuilder: (context) =>
-                                  _menuItems(widget.playlist),
+                              icon: const Icon(
+                                Icons.more_vert,
+                                size: 21,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(color: Colors.black87, blurRadius: 4),
+                                ],
+                              ),
+                              itemBuilder: (context) => playlistMenuItems(
+                                widget.app,
+                                widget.playlist,
+                              ),
                             ),
                           ),
                         ),
@@ -283,30 +291,46 @@ String _syncStatusLabel(SyncStatus status) => switch (status) {
   SyncStatus.readonly => '只读',
 };
 
-List<PopupMenuEntry<String>> _menuItems(PlaylistModel playlist) => [
-  const PopupMenuItem(value: 'cache', child: Text('缓存歌单')),
-  if (playlist.kind != PlaylistKind.favorites)
-    PopupMenuItem(
-      value: 'rename',
-      enabled: playlist.status != SyncStatus.readonly,
-      child: const Text('重命名歌单'),
-    ),
-  const PopupMenuItem(value: 'copy_local', child: Text('复制为本地歌单')),
-  const PopupMenuItem(value: 'copy_cloud', child: Text('复制为云端歌单')),
-  if (playlist.kind == PlaylistKind.cloud)
-    const PopupMenuItem(value: 'sync', child: Text('同步此云歌单')),
-  if (playlist.kind == PlaylistKind.cloud &&
-      playlist.status == SyncStatus.conflict)
-    const PopupMenuItem(value: 'resolve', child: Text('解决同步冲突')),
-  if (playlist.kind != PlaylistKind.favorites)
-    const PopupMenuItem(value: 'remove', child: Text('从本设备移除')),
-  if (playlist.kind == PlaylistKind.cloud)
-    PopupMenuItem(
-      value: 'delete_remote',
-      enabled: playlist.status != SyncStatus.readonly,
-      child: const Text('从服务器删除（在线）'),
-    ),
-];
+bool playlistCanEdit(SylphyApp app, PlaylistModel playlist) {
+  if (playlist.kind != PlaylistKind.cloud) return true;
+  final source = app.sources
+      .where((s) => s.id == playlist.sourceId)
+      .firstOrNull;
+  return source != null &&
+      source.kind.cloudPlaylistWritable &&
+      playlist.status != SyncStatus.readonly &&
+      playlist.status != SyncStatus.syncing;
+}
+
+List<PopupMenuEntry<String>> playlistMenuItems(
+  SylphyApp app,
+  PlaylistModel playlist,
+) {
+  final cloud = playlist.kind == PlaylistKind.cloud;
+  final editable = playlistCanEdit(app, playlist);
+  final source = app.sources
+      .where((s) => s.id == playlist.sourceId)
+      .firstOrNull;
+  final online = source != null && source.enabled;
+  return [
+    const PopupMenuItem(value: 'cache', child: Text('缓存歌单')),
+    if (playlist.kind != PlaylistKind.favorites && editable)
+      const PopupMenuItem(value: 'rename', child: Text('重命名歌单')),
+    if (playlist.kind != PlaylistKind.local)
+      const PopupMenuItem(value: 'copy_local', child: Text('复制为本地歌单')),
+    if (!cloud &&
+        app.sources.any((s) => s.enabled && s.kind.cloudPlaylistWritable))
+      const PopupMenuItem(value: 'copy_cloud', child: Text('复制为云端歌单')),
+    if (cloud && online && playlist.status != SyncStatus.syncing)
+      const PopupMenuItem(value: 'sync', child: Text('同步此云歌单')),
+    if (cloud && editable && playlist.status == SyncStatus.conflict)
+      const PopupMenuItem(value: 'resolve', child: Text('解决同步冲突')),
+    if (playlist.kind != PlaylistKind.favorites)
+      PopupMenuItem(value: 'remove', child: Text(cloud ? '从本设备移除' : '删除本地歌单')),
+    if (cloud && editable && online)
+      const PopupMenuItem(value: 'delete_remote', child: Text('从服务器删除（在线）')),
+  ];
+}
 
 class PlaylistPage extends StatefulWidget {
   const PlaylistPage({
@@ -317,11 +341,15 @@ class PlaylistPage extends StatefulWidget {
     required this.onEdit,
     required this.onAdd,
     required this.onCache,
+    this.buildEntryTracks,
+    this.onAction,
   });
 
   final SylphyApp app;
   final String id;
   final Widget Function(List<Track>) buildTracks;
+  final Widget Function(List<Track>, List<String>)? buildEntryTracks;
+  final ValueChanged<String>? onAction;
   final VoidCallback onEdit, onAdd, onCache;
 
   @override
@@ -329,20 +357,26 @@ class PlaylistPage extends StatefulWidget {
 }
 
 class _PlaylistPageState extends State<PlaylistPage> {
-  late Future<List<Track>> tracks = _load();
+  late Future<({List<Track> tracks, List<String> entryIds})> tracks = _load();
   bool starting = false;
 
-  Future<List<Track>> _load() async => [
-    for (final key in await widget.app.db.playlistKeys(widget.id))
-      await widget.app.db.track(TrackRef.parse(key)) ??
-          Track(
-            ref: TrackRef.parse(key),
-            title: '不可用歌曲',
-            artist: '来源已移除',
-            album: '',
-            missing: true,
-          ),
-  ];
+  Future<({List<Track> tracks, List<String> entryIds})> _load() async {
+    final entries = await widget.app.db.playlistEntries(widget.id);
+    final items = <Track>[];
+    for (final entry in entries) {
+      items.add(
+        await widget.app.db.track(TrackRef.parse(entry.key)) ??
+            Track(
+              ref: TrackRef.parse(entry.key),
+              title: '不可用歌曲',
+              artist: '来源已移除',
+              album: '',
+              missing: true,
+            ),
+      );
+    }
+    return (tracks: items, entryIds: entries.map((e) => e.id).toList());
+  }
 
   @override
   void initState() {
@@ -432,33 +466,41 @@ class _PlaylistPageState extends State<PlaylistPage> {
       appBar: AppBar(
         title: const Text('歌单详情'),
         actions: [
-          IconButton(
-            tooltip: '编辑歌单',
-            onPressed:
-                playlist == null || playlist.status == SyncStatus.readonly
-                ? null
-                : widget.onEdit,
-            icon: const Icon(Icons.edit_outlined),
-          ),
-          IconButton(
-            tooltip: '添加歌曲',
-            onPressed:
-                playlist == null || playlist.status == SyncStatus.readonly
-                ? null
-                : widget.onAdd,
-            icon: const Icon(Icons.playlist_add),
-          ),
+          if (playlist != null && playlistCanEdit(widget.app, playlist))
+            IconButton(
+              tooltip: '编辑歌单',
+              onPressed:
+                  playlist == null || playlist.status == SyncStatus.readonly
+                  ? null
+                  : widget.onEdit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          if (playlist != null && playlistCanEdit(widget.app, playlist))
+            IconButton(
+              tooltip: '添加歌曲',
+              onPressed:
+                  playlist == null || playlist.status == SyncStatus.readonly
+                  ? null
+                  : widget.onAdd,
+              icon: const Icon(Icons.playlist_add),
+            ),
           IconButton(
             tooltip: '缓存歌单',
             onPressed: playlist == null ? null : widget.onCache,
             icon: const Icon(Icons.download_outlined),
           ),
+          if (playlist != null && widget.onAction != null)
+            PopupMenuButton<String>(
+              tooltip: '歌单操作',
+              onSelected: widget.onAction,
+              itemBuilder: (_) => playlistMenuItems(widget.app, playlist),
+            ),
         ],
       ),
       body: SafeArea(
         top: false,
         bottom: false,
-        child: FutureBuilder<List<Track>>(
+        child: FutureBuilder<({List<Track> tracks, List<String> entryIds})>(
           future: tracks,
           builder: (context, snapshot) {
             if (playlist == null) return const Center(child: Text('歌单已移除'));
@@ -473,7 +515,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
-            final items = snapshot.data!;
+            final items = snapshot.data!.tracks;
             return NestedScrollView(
               headerSliverBuilder: (context, innerScrolled) => [
                 SliverToBoxAdapter(
@@ -589,7 +631,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
               ],
               body: items.isEmpty
                   ? const Center(child: Text('这个歌单暂无歌曲'))
-                  : widget.buildTracks(items),
+                  : widget.buildEntryTracks?.call(
+                          items,
+                          snapshot.data!.entryIds,
+                        ) ??
+                        widget.buildTracks(items),
             );
           },
         ),

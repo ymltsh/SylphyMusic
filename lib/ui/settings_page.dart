@@ -444,6 +444,20 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
     ],
     _Section.player => [
+      ListTile(
+        title: const Text('播放器控制'),
+        subtitle: const Text('每次启动的默认样式，使用中可手动切换'),
+        trailing: DropdownButton<bool>(
+          value: app.appearance.playerFab,
+          underline: const SizedBox(),
+          items: const [
+            DropdownMenuItem(value: false, child: Text('横条')),
+            DropdownMenuItem(value: true, child: Text('FAB 悬浮按钮')),
+          ],
+          onChanged: (value) =>
+              _act(() => app.appearance.update(playerFab: value)),
+        ),
+      ),
       SwitchListTile(
         title: const Text('唱片播放样式'),
         subtitle: const Text('系统默认与自定义播放页共用；关闭时使用方形封面'),

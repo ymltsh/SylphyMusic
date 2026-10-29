@@ -212,7 +212,7 @@ class _CoverFlowViewState extends State<CoverFlowView> {
                                 ],
                                 const SizedBox(height: 7),
                                 Text(
-                                  '${selected + 1} / ${widget.itemCount} · 左右滑动浏览，点击中央封面打开',
+                                  '${selected + 1} / ${widget.itemCount} · CoverFlow',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,

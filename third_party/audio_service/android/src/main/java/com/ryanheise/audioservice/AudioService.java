@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -27,6 +28,8 @@ import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
+import android.view.View;
+import android.widget.RemoteViews;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ServiceCompat;
@@ -35,6 +38,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.media.MediaBrowserServiceCompat;
 import androidx.media.VolumeProviderCompat;
 import androidx.media.app.NotificationCompat.MediaStyle;
+import androidx.media.app.NotificationCompat.DecoratedMediaCustomViewStyle;
 import androidx.media.utils.MediaConstants;
 
 import java.io.FileDescriptor;
@@ -413,6 +417,19 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     int getResourceId(String resource) {
+        // Dart supplies these names at runtime, so getIdentifier alone does
+        // not keep the built-in icons alive during release resource shrinking.
+        // Explicit references preserve every standard transport glyph, including
+        // play/pause swaps that are not both present in a single notification.
+        switch (resource) {
+        case "drawable/audio_service_play_arrow": return R.drawable.audio_service_play_arrow;
+        case "drawable/audio_service_pause": return R.drawable.audio_service_pause;
+        case "drawable/audio_service_skip_previous": return R.drawable.audio_service_skip_previous;
+        case "drawable/audio_service_skip_next": return R.drawable.audio_service_skip_next;
+        case "drawable/audio_service_stop": return R.drawable.audio_service_stop;
+        case "drawable/audio_service_fast_forward": return R.drawable.audio_service_fast_forward;
+        case "drawable/audio_service_fast_rewind": return R.drawable.audio_service_fast_rewind;
+        }
         String[] parts = resource.split("/");
         String resourceType = parts[0];
         String resourceName = parts[1];
@@ -635,13 +652,30 @@ public class AudioService extends MediaBrowserServiceCompat {
         // TODO: Look at setColorized
         if (config.notificationColor != -1)
             builder.setColor(config.notificationColor);
-        for (NotificationCompat.Action action : nativeActions) {
-            builder.addAction(action);
-        }
-        final MediaStyle style = new MediaStyle()
-            .setMediaSession(mediaSession.getSessionToken());
-        if (Build.VERSION.SDK_INT < 33) {
-            style.setShowActionsInCompactView(compactActionIndices);
+        // Android 10's MediaStyle tints each action using SystemUI's artwork
+        // foreground palette, which can be nearly invisible on dark covers.
+        // The decorated media style keeps SystemUI's album-art colorization,
+        // while our RemoteViews give ONLY the transport icons a white tint.
+        final boolean whiteControlsOnQ = Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
+            && nativeActions.size() == 3;
+        final MediaStyle style;
+        if (whiteControlsOnQ) {
+            RemoteViews controls = buildWhiteMediaControlsQ();
+            builder.setCustomContentView(controls);
+            builder.setCustomBigContentView(controls);
+            builder.setCustomHeadsUpContentView(controls);
+            // DecoratedMediaCustomViewStyle needs an explicit opt-in to
+            // preserve the artwork-derived background on Android 10.
+            builder.setColorized(true);
+            style = new DecoratedMediaCustomViewStyle()
+                .setMediaSession(mediaSession.getSessionToken());
+        } else {
+            for (NotificationCompat.Action action : nativeActions) {
+                builder.addAction(action);
+            }
+            style = new MediaStyle().setMediaSession(mediaSession.getSessionToken());
+            if (Build.VERSION.SDK_INT < 33)
+                style.setShowActionsInCompactView(compactActionIndices);
         }
         if (config.androidNotificationOngoing) {
             style.setShowCancelButton(true);
@@ -649,13 +683,36 @@ public class AudioService extends MediaBrowserServiceCompat {
             builder.setOngoing(true);
         }
         builder.setStyle(style);
-        // Android 10 SystemUI derives the media notification foreground (including
-        // action icons) from album artwork. Some palettes have poor contrast.
-        // Opt out of artwork-based coloring while preserving the cover and actions.
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            builder.setColorized(false);
-        }
         return builder.build();
+    }
+
+    // Uses the existing action icons and PendingIntents, so play/pause, skip and
+    // headset/media-session handling are unchanged. No fixed notification color.
+    private RemoteViews buildWhiteMediaControlsQ() {
+        RemoteViews views = new RemoteViews(getPackageName(), R.layout.audio_service_media_controls_q);
+        MediaDescriptionCompat description = mediaMetadata == null
+            ? null : mediaMetadata.getDescription();
+        if (description != null) {
+            views.setTextViewText(R.id.audio_service_media_title, description.getTitle());
+            views.setTextViewText(R.id.audio_service_media_subtitle, description.getSubtitle());
+        }
+        final int[] buttonIds = {
+            R.id.audio_service_media_action_0,
+            R.id.audio_service_media_action_1,
+            R.id.audio_service_media_action_2,
+        };
+        for (int i = 0; i < buttonIds.length; i++) {
+            NotificationCompat.Action action = nativeActions.get(i);
+            views.setImageViewResource(buttonIds[i], action.getIcon());
+            views.setInt(buttonIds[i], "setColorFilter", Color.WHITE);
+            views.setContentDescription(buttonIds[i], action.title);
+            if (action.actionIntent == null) {
+                views.setViewVisibility(buttonIds[i], View.INVISIBLE);
+            } else {
+                views.setOnClickPendingIntent(buttonIds[i], action.actionIntent);
+            }
+        }
+        return views;
     }
 
     private NotificationManager getNotificationManager() {

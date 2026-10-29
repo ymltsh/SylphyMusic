@@ -115,18 +115,6 @@ class PlayerCover extends StatelessWidget {
                 child: _art(context, artSize),
               ),
             ),
-            Container(
-              width: size * .045,
-              height: size * .045,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xcc111317),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: .16),
-                  width: size * .0025,
-                ),
-              ),
-            ),
             Positioned(
               top: size * .08,
               left: size * .18,

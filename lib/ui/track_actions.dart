@@ -22,7 +22,14 @@ Future<void> performTrackAction(
       await app.toggleBlacklist(track);
     case 'playlist':
       final candidates = app.playlists.where(
-        (p) => p.kind != PlaylistKind.cloud || p.sourceId == track.ref.sourceId,
+        (p) =>
+            p.kind != PlaylistKind.cloud ||
+            (p.sourceId == track.ref.sourceId &&
+                p.status != SyncStatus.readonly &&
+                p.status != SyncStatus.syncing &&
+                app.sources.any(
+                  (s) => s.id == p.sourceId && s.kind.cloudPlaylistWritable,
+                )),
       );
       final chosen = await showDialog<PlaylistModel>(
         context: context,

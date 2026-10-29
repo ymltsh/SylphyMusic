@@ -506,6 +506,16 @@ class EmbyAdapter extends MusicAdapter {
                 ].contains(codec))) {
           continue;
         }
+        // Emby may include original timed LRC lyrics in item metadata.
+        // Subtitle conversion endpoints can omit these lyrics entirely.
+        final rawEmbedded = stream['Extradata'];
+        if (rawEmbedded is String &&
+            rawEmbedded.trim().isNotEmpty &&
+            utf8.encode(rawEmbedded).length <= 1024 * 1024) {
+          final embedded = normalizeSubtitleLyrics(rawEmbedded);
+          if (parseLrc(embedded).isNotEmpty) return embedded;
+          if (embedded.isNotEmpty) plainFallback ??= embedded;
+        }
         final index = int.tryParse('${stream['Index']}');
         if (index == null || index < 0) continue;
         final mediaId = source['Id']?.toString() ?? track.ref.id;

@@ -104,7 +104,7 @@ class PlayerQuickActions extends StatelessWidget {
               }
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'quality', child: Text('音质信息')),
+              PopupMenuItem(value: 'quality', child: Text('歌曲信息')),
               PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
             ],
           ),

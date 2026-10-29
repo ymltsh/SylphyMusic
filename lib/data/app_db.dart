@@ -512,6 +512,50 @@ class AppDb {
     await batch.commit(noResult: true);
   }
 
+  Future<List<({String id, String key})>> playlistEntries(String id) async =>
+      (await db.query(
+            'playlist_items',
+            columns: ['entry_id', 'track_key'],
+            where: 'playlist_id=?',
+            whereArgs: [id],
+            orderBy: 'position',
+          ))
+          .map(
+            (row) => (
+              id: row['entry_id'] as String,
+              key: row['track_key'] as String,
+            ),
+          )
+          .toList();
+
+  Future<void> removePlaylistEntry(
+    PlaylistModel playlist,
+    String entryId,
+  ) async {
+    await db.transaction((tx) async {
+      final removed = await tx.delete(
+        'playlist_items',
+        where: 'playlist_id=? AND entry_id=?',
+        whereArgs: [playlist.id, entryId],
+      );
+      if (removed > 0 && playlist.kind == PlaylistKind.cloud) {
+        await tx.update(
+          'playlists',
+          {
+            'status':
+                (playlist.status == SyncStatus.conflict
+                        ? SyncStatus.conflict
+                        : SyncStatus.pending)
+                    .name,
+            'message': '',
+          },
+          where: 'id=?',
+          whereArgs: [playlist.id],
+        );
+      }
+    });
+  }
+
   Future<void> removePlaylist(String id) async {
     if (id == 'favorites') return;
     await db.transaction((tx) async {

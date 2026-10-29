@@ -114,8 +114,8 @@ class ReleaseTests(unittest.TestCase):
     def test_reuse_needs_artifacts_but_no_source_fingerprint_or_record(self):
         output = self.root / 'reuse'
         output.mkdir()
-        names = [f'sylphy-music-1.0.0-12-{abi}.apk' for abi in release.ABIS]
-        names += ['sylphy-music-setup-1.0.0-12.exe', 'sylphy-music-windows-1.0.0-12.zip']
+        names = [f'sylphy-music-{abi}.apk' for abi in release.ABIS]
+        names += ['sylphy-music-setup.exe', 'sylphy-music-windows.zip']
         for name in names:
             (output / name).write_bytes(b'fixture')
         record = release.existing_packages(output, '1.0.0', 12)

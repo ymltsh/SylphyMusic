@@ -431,7 +431,10 @@ class LyricsPreview extends StatelessWidget {
         final heights = <int, double>{};
         double heightAt(int index) => heights.putIfAbsent(index, () {
           final painter = TextPainter(
-            text: TextSpan(text: lineAt(index), style: styleFor(index)),
+            text: TextSpan(
+              text: lineAt(index),
+              style: styleFor(index).copyWith(fontWeight: FontWeight.w600),
+            ),
             textDirection: Directionality.of(context),
             textAlign: TextAlign.center,
             textScaler: scaler,
@@ -460,31 +463,68 @@ class LyricsPreview extends StatelessWidget {
           if (height <= constraints.maxHeight || count == 1) break;
           count--;
         }
-        return Center(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: SizedBox(
-              width: constraints.maxWidth,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var index = start; index < start + count; index++)
-                    SizedBox(
-                      height: heightAt(index),
-                      child: Center(
-                        child: Text(
-                          lineAt(index),
-                          maxLines: 2,
-                          softWrap: true,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          textScaler: scaler,
-                          locale: locale,
-                          style: styleFor(index),
+        final duration = MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 320);
+        final windowKey = ValueKey((text, start, count));
+        final windowHeight = List.generate(
+          count,
+          (i) => heightAt(start + i),
+        ).fold(0.0, (sum, height) => sum + height);
+        final distance =
+            constraints.maxHeight > 0 && constraints.maxHeight.isFinite
+            ? (windowHeight / count / constraints.maxHeight).clamp(0.0, 1.0)
+            : .2;
+        return ClipRect(
+          child: AnimatedSwitcher(
+            duration: duration,
+            switchInCurve: Curves.easeInOutCubic,
+            switchOutCurve: Curves.easeInOutCubic,
+            transitionBuilder: (child, animation) {
+              final entering = child.key == windowKey;
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(0, entering ? distance : -distance),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: Center(
+              key: windowKey,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var index = start; index < start + count; index++)
+                        SizedBox(
+                          height: heightAt(index),
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: duration,
+                              curve: Curves.easeInOutCubic,
+                              style: styleFor(index),
+                              child: Text(
+                                lineAt(index),
+                                maxLines: 2,
+                                softWrap: true,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                textScaler: scaler,
+                                locale: locale,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

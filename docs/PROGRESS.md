@@ -1,5 +1,87 @@
 # 实施与验证记录
 
+## 2026-10-29 发布 1.0.7+19 并将源码同步到仓库
+
+按用户要求发布正式版 [1.0.7+19](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.7%2B19)，更新日志收敛为两条面向用户的变化，不再附带签名与验证过程说明：新增播放页「歌曲信息」，修复部分 Emby 服务器歌词缺失。Android 三 ABI APK、Windows 安装程序、便携 ZIP 与摘要文件共六个固定名称资产上传完成，远端大小与本地一致；正式清单 `latest` 指向 1.0.7+19、history 保留 10 条，清单提交 `07ee94e` 已推送。README 同步补充「歌曲信息」说明。
+
+Android 正式签名校验通过，Windows 未代码签名；按约定未运行静态分析、测试或设备验证，实际界面效果由用户确认。日志位于 `build/test_logs/release-1.0.7.log`，本地产物位于 `build/releases/1.0.7-19/`。
+
+本轮同时把 1.0.4 以来一直保留在工作区的源码、原生补丁与文档提交到仓库，此前各次发布只推送版本清单，`main` 与实际发布内容长期不一致。
+
+## 2026-10-29 重写面向用户的 README，开发说明迁入 CONTRIBUTING
+
+按用户要求参考官网重写 `README.md`：顶部 Logo、三张界面截图（音乐首页 / 沉浸播放 / 歌单封面流）、品牌句与徽章，以及核心能力、支持的音源、下载、快速开始、技术栈、文档索引与许可证。截图与 Logo 取自官网 `assets/`，等比缩放后存放在 `.github/assets/`；`pubspec.yaml` 只声明具体文件，因此不进入 Flutter 资源包。徽章与五个固定名称下载地址均实测返回 200，正式版徽章显示 `v1.0.6+18`。
+
+原 README 的开发内容迁入 [CONTRIBUTING](../CONTRIBUTING.md)：环境与平台 Runner 约定、Windows / Linux 运行命令、用户自主验证清单、私密联调环境变量与测试文件、内部打包体积与产物、验收与发布边界。`docs/README.md` 同步修正 README / CONTRIBUTING 两条用途说明，并把 Emby `Extradata` 内嵌歌词的优先级补充到 [Emby 歌词](EMBY_LYRICS.md)。仅文档变更，未重建应用、未运行静态分析或测试。
+
+## 2026-10-29 应用歌曲信息与 Emby Extradata 歌词补丁
+
+应用外部补丁：新增 `lib/ui/song_info_sheet.dart`，播放页菜单「音质信息」改为「歌曲信息」并分组展示基本 / 音频 / 文件 / 来源信息，过滤鉴权流地址后再展示原始路径；`lib/services/sources.dart` 在字幕流转换接口之前优先解析 MediaStreams 的 `Extradata` 原文，能得出 LRC 时间轴就直接返回，仅纯文本时留作回退，沿用 1 MiB 限制。
+
+两处补丁由 `git apply` 直接应用，行号偏移自动校正；`dart format` 重排 `song_info_sheet.dart`。`flutter build windows --debug` 成功（`build\windows\x64\runner\Debug\sylphy_music.exe`），按约定未运行静态分析、测试或设备验证，界面效果由用户确认。
+
+## 2026-10-29 去除唱片孔、补充歌词过渡并发布 1.0.6+18
+
+按用户要求移除共用 PlayerCover 的圆形唱片中央打孔点，保留外圈、封面和旋转。发布期间用户补充歌词预览缺少动画，停止尚未上传的首轮发布流程后，补充 LyricsPreview 的 320 毫秒滑动 / 淡入淡出及高亮颜色、字重过渡；按粗体测量固定行高，减少高亮改变导致的布局跳动，遵循系统减少动画设置。保留既有可见行数、自适应缩放与两行省略规则。此次同时包含本地 / 云歌单复制菜单互斥调整。
+
+重新构建并发布正式版 [1.0.6+18](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.6%2B18)，Android 三 ABI APK、Windows 安装程序、便携 ZIP 和摘要文件共六个固定名称资产已上传，远端大小 / SHA-256 与本地一致，GitHub latest 与远端正式清单已指向该版本。仅清单提交 `d37f11c` 已推送，源码改动保留本地。
+
+Android / Windows Release 构建成功，Android 正式签名匹配，Windows 未代码签名；按用户约定未运行静态分析、测试或设备验证。日志位于 `build/test_logs/release-1.0.6.log`，本地产物位于 `build/releases/1.0.6-18/`。歌词动画实际效果由用户确认。
+
+## 2026-10-29 歌单复制菜单按目标类型互斥
+
+按用户澄清，云歌单隐藏“复制为云端歌单”，本地歌单隐藏“复制为本地歌单”及原先同类型的“复制歌单”；两类歌单仅保留跨类型复制。收藏保留复制为独立歌单的入口，云端目标仍要求存在已启用的可写来源。网格与详情共用此规则。
+
+Android 三 ABI 与 Windows Release 编译 / 内部打包完成，日志为 `build/test_logs/playlist-copy-menu-build.log`，产物位于 `build/internal-review/`。未运行分析、测试或设备验证，未提交、推送或发布。
+
+## 2026-10-29 发布 1.0.5+17 固定附件名更新
+
+按用户要求发布正式版 [1.0.5+17](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.5%2B17)，安装附件使用五个固定文件名，另附 SHA256SUMS.txt。GitHub latest 已指向本次正式版，远端六个资产大小 / SHA-256 与本地一致，远端正式清单为 1.0.5+17，清单提交 `daff65a` 已推送。官网可使用 releases/latest/download 下的固定名称，历史版本附件保持原名。源码与脚本修改保留本地，未额外提交。
+
+Android 三 ABI Release、Windows 安装程序和便携包构建完成，Android 正式签名匹配；未运行静态分析、测试或设备验收。日志位于 `build/test_logs/release-1.0.5.log`，本地产物位于 `build/releases/1.0.5-17/`。
+
+## 2026-10-29 发布附件改为固定文件名
+
+按用户要求调整 release.py 与 Windows 安装脚本：五个安装附件统一为 `sylphy-music-arm64-v8a.apk`、`sylphy-music-armeabi-v7a.apk`、`sylphy-music-x86_64.apk`、`sylphy-music-setup.exe`、`sylphy-music-windows.zip`。本地版本目录、Release Tag 与安装包内部版本继续保留版本号；摘要、资产上传、复用产物和版本清单链接同步使用固定名称。应用历史清单仍指向各自 Tag，官网可在新正式 Release 发布后使用 releases/latest/download 固定链接。
+
+同步更新流程说明与已有复用产物用例中的文件名。Python 脚本编译成功，未运行分析或测试，未重建应用、上传新资产、修改历史附件或发布版本；当前 1.0.4 的旧附件保持原名，新固定链接尚待下次发布生效。
+
+## 2026-10-29 发布 1.0.4+16
+
+按用户要求一键发布正式版 [1.0.4+16](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.4%2B16)，包含 Android 10 白色媒体控制按钮、内置图标资源裁剪修复、歌单类型菜单 / 逐条移除及 FAB / 横条启动默认项。Android 三 ABI APK、Windows 安装 EXE、便携 ZIP 和摘要文件共六个资产发布完成，远端大小和 SHA-256 与本地一致，远端正式清单已指向新版本。仅清单提交 `e5c3d7f` 已推送，源码修改保留在本地。
+
+Android 与 Windows Release 构建成功，Android 正式证书匹配，Windows 未代码签名；未执行静态分析、测试、启动或设备验证。日志位于 `build/test_logs/release-1.0.4.log`，本地产物位于 `build/releases/1.0.4-16/`。
+
+## 2026-10-29 修复 Release 通知控制图标被裁剪
+
+用户反馈 Android 10 通知按钮不可见但可点击。检查现有 Release 的 `build/app/outputs/mapping/release/resources.txt`，播放、暂停、上一首、下一首等 audio_service 图标均标记为不可达；这些资源名由 Dart 动态传入，原生仅通过 getIdentifier 查找，资源裁剪器无法追踪，按钮视图及 PendingIntent 则仍保留。
+
+原生 getResourceId 对七个内置媒体操作图标改为显式 R.drawable 引用，自定义名称继续使用原查找方式；保留 Android 10 白色图标和封面取色方案。重新构建后的资源记录确认四个主要控制图标均从 R.drawable 引用可达。Android 三 ABI 与 Windows Release 编译 / 内部打包完成，日志为 `build/test_logs/android-media-icons-retention-build.log`，产物位于 `build/internal-review/`，版本保持 `1.0.3+15`。
+
+未运行静态分析、测试或设备验证，实际 Android 10 通知显示待用户确认；未提交、推送或发布。
+
+## 2026-10-29 播放器样式改为启动默认项
+
+按用户补充，播放器外观中的 FAB / 横条仅保存每次启动的默认值；主界面运行时长按横条折叠、点击 FAB 展开只修改本次会话状态，不再写入外观设置。更改设置中的默认项会立即应用；其他外观变化及前后台切换保留本次手动选择。
+
+Android 三 ABI 与 Windows Release 编译、内部打包完成，日志为 `build/test_logs/player-startup-default-build.log`，产物位于 `build/internal-review/`。未运行分析、测试或设备验证，未提交、推送或发布。
+
+## 2026-10-29 歌单菜单、逐条移除与播放器控制偏好
+
+歌单网格右上角更多按钮移除白色圆底，保留带阴影的白色图标；网格与详情共用按收藏 / 本地 / 云端及读写、同步状态生成的操作菜单。收藏不提供改名或删除，本地仅提供本地操作，只读云歌单隐藏改名、编辑、添加、移除曲目和服务器删除，不存在可写云端目标时隐藏复制云歌单。
+
+歌单内单曲更多增加“从此歌单移除”，收藏中显示“从收藏移除”。通过独立 entry_id 删除当前条目，保留同曲其他重复条目及其身份；云歌单沿用待同步 / 冲突状态和既有同步流程。只读来源不显示移除，也排除在添加到歌单目标中。
+
+外观 → 播放器外观新增“播放器控制”，可选择主界面横条或 FAB 悬浮按钮，使用既有 settings 保存 `ui_player_fab` 并在重启后恢复；长按折叠 / 点击展开与该偏好同步。未改变数据库 schema。
+
+Android 三 ABI Release 与 Windows Release 编译、内部打包完成，版本保持 `1.0.3+15`，产物位于 `build/internal-review/`，日志为 `build/test_logs/playlist-player-controls-build.log`。按维护者约定未新增或运行静态分析、测试或设备验证；未提交、推送或发布，功能由用户验证。
+
+## 2026-10-29 应用 Android 10 白色媒体按钮补丁
+
+应用 `sylphymusic-android10-white-media-buttons.patch`：Android 10 / API 29 且有三个媒体操作时，使用 DecoratedMediaCustomViewStyle 和自定义 RemoteViews，将操作图标固定为白色，继续使用原有图标、无障碍说明和 PendingIntent，保留封面取色背景。其他系统版本及操作数量沿用原媒体样式。工程已有本地 audio_service 依赖，因此跳过重复的 pubspec 修改，并移除此前 `setColorized(false)` 的覆盖代码。原补丁缺少标准文件分隔头，归一化后应用 Java 与新增 XML 布局；同步本地依赖补丁说明。
+
+最终 Android 三 ABI Release 与 Windows Release 编译和本地打包完成，版本保持 `1.0.3+15`，产物位于 `build/internal-review/`，日志为 `build/test_logs/android10-white-media-buttons-build.log`。未运行静态分析、测试或设备验证，Android 10 实际通知效果由用户验证；未提交、推送或发布。
+
 ## 2026-10-29 快速发布 1.0.3+15
 
 按维护者要求直接运行一键发布，发布 [1.0.3+15](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.3%2B15)，包含飞牛音乐首期接入、后台播放与下载取消隔离、本地代理探测 / 恢复、Android 10 通知配色及返回前台手势条恢复。Android 三 ABI Release、Windows 安装程序 / 便携 ZIP 和摘要文件共六个资产已发布，远端大小与 SHA-256 均匹配本地，正式更新清单已指向新版本。清单提交 `20b0273` 已推送；源码修改和本地版本号保留在工作区，未额外提交源码。

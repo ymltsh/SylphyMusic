@@ -39,6 +39,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
   bool playerCollapsed = false;
+  late bool _defaultPlayerFab;
   bool? onboarding;
   String? sourceFilter;
   bool descending = false;
@@ -57,6 +58,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     app.addListener(_update);
     app.playback.addListener(_update);
+    playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
+    app.appearance.addListener(_appearanceChanged);
     unawaited(_loadWelcome());
   }
 
@@ -79,7 +82,15 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     app.removeListener(_update);
     app.playback.removeListener(_update);
+    app.appearance.removeListener(_appearanceChanged);
     super.dispose();
+  }
+
+  void _appearanceChanged() {
+    if (_defaultPlayerFab != app.appearance.playerFab) {
+      playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
+    }
+    _update();
   }
 
   void _update() {
@@ -470,7 +481,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ],
   );
 
-  Widget _tracks(List<Track> tracks, {bool showPlayAll = true}) {
+  Widget _tracks(
+    List<Track> tracks, {
+    bool showPlayAll = true,
+    Future<void> Function(int)? onRemove,
+    bool favorites = false,
+  }) {
     if (tracks.isEmpty) {
       return const Center(
         child: Text('暂无音乐。可以先添加 Emby、Navidrome 或 WebDAV 来源。'),
@@ -511,13 +527,24 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             ),
           ),
           trailing: PopupMenuButton<String>(
-            onSelected: (v) => _trackAction(v, track),
+            onSelected: (v) {
+              if (v == 'remove_entry' && onRemove != null) {
+                unawaited(_act(() => onRemove(i - (showPlayAll ? 1 : 0))));
+              } else {
+                unawaited(_trackAction(v, track));
+              }
+            },
             itemBuilder: (ctx) => [
               PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
               const PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
               const PopupMenuItem(value: 'next', child: Text('下一首播放')),
               const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列末尾')),
               const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
+              if (onRemove != null)
+                PopupMenuItem(
+                  value: 'remove_entry',
+                  child: Text(favorites ? '从收藏移除' : '从此歌单移除'),
+                ),
               PopupMenuItem(
                 value: 'block',
                 child: Text(
@@ -726,6 +753,15 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           app: app,
           id: playlist.id,
           buildTracks: (tracks) => _tracks(tracks, showPlayAll: false),
+          buildEntryTracks: (tracks, entryIds) => _tracks(
+            tracks,
+            showPlayAll: false,
+            favorites: latest().kind == PlaylistKind.favorites,
+            onRemove: playlistCanEdit(app, latest())
+                ? (index) => app.removePlaylistEntry(latest(), entryIds[index])
+                : null,
+          ),
+          onAction: (action) => _playlistAction(action, latest()),
           onEdit: () => _editPlaylist(latest()),
           onAdd: () => _addToPlaylist(latest()),
           onCache: () => _act(() => app.cachePlaylist(latest())),
