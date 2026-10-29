@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.2",
-    "build": 14,
-    "name": "风灵音乐 v1.0.2",
-    "date": "2026-10-28",
-    "notes": "风灵音乐 1.0.2\n\n- 全套应用图标焕新：默认「微风与低音」，另附高气压、春风拂面、杨柳依依、点阵白、点阵黑、风精灵 6 款可切换图标；关于页改用独立透明 Logo。\n- 歌词预览新增「默认」颜色：未指定颜色时随系统深浅使用黑 / 白，可在编辑器切回主题色或选择预设色。\n- 首次引导欢迎页重设计：浅色留白、风形图标、简介与圆形箭头按钮，适配小屏和深色模式。\n- Android 继续使用正式签名，提供 arm64-v8a、armeabi-v7a、x86_64 三个 APK；Windows 提供安装程序和便携 ZIP。\n\n说明：本次未在 Android 真机 / 模拟器验证图标切换和关于页渲染；Windows 安装包暂未代码签名。旧版选择过备用图标的用户，更新后图标会回退到新的默认图标。\n",
+    "version": "1.0.3",
+    "build": 15,
+    "name": "风灵音乐 v1.0.3",
+    "date": "2026-10-29",
+    "notes": "风灵音乐 1.0.3\n\n- 新增飞牛音乐（fnOS）首期接入：独立账号登录、曲库索引、播放、封面、歌词及只读云歌单；地址以 /music 结尾，暂不支持云歌单写入和 FN Connect 自动寻址。\n- 改进后台播放恢复：分离离线下载与播放连接的取消操作，新增本地媒体代理健康探测及串行重启，避免过期恢复覆盖用户操作。\n- Android 返回前台时重新恢复边到边显示和系统栏样式，改善底部手势条沉浸显示。\n- Android 10 媒体通知关闭封面取色，改善操作图标对比度；补充播放停滞、代理请求和生命周期诊断。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-setup-1.0.2-14.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-windows-1.0.2-14.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-setup-1.0.3-15.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-windows-1.0.3-15.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.2+14"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.3+15"
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "build": 14,
+      "name": "风灵音乐 v1.0.2",
+      "date": "2026-10-28",
+      "notes": "风灵音乐 1.0.2\n\n- 全套应用图标焕新：默认「微风与低音」，另附高气压、春风拂面、杨柳依依、点阵白、点阵黑、风精灵 6 款可切换图标；关于页改用独立透明 Logo。\n- 歌词预览新增「默认」颜色：未指定颜色时随系统深浅使用黑 / 白，可在编辑器切回主题色或选择预设色。\n- 首次引导欢迎页重设计：浅色留白、风形图标、简介与圆形箭头按钮，适配小屏和深色模式。\n- Android 继续使用正式签名，提供 arm64-v8a、armeabi-v7a、x86_64 三个 APK；Windows 提供安装程序和便携 ZIP。\n\n说明：本次未在 Android 真机 / 模拟器验证图标切换和关于页渲染；Windows 安装包暂未代码签名。旧版选择过备用图标的用户，更新后图标会回退到新的默认图标。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-1.0.2-14-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-setup-1.0.2-14.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.2%2B14/sylphy-music-windows-1.0.2-14.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.2+14"
+    },
     {
       "version": "1.0.1",
       "build": 13,
