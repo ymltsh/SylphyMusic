@@ -23,6 +23,7 @@
 | [PLAYER_LAYOUT_EDITOR](PLAYER_LAYOUT_EDITOR.md) | 播放页全画布组件、9 / 16 宫格编辑、统一封面与歌词页、模板与迁移 |
 | [DIAGNOSTIC_LOGGING](DIAGNOSTIC_LOGGING.md) | 用户主动启用的诊断日志、导出 / 分享与隐私边界 |
 | [LAUNCHER_ICONS](LAUNCHER_ICONS.md) | Android 备用桌面图标、activity-alias 切换与资源生成 |
+| [FN_MUSIC](FN_MUSIC.md) | 飞牛音乐原生音源首期接入方式及限制 |
 | [WEBDAV](WEBDAV.md) | 连接、扫描、歌词 / 封面与限制 |
 | [EMBY_TEST_SETUP](EMBY_TEST_SETUP.md) | 专用测试账号与临时歌单验证边界 |
 | [LRC_API](LRC_API.md) | 可选在线歌词补充、配置与缓存边界 |

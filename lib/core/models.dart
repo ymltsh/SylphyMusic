@@ -1,9 +1,14 @@
 import 'dart:convert';
 
-enum SourceKind { emby, subsonic, local, webdav }
+enum SourceKind { emby, subsonic, local, webdav, fnMusic }
 
 extension SourceCapabilities on SourceKind {
   bool get cloudPlaylists =>
+      this == SourceKind.emby ||
+      this == SourceKind.subsonic ||
+      this == SourceKind.fnMusic;
+
+  bool get cloudPlaylistWritable =>
       this == SourceKind.emby || this == SourceKind.subsonic;
 }
 

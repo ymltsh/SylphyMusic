@@ -480,7 +480,7 @@ class SylphyApp extends ChangeNotifier {
     final adapter = factory.create(candidate);
     try {
       await adapter.login(password);
-      if (source.kind == SourceKind.emby) {
+      if (source.kind == SourceKind.emby || source.kind == SourceKind.fnMusic) {
         final oldServer = await vault.read(source.id, 'serverId');
         final newServer = await vault.read(candidate.id, 'serverId');
         final oldUser = await vault.read(source.id, 'userId');

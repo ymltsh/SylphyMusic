@@ -37,7 +37,7 @@ flowchart TD
 | `lib/core/app_controller.dart` | 服务装配及来源、导入、歌词、缓存等应用操作 |
 | `lib/data/app_db.dart` | SQLite schema、迁移、事务、索引提交与持久化 |
 | `lib/data/library_catalog.dart` | SQL 过滤、排序、分组、计数和有界分页 |
-| `lib/services/sources.dart`、`webdav.dart` | 协议接口 / 工厂、安全存储、传输与适配器；WebDAV 是 sources 库的 part |
+| `lib/services/sources.dart`、`webdav.dart`、`fn_music.dart` | 协议接口 / 工厂、安全存储、传输与适配器；WebDAV 和飞牛音乐是 sources 库的 part |
 | `lib/services/library_sync.dart` | 逐页暂存、进度、取消、中断恢复和原子发布 |
 | `lib/services/source_connections.dart` | 来源开关合并、重新验证与关闭验证中的连接 |
 | `lib/services/cloud_sync.dart` | 云歌单基线、保守合并、冲突、写入意图 |
@@ -59,10 +59,11 @@ flowchart TD
 |---|---|---|---|---|
 | Emby | 服务端 Item Id | 分页 Items 与媒体流等字段 | 支持，遵循账号权限 | 单曲 MediaStreams 的 text / lrc 字幕流；服务器图片 |
 | OpenSubsonic | song id | 协议专辑 / 歌曲列表 | 支持，遵循账号权限 | 结构化歌词及兼容文本接口；封面接口 |
+| 飞牛音乐（fnOS） | track guid | 分页 track/list | 只读浏览，保留重复歌曲 | lyric/list 与 static/cover 接口 |
 | WebDAV | 根目录内编码相对路径 | Depth: 1 递归；文件名标题、目录分组 | 不支持；使用本地歌单 | 同名 LRC / TXT 和目录封面；已有完整缓存可读内嵌歌词 |
 | 本地 | 规范化绝对文件路径 | 标签读取、目录增量扫描 | 不适用；使用本地歌单 | 内嵌图片 / 歌词、旁挂 LRC、手动导入 |
 
-UI 和服务通过 `SourceKind.cloudPlaylists` 判断能力，不能将所有远程来源都视为支持云歌单。WebDAV 不在扫描时下载整首音频或解析远程内嵌标签，限制见 [WEBDAV](WEBDAV.md)。
+UI 和服务通过 `SourceKind.cloudPlaylists` 判断云歌单读取能力，新建 / 复制目标通过 `cloudPlaylistWritable` 判断写入能力；飞牛音乐首期只读，不能将所有远程来源都视为支持云歌单写入。飞牛接入地址以 `/music` 结尾，使用音乐应用独立账号，连接限制见 [FN_MUSIC](FN_MUSIC.md)。WebDAV 不在扫描时下载整首音频或解析远程内嵌标签，限制见 [WEBDAV](WEBDAV.md)。
 
 ## 索引与浏览
 

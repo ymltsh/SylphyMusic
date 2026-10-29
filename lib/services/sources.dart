@@ -14,6 +14,7 @@ import 'local_library.dart' show audioExtensions;
 import 'lyrics.dart';
 
 part 'webdav.dart';
+part 'fn_music.dart';
 
 class RemotePlaylist {
   const RemotePlaylist({
@@ -885,6 +886,7 @@ class AdapterFactory {
     SourceKind.emby => EmbyAdapter(profile, vault),
     SourceKind.subsonic => SubsonicAdapter(profile, vault),
     SourceKind.webdav => WebDavAdapter(profile, vault),
+    SourceKind.fnMusic => FnMusicAdapter(profile, vault),
     SourceKind.local => throw UnsupportedError('本地音乐使用直接文件路径'),
   };
 }

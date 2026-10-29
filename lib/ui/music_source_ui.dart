@@ -26,6 +26,12 @@ const musicSourceOptions = <MusicSourceOption>[
     Icons.cloud_outlined,
   ),
   MusicSourceOption(
+    SourceKind.fnMusic,
+    '飞牛音乐（fnOS）',
+    '连接 NAS 上的原生飞牛音乐曲库',
+    Icons.library_music_outlined,
+  ),
+  MusicSourceOption(
     SourceKind.webdav,
     'WebDAV',
     '读取远程音乐文件与文件夹',

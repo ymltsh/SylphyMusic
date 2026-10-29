@@ -683,7 +683,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 items: [
                   const DropdownMenuItem(value: 'local', child: Text('本地歌单')),
                   ...app.sources
-                      .where((s) => s.enabled && s.kind.cloudPlaylists)
+                      .where((s) => s.enabled && s.kind.cloudPlaylistWritable)
                       .map(
                         (s) => DropdownMenuItem(
                           value: s.id,
@@ -901,7 +901,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         builder: (ctx) => SimpleDialog(
           title: const Text('选择云歌单目标来源'),
           children: app.sources
-              .where((s) => s.enabled && s.kind.cloudPlaylists)
+              .where((s) => s.enabled && s.kind.cloudPlaylistWritable)
               .map(
                 (s) => SimpleDialogOption(
                   onPressed: () => Navigator.pop(ctx, s),

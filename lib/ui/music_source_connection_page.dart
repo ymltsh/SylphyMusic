@@ -97,6 +97,14 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
     final url = overridePort == null
         ? _host.text.trim()
         : uri.replace(port: overridePort).toString();
+    if (_kind == SourceKind.fnMusic &&
+        !Uri.parse(url).path
+            .replaceAll(RegExp(r'/+$'), '')
+            .endsWith('/music')) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('飞牛音乐地址需要以 /music 结尾')));
+      return;
+    }
     Navigator.of(context).pop(
       MusicSourceConnectionDraft(
         kind: _kind,
@@ -170,11 +178,15 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     controller: _host,
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: '服务器地址',
-                      prefixIcon: Icon(Icons.dns_outlined),
-                      hintText: 'https://music.example.com/path',
-                      helperText: '可包含反向代理路径；请尽量使用 HTTPS',
+                      prefixIcon: const Icon(Icons.dns_outlined),
+                      hintText: _kind == SourceKind.fnMusic
+                          ? 'https://nas.example.com:5001/music'
+                          : 'https://music.example.com/path',
+                      helperText: _kind == SourceKind.fnMusic
+                          ? '填写飞牛音乐入口，地址以 /music 结尾'
+                          : '可包含反向代理路径；请尽量使用 HTTPS',
                     ),
                     validator: _validHost,
                   ),
@@ -228,6 +240,15 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  if (_kind == SourceKind.fnMusic)
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.info_outline),
+                      title: Text('飞牛音乐账号'),
+                      subtitle: Text(
+                        '使用飞牛「音乐」里创建的独立账号；首期支持曲库、播放、封面和歌词，暂不支持云歌单写入与 FN Connect 自动寻址。',
+                      ),
+                    ),
                   if (_kind == SourceKind.webdav)
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -235,7 +256,9 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                       title: Text('WebDAV 说明'),
                       subtitle: Text('递归读取音乐目录，支持同名歌词文件与文件夹封面；云端歌单为只读。'),
                     ),
-                  if (_editing && _kind != SourceKind.emby)
+                  if (_editing &&
+                      _kind != SourceKind.emby &&
+                      _kind != SourceKind.fnMusic)
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.shield_outlined),
