@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.6",
-    "build": 18,
-    "name": "风灵音乐 v1.0.6",
+    "version": "1.0.7",
+    "build": 19,
+    "name": "风灵音乐 v1.0.7",
     "date": "2026-10-29",
-    "notes": "风灵音乐 1.0.6\n\n- 去除圆形唱片封面中央的打孔点，完整展示专辑封面；共用唱片样式的播放页、歌词页、编辑预览与迷你播放器同步调整。\n- 播放页歌词预览增加逐行滑动和淡入淡出过渡，高亮颜色与字重平滑变化；遵循系统减少动画设置。\n- 歌单复制菜单按类型互斥：云歌单不再显示“复制为云端歌单”，本地歌单不再显示“复制为本地歌单”。\n- 继续提供固定文件名的 Android 三架构 APK、Windows 安装程序及便携 ZIP，官网长期下载链接保持可用。\n\nAndroid 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+    "notes": "风灵音乐 1.0.7\n\n- 新增「歌曲信息」：播放页菜单可查看曲目、音频参数、文件与来源信息，文件路径支持一键复制。\n- 修复部分 Emby 服务器歌词缺失：优先使用曲目元数据中自带的原始 LRC，带时间轴即可正常显示。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.6+18"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.7+19"
   },
   "history": [
+    {
+      "version": "1.0.6",
+      "build": 18,
+      "name": "风灵音乐 v1.0.6",
+      "date": "2026-10-29",
+      "notes": "风灵音乐 1.0.6\n\n- 去除圆形唱片封面中央的打孔点，完整展示专辑封面；共用唱片样式的播放页、歌词页、编辑预览与迷你播放器同步调整。\n- 播放页歌词预览增加逐行滑动和淡入淡出过渡，高亮颜色与字重平滑变化；遵循系统减少动画设置。\n- 歌单复制菜单按类型互斥：云歌单不再显示“复制为云端歌单”，本地歌单不再显示“复制为本地歌单”。\n- 继续提供固定文件名的 Android 三架构 APK、Windows 安装程序及便携 ZIP，官网长期下载链接保持可用。\n\nAndroid 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.6%2B18/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.6+18"
+    },
     {
       "version": "1.0.5",
       "build": 17,
