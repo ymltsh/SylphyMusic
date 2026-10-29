@@ -74,6 +74,7 @@ class MediaProxy {
       }
       final ticket = _tickets[parts[1]];
       if (ticket == null || ticket.expires.isBefore(DateTime.now())) {
+        diagnostics?.record('proxy', 'ticket_rejected');
         req.response.statusCode = HttpStatus.forbidden;
         return;
       }
@@ -94,6 +95,7 @@ class MediaProxy {
         return;
       }
       if (cached != null) {
+        diagnostics?.record('proxy', 'cache_hit');
         await _fileResponse(req, ref, cached.file, cached.bytes, range);
         return;
       }
@@ -174,7 +176,9 @@ class MediaProxy {
       return;
     }
     try {
-      final uri = await adapter.mediaUrl(track);
+      final uri = await adapter
+          .mediaUrl(track)
+          .timeout(const Duration(seconds: 10));
       final preview = cache.preview(track.ref);
       final selected = preview == null
           ? null
@@ -202,11 +206,13 @@ class MediaProxy {
         }
         return;
       }
-      final outgoing = await client.openUrl(req.method, uri);
+      diagnostics?.record('proxy', 'upstream_open_started');
+      final outgoing = await client
+          .openUrl(req.method, uri)
+          .timeout(const Duration(seconds: 15));
       outgoing.followRedirects = false;
-      (await adapter.mediaHeaders()).forEach(
-        (k, v) => outgoing.headers.set(k, v),
-      );
+      (await adapter.mediaHeaders().timeout(const Duration(seconds: 10)))
+          .forEach((k, v) => outgoing.headers.set(k, v));
       outgoing.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
       if (reusable) {
         outgoing.headers.set(
@@ -217,8 +223,14 @@ class MediaProxy {
       } else if (range != null) {
         outgoing.headers.set(HttpHeaders.rangeHeader, range);
       }
+      diagnostics?.record('proxy', 'upstream_waiting_headers');
       final upstream = await outgoing.close().timeout(
         const Duration(seconds: 25),
+      );
+      diagnostics?.record(
+        'proxy',
+        'upstream_headers',
+        details: {'http_status': upstream.statusCode},
       );
       if (upstream.statusCode != 200 && upstream.statusCode != 206) {
         _failures[track.ref.key] = '${upstream.statusCode}';
@@ -238,7 +250,8 @@ class MediaProxy {
               upstream.headers.value('content-range') !=
                   'bytes ${preview.bytes.length}-${selected.end}/${preview.total}')) {
         cache.invalidatePreview();
-        await upstream.drain<void>();
+        diagnostics?.record('proxy', 'preview_mismatch');
+        client.close(force: true);
         await _remoteResponse(req, track, profile, range);
         return;
       }
@@ -285,7 +298,16 @@ class MediaProxy {
       if (req.method == 'HEAD') return;
       Stream<List<int>> combined() async* {
         if (reusable) yield preview.bytes.sublist(selected.start);
-        yield* upstream.timeout(const Duration(seconds: 25));
+        var firstChunk = true;
+        await for (final bytes in upstream.timeout(
+          const Duration(seconds: 25),
+        )) {
+          if (firstChunk) {
+            diagnostics?.record('proxy', 'upstream_first_chunk');
+            firstChunk = false;
+          }
+          yield bytes;
+        }
       }
 
       final full = reusable
@@ -300,8 +322,13 @@ class MediaProxy {
           track.ref,
           combined(),
           (bytes) async {
-            req.response.add(bytes);
-            await req.response.flush();
+            try {
+              req.response.add(bytes);
+              await req.response.flush().timeout(const Duration(seconds: 15));
+            } catch (_) {
+              diagnostics?.record('proxy', 'downstream_write_failed');
+              rethrow;
+            }
           },
           expected: reusable ? selected.length : upstream.contentLength,
           full: full,

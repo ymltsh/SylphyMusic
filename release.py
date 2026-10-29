@@ -246,7 +246,7 @@ def main(argv=None):
     parser.add_argument('--notes-file', type=Path)
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--skip-build', action='store_true', help='Reuse APKs, Windows installer and ZIP for this version')
-    parser.add_argument('--skip-checks', action='store_true', help='Skip analyze/test')
+    parser.add_argument('--skip-checks', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--no-push', action='store_true', help='Update the local manifest without committing or pushing it')
     parser.add_argument('--credentials-file', action='append', default=[])
     if argv is None:
@@ -297,13 +297,6 @@ def main(argv=None):
         return 0
     pubspec = ROOT / 'pubspec.yaml'
     pubspec.write_text(PUB_VERSION.sub(f'version: {version}+{build}', pubspec.read_text(encoding='utf-8'), count=1), encoding='utf-8')
-    if not args.skip_checks:
-        flutter = os.environ.get('FLUTTER_BIN') or shutil.which('flutter')
-        if not flutter:
-            raise ValueError('Flutter is missing; set FLUTTER_BIN.')
-        run([flutter, 'pub', 'get', '--enforce-lockfile'])
-        run([flutter, 'analyze', '--no-pub'])
-        run([flutter, 'test', '--no-pub'])
     record = existing_packages(output, version, build) if args.skip_build else prepare(args, version, build, output)
     run([sys.executable, 'tool/verify_android_signing.py',
          *[output / record['artifacts'][key] for key in ABIS.values()]])

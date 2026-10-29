@@ -1,3 +1,4 @@
+# Optional user-invoked validation; not part of the default delivery workflow.
 param(
     [string]$AndroidDevice = '',
     [string]$CredentialFile = ''

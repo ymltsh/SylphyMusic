@@ -14,6 +14,8 @@
 
 `main.dart` 在 Android 初始化时显式启用 SystemUiMode.edgeToEdge，桌面不执行此调用。MaterialApp.builder 中的 AppSystemBars 为所有路由提供透明系统导航栏、透明分隔线，并随当前应用主题切换手势条 / 三键图标明暗。手势导航使用透明栏；三键导航保留系统的对比度保护，安全区按实际 Insets 避让。保留系统手势条，不隐藏系统导航。
 
+2026-10-29 补充后台恢复：AppSystemBars 监听 resumed，在所有路由上重新启用 edge-to-edge，并调用 restoreSystemUIOverlays 要求原生插件恢复已保存的样式，避免相同 Dart 样式被缓存后不再下发。组件销毁时移除监听；不修改 Activity 生命周期或全局关闭三键导航对比度保护。此轮先交付 Flutter 恢复修复，真实设备长时间后台、锁屏和共享引擎下 Activity 重建的效果待用户验证。
+
 Android API 29+ 的 LaunchTheme / NormalTheme 及夜间资源同步配置透明状态 / 导航栏与正确图标初始明暗，启动阶段保留系统对比度保护。未降低 targetSdk、未退出 edge-to-edge、未修改原生媒体 / 缓存 Runner。
 
 主界面继续使用 Material NavigationBar 自身的 SafeArea，在其背景内延伸到屏幕底部；不为它额外叠加一次底部边距，并启用 maintainBottomViewPadding。宽屏迷你播放器、独立设置等路由、音乐库及聚合分页操作、全屏播放器和队列弹层补齐安全边距。播放器的背景 Material 包在 SafeArea 外，因此手势条下方仍为同一播放器背景。搜索页面沿用 Scaffold 的键盘避让。
@@ -21,6 +23,8 @@ Android API 29+ 的 LaunchTheme / NormalTheme 及夜间资源同步配置透明�
 ## 验证
 
 `integration_test/system_bars_test.dart` 使用临时数据库、合成 WAV 和内存凭据仓库，覆盖浅色 / 深色、首页、设置、真实搜索键盘、全屏播放页、队列弹层。断言系统底部 Insets 非零、NavigationBar 总高度只包含一次安全区、文字和 Seek 控件位于手势区之上。
+
+`test/system_bars_test.dart` 覆盖重复 paused/resumed 时的原生恢复调用、卸载后移除监听、浅深主题下手势 / 三键对比度规则，以及桌面不调用 Android 系统栏接口。模拟生命周期不代表实际锁屏或 Activity 重建验收。
 
 本机 SylphyTest_API35 独立模拟器分别使用手势和三键导航执行。主机从 Android 合成器截取含实际系统栏的截图，保存在 `build/test_logs/edge/`；测试截图不包含私人来源或曲库。测试结束恢复原导航模式；具体结果见 [进度](PROGRESS.md)。
 

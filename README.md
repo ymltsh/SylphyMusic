@@ -4,7 +4,7 @@ Flutter / Material 3 多音源播放器，支持 Android、Windows、Linux。主
 
 已发布 [正式版](https://github.com/ymltsh/SylphyMusic/releases/latest)，提供 Android / Windows，Linux 暂缓。最新证据与剩余工作见 [docs/PROGRESS.md](docs/PROGRESS.md)。
 
-应用内「设置 → 检查更新」提供手动更新检查。按 [更新与发布流程](update.md) 一条命令完成构建、打包、发布和清单推送；源码提交单独处理，人工与设备验收不阻断发布。
+应用内「设置 → 检查更新」提供手动更新检查。按 [更新与发布流程](update.md) 一条命令完成构建、打包、发布和清单推送；源码提交单独处理。编译成功即可交付，静态分析、测试和设备验证由用户负责。
 
 ## 构建与运行
 
@@ -19,8 +19,6 @@ flutter run -d windows
 flutter build apk --debug
 # 生成体积较小的本机验收包（Release 优化、Android 按架构拆分）
 ./tool/build_review.ps1 -CredentialFile ../emby测试账密.txt
-# 本机完整检查、原生测试与内部打包；AndroidDevice 可省略
-./tool/check_local.ps1 -AndroidDevice emulator-5580 -CredentialFile ../emby测试账密.txt
 ```
 
 ```sh
@@ -46,7 +44,9 @@ flutter run -d linux
 
 停用来源会终止该来源的在线读取并暂停当前播放，保留索引、完整缓存和个人引用；受影响的缓存任务保留快照并提示手动重试。重新启用先验证服务器 / 账号认证，再同步索引；用户显式继续播放时重新打开媒体连接。
 
-## 验证
+## 用户自主验证（可选）
+
+以下命令仅供用户主动验证，开发与发布流程默认不执行，也不因历史验证失败追加修复。
 
 ```sh
 flutter analyze

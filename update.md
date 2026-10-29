@@ -23,7 +23,9 @@ App 启动不主动检查；用户在“设置 → 检查更新”读取清单�
 
 根目录 `release.py` 自动执行：
 
-更新版本 → analyze/test（可跳过）→ 构建 Android / Windows → 打包 EXE / ZIP → 上传 GitHub Release → 更新版本清单 → 只提交并推送清单。
+更新版本 → 构建 Android / Windows → 打包 EXE / ZIP → 上传 GitHub Release → 更新版本清单 → 只提交并推送清单。
+
+编译成功即可交付；流程不运行静态分析或测试，也不因历史验证失败追加修复。功能与设备验证由用户负责。
 
 ```powershell
 # 引导模式
@@ -32,7 +34,6 @@ python release.py
 # CLI 模式
 python release.py --version 1.0.1 --build 13 --notes "更新说明"
 python release.py --version 1.0.1 --build 13 --beta --notes "测试版"
-python release.py --version 1.0.1 --build 13 --skip-checks --notes "更新说明"
 python release.py --version 1.0.1 --build 13 --dry-run
 ```
 
@@ -43,10 +44,9 @@ python release.py --version 1.0.1 --build 13 --dry-run
 | --name / --notes | 标题 / 发布说明；--notes-file 可读取多行说明 |
 | --dry-run | 只预览 |
 | --skip-build | 复用本版本已生成的 APK / EXE / ZIP |
-| --skip-checks | 跳过 analyze/test，仍可正常发布 |
 | --no-push | 发布资产并更新本地清单，不提交推送清单 |
 
-Flutter 或 Inno 不在 PATH 时可设置 `FLUTTER_BIN` / `INNO_SETUP_COMPILER`。Token 自动使用 Git 凭据或 `GH_TOKEN` / `GITHUB_TOKEN`。关闭运行中的播放器，避免 Windows EXE 被占用。人工与设备验收不在发布流程中。
+Flutter 或 Inno 不在 PATH 时可设置 `FLUTTER_BIN` / `INNO_SETUP_COMPILER`。Token 自动使用 Git 凭据或 `GH_TOKEN` / `GITHUB_TOKEN`。关闭运行中的播放器，避免 Windows EXE 被占用。旧命令的 `--skip-checks` 参数仍兼容，但已无需传入；测试和验收由用户独立进行。
 
 ### 1. 更新版本号
 

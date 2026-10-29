@@ -9,7 +9,7 @@
 | [项目 README](../README.md) | 运行、构建、功能与内部验收包 |
 | [AGENTS](../AGENTS.md) | 协作约定、工程边界与私密数据 |
 | [ARCH 入口](../ARCH.md) / [架构正文](ARCHITECTURE.md) | 模块、来源能力、数据流与生命周期 |
-| [CONTRIBUTING](../CONTRIBUTING.md) | 环境、相关验证、私密联调和打包 |
+| [CONTRIBUTING](../CONTRIBUTING.md) | 环境、编译交付、可选私密联调和打包 |
 | [PROJECT_SPEC_v3.8](PROJECT_SPEC_v3.8.md) | 产品目标，不代表全部实现或验收完成 |
 | [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) | 实施计划与决策背景 |
 | [PROGRESS](PROGRESS.md) | 最新证据、剩余工作和验收输出 |
@@ -32,4 +32,4 @@
 | [native_licenses](native_licenses/README.md) | 原生许可证文本与说明 |
 | [测试音频](../test/fixtures/README.md) | 合成素材与用途 |
 
-用户当前指令决定工作范围。需求与计划提供背景，代码说明当前实现，日志和进度记录实际验证；发布与验收独立，未完成验收不阻断发布。发现冲突时核对代码和用户已确认的变更，更新对应文档。
+用户当前指令决定工作范围。需求与计划提供背景，代码说明当前实现，日志和进度记录实际验证；编译成功即可交付；静态分析、测试和设备验证由用户负责，不默认执行验证修复流程。发现冲突时核对代码和用户已确认的变更，更新对应文档。

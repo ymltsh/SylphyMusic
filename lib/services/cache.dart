@@ -630,12 +630,14 @@ class CacheManager {
       ..connectionTimeout = const Duration(seconds: 10);
     _prefetchClient = client;
     try {
-      final req = await client.getUrl(await adapter.mediaUrl(track));
+      final req = await client
+          .getUrl(await adapter.mediaUrl(track))
+          .timeout(const Duration(seconds: 15));
       req.followRedirects = false;
       req.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
       req.headers.set(HttpHeaders.rangeHeader, 'bytes=0-${bytesLimit - 1}');
       (await adapter.mediaHeaders()).forEach((k, v) => req.headers.set(k, v));
-      final r = await req.close();
+      final r = await req.close().timeout(const Duration(seconds: 15));
       final encoding = r.headers.value(HttpHeaders.contentEncodingHeader);
       if (encoding != null && encoding != 'identity') return;
       if (r.statusCode != 206) return;
@@ -648,7 +650,7 @@ class CacheManager {
       final total = int.parse(match.group(2)!);
       if (expected > bytesLimit || total < expected) return;
       final out = BytesBuilder(copy: false);
-      await for (final chunk in r) {
+      await for (final chunk in r.timeout(const Duration(seconds: 15))) {
         if (out.length + chunk.length > bytesLimit) {
           out.add(chunk.sublist(0, bytesLimit - out.length));
           break;

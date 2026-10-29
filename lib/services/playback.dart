@@ -55,6 +55,77 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<String?> Function(Track)? _lyricsLoader;
   final Set<TrackRef> _lyricsWarmupRequested = {};
 
+  // Track *actual position advancement*, not just the player's playing flag.
+  // A libmpv stream can remain buffering without ever emitting stream.error.
+  final Stopwatch _progressWatch = Stopwatch()..start();
+  Timer? _stallTimer;
+  int _watchdogPositionMs = -1;
+  int _loadGeneration = 0;
+  bool _stalledRecoveryRunning = false;
+  bool _openStallLogged = false;
+  bool _transitionStallLogged = false;
+
+  void _checkForStall() {
+    if (!_playRequested ||
+        _userPaused ||
+        currentRef == null ||
+        _handlingFailure ||
+        _stalledRecoveryRunning) {
+      return;
+    }
+    if (_finishingTrack) {
+      if (!_transitionStallLogged &&
+          _progressWatch.elapsed >= const Duration(seconds: 50)) {
+        _transitionStallLogged = true;
+        diagnostics?.record('playback', 'transition_stalled');
+      }
+      return;
+    }
+    if (_opening) {
+      // Diagnostics only: Future.timeout does NOT cancel a native player.open.
+      // Opening recovery requires serializing/cancelling the native operation.
+      if (!_openStallLogged &&
+          _progressWatch.elapsed >= const Duration(seconds: 50)) {
+        _openStallLogged = true;
+        diagnostics?.record('playback', 'open_stalled');
+      }
+      return;
+    }
+    if (_progressWatch.elapsed < const Duration(seconds: 45)) return;
+
+    final stuckRef = currentRef;
+    final generation = _loadGeneration;
+    _stalledRecoveryRunning = true;
+    _handlingFailure = true;
+    diagnostics?.record(
+      'playback',
+      'progress_stalled',
+      details: {'index': snapshot.index},
+    );
+    error = '播放进度长时间没有变化，正在尝试恢复';
+    notifyListeners();
+    unawaited(_recoverStall(stuckRef, generation));
+  }
+
+  Future<void> _recoverStall(TrackRef? stuckRef, int generation) async {
+    try {
+      if (currentRef != stuckRef ||
+          _loadGeneration != generation ||
+          !_playRequested ||
+          _userPaused) {
+        return;
+      }
+      await _failed('播放进度超过 45 秒没有变化');
+    } catch (_) {
+      // The recovery attempt is best effort; never leave the guard latched.
+      diagnostics?.record('playback', 'stall_recovery_failed');
+    } finally {
+      _handlingFailure = false;
+      _stalledRecoveryRunning = false;
+      _progressWatch.reset();
+    }
+  }
+
   /// Install the app-owned lyrics loader after its stores/settings are ready.
   /// The current track may already have been restored during initialization.
   void setLyricsLoader(Future<String?> Function(Track) loader) {
@@ -141,6 +212,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.position.listen((v) {
+        final nextMs = v.inMilliseconds;
+        if (nextMs > _watchdogPositionMs + 400) {
+          _watchdogPositionMs = nextMs;
+          _progressWatch.reset();
+        }
         if (error != null && playing && !buffering && v > position) {
           error = null;
         }
@@ -172,13 +248,15 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.completed.listen((done) {
-        if (done && !_opening && !_finishingTrack) {
+        if (done && !_opening && !_finishingTrack && !_stalledRecoveryRunning) {
           diagnostics?.record(
             'playback',
             'track_completed',
             details: {'index': snapshot.index},
           );
           _finishingTrack = true;
+          _transitionStallLogged = false;
+          _progressWatch.reset();
           _publish();
           unawaited(
             _finished().whenComplete(() {
@@ -199,6 +277,10 @@ class PlaybackCoordinator extends ChangeNotifier {
           unawaited(_failed(e).whenComplete(() => _handlingFailure = false));
         }
       }),
+    );
+    _stallTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _checkForStall(),
     );
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
@@ -409,6 +491,10 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _opening = true;
     _playRequested = autoplay;
+    ++_loadGeneration;
+    _watchdogPositionMs = -1;
+    _openStallLogged = false;
+    _progressWatch.reset();
     final resumeMs = snapshot.positionMs;
     error = null;
     try {
@@ -450,15 +536,23 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (source.kind == SourceKind.local) {
         final f = File(current!.remote['path']?.toString() ?? ref.id);
         if (!await f.exists()) throw StateError('本地原始音频文件不存在');
+        diagnostics?.record('playback', 'native_open_started');
         await player.open(Media(f.uri.toString()), play: shouldPlay);
       } else {
         final cached = await cache.find(ref, touch: true);
         final uri = cached != null
             ? cached.file.uri
             : proxy.ticket(current!, source);
+        diagnostics?.record(
+          'playback',
+          cached == null ? 'remote_ticket_open' : 'cached_file_open',
+        );
+        diagnostics?.record('playback', 'native_open_started');
         await player.open(Media(uri.toString()), play: shouldPlay);
       }
       diagnostics?.record('playback', 'player_opened');
+      _watchdogPositionMs = position.inMilliseconds;
+      _progressWatch.reset();
       if (resumeMs > 0) {
         await player.seek(Duration(milliseconds: resumeMs));
       }
@@ -572,6 +666,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     _playRequested = true;
+    _progressWatch.reset();
     _publish();
     if (_session != null && !await _session!.setActive(true)) {
       _playRequested = false;
@@ -708,6 +803,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     final ref = currentRef;
+    final recoveryGeneration = _loadGeneration;
     final proxyFailure = ref == null ? null : proxy.failureFor(ref);
     if (reason.contains('401') ||
         reason.contains('403') ||
@@ -721,6 +817,12 @@ class PlaybackCoordinator extends ChangeNotifier {
       _reconnects = 0;
     }
     final source = ref == null ? null : await db.source(ref.sourceId);
+    if (_loadGeneration != recoveryGeneration ||
+        currentRef != ref ||
+        !_playRequested ||
+        _userPaused) {
+      return;
+    }
     final resumeMs = max(position.inMilliseconds, snapshot.positionMs);
     if (source != null &&
         source.enabled &&
@@ -731,6 +833,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         _playRequested &&
         proxyFailure != '404') {
       _reconnects++;
+      if (ref != null) await cache.cancel(ref, automaticOnly: true);
       diagnostics?.record(
         'playback',
         'reconnect_attempt',
@@ -739,7 +842,10 @@ class PlaybackCoordinator extends ChangeNotifier {
       position = Duration(milliseconds: resumeMs);
       await save();
       await Future<void>.delayed(Duration(milliseconds: 400 * _reconnects));
-      if (currentRef == ref && !_userPaused && _playRequested) {
+      if (currentRef == ref &&
+          _loadGeneration == recoveryGeneration &&
+          !_userPaused &&
+          _playRequested) {
         await _loadCurrent(autoplay: true, manual: false);
       }
       return;
@@ -758,6 +864,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> seek(Duration target) async {
+    _watchdogPositionMs = target.inMilliseconds;
+    _progressWatch.reset();
     cache.invalidatePreview();
     await player.seek(target);
     position = target;
@@ -962,6 +1070,8 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stallTimer?.cancel();
+    _stallTimer = null;
     _detachNotificationArtwork();
     if (_leased != null) cache.release(_leased!);
     for (final s in _subscriptions) {
@@ -972,6 +1082,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> shutdown() async {
+    _stallTimer?.cancel();
+    _stallTimer = null;
     _playRequested = false;
     _lyricsLoader = null;
     _lyricsWarmupRequested.clear();

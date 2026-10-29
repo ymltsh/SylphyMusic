@@ -1,5 +1,7 @@
 # 原生媒体依赖记录
 
+2026-10-29：`audio_service` 0.18.19 改为仓库内 `third_party/audio_service` 路径依赖，保留上游运行源码及 MIT 许可证。唯一原生改动是 Android 10 / API 29 的媒体通知调用 `setColorized(false)`，用于避免封面取色导致操作图标对比度不足；其他系统版本沿用上游行为。来源摘要和维护说明见 [本地补丁记录](../third_party/audio_service/SYLPHY_PATCHES.md)。
+
 记录日期：2026-10-27。以下为当前调试构建实际加载的库及上游构建配置证据，不能代替完整的分发许可验收。
 
 | 平台 | 运行时版本 | 已观察配置 |

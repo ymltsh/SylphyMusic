@@ -52,7 +52,9 @@ void main() {
   final bytes = Uint8List.fromList(List.generate(8192, (i) => i % 251));
   final ranges = <String?>[];
   var version = '"v1"';
+  var stallPreviewRemainder = false;
   Completer<void>? gate, requested;
+  Completer<void>? stalledBodyGate;
   const track = Track(
     ref: TrackRef('a', 'one'),
     title: 'Track',
@@ -63,8 +65,10 @@ void main() {
   setUp(() async {
     ranges.clear();
     version = '"v1"';
+    stallPreviewRemainder = false;
     gate = null;
     requested = null;
+    stalledBodyGate = null;
     root = await Directory.systemTemp.createTemp('sylphy-proxy-');
     db = AppDb(root);
     await db.open();
@@ -86,6 +90,17 @@ void main() {
           'content-range',
           'bytes ${range.start}-${range.end}/${bytes.length}',
         );
+      }
+      if (stallPreviewRemainder && range.start == 1024) {
+        try {
+          request.response.add([bytes[range.start]]);
+          await request.response.flush();
+          await stalledBodyGate!.future;
+          await request.response.close();
+        } catch (_) {
+          // The proxy deliberately closes the obsolete upstream connection.
+        }
+        return;
       }
       if (request.method != 'HEAD') {
         request.response.add(bytes.sublist(range.start, range.end + 1));
@@ -112,6 +127,7 @@ void main() {
 
   tearDown(() async {
     if (gate?.isCompleted == false) gate!.complete();
+    if (stalledBodyGate?.isCompleted == false) stalledBodyGate!.complete();
     client.close(force: true);
     await proxy.dispose();
     await cache.shutdown();
@@ -180,6 +196,23 @@ void main() {
         bytes.sublist(512, 2048),
       );
       expect(ranges, ['bytes=0-1023', 'bytes=1024-2047', 'bytes=512-2047']);
+      expect(await cache.contains(track.ref), isFalse);
+    },
+  );
+
+  test(
+    'changed preview validator retries without draining a stalled body',
+    () async {
+      await cache.prefetchNext(track, profile, bytesLimit: 1024);
+      version = '"v2"';
+      stallPreviewRemainder = true;
+      stalledBodyGate = Completer<void>();
+      final result = await get(range: 'bytes=512-2047')
+          .timeout(const Duration(seconds: 5));
+      expect(result.status, 206);
+      expect(result.body, bytes.sublist(512, 2048));
+      expect(ranges, ['bytes=0-1023', 'bytes=1024-2047', 'bytes=512-2047']);
+      expect(cache.preview(track.ref), isNull);
       expect(await cache.contains(track.ref), isFalse);
     },
   );
