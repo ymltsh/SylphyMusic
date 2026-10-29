@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.7",
-    "build": 19,
-    "name": "风灵音乐 v1.0.7",
+    "version": "1.0.8",
+    "build": 20,
+    "name": "风灵音乐 v1.0.8",
     "date": "2026-10-29",
-    "notes": "风灵音乐 1.0.7\n\n- 新增「歌曲信息」：播放页菜单可查看曲目、音频参数、文件与来源信息，文件路径支持一键复制。\n- 修复部分 Emby 服务器歌词缺失：优先使用曲目元数据中自带的原始 LRC，带时间轴即可正常显示。\n",
+    "notes": "风灵音乐 1.0.8\n\n- 修复来电、蓝牙与耳机插拔中断播放后不再自动恢复的问题：焦点恢复后先确认播放状态稳定，再继续播放。\n- 避免通知音、视频片段等短暂抢占音频焦点时反复启停；未能获得音频焦点时给出提示，不再跳过歌曲。\n- 闪避音量结束后正确恢复原音量，通话期间调整音量也会保留。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.8%2B20/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.7+19"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.8+20"
   },
   "history": [
+    {
+      "version": "1.0.7",
+      "build": 19,
+      "name": "风灵音乐 v1.0.7",
+      "date": "2026-10-29",
+      "notes": "风灵音乐 1.0.7\n\n- 新增「歌曲信息」：播放页菜单可查看曲目、音频参数、文件与来源信息，文件路径支持一键复制。\n- 修复部分 Emby 服务器歌词缺失：优先使用曲目元数据中自带的原始 LRC，带时间轴即可正常显示。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.7%2B19/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.7+19"
+    },
     {
       "version": "1.0.6",
       "build": 18,
