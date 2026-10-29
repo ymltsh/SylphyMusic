@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.4",
-    "build": 16,
-    "name": "风灵音乐 v1.0.4",
+    "version": "1.0.5",
+    "build": 17,
+    "name": "风灵音乐 v1.0.5",
     "date": "2026-10-29",
-    "notes": "风灵音乐 1.0.4\n\n- 修复 Android 10 媒体通知控制按钮不可见但仍可点击：显式保留内置操作图标，避免 Release 资源裁剪；三个控制按钮使用白色图标，保留封面取色背景。\n- 歌单更多按钮去掉白色圆底，操作菜单按收藏、本地、云端及读写权限显示。\n- 歌单内单曲更多新增“从此歌单移除”，收藏中显示“从收藏移除”；仅删除当前条目，保留同曲其他重复记录。\n- 外观 → 播放器外观新增“播放器控制”，可设置每次启动默认使用 FAB 或横条；使用中的手动切换仅本次会话生效。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Android 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+    "notes": "风灵音乐 1.0.5\n\n- 发布附件改为固定文件名，官网可使用 releases/latest/download 长期下载链接，无需跟随版本号修改地址。\n- Android 提供 sylphy-music-arm64-v8a.apk、sylphy-music-armeabi-v7a.apk、sylphy-music-x86_64.apk。\n- Windows 提供 sylphy-music-setup.exe 和 sylphy-music-windows.zip；安装包内部版本和版本清单继续正常递增。\n- 保留 1.0.4 的 Android 10 通知图标修复、歌单菜单与单曲移除，以及 FAB / 横条启动默认样式设置。\n\nAndroid 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-setup-1.0.4-16.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-windows-1.0.4-16.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.5%2B17/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.5%2B17/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.5%2B17/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.5%2B17/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.5%2B17/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.4+16"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.5+17"
   },
   "history": [
+    {
+      "version": "1.0.4",
+      "build": 16,
+      "name": "风灵音乐 v1.0.4",
+      "date": "2026-10-29",
+      "notes": "风灵音乐 1.0.4\n\n- 修复 Android 10 媒体通知控制按钮不可见但仍可点击：显式保留内置操作图标，避免 Release 资源裁剪；三个控制按钮使用白色图标，保留封面取色背景。\n- 歌单更多按钮去掉白色圆底，操作菜单按收藏、本地、云端及读写权限显示。\n- 歌单内单曲更多新增“从此歌单移除”，收藏中显示“从收藏移除”；仅删除当前条目，保留同曲其他重复记录。\n- 外观 → 播放器外观新增“播放器控制”，可设置每次启动默认使用 FAB 或横条；使用中的手动切换仅本次会话生效。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Android 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-setup-1.0.4-16.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-windows-1.0.4-16.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.4+16"
+    },
     {
       "version": "1.0.3",
       "build": 15,
