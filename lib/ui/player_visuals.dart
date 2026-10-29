@@ -27,8 +27,8 @@ class PlayerBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final light = Theme.of(context).brightness == Brightness.light;
-    final base = app.appearance.solidBackground
-        ? (light ? Colors.white : Colors.black)
+    final base = app.appearance.solidBackground && light
+        ? Colors.white
         : scheme.surface;
     final coverBlur =
         background == PlayerBackground.album &&
@@ -87,9 +87,9 @@ class PlayerBackdrop extends StatelessWidget {
                         Colors.white.withValues(alpha: .78),
                       ]
                     : [
-                        Colors.black.withValues(alpha: .52),
-                        scheme.surface.withValues(alpha: .46),
-                        Colors.black.withValues(alpha: .86),
+                        scheme.surface.withValues(alpha: .40),
+                        scheme.surface.withValues(alpha: .52),
+                        scheme.surface.withValues(alpha: .82),
                       ],
                 stops: const [0, .42, 1],
               ),

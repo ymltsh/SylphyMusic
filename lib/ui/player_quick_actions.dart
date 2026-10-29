@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'player_favorite.dart';
+import 'track_actions.dart';
 
 class PlayerQuickActions extends StatelessWidget {
   const PlayerQuickActions({
@@ -62,7 +63,7 @@ class PlayerQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: app.sleepTimer,
+    listenable: Listenable.merge([app.sleepTimer, app]),
     builder: (context, _) => Row(
       key: const ValueKey('player-quick-actions'),
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -96,16 +97,37 @@ class PlayerQuickActions extends StatelessWidget {
         else
           PopupMenuButton<String>(
             tooltip: '更多',
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'edit') {
                 onOpenEditor?.call();
-              } else {
+              } else if (value == 'quality') {
                 onQuality?.call();
+              } else {
+                final selectedTrack = track;
+                if (selectedTrack == null) return;
+                try {
+                  await performTrackAction(context, app, value, selectedTrack);
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('操作失败，请重试')));
+                  }
+                }
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'quality', child: Text('歌曲信息')),
-              PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'quality', child: Text('歌曲信息')),
+              if (track != null) ...[
+                const PopupMenuItem(value: 'playlist', child: Text('加入歌单')),
+                PopupMenuItem(
+                  value: 'block',
+                  child: Text(
+                    app.blacklist.contains(track!.ref.key) ? '取消屏蔽' : '加入歌曲黑名单',
+                  ),
+                ),
+              ],
+              const PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
             ],
           ),
       ],

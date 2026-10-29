@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../core/player_layout.dart';
+import 'app_theme.dart';
 import 'cover_palette.dart';
 import 'lyrics_page.dart';
 import 'player_layout/layout_editor.dart';
@@ -227,17 +228,14 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       }
       final layout = _layout;
       final brightness = Theme.of(context).brightness;
-      final baseScheme = ColorScheme.fromSeed(
-        seedColor: widget.app.appearance.seed,
-        brightness: brightness,
-      );
+      // Share the global charcoal surfaces with the immersive player.
+      final baseTheme = sylphyTheme(widget.app.appearance, brightness);
+      final baseScheme = baseTheme.colorScheme;
       return FutureBuilder<ColorScheme?>(
         future: _paletteFor(track, brightness),
         builder: (context, paletteSnapshot) {
           final scheme = _withCoverPalette(baseScheme, paletteSnapshot.data);
-          final theme = ThemeData(
-            useMaterial3: true,
-            brightness: brightness,
+          final theme = baseTheme.copyWith(
             colorScheme: scheme,
             scaffoldBackgroundColor: scheme.surface,
           );

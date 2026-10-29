@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/appearance.dart';
 import '../core/models.dart';
 import '../core/player_layout.dart';
 import 'lyrics_view.dart';
@@ -141,7 +142,14 @@ class _LyricsPageState extends State<LyricsPage> {
         text: text,
         position: widget.app.playback.position,
         initialFontSize: widget.app.appearance.lyricFontSize,
-        highlightColor: Theme.of(context).colorScheme.primary,
+        highlightColor: switch (widget.app.appearance.lyricPageColorMode) {
+          LyricColorMode.album => Theme.of(context).colorScheme.primary,
+          LyricColorMode.system =>
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+          LyricColorMode.fixed => widget.app.appearance.lyricPageFixedColor,
+        },
         onSeek: _seek,
       );
     },

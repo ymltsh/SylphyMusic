@@ -18,6 +18,7 @@ class SylphyApplication : Application() {
 
     val leases by lazy { EngineLeaseManager(this) }
     private var installedEngine: FlutterEngine? = null
+    private val overlay by lazy { DesktopLyricsOverlay(this) }
     private val channels = mutableMapOf<String, MethodChannel>()
     private var dartStarts = 0
 
@@ -26,6 +27,7 @@ class SylphyApplication : Application() {
         val engine = AudioServicePlugin.getFlutterEngine(this)
         check(FlutterEngineCache.getInstance().get(AudioServicePlugin.getFlutterEngineId()) === engine)
         if (installedEngine === engine) return engine
+        overlay.hide()
         installedEngine = engine
         dartStarts = 0
         Log.i("SylphyLifecycle", "engine_attached engine=${System.identityHashCode(engine)} pid=${android.os.Process.myPid()}")
@@ -59,6 +61,33 @@ class SylphyApplication : Application() {
                         else -> result.notImplemented()
                     }
                 } catch (_: Exception) { result.error("foreground_unavailable", "无法启动或更新前台任务，请回到应用后重试", null) }
+            }
+        }
+        val desktopChannel = MethodChannel(
+            engine.dartExecutor.binaryMessenger, "music.sylphy/desktop_lyrics"
+        )
+        desktopChannel.setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "permission" -> result.success(overlay.hasPermission())
+                    "requestPermission" -> {
+                        overlay.requestPermission()
+                        result.success(null)
+                    }
+                    "show" -> {
+                        overlay.show(
+                            call.argument<String>("text") ?: "",
+                            call.argument<Int>("color") ?: android.graphics.Color.WHITE,
+                            call.argument<Number>("fontSize")?.toFloat() ?: 20f,
+                            onClose = { desktopChannel.invokeMethod("dismissed", null) }
+                        )
+                        result.success(null)
+                    }
+                    "hide" -> { overlay.hide(); result.success(null) }
+                    else -> result.notImplemented()
+                }
+            } catch (e: Exception) {
+                result.error("desktop_lyrics_error", e.message, null)
             }
         }
         MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/engine_lifecycle").setMethodCallHandler { call, result ->

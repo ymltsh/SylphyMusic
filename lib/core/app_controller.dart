@@ -26,6 +26,7 @@ import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lrc_api.dart';
 import '../services/lyrics_store.dart';
+import '../services/android_desktop_lyrics.dart';
 import '../services/webdav_tags.dart';
 import '../services/sync_foreground.dart';
 import '../services/webdav_metadata_enricher.dart';
@@ -65,6 +66,11 @@ class SylphyApp extends ChangeNotifier {
   int catalogRevision = 0;
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
+  late final desktopLyrics = AndroidDesktopLyrics(
+    playback: playback,
+    appearance: appearance,
+    loadLyrics: loadLyrics,
+  );
   late final apiSettings = ApiSettings(db);
   late final lrcApi = LrcApiClient(apiSettings, vault);
   late final playerLayouts = PlayerLayoutStore(db);
@@ -185,6 +191,8 @@ class SylphyApp extends ChangeNotifier {
     app.history.addListener(app._indexChanged);
     await app.reload();
     app.playback.setLyricsLoader((track) => app.loadLyrics(track));
+    app.playback.setArtworkLoader((track) => app.artwork.load(track));
+    if (platformIntegration) await app.desktopLyrics.initialize();
     if (platformIntegration) {
       if (Platform.isAndroid) {
         playback.attachNotificationArtwork(app.artwork);
@@ -788,6 +796,7 @@ class SylphyApp extends ChangeNotifier {
     await index.shutdown();
     await connections.shutdown();
     await jobs.shutdown();
+    await desktopLyrics.shutdown();
     await playback.shutdown();
     await proxy.dispose();
     await cache.shutdown();

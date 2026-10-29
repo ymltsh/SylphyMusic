@@ -14,10 +14,10 @@ class AppBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final solid = appearance?.solidBackground ?? false;
     final file = solid ? null : appearance?.backgroundFile;
-    final solidColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.black
-        : Colors.white;
     final themedSurface = Theme.of(context).colorScheme.surface;
+    final solidColor = Theme.of(context).brightness == Brightness.dark
+        ? themedSurface
+        : Colors.white;
     return Stack(
       fit: StackFit.expand,
       children: [

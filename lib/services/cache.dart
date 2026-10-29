@@ -31,7 +31,8 @@ class CacheEntry {
 
 class TransferToken {
   TransferToken({this.automatic = false});
-  final bool automatic;
+  // A foreground download may claim an in-progress automatic download.
+  bool automatic;
   bool cancelled = false;
   void Function()? onCancel;
   void cancel() {
@@ -187,7 +188,7 @@ class CacheManager {
     final wrongHash =
         stat.type == FileSystemEntityType.file &&
         stat.size == m['bytes'] &&
-        (touch || _verifiedSignatures[ref.key] != signature) &&
+        _verifiedSignatures[ref.key] != signature &&
         (await sha256.bind(file.openRead()).first).toString() != m['sha256'];
     if (stat.type != FileSystemEntityType.file ||
         stat.size != m['bytes'] ||
@@ -284,6 +285,10 @@ class CacheManager {
     if (!automaticOnly) cancelDownload(ref);
     if (automaticOnly && _wholeDemands.contains(ref.key)) return;
     if (token != null && (!automaticOnly || token.automatic)) token.cancel();
+    // An automatic whole-file transfer can still be resolving the source or
+    // waiting behind a relay before it is registered in _active.
+    final download = _downloadTokens[ref.key];
+    if (automaticOnly && download?.automatic == true) download!.cancel();
     _previews.remove(ref.key);
   }
 
@@ -501,20 +506,30 @@ class CacheManager {
     Track track,
     SourceProfile profile, {
     TransferToken? token,
+    bool automatic = false,
   }) async {
-    final existing = _downloads[track.ref.key];
-    if (existing != null) return existing;
-    final demandToken = token ?? TransferToken();
-    _downloadTokens[track.ref.key] = demandToken;
-    _wholeDemands.add(track.ref.key);
+    final key = track.ref.key;
+    final existing = _downloads[key];
+    if (existing != null) {
+      if (!automatic) {
+        // A manual request takes ownership of a shared automatic transfer.
+        _wholeDemands.add(key);
+        final running = _downloadTokens[key];
+        if (running != null) running.automatic = false;
+      }
+      return existing;
+    }
+    final demandToken = token ?? TransferToken(automatic: automatic);
+    _downloadTokens[key] = demandToken;
+    if (!automatic) _wholeDemands.add(key);
     final future = _fetchWhole(track, profile, token: demandToken);
-    _downloads[track.ref.key] = future;
+    _downloads[key] = future;
     try {
       await future;
     } finally {
-      _downloads.remove(track.ref.key);
-      _wholeDemands.remove(track.ref.key);
-      _downloadTokens.remove(track.ref.key);
+      _downloads.remove(key);
+      _wholeDemands.remove(key);
+      _downloadTokens.remove(key);
     }
   }
 

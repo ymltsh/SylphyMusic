@@ -34,6 +34,7 @@ class DiagnosticLogs {
     'manual',
     'playing',
     'queue_size',
+    'rank',
     'source_kind',
     'stage',
     'state',

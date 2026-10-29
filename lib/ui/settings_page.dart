@@ -118,6 +118,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: section == null
                     ? _directory(context)
+                    : section == _Section.lyrics
+                    ? _lyricCards()
                     : [
                         Card(
                           margin: EdgeInsets.zero,
@@ -185,6 +187,120 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     ],
   );
+
+  List<Widget> _lyricCards() => [
+    _group('歌词页面', [
+      _controls(_Section.lyrics)[0],
+      ListTile(
+        leading: const Icon(Icons.palette_outlined),
+        title: const Text('歌词取色'),
+        subtitle: const Text('高亮歌词颜色'),
+        trailing: DropdownButton<LyricColorMode>(
+          value: app.appearance.lyricPageColorMode,
+          underline: const SizedBox(),
+          items: const [
+            DropdownMenuItem(value: LyricColorMode.album, child: Text('专辑取色')),
+            DropdownMenuItem(value: LyricColorMode.system, child: Text('跟随系统')),
+            DropdownMenuItem(value: LyricColorMode.fixed, child: Text('固定颜色')),
+          ],
+          onChanged: (value) =>
+              _act(() => app.appearance.update(lyricPageColorMode: value)),
+        ),
+      ),
+      if (app.appearance.lyricPageColorMode == LyricColorMode.fixed)
+        ListTile(
+          leading: CircleAvatar(
+            radius: 12,
+            backgroundColor: app.appearance.lyricPageFixedColor,
+          ),
+          title: const Text('选择歌词颜色'),
+          onTap: () => _pickLyricsColor(desktop: false),
+          trailing: const Icon(Icons.chevron_right),
+        ),
+    ]),
+    _group('播放页迷你歌词', [_controls(_Section.lyrics)[1]]),
+    if (!kIsWeb && Platform.isAndroid)
+      _group('Android 桌面歌词（悬浮窗）', [
+        SwitchListTile(
+          secondary: const Icon(Icons.picture_in_picture_alt_outlined),
+          title: const Text('显示桌面歌词'),
+          subtitle: const Text('需授予悬浮窗权限；背景自动隐藏，触摸歌词后可拖动或点 × 关闭'),
+          value: app.appearance.desktopLyricsEnabled,
+          onChanged: (value) => _act(() async {
+            final enabled = await app.desktopLyrics.setEnabled(value);
+            if (value && !enabled && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('请在系统设置中授权悬浮窗，返回后将自动开启')),
+              );
+            }
+          }),
+        ),
+        ListTile(
+          leading: const Icon(Icons.format_color_text),
+          title: const Text('桌面歌词取色'),
+          trailing: DropdownButton<LyricColorMode>(
+            value: app.appearance.desktopLyricColorMode,
+            underline: const SizedBox(),
+            items: const [
+              DropdownMenuItem(
+                value: LyricColorMode.system,
+                child: Text('跟随系统'),
+              ),
+              DropdownMenuItem(
+                value: LyricColorMode.fixed,
+                child: Text('固定颜色'),
+              ),
+            ],
+            onChanged: (value) =>
+                _act(() => app.appearance.update(desktopLyricColorMode: value)),
+          ),
+        ),
+        ListTile(
+          title: const Text('桌面歌词大小'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${app.appearance.desktopLyricFontSize.round()}'),
+              Slider(
+                min: 12,
+                max: 40,
+                divisions: 14,
+                value: app.appearance.desktopLyricFontSize,
+                onChanged: (value) => _act(
+                  () => app.appearance.update(desktopLyricFontSize: value),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (app.appearance.desktopLyricColorMode == LyricColorMode.fixed)
+          ListTile(
+            leading: CircleAvatar(
+              radius: 12,
+              backgroundColor: app.appearance.desktopLyricFixedColor,
+            ),
+            title: const Text('选择桌面歌词颜色'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickLyricsColor(desktop: true),
+          ),
+      ]),
+  ];
+
+  Future<void> _pickLyricsColor({required bool desktop}) async {
+    final initial = desktop
+        ? app.appearance.desktopLyricFixedColor
+        : app.appearance.lyricPageFixedColor;
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (_) => ThemeColorDialog(initial: initial),
+    );
+    if (picked == null || !mounted) return;
+    await _act(
+      () => desktop
+          ? app.appearance.update(desktopLyricFixedColor: picked)
+          : app.appearance.update(lyricPageFixedColor: picked),
+    );
+  }
 
   List<Widget> _directory(BuildContext context) => [
     _group('音乐与存储', [

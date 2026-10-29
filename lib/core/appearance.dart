@@ -10,12 +10,22 @@ import 'package:flutter/material.dart';
 
 import '../data/app_db.dart';
 
+/// Colour policy for a lyric surface. The desktop overlay currently supports
+/// system/fixed; album colour is only used on the in-app full-lyrics page.
+enum LyricColorMode { album, system, fixed }
+
 class Appearance extends ChangeNotifier {
   Appearance(this.db);
   final AppDb db;
   static const defaultSeed = Color(0xff5094b2);
   ThemeMode mode = ThemeMode.system;
   Color seed = defaultSeed;
+  LyricColorMode lyricPageColorMode = LyricColorMode.album;
+  Color lyricPageFixedColor = const Color(0xffd5f1ea);
+  LyricColorMode desktopLyricColorMode = LyricColorMode.system;
+  Color desktopLyricFixedColor = const Color(0xffd5f1ea);
+  bool desktopLyricsEnabled = false;
+  double desktopLyricFontSize = 20;
   String? _backgroundName;
   double backgroundVisibility = .24;
   bool _closed = false;
@@ -81,6 +91,45 @@ class Appearance extends ChangeNotifier {
     solidBackground = storedSolid == null
         ? _backgroundName == null
         : storedSolid == 'true';
+    LyricColorMode readColorMode(String? value, LyricColorMode fallback) =>
+        LyricColorMode.values.firstWhere(
+          (mode) => mode.name == value,
+          orElse: () => fallback,
+        );
+    Color readColor(String? value, Color fallback) {
+      final raw = int.tryParse(value ?? '', radix: 16);
+      return raw == null || raw < 0 || raw > 0xffffff
+          ? fallback
+          : Color(0xff000000 | raw);
+    }
+
+    lyricPageColorMode = readColorMode(
+      await db.setting('ui_lyric_page_color_mode'),
+      LyricColorMode.album,
+    );
+    lyricPageFixedColor = readColor(
+      await db.setting('ui_lyric_page_fixed_color'),
+      lyricPageFixedColor,
+    );
+    desktopLyricColorMode = readColorMode(
+      await db.setting('ui_desktop_lyric_color_mode'),
+      LyricColorMode.system,
+    );
+    if (desktopLyricColorMode == LyricColorMode.album) {
+      desktopLyricColorMode = LyricColorMode.system;
+    }
+    desktopLyricFixedColor = readColor(
+      await db.setting('ui_desktop_lyric_fixed_color'),
+      desktopLyricFixedColor,
+    );
+    desktopLyricsEnabled =
+        await db.setting('ui_desktop_lyrics_enabled') == 'true';
+    final desktopFont = double.tryParse(
+      await db.setting('ui_desktop_lyrics_font_size') ?? '',
+    );
+    if (desktopFont != null && desktopFont.isFinite) {
+      desktopLyricFontSize = desktopFont.clamp(12.0, 40.0);
+    }
     final font = double.tryParse(await db.setting('ui_lyrics_font_size') ?? '');
     if (font != null && font.isFinite) {
       final clamped = font.clamp(16.0, 40.0);
@@ -111,8 +160,20 @@ class Appearance extends ChangeNotifier {
     bool? playerFab,
     double? lyricFont,
     double? miniLyricFont,
+    LyricColorMode? lyricPageColorMode,
+    Color? lyricPageFixedColor,
+    LyricColorMode? desktopLyricColorMode,
+    Color? desktopLyricFixedColor,
+    bool? desktopLyricsEnabled,
+    double? desktopLyricFontSize,
   }) async {
     if (_closed) return;
+    if (desktopLyricFontSize != null &&
+        (!desktopLyricFontSize.isFinite ||
+            desktopLyricFontSize < 12 ||
+            desktopLyricFontSize > 40)) {
+      throw ArgumentError('桌面歌词字号超出范围');
+    }
     if (visibility != null &&
         (!visibility.isFinite || visibility < .1 || visibility > .4)) {
       throw ArgumentError('背景可见度超出范围');
@@ -146,6 +207,33 @@ class Appearance extends ChangeNotifier {
     if (miniLyricFont != null) {
       await db.setSetting('ui_mini_lyrics_font_size', '$miniLyricFont');
     }
+    if (lyricPageColorMode != null) {
+      await db.setSetting('ui_lyric_page_color_mode', lyricPageColorMode.name);
+    }
+    if (lyricPageFixedColor != null) {
+      await db.setSetting(
+        'ui_lyric_page_fixed_color',
+        (lyricPageFixedColor.toARGB32() & 0xffffff).toRadixString(16),
+      );
+    }
+    if (desktopLyricColorMode != null) {
+      if (desktopLyricColorMode == LyricColorMode.album) {
+        throw ArgumentError('桌面歌词不支持专辑取色');
+      }
+      await db.setSetting(
+        'ui_desktop_lyric_color_mode',
+        desktopLyricColorMode.name,
+      );
+    }
+    if (desktopLyricFixedColor != null) {
+      await db.setSetting(
+        'ui_desktop_lyric_fixed_color',
+        (desktopLyricFixedColor.toARGB32() & 0xffffff).toRadixString(16),
+      );
+    }
+    if (desktopLyricsEnabled != null) {
+      await db.setSetting('ui_desktop_lyrics_enabled', '$desktopLyricsEnabled');
+    }
     seed = color == null
         ? seed
         : Color(0xff000000 | (color.toARGB32() & 0xffffff));
@@ -159,6 +247,21 @@ class Appearance extends ChangeNotifier {
     this.playerFab = playerFab ?? this.playerFab;
     lyricFontSize = lyricFont ?? lyricFontSize;
     miniLyricFontSize = miniLyricFont ?? miniLyricFontSize;
+    this.lyricPageColorMode = lyricPageColorMode ?? this.lyricPageColorMode;
+    this.lyricPageFixedColor = lyricPageFixedColor ?? this.lyricPageFixedColor;
+    this.desktopLyricColorMode =
+        desktopLyricColorMode ?? this.desktopLyricColorMode;
+    this.desktopLyricFixedColor =
+        desktopLyricFixedColor ?? this.desktopLyricFixedColor;
+    this.desktopLyricsEnabled =
+        desktopLyricsEnabled ?? this.desktopLyricsEnabled;
+    if (desktopLyricFontSize != null) {
+      await db.setSetting(
+        'ui_desktop_lyrics_font_size',
+        '$desktopLyricFontSize',
+      );
+      this.desktopLyricFontSize = desktopLyricFontSize;
+    }
     if (!_closed) notifyListeners();
   }
 

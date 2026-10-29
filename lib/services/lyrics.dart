@@ -6,7 +6,9 @@ class LrcLine {
 
 List<LrcLine> parseLrc(String source) {
   final result = <LrcLine>[];
-  final time = RegExp(r'\[(\d{1,6}):(\d{2})(?:\.(\d{1,3}))?\]');
+  // Emby can append an end marker, such as [00:00.00-1], to a time tag.
+  // LRC display uses the start time; the suffix must not become lyric text.
+  final time = RegExp(r'\[(\d{1,6}):(\d{2})(?:\.(\d{1,3}))?(?:-\d+)?\]');
   final offset =
       int.tryParse(
         RegExp(

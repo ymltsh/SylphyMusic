@@ -67,6 +67,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   final Set<String> _reloadSources = {};
   Future<String?> Function(Track)? _lyricsLoader;
   final Set<TrackRef> _lyricsWarmupRequested = {};
+  Future<File?> Function(Track)? _artworkLoader;
+  final Set<TrackRef> _artworkWarmupRequested = {};
+  String? _aheadPlan;
+  int _aheadGeneration = 0;
+  final Set<TrackRef> _aheadDownloads = {};
 
   // Track *actual position advancement*, not just the player's playing flag.
   // A libmpv stream can remain buffering without ever emitting stream.error.
@@ -173,6 +178,22 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (track != null) _warmLyrics(track);
   }
 
+  /// Warm the same persistent artwork store used by widgets and SystemUI.
+  void setArtworkLoader(Future<File?> Function(Track) loader) {
+    _artworkLoader = loader;
+    final track = current;
+    if (track != null) _warmArtwork(track);
+  }
+
+  void _warmArtwork(Track track) {
+    final loader = _artworkLoader;
+    if (loader == null || !_artworkWarmupRequested.add(track.ref)) return;
+    unawaited(
+      Future<File?>.sync(() => loader(track))
+          .then<void>((_) {}, onError: (Object _, StackTrace _) {}),
+    );
+  }
+
   void _warmLyrics(Track track) {
     final loader = _lyricsLoader;
     if (loader == null || !_lyricsWarmupRequested.add(track.ref)) return;
@@ -187,6 +208,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   void invalidateSource(String id) {
     _reloadSources.add(id);
     _lyricsWarmupRequested.removeWhere((ref) => ref.sourceId == id);
+    _artworkWarmupRequested.removeWhere((ref) => ref.sourceId == id);
+    // Source cancellation is owned by the app's source lifecycle.
+    _aheadPlan = null;
+    ++_aheadGeneration;
   }
 
   SylphyAudioHandler? handler;
@@ -367,7 +392,7 @@ class PlaybackCoordinator extends ChangeNotifier {
           'buffering_changed',
           details: {'buffering': v},
         );
-        if (v && !_opening) cache.invalidatePreview();
+        // A temporary stall must not discard valid ahead-track preview data.
         cache.updatePlaybackPriority(active: playing, buffering: v);
         notifyListeners();
         _publish();
@@ -388,14 +413,6 @@ class PlaybackCoordinator extends ChangeNotifier {
         notifyListeners();
         _publish();
         final now = DateTime.now().millisecondsSinceEpoch;
-        if (playing &&
-            !buffering &&
-            duration > Duration.zero &&
-            duration - position <= const Duration(seconds: 30) &&
-            (player.state.buffer - position >= const Duration(seconds: 8) ||
-                player.state.buffer >= duration)) {
-          unawaited(_prefetchNext());
-        }
         if (!_opening && now - _lastSaved > 5000) {
           _lastSaved = now;
           unawaited(save());
@@ -598,7 +615,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> _prepareCurrent() async {
     final ref = currentRef;
     current = ref == null ? null : await db.track(ref);
-    if (current != null) _warmLyrics(current!);
+    if (current != null) {
+      _warmLyrics(current!);
+      _warmArtwork(current!);
+    }
     position = Duration(milliseconds: snapshot.positionMs);
     notifyListeners();
     _publish();
@@ -633,6 +653,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     position = Duration.zero;
     duration = Duration.zero;
+    _cancelAhead();
     cache.beginQueueSession();
     failures = 0;
     await save();
@@ -676,6 +697,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (source == null) throw StateError('来源已删除');
       if (!source.enabled) throw StateError('来源已停用');
       _warmLyrics(current!);
+      _warmArtwork(current!);
       diagnostics?.record(
         'playback',
         'source_resolved',
@@ -731,7 +753,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       _publish();
       await save();
-      unawaited(_prefetchNext());
+      _scheduleAhead();
     } catch (e) {
       diagnostics?.record(
         'playback',
@@ -787,31 +809,111 @@ class PlaybackCoordinator extends ChangeNotifier {
     await save();
     notifyListeners();
     cache.invalidatePreview();
-    unawaited(_prefetchNext());
+    _scheduleAhead();
   }
 
-  Future<void> _prefetchNext() async {
-    if (!playing || buffering) return;
-    if (duration <= Duration.zero ||
-        duration - position > const Duration(seconds: 30) ||
-        (player.state.buffer - position < const Duration(seconds: 8) &&
-            player.state.buffer < duration)) {
-      return;
+  /// Follow actual play order, including a deterministic list-loop wrap.
+  /// Shuffle creates a new order at wrap time, so its future order is unknown.
+  List<int> _aheadIndices() {
+    if (snapshot.repeat == RepeatKind.one || snapshot.tracks.length < 2) {
+      return const [];
     }
-    final i = _nextIndex();
-    if (i == null) return;
-    try {
-      final t = await db.track(TrackRef.parse(snapshot.tracks[i]));
-      if (t == null) return;
-      final source = await db.source(t.ref.sourceId);
-      if (source == null) return;
-      _warmLyrics(t);
-      await cache.prefetchNext(
-        t,
-        source,
-        planId: '${snapshot.index}/$i/${t.ref.key}',
-      );
-    } catch (_) {}
+    final order = snapshot.order.length == snapshot.tracks.length
+        ? snapshot.order
+        : List.generate(snapshot.tracks.length, (i) => i);
+    final at = order.indexOf(snapshot.index);
+    if (at < 0) return const [];
+    final indices = <int>[];
+    for (var step = 1; step <= 2 && step < order.length; step++) {
+      final offset = at + step;
+      if (offset >= order.length &&
+          (snapshot.repeat != RepeatKind.all || snapshot.shuffle)) {
+        break;
+      }
+      indices.add(order[offset % order.length]);
+    }
+    return indices;
+  }
+
+  void _cancelAhead() {
+    ++_aheadGeneration;
+    _aheadPlan = null;
+    for (final ref in _aheadDownloads.toList()) {
+      unawaited(cache.cancel(ref, automaticOnly: true));
+    }
+    _aheadDownloads.clear();
+  }
+
+  void _scheduleAhead() {
+    if (!_playRequested || currentRef == null) return;
+    final indices = _aheadIndices();
+    final targets = [
+      for (final index in indices) TrackRef.parse(snapshot.tracks[index]),
+    ];
+    final key = '${currentRef!.key}/${targets.map((t) => t.key).join('/')}';
+    if (_aheadPlan == key) return;
+    _aheadPlan = key;
+    final generation = ++_aheadGeneration;
+    final keep = <TrackRef>{currentRef!, ...targets};
+    for (final ref in _aheadDownloads.toList()) {
+      if (keep.contains(ref)) continue;
+      _aheadDownloads.remove(ref);
+      unawaited(cache.cancel(ref, automaticOnly: true));
+    }
+    if (indices.isNotEmpty) unawaited(_warmAhead(indices, generation));
+  }
+
+  Future<void> _warmAhead(List<int> indices, int generation) async {
+    final ready = <({Track track, SourceProfile source})>[];
+    // Warm the first two covers and lyrics before downloading either audio.
+    for (final index in indices) {
+      if (generation != _aheadGeneration) return;
+      try {
+        final track = await db.track(TrackRef.parse(snapshot.tracks[index]));
+        if (generation != _aheadGeneration) return;
+        if (track == null) continue;
+        final source = await db.source(track.ref.sourceId);
+        if (generation != _aheadGeneration) return;
+        if (source == null || !source.enabled) continue;
+        _warmArtwork(track);
+        _warmLyrics(track);
+        if (source.kind != SourceKind.local && !track.missing) {
+          ready.add((track: track, source: source));
+        }
+      } catch (_) {
+        // Optional warming must never interrupt playback.
+      }
+    }
+    // P1 is a verified whole-file cache. P2 only consumes bandwidth after P1.
+    for (var rank = 0; rank < ready.length; rank++) {
+      if (generation != _aheadGeneration || !_playRequested) return;
+      final item = ready[rank];
+      _aheadDownloads.add(item.track.ref);
+      try {
+        await cache.fetchWhole(item.track, item.source, automatic: true);
+        diagnostics?.record(
+          'playback',
+          'ahead_audio_ready',
+          details: {'rank': rank + 1},
+        );
+      } catch (_) {
+        diagnostics?.record(
+          'playback',
+          'ahead_audio_failed',
+          details: {'rank': rank + 1},
+        );
+        if (rank == 0 && generation == _aheadGeneration) {
+          // Strict whole-file validation may fail on a Range-only server.
+          unawaited(
+            cache.prefetchNext(
+              item.track,
+              item.source,
+              planId: '${_aheadPlan ?? ''}/${item.track.ref.key}',
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> play({bool automaticFocusResume = false}) async {
@@ -867,6 +969,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       await player.play();
       // Reassert a focus pause if it arrived during the native play Future.
       if (automaticFocusResume && !_playRequested) await player.pause();
+      if (_playRequested) _scheduleAhead();
     }
   }
 
@@ -882,6 +985,9 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {'system': system},
     );
     _playRequested = false;
+    // Allow a resume to continue unfinished ahead warming.
+    _aheadPlan = null;
+    ++_aheadGeneration;
     _publish();
     await player.pause();
     await save();
@@ -1104,6 +1210,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     cache.invalidatePreview();
     await save();
     notifyListeners();
+    _scheduleAhead();
   }
 
   Future<void> setRepeat(RepeatKind repeat) => setPlaybackMode(
@@ -1211,6 +1318,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     await save();
     notifyListeners();
+    if (!wasCurrent) _scheduleAhead();
   }
 
   Future<void> clearQueue() async {
@@ -1219,6 +1327,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_playIntentGeneration;
     diagnostics?.record('playback', 'queue_cleared');
     _playRequested = false;
+    _cancelAhead();
     _publish();
     final ref = currentRef;
     if (ref != null) await cache.cancel(ref, automaticOnly: true);
@@ -1287,6 +1396,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   @override
   void dispose() {
     _cancelFocusResume();
+    _cancelAhead();
     _stallTimer?.cancel();
     _stallTimer = null;
     _detachNotificationArtwork();
@@ -1303,8 +1413,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     _stallTimer?.cancel();
     _stallTimer = null;
     _playRequested = false;
+    _cancelAhead();
     _lyricsLoader = null;
     _lyricsWarmupRequested.clear();
+    _artworkLoader = null;
+    _artworkWarmupRequested.clear();
     _publish();
     _detachNotificationArtwork();
     for (final subscription in _subscriptions) {

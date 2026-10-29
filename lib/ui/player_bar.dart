@@ -14,6 +14,28 @@ import 'track_lookup.dart';
 String formatTime(Duration time) =>
     '${time.inMinutes}:${(time.inSeconds % 60).toString().padLeft(2, '0')}';
 
+// The mini player opens as a bottom sheet-like full page, with a matching
+// downward exit animation when the user dismisses it.
+Route<void> _nowPlayingRoute(SylphyApp app) => PageRouteBuilder<void>(
+  pageBuilder: (_, _, _) => NowPlayingPage(app: app),
+  transitionDuration: const Duration(milliseconds: 320),
+  reverseTransitionDuration: const Duration(milliseconds: 260),
+  transitionsBuilder: (context, animation, _, child) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    return SlideTransition(
+      position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+          .animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+          ),
+      child: child,
+    );
+  },
+);
+
 class PlayerBar extends StatelessWidget {
   const PlayerBar({
     super.key,
@@ -53,10 +75,7 @@ class PlayerBar extends StatelessWidget {
         child: InkWell(
           onTap: track == null
               ? null
-              : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => NowPlayingPage(app: app)),
-                ),
+              : () => Navigator.of(context).push(_nowPlayingRoute(app)),
           onLongPress: onCollapse,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -219,10 +238,7 @@ class PlayerBar extends StatelessWidget {
       child: InkWell(
         onTap: track == null
             ? null
-            : () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => NowPlayingPage(app: app)),
-              ),
+            : () => Navigator.of(context).push(_nowPlayingRoute(app)),
         child: Row(
           children: [
             if (track != null) CoverArt(app: app, track: track),

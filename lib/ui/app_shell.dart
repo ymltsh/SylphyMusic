@@ -161,6 +161,17 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
   }
 
+  double _navigationBarHeight(BuildContext context) {
+    // NavigationBar.height excludes the bottom system inset. Keep icons and
+    // labels comfortable while adapting to accessibility text scaling.
+    final labelHeight = MediaQuery.textScalerOf(context).scale(12);
+    final extra = ((labelHeight - 12) * 2).clamp(0.0, 32.0).toDouble();
+    final shortScreen = MediaQuery.sizeOf(context).height < 600;
+    return (72.0 + extra - (shortScreen ? 4.0 : 0.0))
+        .clamp(68.0, 104.0)
+        .toDouble();
+  }
+
   Widget _buildContent(BuildContext context) {
     if (onboarding == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -209,6 +220,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     final customBackground =
         app.appearance.backgroundFile != null && !solidBackground;
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return AppBackground(
       appearance: app.appearance,
       child: Scaffold(
@@ -281,13 +293,19 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         bottomNavigationBar: wide
             ? null
             : NavigationBar(
-                backgroundColor: solidBackground
+                backgroundColor: dark
+                    ? scheme.surfaceContainerLow.withValues(
+                        alpha: customBackground ? .92 : 1,
+                      )
+                    : solidBackground
                     ? Colors.transparent
                     : customBackground
                     ? scheme.surfaceContainer.withValues(alpha: .90)
                     : null,
-                surfaceTintColor: solidBackground ? Colors.transparent : null,
-                height: 54,
+                surfaceTintColor: dark || solidBackground
+                    ? Colors.transparent
+                    : null,
+                height: _navigationBarHeight(context),
                 maintainBottomViewPadding: true,
                 selectedIndex: tab,
                 onDestinationSelected: (v) => setState(() => tab = v),
@@ -1123,8 +1141,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       key: const ValueKey('collapsed-player-fab'),
       heroTag: 'collapsed-player-fab',
       tooltip: '展开播放器',
-      backgroundColor: const Color(0xff0d0d10),
-      foregroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+      foregroundColor: Theme.of(context).colorScheme.onSurface,
       elevation: 4,
       shape: const CircleBorder(),
       onPressed: () => setState(() => playerCollapsed = false),

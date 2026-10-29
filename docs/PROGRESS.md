@@ -1,5 +1,43 @@
 # 实施与验证记录
 
+## 2026-10-30 桌面歌词字号 / 背景自动淡出并发布 1.0.11+23
+
+Android 桌面歌词增加独立字号滑块（12–40，默认 20），复用 settings 保存并经既有通道即时传入原生 TextView；更新去重包含字号。原生背景与关闭按钮在显示、修改颜色 / 字号或操作后静置 2.5 秒，以 350 毫秒淡出，仅保留歌词；触摸恢复操作区域，拖动期间取消淡出，松手重新计时。普通歌词更新保留当前背景透明度，不重置淡出计时；关闭窗口移除计时回调并取消动画。
+
+发布正式版 [1.0.11+23](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.11%2B23)，Android 三 ABI、Windows Release 与安装程序构建完成，Android 正式签名匹配；六个固定名称资产远端大小 / SHA-256 与本地一致，GitHub latest 与远端正式清单已更新。仅清单提交 `4671cb9` 已推送，源码改动保留本地。日志为 `build/test_logs/release-1.0.11.log`，产物位于 `build/releases/1.0.11-23/`。
+
+按用户约定未运行静态分析、测试或设备验证，实际悬浮交互由用户确认；Windows 未代码签名。
+
+## 2026-10-30 应用歌词颜色 / Android 桌面歌词补丁并发布 1.0.10+22
+
+应用 `sylphymusic-lyrics-colors-android-desktop.patch`，适配现有封面预热装配上下文，保留后两首预取。歌词页提供专辑取色、跟随系统与固定颜色；Android 新增默认关闭的悬浮桌面歌词，可在歌词设置中主动开启、授权悬浮窗、拖动或关闭，颜色支持跟随系统与固定值。复用现有播放器、歌词加载与 audio_service 引擎，在 disposeAsync 中先关闭悬浮歌词协调再关闭播放和存储。颜色与开关复用 settings，不修改数据库 schema。修正 Kotlin 关闭按钮 text 属性与函数参数同名导致的编译错误。
+
+本次包含此前炭灰深色主题与自适应导航补丁，发布正式版 [1.0.10+22](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.10%2B22)。Android 三 ABI、Windows Release 与安装程序编译成功，六个固定名称资产远端大小 / SHA-256 与本地一致；GitHub latest 和远端正式清单已更新，仅清单提交 `8a40160` 已推送，源码修改保留本地。
+
+Android 正式签名匹配，Windows 未代码签名。按用户约定未运行静态分析、测试或设备验证，实际功能与悬浮权限流程由用户确认。发布日志为 `build/test_logs/release-1.0.10.log`，产物位于 `build/releases/1.0.10-22/`。
+
+## 2026-10-30 应用炭灰深色主题与自适应底部导航补丁
+
+应用 `sylphymusic-charcoal-dark-adaptive-navbar.patch`：深色 Surface 改为分层炭灰色，保留用户主色作为强调色；一级页纯色底与播放页共用主题 Surface，深色封面模糊遮罩沿用炭灰底色。播放页基础主题复用 sylphyTheme；底部 NavigationBar 根据字体缩放与屏幕高度调整到 68–104 逻辑像素，保留系统安全区处理，深色导航栏与折叠 FAB 使用对应主题层级。同步外观说明。
+
+Android 三 ABI Release 与 Windows Release 编译、内部打包完成，版本保持 `1.0.9+21`，产物位于 `build/internal-review/`，日志为 `build/test_logs/charcoal-dark-adaptive-navbar-build.log`。未运行静态分析、测试或设备验证，未提交、推送或发布。
+
+## 2026-10-30 应用歌词 / 菜单 / 滑动补丁并发布 1.0.9+21
+
+应用 `sylphymusic-lyrics-menu-slide-fix.patch`：LRC 时间标签兼容 Emby 附带的结束标记，避免后缀混入歌词；播放页更多菜单复用歌曲操作入口，加入歌单与黑名单 / 取消屏蔽；迷你播放器打开播放页使用自下向上动画，返回使用向下退出动画，遵循系统减少动画设置。本次同时交付此前未发布的后两首封面、歌词与音频预取补丁。
+
+Android 三 ABI、Windows Release 和安装程序编译成功，发布正式版 [1.0.9+21](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.9%2B21)。六个固定名称资产的远端大小 / SHA-256 与本地一致，GitHub latest 和远端正式清单已指向本版；仅清单提交 `5fbd1d8` 已推送，源码改动保留本地。发布进程通过 NO_PROXY 绕过本机代理，不修改系统代理设置。
+
+按用户约定未运行静态分析、测试或设备验证，实际行为由用户确认。Android 使用正式签名，Windows 未代码签名。日志为 `build/test_logs/release-1.0.9.log`，本地产物位于 `build/releases/1.0.9-21/`。
+
+## 2026-10-30 应用后两首预取补丁
+
+应用 `sylphymusic-two-track-prefetch.patch`，适配补丁中省略的 setRepeat / clearQueue 函数上下文及文件分隔头。播放时按实际队列顺序预热后两首封面、歌词，顺序尝试完整音频缓存；第一首完整缓存失败时回退内存前缀预取。列表循环可跨队尾，随机模式不猜测下一轮顺序，单曲循环不预取其他曲目。队列、模式和播放意图变化使过期计划失效，保留现有来源取消与缓存完整性边界。
+
+自动整曲下载令牌可被手动请求接管，取消自动工作时包含尚未注册活动连接的下载；相同资源签名不因 touch 重复校验摘要。应用装配共用 ArtworkStore 回调，新增诊断 rank 字段进入白名单，避免导出过滤预取顺序信息。同步架构说明。
+
+Android 三 ABI Release 与 Windows Release 编译、内部打包完成，版本保持当前 `1.0.8+20`，产物位于 `build/internal-review/`，日志为 `build/test_logs/two-track-prefetch-build.log`。按用户约定未运行分析、测试或设备验证，未连接私人音源，未提交、推送或发布。
+
 ## 2026-10-29 发布 1.0.8+20
 
 按用户要求发布正式版 [1.0.8+20](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.8%2B20)，内容是上一轮的音频焦点恢复补丁，更新日志保持三条面向用户的描述。Android 三 ABI APK、Windows 安装程序、便携 ZIP 与摘要文件共六个固定名称资产上传完成，远端大小与本地一致；正式清单 `latest` 指向 1.0.8+20、history 保留 11 条，清单提交 `7ce3f6d` 已推送。
