@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.10",
-    "build": 22,
-    "name": "风灵音乐 v1.0.10",
+    "version": "1.0.11",
+    "build": 23,
+    "name": "风灵音乐 v1.0.11",
     "date": "2026-10-30",
-    "notes": "风灵音乐 1.0.10\n\n- 歌词页面新增专辑取色、跟随系统和固定颜色模式，可单独选择高亮歌词颜色。\n- Android 新增可拖动、可关闭的桌面悬浮歌词，支持跟随系统或固定颜色；需手动开启并授予悬浮窗权限。\n- 深色界面改为分层炭灰配色，播放页统一主题底色，底部导航栏高度适配屏幕和字体大小。\n",
+    "notes": "风灵音乐 1.0.11\n\n- Android 桌面歌词新增字号调节，支持 12–40 并保存选择，调整后即时生效。\n- 桌面歌词背景和关闭按钮静置后自动淡出，只保留歌词；触摸后重新显示，方便拖动或关闭。\n- 正常歌词换行保持背景隐藏，调整颜色或字号时短暂显示操作区域。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.11%2B23/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.11%2B23/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.11%2B23/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.11%2B23/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.11%2B23/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.10+22"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.11+23"
   },
   "history": [
+    {
+      "version": "1.0.10",
+      "build": 22,
+      "name": "风灵音乐 v1.0.10",
+      "date": "2026-10-30",
+      "notes": "风灵音乐 1.0.10\n\n- 歌词页面新增专辑取色、跟随系统和固定颜色模式，可单独选择高亮歌词颜色。\n- Android 新增可拖动、可关闭的桌面悬浮歌词，支持跟随系统或固定颜色；需手动开启并授予悬浮窗权限。\n- 深色界面改为分层炭灰配色，播放页统一主题底色，底部导航栏高度适配屏幕和字体大小。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.10%2B22/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.10+22"
+    },
     {
       "version": "1.0.9",
       "build": 21,
