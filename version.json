@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.3",
-    "build": 15,
-    "name": "风灵音乐 v1.0.3",
+    "version": "1.0.4",
+    "build": 16,
+    "name": "风灵音乐 v1.0.4",
     "date": "2026-10-29",
-    "notes": "风灵音乐 1.0.3\n\n- 新增飞牛音乐（fnOS）首期接入：独立账号登录、曲库索引、播放、封面、歌词及只读云歌单；地址以 /music 结尾，暂不支持云歌单写入和 FN Connect 自动寻址。\n- 改进后台播放恢复：分离离线下载与播放连接的取消操作，新增本地媒体代理健康探测及串行重启，避免过期恢复覆盖用户操作。\n- Android 返回前台时重新恢复边到边显示和系统栏样式，改善底部手势条沉浸显示。\n- Android 10 媒体通知关闭封面取色，改善操作图标对比度；补充播放停滞、代理请求和生命周期诊断。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+    "notes": "风灵音乐 1.0.4\n\n- 修复 Android 10 媒体通知控制按钮不可见但仍可点击：显式保留内置操作图标，避免 Release 资源裁剪；三个控制按钮使用白色图标，保留封面取色背景。\n- 歌单更多按钮去掉白色圆底，操作菜单按收藏、本地、云端及读写权限显示。\n- 歌单内单曲更多新增“从此歌单移除”，收藏中显示“从收藏移除”；仅删除当前条目，保留同曲其他重复记录。\n- 外观 → 播放器外观新增“播放器控制”，可设置每次启动默认使用 FAB 或横条；使用中的手动切换仅本次会话生效。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Android 使用既有正式签名，Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-setup-1.0.3-15.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-windows-1.0.3-15.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-1.0.4-16-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-setup-1.0.4-16.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.4%2B16/sylphy-music-windows-1.0.4-16.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.3+15"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.4+16"
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "build": 15,
+      "name": "风灵音乐 v1.0.3",
+      "date": "2026-10-29",
+      "notes": "风灵音乐 1.0.3\n\n- 新增飞牛音乐（fnOS）首期接入：独立账号登录、曲库索引、播放、封面、歌词及只读云歌单；地址以 /music 结尾，暂不支持云歌单写入和 FN Connect 自动寻址。\n- 改进后台播放恢复：分离离线下载与播放连接的取消操作，新增本地媒体代理健康探测及串行重启，避免过期恢复覆盖用户操作。\n- Android 返回前台时重新恢复边到边显示和系统栏样式，改善底部手势条沉浸显示。\n- Android 10 媒体通知关闭封面取色，改善操作图标对比度；补充播放停滞、代理请求和生命周期诊断。\n\n提供 Android 三架构 APK、Windows 安装程序和便携 ZIP。Windows 暂未代码签名。本次按维护者要求仅编译与打包，未运行静态分析、测试或设备验收，实际功能由用户验证。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-1.0.3-15-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-setup-1.0.3-15.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.3%2B15/sylphy-music-windows-1.0.3-15.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.3+15"
+    },
     {
       "version": "1.0.2",
       "build": 14,
