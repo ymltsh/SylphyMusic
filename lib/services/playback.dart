@@ -43,9 +43,22 @@ class PlaybackCoordinator extends ChangeNotifier {
   int failures = 0;
   double speed = 1.0;
   double volume = 100;
-  bool _opening = false, _userPaused = false, _interrupted = false;
+  bool _opening = false, _userPaused = false;
   bool _handlingFailure = false;
   bool _finishingTrack = false;
+  // GAIN is not permission to restart immediately: video feeds can briefly
+  // release focus between clips. Keep resume eligibility separate from focus.
+  bool _resumeOnFocusGain = false;
+  bool _focusWasLost = false;
+  bool _ducking = false;
+  TrackRef? _focusResumeRef;
+  Timer? _focusResumeTimer;
+  int _focusResumeEpoch = 0;
+  DateTime? _focusBurstStarted;
+  int _focusLossCount = 0;
+  static const _focusResumeDelay = Duration(seconds: 2);
+  static const _focusChatterWindow = Duration(seconds: 12);
+  static const _focusResumeMaxAge = Duration(seconds: 15);
   int _lastSaved = 0;
   int _reconnects = 0;
   TrackRef? _recoveryRef;
@@ -196,6 +209,130 @@ class PlaybackCoordinator extends ChangeNotifier {
   })?
   _lastMediaItem;
 
+  void _cancelFocusResume({
+    bool keepEligibility = false,
+    bool resetBurst = false,
+  }) {
+    ++_focusResumeEpoch;
+    _focusResumeTimer?.cancel();
+    _focusResumeTimer = null;
+    if (!keepEligibility) {
+      _resumeOnFocusGain = false;
+      _focusResumeRef = null;
+    }
+    if (resetBurst) {
+      _focusBurstStarted = null;
+      _focusLossCount = 0;
+    }
+  }
+
+  Future<void> _applyPlayerVolume() =>
+      player.setVolume(volume * (_ducking ? 0.25 : 1.0));
+
+  Future<void> _abandonAudioFocus() async {
+    if (_session == null) return;
+    try {
+      await _session!.setActive(false);
+    } catch (_) {
+      // Cleanup must not fail if Android has already reclaimed the session.
+      diagnostics?.record('audio_focus', 'release_failed');
+    }
+  }
+
+  void _onAudioInterruption(AudioInterruptionEvent event) {
+    diagnostics?.record(
+      'audio_focus',
+      'interruption',
+      details: {
+        'state': event.begin ? 'begin' : 'end',
+        'type': event.type.name,
+      },
+    );
+    if (event.begin) {
+      // A new loss always cancels a pending timer. A second rapid loss also
+      // cancels the right to auto-resume, preventing clip-to-clip oscillation.
+      _cancelFocusResume(
+        keepEligibility: event.type == AudioInterruptionType.pause,
+      );
+      if (event.type == AudioInterruptionType.duck) {
+        _ducking = true;
+        unawaited(_applyPlayerVolume());
+        return;
+      }
+      if (_ducking) {
+        _ducking = false;
+        unawaited(_applyPlayerVolume());
+      }
+
+      _focusWasLost = true;
+      final wasRequested = _playRequested; // Includes buffering and track open.
+      if (event.type == AudioInterruptionType.pause) {
+        if (wasRequested || _resumeOnFocusGain) {
+          final now = DateTime.now();
+          if (_focusBurstStarted == null ||
+              now.difference(_focusBurstStarted!) > _focusChatterWindow) {
+            _focusBurstStarted = now;
+            _focusLossCount = 0;
+          }
+          ++_focusLossCount;
+          if (_focusLossCount >= 2) {
+            _cancelFocusResume();
+            diagnostics?.record('audio_focus', 'resume_suppressed');
+          } else if (wasRequested) {
+            _resumeOnFocusGain = true;
+            _focusResumeRef = currentRef;
+          }
+        }
+      } else {
+        // audio_session maps permanent AUDIOFOCUS_LOSS to `unknown`.
+        // It must never create an automatic resume entitlement.
+        _cancelFocusResume();
+      }
+      if (wasRequested) unawaited(pause(system: true));
+      return;
+    }
+
+    if (event.type == AudioInterruptionType.duck) {
+      _ducking = false;
+      unawaited(_applyPlayerVolume());
+      return;
+    }
+    _focusWasLost = false;
+    if (event.type != AudioInterruptionType.pause ||
+        !_resumeOnFocusGain ||
+        _userPaused) {
+      return;
+    }
+    final resumeRef = _focusResumeRef;
+    if (resumeRef == null) {
+      _cancelFocusResume();
+      return;
+    }
+    final focusEpoch = _focusResumeEpoch;
+    final intentGeneration = _playIntentGeneration;
+    final loadGeneration = _loadGeneration;
+    final gainTime = DateTime.now();
+    _focusResumeTimer?.cancel();
+    _focusResumeTimer = Timer(_focusResumeDelay, () {
+      _focusResumeTimer = null;
+      if (focusEpoch != _focusResumeEpoch ||
+          _focusWasLost ||
+          !_resumeOnFocusGain ||
+          _userPaused ||
+          _playRequested ||
+          currentRef != resumeRef ||
+          _playIntentGeneration != intentGeneration ||
+          _loadGeneration != loadGeneration ||
+          DateTime.now().difference(gainTime) > _focusResumeMaxAge) {
+        _cancelFocusResume();
+        return;
+      }
+      _cancelFocusResume();
+      diagnostics?.record('audio_focus', 'resume_after_stable_gain');
+      unawaited(play(automaticFocusResume: true));
+    });
+  }
+
   Future<void> initialize() async {
     snapshot = await db.queue();
     speed = double.tryParse(await db.setting('speed') ?? '1') ?? 1;
@@ -323,27 +460,12 @@ class PlaybackCoordinator extends ChangeNotifier {
       _session = await AudioSession.instance;
       await _session!.configure(const AudioSessionConfiguration.music());
       _subscriptions.add(
-        _session!.interruptionEventStream.listen((event) {
-          if (event.begin) {
-            if (event.type == AudioInterruptionType.duck) {
-              unawaited(player.setVolume(volume * 0.25));
-            } else if (playing) {
-              _interrupted = true;
-              unawaited(pause(system: true));
-            }
-          } else {
-            if (event.type == AudioInterruptionType.duck) {
-              unawaited(player.setVolume(volume));
-            } else if (_interrupted && !_userPaused) {
-              _interrupted = false;
-              unawaited(play());
-            }
-          }
-        }),
+        _session!.interruptionEventStream.listen(_onAudioInterruption),
       );
       _subscriptions.add(
         _session!.becomingNoisyEventStream.listen((_) {
-          _interrupted = false;
+          _cancelFocusResume();
+          _focusWasLost = false;
           unawaited(pause(system: true));
         }),
       );
@@ -488,6 +610,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     bool autoplay = true,
   }) async {
     if (tracks.isEmpty) return;
+    _cancelFocusResume(resetBurst: true);
+    _focusWasLost = false;
+    if (autoplay) _userPaused = false;
     final previousRef = currentRef;
     if (previousRef != null) {
       await cache.cancel(previousRef, automaticOnly: true);
@@ -563,7 +688,12 @@ class PlaybackCoordinator extends ChangeNotifier {
           _playRequested &&
           _session != null &&
           !await _session!.setActive(true)) {
-        throw StateError('系统暂时未授予音频焦点');
+        // Focus denial is not a broken media source. Do not skip tracks.
+        _playRequested = false;
+        error = '系统暂时未授予音频焦点';
+        notifyListeners();
+        _publish();
+        return;
       }
       cache.lease(ref);
       _leased = ref;
@@ -594,7 +724,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       }
       // A pause can arrive while the async track opening was in flight.
       if (!_playRequested) await player.pause();
-      _userPaused = !_playRequested;
+      // Never infer a USER pause from _playRequested: audio focus may have
+      // paused us while player.open was still awaiting native preparation.
       diagnostics?.record('playback', 'load_finished');
       _reloadSources.remove(source.id);
       notifyListeners();
@@ -683,13 +814,27 @@ class PlaybackCoordinator extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> play() async {
-    ++_playIntentGeneration;
+  Future<void> play({bool automaticFocusResume = false}) async {
+    if (!automaticFocusResume) {
+      _cancelFocusResume(resetBurst: true);
+      _focusWasLost = false;
+    }
+    final focusEpoch = _focusResumeEpoch;
+    final intentGeneration = ++_playIntentGeneration;
     diagnostics?.record('playback', 'play_requested');
     _userPaused = false;
     if (current == null) await _prepareCurrent();
     if (current == null) return;
+    final requestedRef = currentRef;
     final source = await db.source(current!.ref.sourceId);
+    if (intentGeneration != _playIntentGeneration ||
+        currentRef != requestedRef ||
+        (automaticFocusResume &&
+            (focusEpoch != _focusResumeEpoch ||
+                _focusWasLost ||
+                _userPaused))) {
+      return;
+    }
     if (source == null || !source.enabled) {
       error = '来源已停用或移除';
       await pause();
@@ -712,17 +857,30 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (_playRequested) await player.play();
+    if (automaticFocusResume &&
+        (focusEpoch != _focusResumeEpoch || _focusWasLost || _userPaused)) {
+      _playRequested = false;
+      _publish();
+      return;
+    }
+    if (_playRequested && intentGeneration == _playIntentGeneration) {
+      await player.play();
+      // Reassert a focus pause if it arrived during the native play Future.
+      if (automaticFocusResume && !_playRequested) await player.pause();
+    }
   }
 
   Future<void> pause({bool system = false}) async {
+    if (!system) {
+      _cancelFocusResume(resetBurst: true);
+      _userPaused = true;
+    }
     ++_playIntentGeneration;
     diagnostics?.record(
       'playback',
       'pause_requested',
       details: {'system': system},
     );
-    if (!system) _userPaused = true;
     _playRequested = false;
     _publish();
     await player.pause();
@@ -749,6 +907,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> next({bool manual = true}) async {
+    if (manual) {
+      _cancelFocusResume(resetBurst: true);
+      _focusWasLost = false;
+      _userPaused = false;
+    }
     diagnostics?.record(
       'playback',
       'next_requested',
@@ -791,6 +954,9 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> previous() async {
     if (snapshot.tracks.isEmpty) return;
+    _cancelFocusResume(resetBurst: true);
+    _focusWasLost = false;
+    _userPaused = false;
     int? index;
     var hist = [...snapshot.history];
     if (hist.isNotEmpty) {
@@ -965,7 +1131,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> setVolume(double v) async {
     volume = v.clamp(0, 100);
-    await player.setVolume(volume);
+    await _applyPlayerVolume();
     await db.setSetting('volume', '$volume');
     notifyListeners();
   }
@@ -985,6 +1151,9 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> retry() async {
+    _cancelFocusResume(resetBurst: true);
+    _focusWasLost = false;
+    _userPaused = false;
     failures = 0;
     await save();
     await _loadCurrent(autoplay: true, manual: true);
@@ -992,6 +1161,9 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> jumpTo(int index) async {
     if (index < 0 || index >= snapshot.tracks.length) return;
+    _cancelFocusResume(resetBurst: true);
+    _focusWasLost = false;
+    _userPaused = false;
     final old = currentRef;
     if (old != null) await cache.cancel(old, automaticOnly: true);
     snapshot = QueueSnapshot(
@@ -1010,6 +1182,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> removeAt(int index) async {
     if (index < 0 || index >= snapshot.tracks.length) return;
     final wasCurrent = index == snapshot.index;
+    if (wasCurrent) _cancelFocusResume(resetBurst: true);
     final wasPlaying = _playRequested;
     final tracks = [...snapshot.tracks]..removeAt(index);
     if (tracks.isEmpty) {
@@ -1041,12 +1214,16 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> clearQueue() async {
+    _cancelFocusResume(resetBurst: true);
+    _focusWasLost = false;
+    ++_playIntentGeneration;
     diagnostics?.record('playback', 'queue_cleared');
     _playRequested = false;
     _publish();
     final ref = currentRef;
     if (ref != null) await cache.cancel(ref, automaticOnly: true);
     await player.stop();
+    await _abandonAudioFocus();
     if (_leased != null) {
       cache.release(_leased!);
       _leased = null;
@@ -1109,6 +1286,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    _cancelFocusResume();
     _stallTimer?.cancel();
     _stallTimer = null;
     _detachNotificationArtwork();
@@ -1121,6 +1299,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> shutdown() async {
+    _cancelFocusResume();
     _stallTimer?.cancel();
     _stallTimer = null;
     _playRequested = false;
@@ -1132,6 +1311,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       await subscription.cancel();
     }
     _subscriptions.clear();
+    await _abandonAudioFocus();
     await save();
     if (_leased != null) {
       cache.release(_leased!);
