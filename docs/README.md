@@ -6,10 +6,10 @@
 |---|---|
 | [更新与发布流程](../update.md) | 手动更新、正式 / 测试版清单、本地打包与显式 GitHub 发布 |
 | [Android 正式签名](ANDROID_SIGNING.md) | 正式证书、私钥备份、验签与测试版迁移限制 |
-| [项目 README](../README.md) | 运行、构建、功能与内部验收包 |
+| [项目 README](../README.md) | 面向用户的功能、音源、下载、快速开始与技术栈 |
 | [AGENTS](../AGENTS.md) | 协作约定、工程边界与私密数据 |
 | [ARCH 入口](../ARCH.md) / [架构正文](ARCHITECTURE.md) | 模块、来源能力、数据流与生命周期 |
-| [CONTRIBUTING](../CONTRIBUTING.md) | 环境、编译交付、可选私密联调和打包 |
+| [CONTRIBUTING](../CONTRIBUTING.md) | 环境、运行、编译交付、用户验证、私密联调、打包与验收边界 |
 | [PROJECT_SPEC_v3.8](PROJECT_SPEC_v3.8.md) | 产品目标，不代表全部实现或验收完成 |
 | [IMPLEMENTATION_PLAN](IMPLEMENTATION_PLAN.md) | 实施计划与决策背景 |
 | [PROGRESS](PROGRESS.md) | 最新证据、剩余工作和验收输出 |
