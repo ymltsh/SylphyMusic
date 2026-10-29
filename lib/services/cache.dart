@@ -35,6 +35,7 @@ class TransferToken {
   bool cancelled = false;
   void Function()? onCancel;
   void cancel() {
+    if (cancelled) return;
     cancelled = true;
     onCancel?.call();
   }
@@ -272,9 +273,15 @@ class CacheManager {
     }
   }
 
+  /// A cache job owns its explicit download, not the playback relay for the
+  /// same track. Pausing a dataSync service must never close the mpv upstream.
+  void cancelDownload(TrackRef ref) {
+    _downloadTokens[ref.key]?.cancel();
+  }
+
   Future<void> cancel(TrackRef ref, {bool automaticOnly = false}) async {
     final token = _active[ref.key];
-    if (!automaticOnly) _downloadTokens[ref.key]?.cancel();
+    if (!automaticOnly) cancelDownload(ref);
     if (automaticOnly && _wholeDemands.contains(ref.key)) return;
     if (token != null && (!automaticOnly || token.automatic)) token.cancel();
     _previews.remove(ref.key);
@@ -533,6 +540,20 @@ class CacheManager {
         current.url != profile.url ||
         current.username != profile.username) {
       throw StateError('来源已停用或连接已变化');
+    }
+    // captureRelay may have claimed this track while _spaceGuard/store.source
+    // was awaiting. Never overwrite its token with a download token: doing so
+    // loses cancellation ownership and can leak an in-flight relay.
+    while (_active.containsKey(track.ref.key)) {
+      if (_stopped || token?.cancelled == true) {
+        throw StateError('缓存任务已取消');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (_stopped ||
+        token?.cancelled == true ||
+        epoch != (_sourceEpochs[profile.id] ?? 0)) {
+      throw StateError('缓存任务已取消或来源已变化');
     }
     final adapter = factory.create(profile);
     final t = token ?? TransferToken();

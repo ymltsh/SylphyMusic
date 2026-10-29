@@ -6,9 +6,21 @@ import io.flutter.plugin.common.MethodChannel
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 
 class MainActivity : AudioServiceActivity() {
     private val notificationRequests = mutableListOf<MethodChannel.Result>()
+    // Correlate the observed foreground recovery with the Dart watchdog gap.
+    override fun onStart() {
+        super.onStart()
+        Log.i("SylphyLifecycle", "activity_visible pid=${android.os.Process.myPid()}")
+    }
+
+    override fun onStop() {
+        Log.i("SylphyLifecycle", "activity_hidden pid=${android.os.Process.myPid()}")
+        super.onStop()
+    }
+
     // audio_service owns the engine; active dataSync leases keep it bound.
     override fun provideFlutterEngine(context: Context): FlutterEngine =
         (application as SylphyApplication).engine()

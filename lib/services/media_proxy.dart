@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:synchronized/synchronized.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/models.dart';
@@ -16,6 +18,8 @@ class MediaProxy {
   final CacheManager cache;
   final AdapterFactory factory;
   final DiagnosticLogs? diagnostics;
+  final Lock _lifecycleLock = Lock();
+  bool _disposed = false;
   HttpServer? _server;
   final Set<Future<void>> _handlers = {};
   final Map<HttpClient, String> _clients = {};
@@ -33,19 +37,77 @@ class MediaProxy {
   final Map<String, ({Track track, SourceProfile profile, DateTime expires})>
   _tickets = {};
   int get port => _server?.port ?? 0;
-  Future<void> start() async {
-    _server = await HttpServer.bind(
+
+  Future<void> _bind() async {
+    final server = await HttpServer.bind(
       InternetAddress.loopbackIPv4,
       0,
       shared: false,
     );
+    _server = server;
     diagnostics?.record('proxy', 'server_listening');
-    _server!.listen((req) {
+    server.listen((req) {
       final handler = _handle(req);
       _handlers.add(handler);
       unawaited(handler.whenComplete(() => _handlers.remove(handler)));
     });
   }
+
+  Future<void> start() => _lifecycleLock.synchronized(() async {
+    if (_disposed) throw StateError('媒体代理已关闭');
+    if (_server == null) await _bind();
+  });
+
+  /// Probe the actual HTTP listener, not merely the nonzero port. This does
+  /// not assert that Emby or an existing upstream transfer is healthy.
+  Future<bool> ping() async {
+    final server = _server;
+    if (_disposed || server == null) return false;
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 2);
+    try {
+      final request = await client
+          .getUrl(Uri.parse('http://127.0.0.1:${server.port}/health'))
+          .timeout(const Duration(seconds: 2));
+      final response = await request.close().timeout(
+        const Duration(seconds: 2),
+      );
+      if (response.statusCode != HttpStatus.ok) return false;
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 2));
+      return body == 'proxy ok';
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Serialized against start/dispose. Old tickets are intentionally invalid:
+  /// the playback coordinator must open a fresh ticket after a restart.
+  Future<void> restart() => _lifecycleLock.synchronized(() async {
+    if (_disposed) throw StateError('媒体代理已关闭');
+    diagnostics?.record('proxy', 'restart_started');
+    final old = _server;
+    _server = null;
+    _tickets.clear();
+    for (final client in _clients.keys.toList()) {
+      client.close(force: true);
+    }
+    try {
+      await old?.close(force: true);
+      await _bind();
+      diagnostics?.record('proxy', 'restart_completed');
+    } catch (e) {
+      diagnostics?.record(
+        'proxy',
+        'restart_failed',
+        details: {'type': e.runtimeType.toString()},
+      );
+      rethrow;
+    }
+  });
 
   Uri ticket(Track track, SourceProfile profile) {
     _failures.remove(track.ref.key);
@@ -63,6 +125,17 @@ class MediaProxy {
   Future<void> _handle(HttpRequest req) async {
     diagnostics?.record('proxy', 'request_started');
     try {
+      // Only bound to loopback. No authentication, media data or track details
+      // are exposed through this deliberately small health endpoint.
+      if (req.uri.path == '/health' && req.uri.query.isEmpty) {
+        if (req.method != 'GET') {
+          req.response.statusCode = HttpStatus.methodNotAllowed;
+          return;
+        }
+        req.response.headers.contentType = ContentType.text;
+        req.response.write('proxy ok');
+        return;
+      }
       if (req.method != 'GET' && req.method != 'HEAD') {
         req.response.statusCode = HttpStatus.methodNotAllowed;
         return;
@@ -346,15 +419,18 @@ class MediaProxy {
     }
   }
 
-  Future<void> dispose() async {
+  Future<void> dispose() => _lifecycleLock.synchronized(() async {
+    if (_disposed) return;
+    _disposed = true;
     cache.cancelAll(permanent: true);
-    for (final client in _clients.keys) {
+    for (final client in _clients.keys.toList()) {
       client.close(force: true);
     }
     _failures.clear();
     _tickets.clear();
-    await _server?.close(force: true);
-    await Future.wait(_handlers.toList());
+    final old = _server;
     _server = null;
-  }
+    await old?.close(force: true);
+    await Future.wait(_handlers.toList());
+  });
 }

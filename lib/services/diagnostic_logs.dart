@@ -28,6 +28,7 @@ class DiagnosticLogs {
     'autoplay',
     'attempt',
     'buffering',
+    'gap_ms',
     'http_status',
     'index',
     'manual',

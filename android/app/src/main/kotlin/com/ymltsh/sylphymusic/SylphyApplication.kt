@@ -11,6 +11,11 @@ import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 
 class SylphyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Log.i("SylphyLifecycle", "application_created pid=${android.os.Process.myPid()}")
+    }
+
     val leases by lazy { EngineLeaseManager(this) }
     private var installedEngine: FlutterEngine? = null
     private val channels = mutableMapOf<String, MethodChannel>()

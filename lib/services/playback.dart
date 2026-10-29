@@ -59,6 +59,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   // A libmpv stream can remain buffering without ever emitting stream.error.
   final Stopwatch _progressWatch = Stopwatch()..start();
   Timer? _stallTimer;
+  int? _lastWatchdogTickMs;
+  int _playIntentGeneration = 0;
   int _watchdogPositionMs = -1;
   int _loadGeneration = 0;
   bool _stalledRecoveryRunning = false;
@@ -95,6 +97,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
     final stuckRef = currentRef;
     final generation = _loadGeneration;
+    final intentGeneration = _playIntentGeneration;
     _stalledRecoveryRunning = true;
     _handlingFailure = true;
     diagnostics?.record(
@@ -104,17 +107,40 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     error = '播放进度长时间没有变化，正在尝试恢复';
     notifyListeners();
-    unawaited(_recoverStall(stuckRef, generation));
+    unawaited(_recoverStall(stuckRef, generation, intentGeneration));
   }
 
-  Future<void> _recoverStall(TrackRef? stuckRef, int generation) async {
+  bool _sameRecovery(TrackRef? ref, int generation, int intentGeneration) =>
+      currentRef == ref &&
+      _loadGeneration == generation &&
+      _playIntentGeneration == intentGeneration &&
+      _playRequested &&
+      !_userPaused;
+
+  Future<void> _recoverStall(
+    TrackRef? stuckRef,
+    int generation,
+    int intentGeneration,
+  ) async {
     try {
-      if (currentRef != stuckRef ||
-          _loadGeneration != generation ||
-          !_playRequested ||
-          _userPaused) {
-        return;
+      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
+      // A responsive local listener does not imply the Emby upstream is
+      // healthy. Never restart the proxy on every buffering event.
+      diagnostics?.record('playback', 'local_proxy_probe_started');
+      final healthy = await proxy.ping();
+      diagnostics?.record(
+        'playback',
+        healthy ? 'local_proxy_healthy' : 'local_proxy_unresponsive',
+      );
+      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
+      if (!healthy) {
+        try {
+          await proxy.restart();
+        } catch (_) {
+          // _failed still applies the bounded retry/stop policy below.
+        }
       }
+      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
       await _failed('播放进度超过 45 秒没有变化');
     } catch (_) {
       // The recovery attempt is best effort; never leave the guard latched.
@@ -278,10 +304,20 @@ class PlaybackCoordinator extends ChangeNotifier {
         }
       }),
     );
-    _stallTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _checkForStall(),
-    );
+    _stallTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final previous = _lastWatchdogTickMs;
+      _lastWatchdogTickMs = now;
+      if (previous != null && now - previous > 15000) {
+        // A delayed Dart timer alone does not prove the process was killed.
+        diagnostics?.record(
+          'playback',
+          'dart_timer_delayed',
+          details: {'gap_ms': now - previous},
+        );
+      }
+      _checkForStall();
+    });
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
       _session = await AudioSession.instance;
@@ -648,6 +684,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> play() async {
+    ++_playIntentGeneration;
     diagnostics?.record('playback', 'play_requested');
     _userPaused = false;
     if (current == null) await _prepareCurrent();
@@ -679,6 +716,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> pause({bool system = false}) async {
+    ++_playIntentGeneration;
     diagnostics?.record(
       'playback',
       'pause_requested',
@@ -864,6 +902,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> seek(Duration target) async {
+    ++_playIntentGeneration;
     _watchdogPositionMs = target.inMilliseconds;
     _progressWatch.reset();
     cache.invalidatePreview();

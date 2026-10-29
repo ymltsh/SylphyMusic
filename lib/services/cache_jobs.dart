@@ -154,7 +154,7 @@ class CacheJobs {
         whereArgs: [ref.key, jobId],
         limit: 1,
       );
-      if (other.isEmpty) await cache.cancel(ref);
+      if (other.isEmpty) cache.cancelDownload(ref);
     }
   }
 
@@ -357,8 +357,10 @@ class CacheJobs {
       'cache_job_items',
       where: "state='running'",
     );
+    // Only the explicit offline job is being paused. The same track may be
+    // streaming through captureRelay, which must remain alive for playback.
     for (final item in items) {
-      await cache.cancel(TrackRef.parse(item['track_key'] as String));
+      cache.cancelDownload(TrackRef.parse(item['track_key'] as String));
     }
     await idle?.future;
   }
