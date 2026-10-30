@@ -1,4 +1,14 @@
 {
-  "latest": null,
+  "latest": {
+    "version": "1.0.14-openlist.2",
+    "build": 28,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.2 (arm64-v8a)",
+    "date": "2026-10-30",
+    "notes": "风灵音乐 OpenList Lite 特别版 · 1.0.14-openlist.2+28\n\n仅适用于 Android arm64-v8a；独立包名，可与普通版共存，使用独立更新通道。本版本不会替换普通版 Latest。\n\n- 内置 OpenList 网盘服务，提供智能运行、持续运行和服务总开关；关闭后停止专用进程，阻止自动启动。\n- 本机端口改为 10486，WebDAV 地址为 http://127.0.0.1:10486/dav/；旧版内置音源地址自动迁移。\n- 预置 sylphy/sylphy 账号，允许 WebDAV 读取、管理；使用 admin 管理网盘，账号及初始密码可复制，已有账号不重置。\n- 添加音乐源可直接选择 OpenList，预填连接并浏览音乐目录，支持基础目录及扫描层级。\n- 保留音乐索引、完整缓存和歌单引用；停止服务会暂停对应播放，重新启用后由用户继续。\n\nAndroid arm64 Release 已编译并校验正式签名；未运行静态分析、测试或设备验收，网盘登录、服务启停及播放由用户验证。\n\n安装包仅提供 sylphy-music-arm64-v8a.apk。SHA256SUMS.txt 提供附件校验值。\n本次构建的实际源码快照及 OpenList 上游源码、前端源码与许可证见 sylphy-music-openlist-source.zip；GitHub 自动生成的 Source code 归档仅对应标签的 Git 基线。\n",
+    "urls": {
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.2%2B28/sylphy-music-arm64-v8a.apk"
+    },
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.2%2B28"
+  },
   "history": []
 }
