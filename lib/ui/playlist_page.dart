@@ -292,6 +292,9 @@ String _syncStatusLabel(SyncStatus status) => switch (status) {
 };
 
 bool playlistCanEdit(SylphyApp app, PlaylistModel playlist) {
+  if (playlist.kind == PlaylistKind.favorites && playlist.sourceId != null) {
+    return false;
+  }
   if (playlist.kind != PlaylistKind.cloud) return true;
   final source = app.sources
       .where((s) => s.id == playlist.sourceId)

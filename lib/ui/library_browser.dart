@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../data/library_catalog.dart';
 import 'cover_flow.dart';
 import 'cover_art.dart';
+import 'route_player_bar.dart';
 
 class LibraryBrowser extends StatefulWidget {
   const LibraryBrowser({
@@ -193,6 +194,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           appBar: AppBar(
             title: Text(album ? row.track.album : row.track.artist),
           ),
+          bottomNavigationBar: RoutePlayerBar(app: widget.app),
           body: LibraryBrowser(
             app: widget.app,
             query: widget.query.songsIn(album ? 'album' : 'artist', row.key),

@@ -9,7 +9,7 @@ Future<void> _act(BuildContext context, Future<void> Function() action) async {
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('播放操作失败，请重试')));
+          .showSnackBar(const SnackBar(content: Text('收藏操作失败，请重试')));
     }
   }
 }
@@ -23,7 +23,9 @@ class PlayerFavorite extends StatefulWidget {
 }
 
 class _PlayerFavoriteState extends State<PlayerFavorite> {
-  late Future<List<String>> keys = widget.app.db.playlistKeys('favorites');
+  late Future<List<String>> keys = _loadKeys();
+  Future<List<String>> _loadKeys() =>
+      widget.app.db.playlistKeys(widget.app.favoritePlaylistId(widget.track));
   bool busy = false;
   @override
   void initState() {
@@ -34,7 +36,7 @@ class _PlayerFavoriteState extends State<PlayerFavorite> {
   void _changed() {
     if (mounted) {
       setState(() {
-        keys = widget.app.db.playlistKeys('favorites');
+        keys = _loadKeys();
       });
     }
   }
@@ -54,7 +56,7 @@ class _PlayerFavoriteState extends State<PlayerFavorite> {
       _changed();
     }
     if (oldWidget.track.ref != widget.track.ref) {
-      keys = widget.app.db.playlistKeys('favorites');
+      keys = _loadKeys();
     }
   }
 
@@ -78,7 +80,7 @@ class _PlayerFavoriteState extends State<PlayerFavorite> {
                 );
                 if (mounted) {
                   setState(() {
-                    keys = widget.app.db.playlistKeys('favorites');
+                    keys = _loadKeys();
                     busy = false;
                   });
                 }

@@ -50,6 +50,10 @@ abstract class MusicAdapter {
   Future<void> deletePlaylist(String id);
   Future<void> renamePlaylist(String id, String name) async =>
       throw UnsupportedError('此来源暂不支持歌单改名');
+  Future<List<String>> fetchStarredIds() async =>
+      throw UnsupportedError('此来源暂不支持云端红心收藏');
+  Future<void> setStarred(String id, bool starred) async =>
+      throw UnsupportedError('此来源暂不支持云端红心收藏');
   Future<Uri> mediaUrl(Track track);
   Future<String?> lyrics(Track track);
   Future<Map<String, String>> mediaHeaders();
@@ -644,6 +648,7 @@ class SubsonicAdapter extends MusicAdapter {
         'ping',
         'getAlbumList2',
         'getAlbum',
+        'getStarred2',
         'getPlaylists',
         'getPlaylist',
         'getLyrics',
@@ -733,6 +738,23 @@ class SubsonicAdapter extends MusicAdapter {
       }
       if (albums.length < 300) break;
     }
+  }
+
+  @override
+  Future<List<String>> fetchStarredIds() async {
+    final data = await _api('getStarred2');
+    final songs = (data['starred2'] as Map?)?['song'] as List? ?? const [];
+    return songs
+        .whereType<Map>()
+        .map((song) => song['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  @override
+  Future<void> setStarred(String id, bool starred) async {
+    await _api(starred ? 'star' : 'unstar', {'id': id});
   }
 
   @override

@@ -77,6 +77,16 @@ class SylphyApp extends ChangeNotifier {
   late final history = ListeningHistory(db, playback);
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};
+  bool cloudFavoritesByDefault = false;
+  int autoSyncMinutes = 360;
+  bool autoSyncNotice = false;
+  String? syncNotice;
+  int syncNoticeRevision = 0;
+  bool _appForeground = true;
+  bool _autoSyncRunning = false;
+  final _lastAutoSyncAttempt = <String, int>{};
+  Future<void>? _autoSyncTask;
+  Timer? _autoSyncTimer;
   int _busyOperations = 0;
   Timer? _catalogRefreshTimer;
   bool _foregroundSyncRunning = false;
@@ -181,7 +191,12 @@ class SylphyApp extends ChangeNotifier {
     await app.assets.initialize();
     app.index.addListener(app._indexChanged);
     app._sleepLifecycle = AppLifecycleListener(
-      onResume: () => unawaited(app.sleepTimer.checkDue()),
+      onResume: () {
+        app._appForeground = true;
+        unawaited(app.sleepTimer.checkDue());
+      },
+      onPause: () => app._appForeground = false,
+      onHide: () => app._appForeground = false,
     );
     await app.appearance.initialize();
     app.apiSettings.addListener(app._apiChanged);
@@ -189,7 +204,16 @@ class SylphyApp extends ChangeNotifier {
     await app.playerLayouts.initialize();
     await app.history.initialize();
     app.history.addListener(app._indexChanged);
+    app.cloudFavoritesByDefault =
+        await db.setting('favorite_location') == 'cloud';
+    app.autoSyncMinutes =
+        int.tryParse(await db.setting('auto_sync_minutes') ?? '') ?? 360;
+    app.autoSyncNotice = await db.setting('auto_sync_notice') == 'true';
     await app.reload();
+    app._autoSyncTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => unawaited(app.refreshIfStale().catchError((Object _) {})),
+    );
     app.playback.setLyricsLoader((track) => app.loadLyrics(track));
     app.playback.setArtworkLoader((track) => app.artwork.load(track));
     if (platformIntegration) await app.desktopLyrics.initialize();
@@ -213,8 +237,9 @@ class SylphyApp extends ChangeNotifier {
         if (source.kind != SourceKind.local &&
             source.enabled &&
             (interrupted.contains(source.id) ||
-                DateTime.now().millisecondsSinceEpoch - source.lastSync >
-                    6 * 60 * 60 * 1000)) {
+                (autoSyncMinutes > 0 &&
+                    DateTime.now().millisecondsSinceEpoch - source.lastSync >
+                        autoSyncMinutes * 60 * 1000))) {
           try {
             await syncSource(source);
           } catch (_) {}
@@ -230,18 +255,82 @@ class SylphyApp extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> refreshIfStale() async {
-    if (busy) return;
-    for (final source in [...sources]) {
-      if (source.kind != SourceKind.local &&
-          source.enabled &&
-          DateTime.now().millisecondsSinceEpoch - source.lastSync >
-              6 * 60 * 60 * 1000) {
+  Future<void> refreshIfStale() {
+    if (_autoSyncTask != null) return _autoSyncTask!;
+    final task = _refreshIfStale();
+    _autoSyncTask = task;
+    return task.whenComplete(() {
+      if (identical(_autoSyncTask, task)) _autoSyncTask = null;
+    });
+  }
+
+  Future<void> _refreshIfStale() async {
+    if (_disposed ||
+        !_appForeground ||
+        busy ||
+        _autoSyncRunning ||
+        autoSyncMinutes <= 0) {
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final stale = sources
+        .where(
+          (source) =>
+              source.kind != SourceKind.local &&
+              source.enabled &&
+              now - source.lastSync > autoSyncMinutes * 60 * 1000 &&
+              now - (_lastAutoSyncAttempt[source.id] ?? 0) >
+                  autoSyncMinutes * 60 * 1000,
+        )
+        .toList();
+    if (stale.isEmpty) return;
+    _autoSyncRunning = true;
+    var failed = 0;
+    try {
+      for (final source in stale) {
+        if (_disposed || !_appForeground) break;
+        _lastAutoSyncAttempt[source.id] = DateTime.now().millisecondsSinceEpoch;
         try {
           await syncSource(source);
-        } catch (_) {}
+        } catch (_) {
+          failed++;
+        }
       }
+      if (!_disposed) {
+        await cloud.syncAll();
+        await reload();
+        if (autoSyncNotice) {
+          syncNotice = failed == 0
+              ? '自动同步完成（${stale.length} 个音乐源）'
+              : '自动同步完成，$failed 个音乐源失败';
+          syncNoticeRevision++;
+          notifyListeners();
+        }
+      }
+    } finally {
+      _autoSyncRunning = false;
     }
+  }
+
+  Future<void> setAutoSyncMinutes(int minutes) async {
+    if (!const [0, 5, 15, 30, 60, 360, 1440].contains(minutes)) {
+      throw ArgumentError.value(minutes, 'minutes');
+    }
+    await db.setSetting('auto_sync_minutes', '$minutes');
+    autoSyncMinutes = minutes;
+    notifyListeners();
+  }
+
+  Future<void> setAutoSyncNotice(bool enabled) async {
+    await db.setSetting('auto_sync_notice', '$enabled');
+    autoSyncNotice = enabled;
+    notifyListeners();
+  }
+
+  Future<void> setCloudFavoritesByDefault(bool enabled) async {
+    await db.setSetting('favorite_location', enabled ? 'cloud' : 'local');
+    cloudFavoritesByDefault = enabled;
+    notifyListeners();
   }
 
   void _scheduleCatalogRefresh() {
@@ -457,6 +546,7 @@ class SylphyApp extends ChangeNotifier {
       if (_disposed || index.progress[source.id]?.state != 'completed') return;
       artwork.invalidate();
       await cloud.refreshCloudForSource(source);
+      await cloud.refreshStarredForSource(source);
     });
     if (!_disposed &&
         index.progress[source.id]?.state == 'completed' &&
@@ -587,14 +677,43 @@ class SylphyApp extends ChangeNotifier {
     await reload();
   }
 
-  Future<void> toggleFavorite(Track ref) async {
-    final keys = await db.playlistKeys('favorites');
-    if (keys.contains(ref.ref.key)) {
-      keys.removeWhere((x) => x == ref.ref.key);
-    } else {
-      keys.add(ref.ref.key);
+  String favoritePlaylistId(Track track) {
+    final source = sources.where((s) => s.id == track.ref.sourceId).firstOrNull;
+    return cloudFavoritesByDefault && source?.kind == SourceKind.subsonic
+        ? PlaylistSyncService.cloudFavoriteId(source!.id)
+        : 'favorites';
+  }
+
+  Future<void> toggleFavorite(Track track) async {
+    final id = favoritePlaylistId(track);
+    final keys = await db.playlistKeys(id);
+    final starred = !keys.contains(track.ref.key);
+    if (id != 'favorites') {
+      final source = sources.where((s) => s.id == track.ref.sourceId).first;
+      if (!source.enabled) throw StateError('音乐源已停用，无法修改云端收藏');
+      final adapter = factory.create(source);
+      try {
+        await adapter.setStarred(track.ref.id, starred);
+      } finally {
+        adapter.close();
+      }
+      if (await db.playlist(id) == null) {
+        await db.putPlaylist(
+          PlaylistModel(
+            id: id,
+            name: '${source.name} · 云端收藏',
+            kind: PlaylistKind.favorites,
+            sourceId: source.id,
+          ),
+        );
+      }
     }
-    await db.replacePlaylistKeys('favorites', keys);
+    if (starred) {
+      keys.add(track.ref.key);
+    } else {
+      keys.removeWhere((key) => key == track.ref.key);
+    }
+    await db.replacePlaylistKeys(id, keys);
     await reload();
   }
 
@@ -623,6 +742,21 @@ class SylphyApp extends ChangeNotifier {
     PlaylistModel playlist,
     String entryId,
   ) async {
+    if (playlist.kind == PlaylistKind.favorites && playlist.sourceId != null) {
+      final entries = await db.playlistEntries(playlist.id);
+      final key = entries.where((e) => e.id == entryId).firstOrNull?.key;
+      if (key == null) return;
+      final source = await db.source(playlist.sourceId!);
+      if (source == null || !source.enabled) {
+        throw StateError('音乐源已停用，无法修改云端收藏');
+      }
+      final adapter = factory.create(source);
+      try {
+        await adapter.setStarred(TrackRef.parse(key).id, false);
+      } finally {
+        adapter.close();
+      }
+    }
     await cloud.removeEntry(playlist.id, entryId);
     await reload();
     if (playlist.kind == PlaylistKind.cloud) {
@@ -783,6 +917,7 @@ class SylphyApp extends ChangeNotifier {
     _disposed = true;
     _interruptForegroundSync();
     final metadataStopped = metadataEnricher.shutdown();
+    _autoSyncTimer?.cancel();
     _catalogRefreshTimer?.cancel();
     _sleepLifecycle?.dispose();
     await sleepTimer.shutdown();
@@ -803,6 +938,7 @@ class SylphyApp extends ChangeNotifier {
     await webDavTags.shutdown();
     await metadataStopped;
     await _foregroundSyncTask?.catchError((Object _) {});
+    await _autoSyncTask?.catchError((Object _) {});
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();

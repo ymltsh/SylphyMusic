@@ -17,6 +17,7 @@ import 'about_page.dart';
 
 enum _Section {
   playback,
+  sync,
   lyrics,
   theme,
   background,
@@ -95,6 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
       final title = switch (section) {
         null => '设置',
         _Section.playback => '播放器设置',
+        _Section.sync => '同步与收藏',
         _Section.lyrics => '歌词设置',
         _Section.theme => '主题与配色',
         _Section.background => '页面背景',
@@ -313,6 +315,12 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: widget.onSources,
       ),
       _entry(
+        Icons.sync_outlined,
+        '同步与收藏',
+        '${app.autoSyncMinutes == 0 ? '不自动同步' : '每 ${app.autoSyncMinutes} 分钟同步'} · 默认${app.cloudFavoritesByDefault ? '云端' : '本地'}收藏',
+        _Section.sync,
+      ),
+      _entry(
         Icons.storage_outlined,
         '下载与缓存',
         '缓存上限 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB · 任务与清理',
@@ -405,6 +413,47 @@ class _SettingsPageState extends State<SettingsPage> {
   ];
 
   List<Widget> _controls(_Section section) => switch (section) {
+    _Section.sync => [
+      ListTile(
+        title: const Text('自动同步间隔'),
+        subtitle: const Text('仅在应用前台检查，按需更新到期音源'),
+        trailing: DropdownButton<int>(
+          value: app.autoSyncMinutes,
+          items: const [
+            DropdownMenuItem(value: 0, child: Text('关闭')),
+            DropdownMenuItem(value: 5, child: Text('5 分钟')),
+            DropdownMenuItem(value: 15, child: Text('15 分钟')),
+            DropdownMenuItem(value: 30, child: Text('30 分钟')),
+            DropdownMenuItem(value: 60, child: Text('1 小时')),
+            DropdownMenuItem(value: 360, child: Text('6 小时')),
+            DropdownMenuItem(value: 1440, child: Text('24 小时')),
+          ],
+          onChanged: (v) {
+            if (v != null) _act(() => app.setAutoSyncMinutes(v));
+          },
+        ),
+      ),
+      SwitchListTile(
+        title: const Text('自动同步提示'),
+        subtitle: const Text('同步结束时在应用内提示，不发送系统后台通知'),
+        value: app.autoSyncNotice,
+        onChanged: (v) => _act(() => app.setAutoSyncNotice(v)),
+      ),
+      ListTile(
+        title: const Text('默认收藏位置'),
+        subtitle: const Text('云端红心仅支持 Navidrome/OpenSubsonic，其余来源仍使用本地收藏'),
+        trailing: DropdownButton<bool>(
+          value: app.cloudFavoritesByDefault,
+          items: const [
+            DropdownMenuItem(value: false, child: Text('本地')),
+            DropdownMenuItem(value: true, child: Text('云端')),
+          ],
+          onChanged: (v) {
+            if (v != null) _act(() => app.setCloudFavoritesByDefault(v));
+          },
+        ),
+      ),
+    ],
     _Section.playback => [
       ListTile(
         title: const Text('播放速度'),

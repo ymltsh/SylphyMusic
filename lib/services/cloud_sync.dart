@@ -61,6 +61,30 @@ class PlaylistSyncService {
   final AppDb db;
   final AdapterFactory factory;
   final Set<String> busy = {};
+
+  static String cloudFavoriteId(String sourceId) => 'cloud-favorites:$sourceId';
+
+  // Subsonic stars are distinct from playlists. Keep a source-scoped local
+  // mirror so server favorites never overwrite cross-source local favorites.
+  Future<void> refreshStarredForSource(SourceProfile source) async {
+    if (!source.enabled || source.kind != SourceKind.subsonic) return;
+    final adapter = factory.create(source);
+    try {
+      final ids = await adapter.fetchStarredIds();
+      await db.savePlaylistSnapshot(
+        PlaylistModel(
+          id: cloudFavoriteId(source.id),
+          name: '${source.name} · 云端收藏',
+          kind: PlaylistKind.favorites,
+          sourceId: source.id,
+        ),
+        ids.map((id) => TrackRef(source.id, id).key).toList(),
+      );
+    } finally {
+      adapter.close();
+    }
+  }
+
   Future<void> refreshCloudForSource(SourceProfile source) async {
     if (!source.kind.cloudPlaylists) return;
     final adapter = factory.create(source);
