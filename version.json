@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.18",
-    "build": 31,
-    "name": "风灵音乐 v1.0.18",
-    "date": "2026-10-30",
-    "notes": "- 缓存任务支持取消并移除，已完成或失败的任务也可移除记录；已下载且校验通过的音乐缓存保留。\n- 修复取消或暂停与下载启动之间的竞态，通过任务传输令牌及时中断对应工作，任务记录移除后不会被迟到的结果重新写回。\n- 失败任务同时提供重试和移除入口，并改进移除失败时的提示。\n\nAndroid 提供 arm64-v8a、armeabi-v7a 和 x86_64，Windows 提供安装版及便携版。未运行静态分析、测试或设备验收，功能由用户验证。\n",
+    "version": "1.0.19",
+    "build": 32,
+    "name": "风灵音乐 v1.0.19",
+    "date": "2026-10-31",
+    "notes": "【升级必读】本次更换统一缓存关联方式。升级后请先进入「设置 → 下载与缓存 → 清理所有缓存资源」，清理旧版音频、封面和远程歌词缓存，再重新缓存歌曲或歌单。旧缓存不会自动转换或补齐歌曲关联；手动导入歌词将保留，服务器及本地原始音乐不受影响。\n\n- 完整音频、封面与歌词共用缓存空间额度，跨类型自动淘汰；共享专辑封面按实际文件去重计费。\n- 缓存空间页按歌曲展示音频、封面、歌词及手动歌词占用，支持选择性清理；仍被其他歌曲使用的共享封面会保留。\n- 缓存任务完成音频后尝试获取封面和歌词；缺少可选资源不会让完整音频任务失败。\n- 修复并发写入配额、共享文件复用、读取中文件延迟清理、取消任务和迟到结果等边界，保留受保护的手动歌词。\n\n本轮验证：静态分析无问题；完整回归连续两轮均为 258 项通过，5 项真实服务器测试按条件跳过；Windows 原生离线资源持久化集成测试通过。Android 提供 arm64-v8a、armeabi-v7a、x86_64，Windows 提供安装版和便携版。Android 实机后台 / 强杀场景仍需设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.19%2B32/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.19%2B32/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.19%2B32/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.19%2B32/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.19%2B32/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.18+31"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.19+32"
   },
   "history": [
+    {
+      "version": "1.0.18",
+      "build": 31,
+      "name": "风灵音乐 v1.0.18",
+      "date": "2026-10-30",
+      "notes": "- 缓存任务支持取消并移除，已完成或失败的任务也可移除记录；已下载且校验通过的音乐缓存保留。\n- 修复取消或暂停与下载启动之间的竞态，通过任务传输令牌及时中断对应工作，任务记录移除后不会被迟到的结果重新写回。\n- 失败任务同时提供重试和移除入口，并改进移除失败时的提示。\n\nAndroid 提供 arm64-v8a、armeabi-v7a 和 x86_64，Windows 提供安装版及便携版。未运行静态分析、测试或设备验收，功能由用户验证。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.18%2B31/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.18+31"
+    },
     {
       "version": "1.0.17",
       "build": 30,
