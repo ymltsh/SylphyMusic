@@ -10,6 +10,7 @@ import '../data/app_db.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'sources.dart';
+import 'openlist_lite.dart';
 import 'byte_range.dart';
 
 class MediaProxy {
@@ -248,7 +249,9 @@ class MediaProxy {
       _clients.remove(client);
       return;
     }
+    final openListLease = 'proxy:${const Uuid().v4()}';
     try {
+      await OpenListLite.acquireTask(profile.url, openListLease);
       final uri = await adapter
           .mediaUrl(track)
           .timeout(const Duration(seconds: 10));
@@ -416,6 +419,7 @@ class MediaProxy {
       client.close(force: true);
       _clients.remove(client);
       adapter.close();
+      await OpenListLite.releaseTask(profile.url, openListLease);
     }
   }
 

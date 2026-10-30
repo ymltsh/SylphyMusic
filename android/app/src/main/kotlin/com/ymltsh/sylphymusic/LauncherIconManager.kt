@@ -27,7 +27,7 @@ internal class LauncherIconManager(private val activity: Activity) {
     }
 
     private fun component(icon: Icon): ComponentName =
-        ComponentName(activity.packageName, "${activity.packageName}.${icon.alias}")
+        ComponentName(activity.packageName, "${MainActivity::class.java.packageName}.${icon.alias}")
 
     private fun enabled(icon: Icon): Boolean = when (
         activity.packageManager.getComponentEnabledSetting(component(icon))

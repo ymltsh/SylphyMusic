@@ -1,0 +1,3 @@
+# Generated from pinned OpenList source; do not commit native binaries here.
+*.aar
+*.jar

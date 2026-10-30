@@ -12,6 +12,7 @@ import '../data/app_db.dart';
 import '../data/library_catalog.dart';
 import '../services/app_updates.dart';
 import '../services/system_notifications.dart';
+import '../services/openlist_lite.dart';
 import '../services/api_settings.dart';
 import '../services/cache.dart';
 import '../services/cache_jobs.dart';
@@ -941,6 +942,7 @@ class SylphyApp extends ChangeNotifier {
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();
+    await OpenListLite.shutdown();
     await appearance.shutdown();
     await playerLayouts.shutdown();
     await diagnostics.shutdown();

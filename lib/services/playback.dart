@@ -13,6 +13,7 @@ import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
+import 'openlist_lite.dart';
 
 /// Metadata sent to Android must include an actual artwork URI; the platform
 /// cannot access Flutter's in-widget Image.file cache automatically.
@@ -747,6 +748,11 @@ class PlaybackCoordinator extends ChangeNotifier {
       final source = await db.source(ref.sourceId);
       if (source == null) throw StateError('来源已删除');
       if (!source.enabled) throw StateError('来源已停用');
+      if (autoplay && OpenListLite.managesUrl(source.url)) {
+        await OpenListLite.acquirePlayback(source.url);
+      } else {
+        await OpenListLite.releasePlayback();
+      }
       _warmLyrics(current!);
       _warmArtwork(current!);
       diagnostics?.record(
@@ -994,6 +1000,9 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    if (OpenListLite.managesUrl(source.url)) {
+      await OpenListLite.acquirePlayback(source.url);
+    }
     if (player.state.playlist.medias.isEmpty ||
         _reloadSources.contains(source.id) ||
         error != null) {
@@ -1036,6 +1045,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {'system': system},
     );
     _playRequested = false;
+    await OpenListLite.releasePlayback();
     // Allow a resume to continue unfinished ahead warming.
     _aheadPlan = null;
     ++_aheadGeneration;
@@ -1377,6 +1387,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     _focusWasLost = false;
     ++_playIntentGeneration;
     diagnostics?.record('playback', 'queue_cleared');
+    await OpenListLite.releasePlayback();
     _playRequested = false;
     _cancelAhead();
     _publish();

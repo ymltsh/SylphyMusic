@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [OpenList Lite Android](OPENLIST_LITE_ANDROID.md) | 独立分支、本地 OpenList 服务、原生依赖构建与 WebDAV 接入 |
 | [更新与发布流程](../update.md) | 手动更新、正式 / 测试版清单、本地打包与显式 GitHub 发布 |
 | [Android 正式签名](ANDROID_SIGNING.md) | 正式证书、私钥备份、验签与测试版迁移限制 |
 | [项目 README](../README.md) | 面向用户的功能、音源、下载、快速开始与技术栈 |

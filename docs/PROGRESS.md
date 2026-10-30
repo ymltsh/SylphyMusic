@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-10-30 修复 OpenList 初始化 record not found 并同步 v0.3 体积优化
+
+定位到固定上游 v4.2.9 默认等待 Web 安装向导创建管理员，而桥接层在首次初始化后直接读取管理员，空数据库触发 `PlatformException(openlist_error, record not found, null, null)`。桥接层现仅在 `gorm.ErrRecordNotFound` 时按上游安装向导字段创建管理员，使用安装级随机密码与上游加盐哈希；已有管理员及密码保留，不依赖旧 marker 决定重置。移除启动前无效的在线清缓存调用，并区分数据库已装配与账号已配置状态，避免账号配置重试重复装配数据库。不删除用户数据库。
+
+同步 v0.3 的 Lite / full 前端选择、体积报告脚本和 JNI 压缩，保留此前 `.private/` 构建目录及固定 gomobile 工具版本。重新编译 AAR 与 Android arm64 Release 成功，正式签名校验通过，APK 仅含 arm64-v8a 原生库，体积由约 180.8 MB 降至 48.6 MB；压缩不等于减少安装后原生库大小或运行内存。
+
+安装包：`build/internal-review/openlist-lite-v3/sylphy-music-openlist-1.0.14-openlist.1-27-arm64-v8a-init-fix.apk`，同目录提供 SHA256SUMS.txt。日志：`build/test_logs/openlist-v3-gomobile-bind.log`、`build/test_logs/openlist-v3-android-build.log`、`build/test_logs/openlist-v3-size-report.log`。版本保持 `1.0.14-openlist.1+27`。未运行测试、静态分析或设备验证，未提交、推送或发布；安装后的初始化及原有账号登录由用户验证。
+
+## 2026-10-30 应用 OpenList Lite Android v0.2 补丁分支
+
+从 main `1f5427b` 创建本地 `feature/android-openlist-lite`，应用 `sylphy_openlist_lite_android_patch_v0.2.zip`。新增 Android 进程内 OpenList v4.2.9 与配套 Web UI、智能 / 持续运行模式、设置入口、WebView，以及扫描、播放、代理、缓存租约。版本为 `1.0.14-openlist.1+27`，独立包名 `com.ymltsh.sylphymusic.openlist`，使用分支更新地址和空清单；main 与远端发布未修改。
+
+适配新版 gomobile 工具依赖并固定工具版本，构建临时目录使用 `.private/`；增加应用退出时的 OpenList 服务清理，修正 arm64 分包与补丁自带 ABI 过滤冲突，并修正预览工作流附件路径、移除默认测试步骤。新增架构和文档入口说明。
+
+本机 Windows 环境已从固定上游提交 `0497ee853853eff5fc0ada9f21684a990887de83` 编译 AAR，Android arm64 Release APK 编译成功且正式签名校验通过，包内仅有 arm64-v8a 原生库。安装包位于 `build/internal-review/openlist-lite/sylphy-music-openlist-1.0.14-openlist.1-27-arm64-v8a.apk`，约 180.8 MB；同目录 `SHA256SUMS.txt` 记录 APK、AAR 与前端压缩包摘要。编译日志为 `build/test_logs/openlist-android-build.log` 和 `build/test_logs/openlist-gomobile-bind.log`。
+
+未运行静态分析、测试或设备验证，未提交、推送或发布；网盘登录、挂载、扫描播放、反复启停及后台运行由用户验证。
+
 ## 2026-10-30 合并 AudioTrack 验证分支并发布 1.0.13+26
 
 用户确认 AudioTrack 补丁有效，授权合并 `validation/android-audiotrack`。已合入 main 并推送，保留验证版的音频输出顺序与实际后端诊断逻辑，移除实验专用命名并更新验证说明；源码提交 `2926907`。

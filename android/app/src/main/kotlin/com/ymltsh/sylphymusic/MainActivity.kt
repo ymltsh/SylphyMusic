@@ -14,6 +14,8 @@ class MainActivity : AudioServiceActivity() {
     override fun onStart() {
         super.onStart()
         Log.i("SylphyLifecycle", "activity_visible pid=${android.os.Process.myPid()}")
+        OpenListRuntime.bind(applicationContext)
+        OpenListRuntime.onAppForeground()
     }
 
     override fun onStop() {

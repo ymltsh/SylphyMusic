@@ -66,6 +66,7 @@ class WebDavAdapter extends MusicAdapter {
       .where((e) => e.name.local == local && e.namespaceUri == 'DAV:');
 
   Future<List<_DavEntry>> _list(Uri directory, {String? password}) async {
+    await OpenListLite.ensureFor(directory);
     final response = await transport.request(
       'PROPFIND',
       directory,
@@ -146,99 +147,119 @@ class WebDavAdapter extends MusicAdapter {
 
   @override
   Stream<List<Track>> libraryPages() async* {
-    final pending = <Uri>[_root], visited = <String>{}, seenTracks = <String>{};
-    var page = <Track>[];
-    while (pending.isNotEmpty) {
-      final directory = pending.removeLast();
-      final dirId = _id(directory);
-      if (!visited.add(dirId)) continue;
-      if (visited.length > 100000) throw StateError('WebDAV 目录数量过多，已停止扫描');
-      final entries = await _list(directory);
-      final depth = directory.pathSegments.where((s) => s.isNotEmpty).length;
-      final children = entries
-          .where(
-            (e) =>
-                e.uri.pathSegments.where((s) => s.isNotEmpty).length ==
-                depth + 1,
-          )
-          .toList();
-      final files = {
-        for (final e in children.where((e) => !e.directory))
-          e.uri.pathSegments.last.toLowerCase(): e,
-      };
-      for (final entry in children) {
-        if (entry.directory) {
-          pending.add(
-            entry.uri.path.endsWith('/')
-                ? entry.uri
-                : entry.uri.replace(
-                    pathSegments: [...entry.uri.pathSegments, ''],
-                  ),
+    await OpenListLite.acquireScan(profile.url, profile.id);
+    try {
+      final pending = <Uri>[_root],
+          visited = <String>{},
+          seenTracks = <String>{};
+      var page = <Track>[];
+      while (pending.isNotEmpty) {
+        final directory = pending.removeLast();
+        final dirId = _id(directory);
+        if (!visited.add(dirId)) continue;
+        if (visited.length > 100000) throw StateError('WebDAV 目录数量过多，已停止扫描');
+        final entries = await _list(directory);
+        final depth = directory.pathSegments.where((s) => s.isNotEmpty).length;
+        final children = entries
+            .where(
+              (e) =>
+                  e.uri.pathSegments.where((s) => s.isNotEmpty).length ==
+                  depth + 1,
+            )
+            .toList();
+        final files = {
+          for (final e in children.where((e) => !e.directory))
+            e.uri.pathSegments.last.toLowerCase(): e,
+        };
+        for (final entry in children) {
+          if (entry.directory) {
+            pending.add(
+              entry.uri.path.endsWith('/')
+                  ? entry.uri
+                  : entry.uri.replace(
+                      pathSegments: [...entry.uri.pathSegments, ''],
+                    ),
+            );
+            continue;
+          }
+          final name = entry.uri.pathSegments.last;
+          final dot = name.lastIndexOf('.');
+          if (dot < 0 ||
+              !audioExtensions.contains(name.substring(dot).toLowerCase())) {
+            continue;
+          }
+          final id = _id(entry.uri);
+          if (!seenTracks.add(id)) continue;
+          final stem = name.substring(0, dot);
+          final lyric =
+              files['${stem.toLowerCase()}.lrc'] ??
+              files['${stem.toLowerCase()}.txt'];
+          final cover = [
+            '${stem.toLowerCase()}.jpg',
+            '${stem.toLowerCase()}.png',
+            'cover.jpg',
+            'cover.png',
+            'folder.jpg',
+            'folder.png',
+            'front.jpg',
+            'front.png',
+            'cover.webp',
+          ].map((name) => files[name]).whereType<_DavEntry>().firstOrNull;
+          final relative = Uri.parse(id).pathSegments;
+          page.add(
+            Track(
+              ref: TrackRef(profile.id, id),
+              title: stem,
+              artist: relative.length >= 3
+                  ? relative[relative.length - 3]
+                  : '未知艺术家',
+              album: relative.length >= 2
+                  ? relative[relative.length - 2]
+                  : '未知专辑',
+              coverId: cover == null ? '' : _id(cover.uri),
+              remote: {
+                'size': int.tryParse(
+                  entry.properties['getcontentlength'] ?? '',
+                ),
+                'DateModified': entry.properties['getlastmodified'],
+                'etag': entry.properties['getetag'],
+                'format': name.substring(dot + 1).toUpperCase(),
+                if (lyric != null) 'lyricsId': _id(lyric.uri),
+              },
+            ),
           );
-          continue;
-        }
-        final name = entry.uri.pathSegments.last;
-        final dot = name.lastIndexOf('.');
-        if (dot < 0 ||
-            !audioExtensions.contains(name.substring(dot).toLowerCase())) {
-          continue;
-        }
-        final id = _id(entry.uri);
-        if (!seenTracks.add(id)) continue;
-        final stem = name.substring(0, dot);
-        final lyric =
-            files['${stem.toLowerCase()}.lrc'] ??
-            files['${stem.toLowerCase()}.txt'];
-        final cover = [
-          '${stem.toLowerCase()}.jpg',
-          '${stem.toLowerCase()}.png',
-          'cover.jpg',
-          'cover.png',
-          'folder.jpg',
-          'folder.png',
-          'front.jpg',
-          'front.png',
-          'cover.webp',
-        ].map((name) => files[name]).whereType<_DavEntry>().firstOrNull;
-        final relative = Uri.parse(id).pathSegments;
-        page.add(
-          Track(
-            ref: TrackRef(profile.id, id),
-            title: stem,
-            artist: relative.length >= 3
-                ? relative[relative.length - 3]
-                : '未知艺术家',
-            album: relative.length >= 2
-                ? relative[relative.length - 2]
-                : '未知专辑',
-            coverId: cover == null ? '' : _id(cover.uri),
-            remote: {
-              'size': int.tryParse(entry.properties['getcontentlength'] ?? ''),
-              'DateModified': entry.properties['getlastmodified'],
-              'etag': entry.properties['getetag'],
-              'format': name.substring(dot + 1).toUpperCase(),
-              if (lyric != null) 'lyricsId': _id(lyric.uri),
-            },
-          ),
-        );
-        if (page.length == 250) {
-          yield page;
-          page = [];
+          if (page.length == 250) {
+            yield page;
+            page = [];
+          }
         }
       }
+      if (page.isNotEmpty) yield page;
+    } finally {
+      await OpenListLite.releaseScan(profile.url, profile.id);
     }
-    if (page.isNotEmpty) yield page;
   }
 
   @override
-  Future<Uri> mediaUrl(Track track) async => _uri(track.ref.id);
+  Future<Uri> mediaUrl(Track track) async {
+    final uri = _uri(track.ref.id);
+    await OpenListLite.ensureFor(uri);
+    return uri;
+  }
+
   @override
   Future<Map<String, String>> mediaHeaders() => _headers();
   @override
-  Future<Uri?> coverUrl(Track track) async =>
-      track.coverId.isEmpty ? null : _uri(track.coverId);
+  Future<Uri?> coverUrl(Track track) async {
+    if (track.coverId.isEmpty) return null;
+    final uri = _uri(track.coverId);
+    await OpenListLite.ensureFor(uri);
+    return uri;
+  }
+
   @override
   Future<String?> lyrics(Track track) async {
+    await OpenListLite.ensureFor(_root);
     final known = track.remote['lyricsId']?.toString();
     final id = track.ref.id;
     final dot = id.lastIndexOf('.');

@@ -32,6 +32,13 @@ class SylphyApplication : Application() {
         installedEngine = engine
         dartStarts = 0
         Log.i("SylphyLifecycle", "engine_attached engine=${System.identityHashCode(engine)} pid=${android.os.Process.myPid()}")
+        OpenListRuntime.bind(this)
+        MethodChannel(engine.dartExecutor.binaryMessenger, OpenListRuntime.CHANNEL)
+            .setMethodCallHandler { call, result ->
+                @Suppress("UNCHECKED_CAST")
+                val args = call.arguments as? Map<String, Any?> ?: emptyMap()
+                OpenListRuntime.dispatch(call.method, args, result)
+            }
         for (owner in listOf("sync", "cache")) {
             val name = if (owner == "sync") "sync_lifecycle" else "cache_lifecycle"
             val channel = MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/$name")

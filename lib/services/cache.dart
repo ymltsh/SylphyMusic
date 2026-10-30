@@ -13,6 +13,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' show ConflictAlgorithm;
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'sources.dart';
+import 'openlist_lite.dart';
 
 class CacheEntry {
   const CacheEntry({
@@ -576,7 +577,9 @@ class CacheManager {
     final tmp = File(p.join(root.path, 'tmp', '${const Uuid().v4()}.partial'));
     HttpClient? client;
     IOSink? sink;
+    final openListLease = 'cache:${const Uuid().v4()}';
     try {
+      await OpenListLite.acquireTask(profile.url, openListLease);
       await _backgroundBudget(t);
       client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
       t.onCancel = () => client?.close(force: true);
@@ -631,6 +634,7 @@ class CacheManager {
       client?.close(force: true);
       adapter.close();
       _active.remove(track.ref.key);
+      await OpenListLite.releaseTask(profile.url, openListLease);
     }
   }
 
@@ -665,7 +669,9 @@ class CacheManager {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     _prefetchClient = client;
+    final openListLease = 'prefetch:${const Uuid().v4()}';
     try {
+      await OpenListLite.acquireTask(profile.url, openListLease);
       final req = await client
           .getUrl(await adapter.mediaUrl(track))
           .timeout(const Duration(seconds: 15));
@@ -706,6 +712,7 @@ class CacheManager {
       client.close(force: true);
       if (identical(_prefetchClient, client)) _prefetchClient = null;
       adapter.close();
+      await OpenListLite.releaseTask(profile.url, openListLease);
     }
   }
 

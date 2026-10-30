@@ -10,7 +10,7 @@ class AppVersion implements Comparable<AppVersion> {
     }
   }
   static final _pattern = RegExp(
-    r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|beta2))?$',
+    r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|beta2|openlist\.[1-9]\d*))?$',
   );
   final String version;
   final int build;
@@ -128,8 +128,10 @@ class AppUpdates {
   }) : _clientFactory = clientFactory ?? (() => http.Client()),
        _readVersion = readVersion ?? AppVersion.installed;
   static const repository = 'ymltsh/SylphyMusic';
-  static const releasePage = 'https://github.com/$repository/releases/latest';
-  static const rawBase = 'https://raw.githubusercontent.com/$repository/main';
+  static const releasePage =
+      'https://github.com/$repository/releases?q=openlist-lite';
+  static const rawBase =
+      'https://raw.githubusercontent.com/$repository/feature/android-openlist-lite';
   static const defaultMirror = 'https://hub.wgen.top/';
   final String mirror;
 

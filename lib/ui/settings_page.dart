@@ -14,6 +14,7 @@ import 'launcher_icon_picker.dart';
 import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
 import 'about_page.dart';
+import 'openlist_lite_settings.dart';
 
 enum _Section {
   playback,
@@ -306,6 +307,18 @@ class _SettingsPageState extends State<SettingsPage> {
 
   List<Widget> _directory(BuildContext context) => [
     _group('音乐与存储', [
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+        ListTile(
+          leading: _entryIcon(Icons.cloud_outlined),
+          title: const Text('OpenList Lite · 网盘管理'),
+          subtitle: const Text('内置 Web UI · 智能 / 持续运行'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const OpenListLiteSettingsPage(),
+            ),
+          ),
+        ),
       ListTile(
         leading: _entryIcon(Icons.dns_outlined),
         title: const Text('音乐源管理'),

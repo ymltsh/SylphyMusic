@@ -2,6 +2,10 @@
 
 本文描述当前代码。目标见 [产品规格](PROJECT_SPEC_v3.8.md)，实际验证和待办见 [PROGRESS](PROGRESS.md)。工程支持三端构建结构，Linux 本地原生验收目前暂缓。
 
+## OpenList Android 分支
+
+`feature/android-openlist-lite` 使用独立 Android 包名和分支更新清单。`OpenListLite` 经 MethodChannel 调用进程内 Go OpenList 服务，原生管理智能运行、持续运行通知与本机 WebView。WebDAV 扫描、媒体代理、缓存和播放获取运行租约，服务仅监听 `127.0.0.1:5244`。应用退出在停止媒体与资源读取后，通过 `disposeAsync()` 释放租约、停止 OpenList 与通知，再关闭应用数据库。构建及使用方式见 [OpenList Lite](OPENLIST_LITE_ANDROID.md)。
+
 ## 结构与模块
 
 ```mermaid

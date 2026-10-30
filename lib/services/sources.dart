@@ -11,6 +11,7 @@ import 'package:xml/xml.dart';
 
 import '../core/models.dart';
 import 'local_library.dart' show audioExtensions;
+import 'openlist_lite.dart';
 import 'lyrics.dart';
 
 part 'webdav.dart';

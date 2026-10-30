@@ -42,6 +42,8 @@ void main() {
       greaterThan(0),
     );
     expect(AppVersion('0.3.0', 3).compareTo(AppVersion('0.3.0', 3)), 0);
+    expect(AppVersion('1.0.14-openlist.1', 27).prerelease, isTrue);
+    expect(() => AppVersion('1.0.14-openlist.0', 27), throwsFormatException);
     expect(() => AppVersion('0.3', 3), throwsFormatException);
     expect(() => AppVersion('00.3.0', 3), throwsFormatException);
   });
@@ -60,7 +62,7 @@ void main() {
     expect(result.available, isTrue);
     expect(
       calls.single.toString(),
-      'https://mirror.example/proxy/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json',
+      'https://mirror.example/proxy/https://raw.githubusercontent.com/ymltsh/SylphyMusic/feature/android-openlist-lite/version.json',
     );
     expect(result.latest!.page.toString(), AppUpdates.releasePage);
   });
@@ -81,7 +83,7 @@ void main() {
     final original = Uri.parse(AppUpdates.releasePage);
     expect(
       AppUpdates.accelerate(original, AppUpdates.defaultMirror).toString(),
-      'https://hub.wgen.top/https://github.com/ymltsh/SylphyMusic/releases/latest',
+      'https://hub.wgen.top/https://github.com/ymltsh/SylphyMusic/releases?q=openlist-lite',
     );
     expect(
       () => AppUpdates.accelerate(

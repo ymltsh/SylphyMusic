@@ -28,7 +28,7 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.ymltsh.sylphymusic"
+        applicationId = "com.ymltsh.sylphymusic.openlist"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -47,12 +47,20 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
             }
         }
     }
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
+
     buildTypes {
         release {
             if (signingFile.exists()) signingConfig = signingConfigs.getByName("release")
             else if (internalDebugSigning) signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    implementation(files("libs/openlistlib.aar"))
 }
 
 flutter {
