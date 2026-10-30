@@ -983,3 +983,9 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 按用户要求，将 `sylphymusic-sync-stars-player.patch` 同时应用到 main 与 feature/android-openlist-lite。适配两处界面上下文，歌单详情保留既有播放栏，避免重复参数；退出时等待自动同步任务结束再关闭数据库。OpenList 分支三个 ABI Android Release 编译成功，本轮不运行 analyze、测试或设备验证；既有 OpenList 未提交工作保留，不推送或发布该分支。主分支准备 1.0.14+27 Android / Windows 正式更新，发布结果另记。
 
 主分支 Android 三个 ABI 与 Windows Release 均编译成功；Android 三份包正式签名校验通过且证书一致。功能与设备验证由用户执行，本轮未运行 analyze 或测试。
+
+## 2026-10-30 发布 1.0.14 正式更新
+
+源码提交 `746576c`，清单提交 `05761c4`，正式标签 `v1.0.14+27`。Android 三个 ABI、Windows 安装 EXE / 便携 ZIP 与 SHA256SUMS.txt 六个附件已发布，远端大小和 SHA-256 均与本地一致。原始及加速正式清单均返回 1.0.14+27；历史版本保留。Android 正式签名校验通过。主分支 Android / Windows Release 编译成功；本轮未运行 analyze、测试、应用启动或设备验收。OpenList 补丁提交 `6f01846`，文档提交 `ebb8afb`，该分支只更新本地，原有未提交开发内容保留。
+
+发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14%2B27
