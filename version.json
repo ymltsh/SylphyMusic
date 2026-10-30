@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.12",
-    "build": 24,
-    "name": "风灵音乐 v1.0.12",
+    "version": "1.0.13",
+    "build": 26,
+    "name": "风灵音乐 v1.0.13",
     "date": "2026-10-30",
-    "notes": "风灵音乐 1.0.12\n\n- 过滤蓝牙耳机及线控长按产生的重复按键事件，减少播放与暂停反复切换。\n- 外部设备连续发送异常播放控制时自动暂停，待命令恢复平静后重新接受操作。\n- 耳机单击按最新播放意图切换状态，应用内播放操作和停止命令保持可用。\n",
+    "notes": "- 改善 Android 在切换应用时可能出现的短促爆音，优先使用 AudioTrack 音频输出。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13%2B26/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13%2B26/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13%2B26/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13%2B26/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13%2B26/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.12+24"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.13+26"
   },
   "history": [
+    {
+      "version": "1.0.12",
+      "build": 24,
+      "name": "风灵音乐 v1.0.12",
+      "date": "2026-10-30",
+      "notes": "风灵音乐 1.0.12\n\n- 过滤蓝牙耳机及线控长按产生的重复按键事件，减少播放与暂停反复切换。\n- 外部设备连续发送异常播放控制时自动暂停，待命令恢复平静后重新接受操作。\n- 耳机单击按最新播放意图切换状态，应用内播放操作和停止命令保持可用。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.12%2B24/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.12+24"
+    },
     {
       "version": "1.0.11",
       "build": 23,
