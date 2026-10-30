@@ -1,6 +1,6 @@
-# Android AudioTrack A/B validation (experimental)
+# Android AudioTrack validation
 
-This patch is for investigating short crackling / popping when switching Android apps under load. It is **not** a verified fix and should not be merged into `main` without real-device tests.
+The maintainer confirmed on 2026-10-30 that the 1.0.13-beta+25 patch was effective and authorized merging it into `main` for the stable release. Android now prefers AudioTrack with OpenSL ES fallback. The comparison procedure below is retained for future device-specific investigation.
 
 ## Scope
 

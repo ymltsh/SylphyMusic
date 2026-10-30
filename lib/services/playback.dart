@@ -63,7 +63,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _reconnects = 0;
   TrackRef? _recoveryRef;
   AudioSession? _session;
-  // Test-only: sample the actual mpv AO once per track, after audio advances.
+  // Sample the actual mpv AO once per track, after audio advances.
   bool _androidAudioOutputProbed = false;
   TrackRef? _leased;
   final Set<String> _reloadSources = {};
@@ -360,9 +360,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     });
   }
 
-  // Verification experiment only: prefer Android AudioTrack with OpenSL ES
+  // Prefer Android AudioTrack with OpenSL ES
   // fallback. Do not change network caching, focus or the output buffer here.
-  Future<void> _configureAndroidAudioOutputForTest() async {
+  Future<void> _configureAndroidAudioOutput() async {
     if (!Platform.isAndroid) return;
     final native = player.platform;
     if (native is! NativePlayer) {
@@ -407,7 +407,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     volume = double.tryParse(await db.setting('volume') ?? '100') ?? 100;
     await player.setRate(speed);
     await player.setVolume(volume);
-    await _configureAndroidAudioOutputForTest();
+    await _configureAndroidAudioOutput();
     await _setMpvOption('gapless-audio', 'weak');
     await _setMpvOption('replaygain', await db.setting('replaygain') ?? 'no');
     await _setMpvOption('audio-pitch-correction', 'yes');
