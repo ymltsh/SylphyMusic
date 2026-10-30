@@ -8,6 +8,7 @@ import 'cache_tasks.dart';
 import 'cache_storage.dart';
 import 'playlist_page.dart';
 import 'player_bar.dart';
+import 'route_player_bar.dart';
 import 'playback_notice.dart';
 import 'capsule_toggle.dart';
 import 'cover_art.dart';
@@ -40,6 +41,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   bool playlistCoverFlow = false;
   bool playerCollapsed = false;
   late bool _defaultPlayerFab;
+  int _shownSyncNoticeRevision = 0;
   bool? onboarding;
   String? sourceFilter;
   bool descending = false;
@@ -94,7 +96,20 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   }
 
   void _update() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (app.syncNoticeRevision != _shownSyncNoticeRevision) {
+      _shownSyncNoticeRevision = app.syncNoticeRevision;
+      final notice = app.syncNotice;
+      if (notice != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(notice)));
+          }
+        });
+      }
+    }
+    setState(() {});
   }
 
   Future<void> _act(Future<void> Function() f) async {
@@ -130,6 +145,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           builder: (context, _) => Scaffold(
             appBar: AppBar(title: Text(title)),
             body: SafeArea(top: false, child: page()),
+            bottomNavigationBar: RoutePlayerBar(app: app),
           ),
         ),
       ),
@@ -142,7 +158,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   });
   void _favorites() {
     final favorite = app.playlists
-        .where((p) => p.kind == PlaylistKind.favorites)
+        .where((p) => p.id == 'favorites')
         .firstOrNull;
     if (favorite != null) _playlistDetails(favorite);
   }
@@ -775,7 +791,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             tracks,
             showPlayAll: false,
             favorites: latest().kind == PlaylistKind.favorites,
-            onRemove: playlistCanEdit(app, latest())
+            onRemove:
+                (latest().kind == PlaylistKind.favorites ||
+                    playlistCanEdit(app, latest()))
                 ? (index) => app.removePlaylistEntry(latest(), entryIds[index])
                 : null,
           ),

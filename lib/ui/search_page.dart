@@ -7,6 +7,7 @@ import '../core/models.dart';
 import '../data/library_catalog.dart';
 import 'capsule_toggle.dart';
 import 'library_browser.dart';
+import 'route_player_bar.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({
@@ -54,6 +55,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    bottomNavigationBar: RoutePlayerBar(app: widget.app),
     appBar: AppBar(
       title: TextField(
         controller: input,

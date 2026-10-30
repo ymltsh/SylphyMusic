@@ -23,13 +23,14 @@ Future<void> performTrackAction(
     case 'playlist':
       final candidates = app.playlists.where(
         (p) =>
-            p.kind != PlaylistKind.cloud ||
-            (p.sourceId == track.ref.sourceId &&
-                p.status != SyncStatus.readonly &&
-                p.status != SyncStatus.syncing &&
-                app.sources.any(
-                  (s) => s.id == p.sourceId && s.kind.cloudPlaylistWritable,
-                )),
+            (p.kind != PlaylistKind.favorites || p.sourceId == null) &&
+            (p.kind != PlaylistKind.cloud ||
+                (p.sourceId == track.ref.sourceId &&
+                    p.status != SyncStatus.readonly &&
+                    p.status != SyncStatus.syncing &&
+                    app.sources.any(
+                      (s) => s.id == p.sourceId && s.kind.cloudPlaylistWritable,
+                    ))),
       );
       final chosen = await showDialog<PlaylistModel>(
         context: context,

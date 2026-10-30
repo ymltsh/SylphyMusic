@@ -977,3 +977,9 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 - 正式清单 `version.json` 的 latest 为 1.0.2+14，history 保留 1.0.1+13、1.0.0+12、0.2.3+5；GitHub raw 与加速地址均返回新版本，五个下载链接 HTTP 200。
 - 发布过程：`flutter analyze` 无问题，全量测试 237 项通过、5 项私密默认跳过；本轮仅设置 HTTPS 代理并排除 127.0.0.1，避免 Flutter 测试本地服务被代理拦截。
 - 仍待完成：Android 真机 / 模拟器验收（图标切换、关于页、欢迎页）；Windows 安装 / 卸载未在用户环境执行；Windows 未代码签名。
+
+## 2026-10-30 应用自动同步、云端收藏与路由播放栏补丁
+
+按用户要求，将 `sylphymusic-sync-stars-player.patch` 同时应用到 main 与 feature/android-openlist-lite。适配两处界面上下文，歌单详情保留既有播放栏，避免重复参数；退出时等待自动同步任务结束再关闭数据库。OpenList 分支三个 ABI Android Release 编译成功，本轮不运行 analyze、测试或设备验证；既有 OpenList 未提交工作保留，不推送或发布该分支。主分支准备 1.0.14+27 Android / Windows 正式更新，发布结果另记。
+
+主分支 Android 三个 ABI 与 Windows Release 均编译成功；Android 三份包正式签名校验通过且证书一致。功能与设备验证由用户执行，本轮未运行 analyze 或测试。
