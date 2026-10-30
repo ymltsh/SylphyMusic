@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "0.2.8-beta",
-    "build": 11,
-    "name": "风灵音乐 0.2.8-beta（测试签名）",
-    "date": "2026-10-28",
-    "notes": "本次为 Android / Windows 测试更新（Android 沿用测试签名，Windows 未代码签名）。\n\n- 修复 Emby SRT 零时长 / 结束时间倒置导致纯音乐提示丢失或提前清空的问题，兼容已缓存 SRT，手动导入不受影响。\n- 新增可选 LrcApi 在线歌词补充：默认关闭，可配置接口与安全存储鉴权密钥；原歌词优先，缺词时尝试补充。\n- 修复 API 设置弹窗保存 / 关闭时的输入控制器生命周期异常。\n- 播放页支持分别点击艺术家、专辑进入对应歌曲列表，返回后保留播放状态。\n- 首次引导连接来源后，可在后台同步期间继续完成设置。\n\n在线补充开启后会向配置的接口发送歌名、艺术家与专辑。提供三种 Android 架构 APK、Windows 安装程序和便携 ZIP。Linux 与真机后台策略仍待验收。\n",
+    "version": "1.0.13-beta",
+    "build": 25,
+    "name": "风灵音乐 1.0.13-beta（AudioTrack 验证版）",
+    "date": "2026-10-30",
+    "notes": "Android 音频输出验证版：尝试优先使用 AudioTrack，并记录实际音频输出后端，用于排查切换应用时的爆音。\n此版本为实验性更新，改善效果需真机对比确认。请在设置中开启诊断日志，使用完整缓存的同一首歌曲对比。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-x86_64.apk",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-windows-0.2.8-beta-11.zip",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-setup-0.2.8-beta-11.exe"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13-beta%2B25/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13-beta%2B25/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13-beta%2B25/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13-beta%2B25/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.13-beta%2B25/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.8-beta%2B11"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.13-beta+25"
   },
   "history": [
+    {
+      "version": "0.2.8-beta",
+      "build": 11,
+      "name": "风灵音乐 0.2.8-beta（测试签名）",
+      "date": "2026-10-28",
+      "notes": "本次为 Android / Windows 测试更新（Android 沿用测试签名，Windows 未代码签名）。\n\n- 修复 Emby SRT 零时长 / 结束时间倒置导致纯音乐提示丢失或提前清空的问题，兼容已缓存 SRT，手动导入不受影响。\n- 新增可选 LrcApi 在线歌词补充：默认关闭，可配置接口与安全存储鉴权密钥；原歌词优先，缺词时尝试补充。\n- 修复 API 设置弹窗保存 / 关闭时的输入控制器生命周期异常。\n- 播放页支持分别点击艺术家、专辑进入对应歌曲列表，返回后保留播放状态。\n- 首次引导连接来源后，可在后台同步期间继续完成设置。\n\n在线补充开启后会向配置的接口发送歌名、艺术家与专辑。提供三种 Android 架构 APK、Windows 安装程序和便携 ZIP。Linux 与真机后台策略仍待验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-0.2.8-beta-11-x86_64.apk",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-windows-0.2.8-beta-11.zip",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v0.2.8-beta%2B11/sylphy-music-setup-0.2.8-beta-11.exe"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v0.2.8-beta%2B11"
+    },
     {
       "version": "0.2.7-beta",
       "build": 10,
