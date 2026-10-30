@@ -1009,7 +1009,10 @@ public class AudioService extends MediaBrowserServiceCompat {
             // TODO: use typesafe version once SDK 33 is released.
             @SuppressWarnings("deprecation")
             final KeyEvent event = (KeyEvent)mediaButtonEvent.getExtras().getParcelable(Intent.EXTRA_KEY_EVENT);
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            if (event == null) return false;
+            // Bluetooth/headset key-repeat ACTION_DOWNs are not distinct clicks.
+            // Consume them without forwarding a new play/pause command to Dart.
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                 switch (event.getKeyCode()) {
                 case KEYCODE_BYPASS_PLAY:
                     onPlay();

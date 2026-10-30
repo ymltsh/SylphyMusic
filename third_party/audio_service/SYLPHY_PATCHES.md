@@ -20,3 +20,7 @@ and removes the glyphs even though the clickable RemoteViews buttons survive.
 
 The app uses this directory through its `pubspec.yaml` path dependency. When
 upgrading the upstream package, review and reapply this change.
+
+Headset transport handling rejects missing KeyEvents and consumes repeated
+ACTION_DOWN events without forwarding another media command to Dart. The
+app-owned audio handler separately limits external play/pause/toggle bursts.
