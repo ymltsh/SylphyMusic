@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.15",
-    "build": 28,
-    "name": "风灵音乐 v1.0.15",
+    "version": "1.0.16",
+    "build": 29,
+    "name": "风灵音乐 v1.0.16",
     "date": "2026-10-30",
-    "notes": "同步完成提示改为系统通知，不再显示应用内弹条；Android 开启通知选项时请求通知权限，Windows 支持点击系统通知恢复窗口。新增 Emby 云端收藏同步、添加和取消收藏，默认收藏位置可选本地或云端。",
+    "notes": "- 修复从设置进入音乐源管理后，点击来源卡片或“查看曲库”意外返回设置页的问题，现在回到曲库并筛选所选来源。\n- WebDAV 支持选择基础目录和扫描子目录层级，编辑扫描范围后重新同步，兼容旧来源并保留已有索引与曲目身份。\n- 更新应用图标选择页，加入当前图标卡、图标预览和应用按钮，更新内置图标素材。\n- 我的音乐空间增加音源 Logo 叠卡与品牌渐变，统一来源图标展示。\n- 优化播放页打开时的主题、封面取色和歌词处理路径；精简设置界面，调整播放页编辑器胶囊按钮与默认辅助网格。\n- 音源启停和同步按来源独立管理，同步中可取消或停用，避免单个来源操作锁住其他来源。\n\n本版为普通版，提供 Android arm64-v8a、armeabi-v7a、x86_64，以及 Windows 安装版和便携版。OpenList 特别版继续使用独立包名及更新通道。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.16%2B29/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.16%2B29/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.16%2B29/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.16%2B29/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.16%2B29/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.15+28"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.16%2B29"
   },
   "history": [
+    {
+      "version": "1.0.15",
+      "build": 28,
+      "name": "风灵音乐 v1.0.15",
+      "date": "2026-10-30",
+      "notes": "同步完成提示改为系统通知，不再显示应用内弹条；Android 开启通知选项时请求通知权限，Windows 支持点击系统通知恢复窗口。新增 Emby 云端收藏同步、添加和取消收藏，默认收藏位置可选本地或云端。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.15%2B28/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.15+28"
+    },
     {
       "version": "1.0.14",
       "build": 27,
