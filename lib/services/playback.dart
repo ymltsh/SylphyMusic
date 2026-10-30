@@ -63,6 +63,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _reconnects = 0;
   TrackRef? _recoveryRef;
   AudioSession? _session;
+  // Test-only: sample the actual mpv AO once per track, after audio advances.
+  bool _androidAudioOutputProbed = false;
   TrackRef? _leased;
   final Set<String> _reloadSources = {};
   Future<String?> Function(Track)? _lyricsLoader;
@@ -358,12 +360,54 @@ class PlaybackCoordinator extends ChangeNotifier {
     });
   }
 
+  // Verification experiment only: prefer Android AudioTrack with OpenSL ES
+  // fallback. Do not change network caching, focus or the output buffer here.
+  Future<void> _configureAndroidAudioOutputForTest() async {
+    if (!Platform.isAndroid) return;
+    final native = player.platform;
+    if (native is! NativePlayer) {
+      diagnostics?.record('playback', 'audio_output_native_unavailable');
+      return;
+    }
+    try {
+      // media_kit may ignore mpv error codes: this records only the request.
+      await native.setProperty('ao', 'audiotrack,opensles,');
+      diagnostics?.record('playback', 'audio_output_override_requested');
+    } catch (_) {
+      // Keep the package's default output backend if the override fails.
+      diagnostics?.record('playback', 'audio_output_override_failed');
+    }
+  }
+
+  Future<void> _probeAndroidAudioOutput() async {
+    if (!Platform.isAndroid || _androidAudioOutputProbed) return;
+    _androidAudioOutputProbed = true;
+    final native = player.platform;
+    if (native is! NativePlayer) return;
+    try {
+      // Unlike the requested `ao`, `current-ao` reports the actual driver.
+      final actual = await native.getProperty('current-ao');
+      const known = {'audiotrack', 'aaudio', 'opensles', 'null'};
+      final driver = known.contains(actual)
+          ? actual
+          : (actual.isEmpty ? 'unavailable' : 'other');
+      diagnostics?.record(
+        'playback',
+        'audio_output_selected',
+        details: {'type': driver},
+      );
+    } catch (_) {
+      diagnostics?.record('playback', 'audio_output_probe_failed');
+    }
+  }
+
   Future<void> initialize() async {
     snapshot = await db.queue();
     speed = double.tryParse(await db.setting('speed') ?? '1') ?? 1;
     volume = double.tryParse(await db.setting('volume') ?? '100') ?? 100;
     await player.setRate(speed);
     await player.setVolume(volume);
+    await _configureAndroidAudioOutputForTest();
     await _setMpvOption('gapless-audio', 'weak');
     await _setMpvOption('replaygain', await db.setting('replaygain') ?? 'no');
     await _setMpvOption('audio-pitch-correction', 'yes');
@@ -401,6 +445,12 @@ class PlaybackCoordinator extends ChangeNotifier {
     _subscriptions.add(
       player.stream.position.listen((v) {
         final nextMs = v.inMilliseconds;
+        if (Platform.isAndroid &&
+            playing &&
+            !_androidAudioOutputProbed &&
+            nextMs >= 500) {
+          unawaited(_probeAndroidAudioOutput());
+        }
         if (nextMs > _watchdogPositionMs + 400) {
           _watchdogPositionMs = nextMs;
           _progressWatch.reset();
@@ -673,6 +723,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _opening = true;
     _playRequested = autoplay;
+    _androidAudioOutputProbed = false;
     ++_loadGeneration;
     _watchdogPositionMs = -1;
     _openStallLogged = false;
@@ -1438,10 +1489,72 @@ class PlaybackCoordinator extends ChangeNotifier {
 class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
   SylphyAudioHandler(this.controller);
   final PlaybackCoordinator controller;
+
+  // Audio focus and noisy-device events use system:true and never come through
+  // this gate. Only external MediaSession transport commands are rate-limited;
+  // the in-app UI can always use PlaybackCoordinator directly.
+  static const _transportQuietMs = 800;
+  static const _transportBurstLimit = 6;
+  final Stopwatch _transportClock = Stopwatch()..start();
+  int? _lastTransportMs;
+  int _transportBurstCount = 0;
+  bool _transportStorm = false;
+
+  bool _allowTransport(String type) {
+    final now = _transportClock.elapsedMilliseconds;
+    final last = _lastTransportMs;
+    if (last == null || now - last > _transportQuietMs) {
+      _transportBurstCount = 0;
+      _transportStorm = false;
+    }
+    _lastTransportMs = now;
+    if (_transportStorm) return false;
+    if (++_transportBurstCount > _transportBurstLimit) {
+      _transportStorm = true;
+      controller.diagnostics?.record(
+        'media_control',
+        'transport_storm',
+        details: {'type': type},
+      );
+      // Fail safe: stop the audible oscillation and keep ignoring repeated
+      // commands until the accessory/OS has been quiet for 800 ms.
+      unawaited(controller.pause().catchError((Object _) {}));
+      return false;
+    }
+    controller.diagnostics?.record(
+      'media_control',
+      'transport_command',
+      details: {'type': type},
+    );
+    return true;
+  }
+
   @override
-  Future<void> play() => controller.play();
+  Future<void> play() =>
+      _allowTransport('play') ? controller.play() : Future<void>.value();
+
   @override
-  Future<void> pause() => controller.pause();
+  Future<void> pause() =>
+      _allowTransport('pause') ? controller.pause() : Future<void>.value();
+
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    if (button == MediaButton.media) {
+      if (!_allowTransport('toggle')) return;
+      // Play intent updates synchronously, while native `playing` can lag.
+      if (controller._playRequested) {
+        await controller.pause();
+      } else {
+        await controller.play();
+      }
+    } else if (button == MediaButton.next) {
+      await controller.next();
+    } else if (button == MediaButton.previous) {
+      await controller.previous();
+    }
+  }
+
+  // Stop must remain available even in a transport-command storm.
   @override
   Future<void> stop() => controller.pause();
   @override

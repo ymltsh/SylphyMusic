@@ -1,5 +1,21 @@
 # 实施与验证记录
 
+## 2026-10-30 AudioTrack 验证分支与测试更新 1.0.13-beta+25
+
+在 `validation/android-audiotrack` 分支应用 `SylphyMusic-android-audiotrack-validation.patch`，基于当前已发布的耳机控制改动：Android 请求优先 AudioTrack、回退 OpenSL ES，并在每首曲目进度超过 500ms 后记录实际 `current-ao`。实验代码未合入 main；main 仅更新测试清单。
+
+发布预发布版 [1.0.13-beta+25](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.13-beta%2B25)，标签指向验证源码提交 `0f3a655`。Android 三 ABI、Windows Release 与安装程序编译成功，Android 正式签名校验通过，六个远端附件的大小和 SHA-256 与本地一致。测试清单提交 `b97f38e` 已推送 main，正式版清单保持 1.0.12+24。
+
+产物位于 `build/releases/1.0.13-beta-25/`，日志为 `build/test_logs/release-1.0.13-beta.log`。未运行静态分析、测试或设备验证；实际后端及爆音对比由用户参照 `docs/ANDROID_AUDIOTRACK_VERIFICATION.md` 验证。
+
+## 2026-10-30 应用耳机播放控制补丁并发布 1.0.12+24
+
+应用 `sylphymusic-headset-transport-loop.patch`：Android 原生媒体按键入口拒绝空事件并消费长按重复事件，不重复转发到 Dart。外部播放 / 暂停 / 切换命令在间隔不超过 800 毫秒的连续突发中最多接受六次，超限暂停并忽略后续命令，静默超过 800 毫秒后恢复；耳机单击依据同步播放意图切换，避免原生状态延迟造成反复启停。应用内操作、系统焦点处理与停止命令保留原路径，同步第三方补丁说明。
+
+发布正式版 [1.0.12+24](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.12%2B24)，Android 三 ABI、Windows Release 与安装程序编译成功，Android 正式签名匹配；六个固定名称资产远端大小 / SHA-256 与本地一致，GitHub latest 与远端正式清单已更新。仅清单提交 `32af9b1` 已推送，源码改动保留本地。日志为 `build/test_logs/release-1.0.12.log`，产物位于 `build/releases/1.0.12-24/`。
+
+按用户约定未运行静态分析、测试或设备验证，耳机与蓝牙实际操作由用户确认；Windows 未代码签名。
+
 ## 2026-10-30 桌面歌词字号 / 背景自动淡出并发布 1.0.11+23
 
 Android 桌面歌词增加独立字号滑块（12–40，默认 20），复用 settings 保存并经既有通道即时传入原生 TextView；更新去重包含字号。原生背景与关闭按钮在显示、修改颜色 / 字号或操作后静置 2.5 秒，以 350 毫秒淡出，仅保留歌词；触摸恢复操作区域，拖动期间取消淡出，松手重新计时。普通歌词更新保留当前背景透明度，不重置淡出计时；关闭窗口移除计时回调并取消动画。
