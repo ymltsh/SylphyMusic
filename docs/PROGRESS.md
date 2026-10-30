@@ -997,3 +997,5 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 Emby 收藏分页读取当前用户的 Audio 收藏，通过 FavoriteItems POST / DELETE 添加或取消，写操作不自动重试；与 Navidrome / OpenSubsonic 共用按来源隔离的云端收藏镜像和默认收藏选项。本轮仅编译，不运行 analyze、测试或设备验证；未连接私人 Emby 服务器。两个分支均同步修改，主分支准备 1.0.15+28 正式更新，OpenList 保留本地。
 
 编译结果：主分支 Android 三个 ABI 与 Windows Release、Windows 安装程序和便携包均成功；OpenList 分支三个 ABI Android Release 成功。功能和通知显示、Emby 服务端联动由用户验收。
+
+发布完成：源码 `2ef6f92`，清单 `0b73b44`，正式标签 `v1.0.15+28`。六个附件远端大小和 SHA-256 均与本地一致，Android 三份正式签名校验通过；原始 / 加速正式清单均返回 1.0.15+28。OpenList 修正提交 `499c417`，仅本地，保留原有未提交开发内容。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.15%2B28
