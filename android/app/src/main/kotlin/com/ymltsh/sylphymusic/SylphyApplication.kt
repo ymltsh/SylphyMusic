@@ -28,6 +28,7 @@ class SylphyApplication : Application() {
         check(FlutterEngineCache.getInstance().get(AudioServicePlugin.getFlutterEngineId()) === engine)
         if (installedEngine === engine) return engine
         overlay.hide()
+        SystemNotifications.register(this, engine)
         installedEngine = engine
         dartStarts = 0
         Log.i("SylphyLifecycle", "engine_attached engine=${System.identityHashCode(engine)} pid=${android.os.Process.myPid()}")

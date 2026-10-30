@@ -41,7 +41,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   bool playlistCoverFlow = false;
   bool playerCollapsed = false;
   late bool _defaultPlayerFab;
-  int _shownSyncNoticeRevision = 0;
   bool? onboarding;
   String? sourceFilter;
   bool descending = false;
@@ -97,18 +96,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
 
   void _update() {
     if (!mounted) return;
-    if (app.syncNoticeRevision != _shownSyncNoticeRevision) {
-      _shownSyncNoticeRevision = app.syncNoticeRevision;
-      final notice = app.syncNotice;
-      if (notice != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(notice)));
-          }
-        });
-      }
-    }
     setState(() {});
   }
 

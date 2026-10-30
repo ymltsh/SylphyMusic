@@ -989,3 +989,11 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 源码提交 `746576c`，清单提交 `05761c4`，正式标签 `v1.0.14+27`。Android 三个 ABI、Windows 安装 EXE / 便携 ZIP 与 SHA256SUMS.txt 六个附件已发布，远端大小和 SHA-256 均与本地一致。原始及加速正式清单均返回 1.0.14+27；历史版本保留。Android 正式签名校验通过。主分支 Android / Windows Release 编译成功；本轮未运行 analyze、测试、应用启动或设备验收。OpenList 补丁提交 `6f01846`，文档提交 `ebb8afb`，该分支只更新本地，原有未提交开发内容保留。
 
 发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14%2B27
+
+## 2026-10-30 系统同步通知与 Emby 云端收藏
+
+按用户追加要求，自动同步完成提示改为 Android 通知栏 / Windows 系统通知，删除应用内 SnackBar 通知与相关控制器状态。沿用自动同步通知开关，启用时请求 Android 通知权限，拒绝或禁用通知不影响同步；Android 完成通知使用独立频道与通知 ID，避免覆盖前台同步进度。Windows 通过已有托盘发送系统通知并支持点击恢复窗口。
+
+Emby 收藏分页读取当前用户的 Audio 收藏，通过 FavoriteItems POST / DELETE 添加或取消，写操作不自动重试；与 Navidrome / OpenSubsonic 共用按来源隔离的云端收藏镜像和默认收藏选项。本轮仅编译，不运行 analyze、测试或设备验证；未连接私人 Emby 服务器。两个分支均同步修改，主分支准备 1.0.15+28 正式更新，OpenList 保留本地。
+
+编译结果：主分支 Android 三个 ABI 与 Windows Release、Windows 安装程序和便携包均成功；OpenList 分支三个 ABI Android Release 成功。功能和通知显示、Emby 服务端联动由用户验收。
