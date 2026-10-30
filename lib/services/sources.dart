@@ -370,6 +370,31 @@ class EmbyAdapter extends MusicAdapter {
   }
 
   @override
+  Future<List<String>> fetchStarredIds() async {
+    final user = await _userId;
+    if (user.isEmpty) throw StateError('Emby 未保存用户 ID，请重新登录');
+    final ids = <String>[];
+    await for (final page in _itemPages('Users/$user/Items', {
+      'Recursive': 'true',
+      'IncludeItemTypes': 'Audio',
+      'IsFavorite': 'true',
+    })) {
+      ids.addAll(page.map((item) => item['Id'].toString()));
+    }
+    return ids;
+  }
+
+  @override
+  Future<void> setStarred(String id, bool starred) async {
+    final user = await _userId;
+    if (user.isEmpty) throw StateError('Emby 未保存用户 ID，请重新登录');
+    await _api(
+      starred ? 'POST' : 'DELETE',
+      'Users/$user/FavoriteItems/${Uri.encodeComponent(id)}',
+    );
+  }
+
+  @override
   Future<List<RemotePlaylist>> fetchPlaylists() async {
     final u = await _userId;
     return (await _pagedItems('Users/$u/Items', {

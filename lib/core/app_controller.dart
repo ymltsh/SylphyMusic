@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../data/app_db.dart';
 import '../data/library_catalog.dart';
 import '../services/app_updates.dart';
+import '../services/system_notifications.dart';
 import '../services/api_settings.dart';
 import '../services/cache.dart';
 import '../services/cache_jobs.dart';
@@ -80,8 +81,6 @@ class SylphyApp extends ChangeNotifier {
   bool cloudFavoritesByDefault = false;
   int autoSyncMinutes = 360;
   bool autoSyncNotice = false;
-  String? syncNotice;
-  int syncNoticeRevision = 0;
   bool _appForeground = true;
   bool _autoSyncRunning = false;
   final _lastAutoSyncAttempt = <String, int>{};
@@ -300,11 +299,10 @@ class SylphyApp extends ChangeNotifier {
         await cloud.syncAll();
         await reload();
         if (autoSyncNotice) {
-          syncNotice = failed == 0
+          final message = failed == 0
               ? '自动同步完成（${stale.length} 个音乐源）'
               : '自动同步完成，$failed 个音乐源失败';
-          syncNoticeRevision++;
-          notifyListeners();
+          await SystemNotifications.syncCompleted(message);
         }
       }
     } finally {
@@ -322,6 +320,7 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<void> setAutoSyncNotice(bool enabled) async {
+    if (enabled) await SystemNotifications.requestPermission();
     await db.setSetting('auto_sync_notice', '$enabled');
     autoSyncNotice = enabled;
     notifyListeners();
@@ -679,7 +678,7 @@ class SylphyApp extends ChangeNotifier {
 
   String favoritePlaylistId(Track track) {
     final source = sources.where((s) => s.id == track.ref.sourceId).firstOrNull;
-    return cloudFavoritesByDefault && source?.kind == SourceKind.subsonic
+    return cloudFavoritesByDefault && source?.kind.cloudFavorites == true
         ? PlaylistSyncService.cloudFavoriteId(source!.id)
         : 'favorites';
   }

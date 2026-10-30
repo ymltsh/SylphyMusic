@@ -434,14 +434,16 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       SwitchListTile(
-        title: const Text('自动同步提示'),
-        subtitle: const Text('同步结束时在应用内提示，不发送系统后台通知'),
+        title: const Text('自动同步系统通知'),
+        subtitle: const Text('同步结束时发送系统通知，需允许系统通知权限'),
         value: app.autoSyncNotice,
         onChanged: (v) => _act(() => app.setAutoSyncNotice(v)),
       ),
       ListTile(
         title: const Text('默认收藏位置'),
-        subtitle: const Text('云端红心仅支持 Navidrome/OpenSubsonic，其余来源仍使用本地收藏'),
+        subtitle: const Text(
+          '云端收藏支持 Emby、Navidrome / OpenSubsonic，其余来源仍使用本地收藏',
+        ),
         trailing: DropdownButton<bool>(
           value: app.cloudFavoritesByDefault,
           items: const [

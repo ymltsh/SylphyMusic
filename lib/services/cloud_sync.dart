@@ -64,10 +64,10 @@ class PlaylistSyncService {
 
   static String cloudFavoriteId(String sourceId) => 'cloud-favorites:$sourceId';
 
-  // Subsonic stars are distinct from playlists. Keep a source-scoped local
+  // Server favorites are distinct from playlists. Keep a source-scoped local
   // mirror so server favorites never overwrite cross-source local favorites.
   Future<void> refreshStarredForSource(SourceProfile source) async {
-    if (!source.enabled || source.kind != SourceKind.subsonic) return;
+    if (!source.enabled || !source.kind.cloudFavorites) return;
     final adapter = factory.create(source);
     try {
       final ids = await adapter.fetchStarredIds();

@@ -24,6 +24,22 @@ DesktopIntegration::DesktopIntegration(HWND window, flutter::BinaryMessenger* me
         {flutter::EncodableValue("tray"), flutter::EncodableValue(tray_ready_)}}));
       return;
     }
+    if (call.method_name() == "syncCompleted") {
+      auto values = call.arguments() ? std::get_if<flutter::EncodableMap>(call.arguments()) : nullptr;
+      if (!values || !tray_ready_) {
+        result->Error("notification_unavailable", "System notification area unavailable");
+        return;
+      }
+      auto notice = tray_;
+      notice.uFlags = NIF_INFO;
+      notice.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME;
+      wcscpy_s(notice.szInfoTitle, L"Sylphy Music");
+      auto message = winrt::to_hstring(StringValue(*values, "message"));
+      wcsncpy_s(notice.szInfo, message.c_str(), _TRUNCATE);
+      if (Shell_NotifyIconW(NIM_MODIFY, &notice)) result->Success();
+      else result->Error("notification_unavailable", "System notification could not be posted");
+      return;
+    }
     if (call.method_name() != "update") { result->NotImplemented(); return; }
     try {
       auto values = call.arguments() ? std::get_if<flutter::EncodableMap>(call.arguments()) : nullptr;
@@ -83,7 +99,7 @@ bool DesktopIntegration::Handle(UINT message, WPARAM wparam, LPARAM lparam) {
     return true;
   }
   if (message == kTray) {
-    if (lparam == WM_LBUTTONUP || lparam == WM_LBUTTONDBLCLK) {
+    if (lparam == WM_LBUTTONUP || lparam == WM_LBUTTONDBLCLK || lparam == NIN_BALLOONUSERCLICK) {
       ShowWindow(window_, SW_RESTORE); SetForegroundWindow(window_);
     } else if (lparam == WM_RBUTTONUP) {
       HMENU menu = CreatePopupMenu();
