@@ -1,7 +1,7 @@
 # SylphyMusic OpenList Edition (Android arm64) — preview
 
-> Branch: `feature/android-openlist-lite` · Proposed app version:
-> `1.0.14-openlist.1+27` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
+> Branch: `feature/android-openlist-lite` · Special edition:
+> `1.0.14-openlist.2+28` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
 >
 > The original archive is a **source patch** without a precompiled AAR/APK.
 > The local Windows environment has now compiled the AAR and arm64 Release APK;
@@ -9,15 +9,18 @@
 
 ## Scope
 
-- Same-package native Go OpenList server behind 127.0.0.1:5244 (not LAN-facing)
+- Native Go OpenList server in a private `:openlist` Android process behind 127.0.0.1:10486 (not LAN-facing)
 - Upstream v4.2.9, entire `drivers` registry and bundled frontend Web UI
 - Flutter Settings → OpenList Lite → native WebView; default `admin` login
 - Smart mode: start for Web UI, scanning, WebDAV file requests or network audio;
   stop after ~3 minutes without a lease. Continuous mode: user-triggered
   `specialUse` foreground service + ongoing notification and switch-to-smart action.
-- Use existing SylphyMusic WebDAV music source (read-only): URL
-  `http://127.0.0.1:5244/dav/`. Create a dedicated read-only OpenList user from
-  the Web UI and use its credentials in SylphyMusic rather than the admin account.
+- Add Music Source → OpenList presets `http://127.0.0.1:10486/dav/` and
+  `sylphy/sylphy`, then lets the user select a base folder and scan depth.
+  This remains a WebDAV source internally; the music client only reads files.
+- The persistent service master switch stops listeners and the foreground
+  notification, clears leases, cancels matching online work, and exits the private
+  process. Scanning, playback and foreground recovery cannot restart it until enabled.
 - Standalone Android application ID `com.ymltsh.sylphymusic.openlist`, so the
   app can coexist with the original edition. Application data cannot be shared
   automatically between the editions.
@@ -61,17 +64,26 @@ OpenList v4.2.9 does not automatically provision an administrator on a fresh dat
 
 ## Initial provisioning
 
-1. Open Settings → OpenList Lite. Leave Smart selected or opt into Continuous.
+1. Open Settings → OpenList Lite and enable the service. Leave Smart selected or opt into Continuous.
 2. Tap OpenList Web UI. Admin username is `admin`; the per-install initial
    password can be viewed in the settings page. Password is encrypted with a key
    in Android Keystore. The bootstrap password is installed only once; changing
    the admin password in OpenList Web UI does not reset it on app restart.
-3. Add a storage mount via OpenList Web UI; create a *separate read-only account*
-   with access only to required music mounts.
-4. Add an existing SylphyMusic WebDAV source using the localhost URL and
-   read-only account, then scan and play music as usual.
+   The dialog has separate copy buttons for the username and initial password.
+3. Use `admin` to add storage mounts. Initialization also provisions a missing
+   ordinary `sylphy` account with initial password `sylphy`, root base path and
+   exactly WebDAV read/manage permissions (bits 8 and 9). This is an intentional
+   public product default. Existing accounts, passwords, permissions and disabled
+   state are preserved. Settings provides copy controls for the default credentials.
+4. Add Music Source → OpenList → Select Directory, select the mounted music
+   folder and scan depth, then connect. If the account password was changed in
+   the Web UI, enter the changed password in the connection form.
 5. When switching from Continuous to Smart, the notification is removed; the
    server remains alive while active leases exist and stops after an idle grace.
+6. Turning off the master switch exits the private process, including Go workers
+   and driver timers. Matching playback pauses and online tasks are cancelled;
+   mounts, index and complete cache remain. Enabling restores the chosen mode,
+   while playback remains paused until the user resumes it.
 
 ## Android behavior and limitations
 
@@ -82,13 +94,17 @@ OpenList v4.2.9 does not automatically provision an administrator on a fresh dat
   If distribution policy rejects that category, choose an alternative compliant
   distribution/runtime design. Do not disguise continuous server activity as
   `mediaPlayback` or `dataSync` (the latter has a six-hour limit for target 35+).
-- The same-process Go runtime must pass Android repeated Start/Stop tests;
-  OpenList upstream does not promise unlimited in-process restart cycles.
+- Smart idle stop/start still occurs within the private process and needs device
+  validation. The master switch exits that process so the next enable has a fresh
+  Go runtime without terminating the music player.
 - Web UI is embedded in an Android WebView. HTTPS links such as external OAuth
   login flows are opened in the system browser; auth callback behavior depends
   on individual storage providers and needs per-driver validation.
-- The fixed port 5244 is checked before startup, and conflicts fail explicitly.
+- The fixed port 10486 is checked before startup, and conflicts fail explicitly.
   There is intentionally no silent fallback to a different server.
+- On Android, saved WebDAV sources using `http://127.0.0.1:5244/dav` or its
+  descendants are migrated to port 10486 before background work starts. Only
+  the URL port changes; source IDs, credentials, scan scope and references remain.
 - Credentials must never be sent to untrusted origins; WebView navigation is
   restricted to the local origin or an external HTTPS browser intent.
 - Smart mode holds scanning and playback leases; other background prefetch/
@@ -123,12 +139,15 @@ OpenList v4.2.9 does not automatically provision an administrator on a fresh dat
 The edition uses `com.ymltsh.sylphymusic.openlist` and isolated local
 `version.json` / `version-beta.json` with `latest: null`. The app update client
 fetches from `feature/android-openlist-lite`, NOT `main`: a mainline APK must
-never be installed as an OpenList Edition update. Add signed OpenList Edition
-release assets to its branch-specific manifest only after CI and device checks.
+never be installed as an OpenList Edition update. Publish signed arm64 artifacts
+and update that branch's manifest under the maintainer's release authorization;
+compilation is required, while functional and device checks remain with the user.
 
 ## Remote branch
 
-The patch creates a local branch. The connected GitHub integration rejected
-remote branch creation with HTTP 403; after review and verification, a
-maintainer with push access may publish it using
-`git push -u origin feature/android-openlist-lite`.
+The remote `feature/android-openlist-lite` branch now hosts the separate update
+manifest. Version `1.0.14-openlist.2+28` is published as an independent GitHub
+prerelease without changing the ordinary edition's Latest release. Only the
+manifest was committed for this publication; the exact application/backend/frontend
+build source is attached as `sylphy-music-openlist-source.zip`. GitHub's automatic
+source archive represents the Git tag baseline rather than the local build snapshot.

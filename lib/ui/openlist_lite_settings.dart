@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import '../services/openlist_lite.dart';
 
 class OpenListLiteSettingsPage extends StatefulWidget {
-  const OpenListLiteSettingsPage({super.key});
+  const OpenListLiteSettingsPage({super.key, required this.setEnabled});
+
+  final Future<void> Function(bool) setEnabled;
 
   @override
   State<OpenListLiteSettingsPage> createState() =>
@@ -13,6 +15,7 @@ class OpenListLiteSettingsPage extends StatefulWidget {
 
 class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
   String _mode = 'smart';
+  bool _enabled = true;
   bool _running = false;
   bool _busy = true;
   String? _error;
@@ -30,6 +33,7 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
       setState(() {
         _mode = status['mode'] == 'continuous' ? 'continuous' : 'smart';
         _running = status['running'] == true;
+        _enabled = status['enabled'] != false;
         _busy = false;
       });
     } catch (e) {
@@ -79,13 +83,21 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
                   tooltip: '刷新状态',
                 ),
               ),
+              SwitchListTile(
+                title: const Text('启用 OpenList 服务'),
+                subtitle: const Text('关闭后立即停止服务，扫描、播放和后台任务均不会自动启动'),
+                value: _enabled,
+                onChanged: _busy
+                    ? null
+                    : (value) => _run(() => widget.setEnabled(value)),
+              ),
               const Divider(height: 1),
               RadioListTile<String>(
                 title: const Text('智能运行（推荐）'),
                 subtitle: const Text('需要时启动，空闲约 3 分钟后自动停止'),
                 value: 'smart',
                 groupValue: _mode,
-                onChanged: _busy
+                onChanged: _busy || !_enabled
                     ? null
                     : (_) => _run(() => OpenListLite.setMode('smart')),
               ),
@@ -94,7 +106,7 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
                 subtitle: const Text('用户主动保持本地服务；受 Android 后台限制，不保证永久存活'),
                 value: 'continuous',
                 groupValue: _mode,
-                onChanged: _busy
+                onChanged: _busy || !_enabled
                     ? null
                     : (_) => _run(() => OpenListLite.setMode('continuous')),
               ),
@@ -103,7 +115,9 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: _busy ? null : () => _run(OpenListLite.openUi),
+          onPressed: _busy || !_enabled
+              ? null
+              : () => _run(OpenListLite.openUi),
           icon: const Icon(Icons.open_in_browser),
           label: const Text('打开 OpenList 原生 Web UI'),
         ),
@@ -121,7 +135,7 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
         ),
         ListTile(
           title: const Text('查看初始管理员密码'),
-          subtitle: const Text('首次管理网盘时使用；建议在 Web UI 中设置只读音乐账号'),
+          subtitle: const Text('使用 admin 管理网盘；若已修改密码，请使用修改后的密码'),
           trailing: const Icon(Icons.lock_outline),
           onTap: _busy
               ? null
@@ -135,6 +149,17 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
                       content: SelectableText('用户名：admin\n密码：$password'),
                       actions: [
                         TextButton(
+                          onPressed: () => Clipboard.setData(
+                            const ClipboardData(text: 'admin'),
+                          ),
+                          child: const Text('复制账号'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              Clipboard.setData(ClipboardData(text: password)),
+                          child: const Text('复制密码'),
+                        ),
+                        TextButton(
                           onPressed: () => Navigator.pop(ctx),
                           child: const Text('关闭'),
                         ),
@@ -143,10 +168,34 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
                   );
                 }),
         ),
+        ListTile(
+          title: const Text('预置 WebDAV 账号'),
+          subtitle: const SelectableText(
+            '账号：sylphy\n初始密码：sylphy\n权限：WebDAV 读取、管理',
+          ),
+          trailing: Wrap(
+            children: [
+              IconButton(
+                tooltip: '复制账号',
+                icon: const Icon(Icons.person_outline),
+                onPressed: () => Clipboard.setData(
+                  const ClipboardData(text: OpenListLite.webDavUsername),
+                ),
+              ),
+              IconButton(
+                tooltip: '复制初始密码',
+                icon: const Icon(Icons.copy),
+                onPressed: () => Clipboard.setData(
+                  const ClipboardData(text: OpenListLite.webDavPassword),
+                ),
+              ),
+            ],
+          ),
+        ),
         const Padding(
           padding: EdgeInsets.all(12),
           child: Text(
-            '在 Web UI 中添加网盘后，返回“音乐源管理”，添加 WebDAV 来源，填写上面的地址及具有读取权限的 OpenList 账号。'
+            '使用 admin 在 Web UI 中添加网盘后，返回“音乐源管理”，选择 OpenList 并选择音乐目录即可。预置账号只在缺失时创建，已修改的密码或权限不会重置。'
             '完整 Web UI 和驱动由内置 OpenList 提供。此模式只监听 127.0.0.1，不开放局域网访问。',
           ),
         ),

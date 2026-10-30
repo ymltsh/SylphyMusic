@@ -76,7 +76,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 7,
+      version: 8,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -130,10 +130,18 @@ class AppDb {
           }
           await database.execute(_webDavTagsTable);
         }
+        if (oldVersion < 8) {
+          await database.execute(
+            "ALTER TABLE sources ADD COLUMN webdav_base_path TEXT NOT NULL DEFAULT ''",
+          );
+          await database.execute(
+            'ALTER TABLE sources ADD COLUMN webdav_max_depth INTEGER NOT NULL DEFAULT -1',
+          );
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
-          '''CREATE TABLE sources(id TEXT PRIMARY KEY, name TEXT NOT NULL,kind TEXT NOT NULL,url TEXT NOT NULL,username TEXT NOT NULL,remote_user_id TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,last_sync INTEGER NOT NULL DEFAULT 0)''',
+          '''CREATE TABLE sources(id TEXT PRIMARY KEY, name TEXT NOT NULL,kind TEXT NOT NULL,url TEXT NOT NULL,username TEXT NOT NULL,remote_user_id TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,last_sync INTEGER NOT NULL DEFAULT 0,webdav_base_path TEXT NOT NULL DEFAULT '',webdav_max_depth INTEGER NOT NULL DEFAULT -1)''',
           '''CREATE TABLE tracks(source_id TEXT NOT NULL,id TEXT NOT NULL,title TEXT,artist TEXT,album TEXT,album_artist TEXT,duration_ms INTEGER,cover_id TEXT,year INTEGER,disc INTEGER,number INTEGER,remote_json TEXT,missing INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(source_id,id))''',
           '''CREATE TABLE playlists(id TEXT PRIMARY KEY,name TEXT NOT NULL,kind TEXT NOT NULL,source_id TEXT,remote_id TEXT,status TEXT NOT NULL DEFAULT 'synced',base_json TEXT NOT NULL DEFAULT '[]',message TEXT NOT NULL DEFAULT '')''',
           '''CREATE TABLE playlist_items(playlist_id TEXT NOT NULL,entry_id TEXT NOT NULL,position INTEGER NOT NULL,track_key TEXT NOT NULL,PRIMARY KEY(playlist_id,entry_id))''',
@@ -267,7 +275,9 @@ class AppDb {
       if (!current.enabled ||
           current.url != original.url ||
           current.username != original.username ||
-          current.kind != original.kind) {
+          current.kind != original.kind ||
+          current.webdavBasePath != original.webdavBasePath ||
+          current.webdavMaxDepth != original.webdavMaxDepth) {
         throw StateError('来源连接已变更或停用，已丢弃过期索引结果');
       }
       await tx.update(

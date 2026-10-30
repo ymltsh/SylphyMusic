@@ -24,7 +24,7 @@ class OpenListWebActivity : Activity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
-                if (url.scheme == "http" && url.host == "127.0.0.1" && url.port == 5244) return false
+                if (url.scheme == "http" && url.host == "127.0.0.1" && url.port == 10486) return false
                 if (url.scheme == "https") {
                     // OAuth/browser-based logins must leave the privileged local WebView.
                     startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url.toString())))

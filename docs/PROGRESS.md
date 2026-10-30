@@ -1,5 +1,33 @@
 # 实施与验证记录
 
+## 2026-10-30 发布 OpenList-Lite 特别版 1.0.14-openlist.2+28
+
+按用户授权发布独立 OpenList 特别版，仅提供 Android arm64-v8a 安装包；GitHub 采用预发布并显式不设为 Latest，普通版 Latest 保持 `v1.0.15+28`。Android arm64 Release 编译成功、正式签名校验通过，APK 原生库仅含 arm64-v8a。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.2%2B28 。
+
+发布附件为 `sylphy-music-arm64-v8a.apk`、`sylphy-music-openlist-source.zip`、`SHA256SUMS.txt`，三个远端附件大小及 SHA-256 均与本地一致。源码快照包含本次实际应用源码、固定 OpenList 后端及桥接修改、嵌入的 Lite 前端产物、前端 v4.2.9 源码与许可证；GitHub 自动源码归档仅表示标签基线。私密目录、签名配置和构建产物未纳入源码快照。
+
+已创建远端 `feature/android-openlist-lite`，仅提交本轮 `version.json` 清单（`2c6f46e`）并推送该分支；源码修改保留本地。原始和加速 OpenList 清单均返回本版，下载字段仅 `android_arm64`。本地产物为 `build/releases/1.0.14-openlist.2-28/`，日志为 `build/test_logs/openlist-release-28-build.log`、`build/test_logs/openlist-release-28-publish.log`。未运行测试、静态分析或设备验收。
+
+## 2026-10-30 OpenList 端口改为 10486
+
+仅在 `feature/android-openlist-lite` 将内置服务监听、启动端口检查、Web UI 导航白名单、CORS、WebDAV 默认地址和来源识别统一改为 `10486`。Android 启动时在后台任务开始前，将旧版 `127.0.0.1:5244/dav` 及其子目录的 WebDAV 来源迁移到新端口，仅更新地址，保留来源 ID、凭据、扫描范围、索引、歌单和缓存。通知 ID 仍沿用原值，它不是监听端口。
+
+Go AAR 与 Android arm64 Release APK 重新编译成功，版本保持 `1.0.14-openlist.1+27`，APK 为 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`（约 48.5 MB）。日志为 `build/test_logs/openlist-port-gomobile-build.log`、`build/test_logs/openlist-port-android-build.log`。未运行测试、静态分析或设备验证，未提交、推送或发布。
+
+## 2026-10-30 OpenList 总开关、预置 WebDAV 账号与音源入口
+
+仅修改 `feature/android-openlist-lite`，保留此前 WebDAV 扫描范围补丁。设置新增持久化服务总开关，关闭时封锁自动启动入口、停止常驻通知并清除租约；Go 服务迁至非导出服务所在的 `:openlist` 专用进程，关闭后退出该进程释放 Go 线程、驱动和计时任务。播放器主进程保持运行，匹配本机 OpenList 的播放暂停、在线任务取消，索引、完整缓存、挂载与账户数据保留。重新启用恢复已选智能 / 持续模式，不自动恢复播放。
+
+初始化补充缺失的 sylphy/sylphy 普通账号，仅授予 WebDAV 读取和管理位；已有账号及其密码、权限和停用状态不重置。admin 继续用于管理网盘，设置提供管理员账号与初始密码复制，以及预置 WebDAV 账号密码复制。添加音乐源新增 Android OpenList 选项，预填本机 WebDAV 地址和预置账号，支持目录选择与扫描深度，持久化仍使用 WebDAV 来源身份。
+
+已重新编译 Go AAR 和 Android arm64 Release APK（约 48.5 MB）；APK 为 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`。日志为 `build/test_logs/openlist-switch-gomobile-build.log`、`build/test_logs/openlist-switch-android-build.log`。版本保持 `1.0.14-openlist.1+27`。未运行测试、静态分析或设备验证，未提交、推送或发布；完整关闭、重新启用、账号登录与目录浏览需由用户在设备上验证。
+
+## 2026-10-30 应用 WebDAV 扫描范围补丁
+
+在 `feature/android-openlist-lite` 应用 `sylphymusic-webdav-scan.patch`，新增 WebDAV 基础目录浏览选择、扫描子目录层级与来源范围展示；SQLite 升至 v8，以前向迁移保存范围，旧来源默认保持根目录与不限层级。修改范围取消旧索引及标签补全并重新同步，索引提交检查范围防止过期结果覆盖。适配已有 OpenList 扫描租约，保留 acquireScan / releaseScan。
+
+Android arm64 Release 编译成功（约 48.5 MB），产物 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`，日志 `build/test_logs/webdav-scan-android-build.log`。未运行静态分析、测试或设备验证，未提交、推送或发布；功能由用户验证。补丁同时应用于 main 的现有工作区，保留其已有改动。
+
 ## 2026-10-30 修复 OpenList 初始化 record not found 并同步 v0.3 体积优化
 
 定位到固定上游 v4.2.9 默认等待 Web 安装向导创建管理员，而桥接层在首次初始化后直接读取管理员，空数据库触发 `PlatformException(openlist_error, record not found, null, null)`。桥接层现仅在 `gorm.ErrRecordNotFound` 时按上游安装向导字段创建管理员，使用安装级随机密码与上游加盐哈希；已有管理员及密码保留，不依赖旧 marker 决定重置。移除启动前无效的在线清缓存调用，并区分数据库已装配与账号已配置状态，避免账号配置重试重复装配数据库。不删除用户数据库。

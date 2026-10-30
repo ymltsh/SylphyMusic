@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../services/openlist_lite.dart';
+import '../services/sources.dart' show WebDavDirectory;
 import 'music_source_ui.dart';
+import 'webdav_folder_picker.dart';
 
 /// The form collects data; the shell remains responsible for authentication.
 class MusicSourceConnectionDraft {
@@ -11,6 +16,8 @@ class MusicSourceConnectionDraft {
     required this.url,
     required this.username,
     required this.password,
+    this.webdavBasePath = '',
+    this.webdavMaxDepth = -1,
   });
 
   final SourceKind kind;
@@ -18,6 +25,8 @@ class MusicSourceConnectionDraft {
   final String url;
   final String username;
   final String password;
+  final String webdavBasePath;
+  final int webdavMaxDepth;
 }
 
 class MusicSourceConnectionPage extends StatefulWidget {
@@ -25,10 +34,19 @@ class MusicSourceConnectionPage extends StatefulWidget {
     super.key,
     this.initialKind = SourceKind.emby,
     this.source,
+    this.browseWebDavDirectories,
   });
 
   final SourceKind initialKind;
   final SourceProfile? source;
+  final Future<List<WebDavDirectory>> Function(
+    String url,
+    String username,
+    String password,
+    String path,
+    String? sourceId,
+  )?
+  browseWebDavDirectories;
 
   @override
   State<MusicSourceConnectionPage> createState() =>
@@ -42,8 +60,11 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
   late final TextEditingController _port;
   late final TextEditingController _user;
   late final TextEditingController _password;
+  late final TextEditingController _webdavDepth;
+  late String _webdavBasePath;
   late SourceKind _kind;
   bool _obscurePassword = true;
+  bool _openList = false;
 
   bool get _editing => widget.source != null;
 
@@ -52,11 +73,16 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
     super.initState();
     final source = widget.source;
     _kind = source?.kind ?? widget.initialKind;
+    _openList = source != null && OpenListLite.managesUrl(source.url);
     _name = TextEditingController(text: source?.name ?? '');
     _host = TextEditingController(text: source?.url ?? '');
     _port = TextEditingController();
     _user = TextEditingController(text: source?.username ?? '');
     _password = TextEditingController();
+    _webdavBasePath = source?.webdavBasePath ?? '';
+    _webdavDepth = TextEditingController(
+      text: '${source?.webdavMaxDepth ?? -1}',
+    );
   }
 
   @override
@@ -66,7 +92,30 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
     _port.dispose();
     _user.dispose();
     _password.dispose();
+    _webdavDepth.dispose();
     super.dispose();
+  }
+
+  void _selectKind(SourceKind kind, {bool openList = false}) {
+    setState(() {
+      if (_openList && !openList) {
+        _host.clear();
+        _port.clear();
+        _user.clear();
+        _password.clear();
+        if (_name.text == 'OpenList') _name.clear();
+      }
+      _kind = kind;
+      _openList = openList;
+      _webdavBasePath = '';
+      if (openList) {
+        if (_name.text.isEmpty) _name.text = 'OpenList';
+        _host.text = OpenListLite.webDavUrl;
+        _port.clear();
+        _user.text = OpenListLite.webDavUsername;
+        _password.text = OpenListLite.webDavPassword;
+      }
+    });
   }
 
   String? _required(String? value) =>
@@ -90,13 +139,41 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
     return port != null && port >= 1 && port <= 65535 ? null : '端口必须为 1–65535';
   }
 
-  void _save() {
-    if (!_form.currentState!.validate()) return;
+  String _connectionUrl() {
     final uri = Uri.parse(_host.text.trim());
     final overridePort = int.tryParse(_port.text.trim());
-    final url = overridePort == null
+    return overridePort == null
         ? _host.text.trim()
         : uri.replace(port: overridePort).toString();
+  }
+
+  Future<void> _chooseWebDavDirectory() async {
+    if (_validHost(_host.text) != null || _validPort(_port.text) != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先填写正确的服务器地址和端口')));
+      return;
+    }
+    final browse = widget.browseWebDavDirectories;
+    if (browse == null) return;
+    final url = _connectionUrl();
+    final username = _user.text.trim();
+    final password = _password.text;
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (_) => WebDavFolderPicker(
+        initialPath: _webdavBasePath,
+        load: (path) =>
+            browse(url, username, password, path, widget.source?.id),
+      ),
+    );
+    if (mounted && selected != null) {
+      setState(() => _webdavBasePath = selected);
+    }
+  }
+
+  void _save() {
+    if (!_form.currentState!.validate()) return;
+    final url = _connectionUrl();
     if (_kind == SourceKind.fnMusic &&
         !Uri.parse(url).path
             .replaceAll(RegExp(r'/+$'), '')
@@ -112,6 +189,10 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
         url: url,
         username: _user.text.trim(),
         password: _password.text,
+        webdavBasePath: _kind == SourceKind.webdav ? _webdavBasePath : '',
+        webdavMaxDepth: _kind == SourceKind.webdav
+            ? int.parse(_webdavDepth.text.trim())
+            : -1,
       ),
     );
   }
@@ -140,7 +221,9 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                           kind: _kind,
                           source: widget.source,
                         ),
-                        title: Text(sourceOptionFor(_kind).title),
+                        title: Text(
+                          _openList ? 'OpenList' : sourceOptionFor(_kind).title,
+                        ),
                         subtitle: const Text('现有连接的类型不可修改'),
                       ),
                     )
@@ -148,21 +231,34 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: musicSourceOptions
-                          .where((option) => option.kind != SourceKind.local)
-                          .map(
-                            (option) => ChoiceChip(
-                              selected: _kind == option.kind,
-                              avatar: MusicSourceIcon(
-                                kind: option.kind,
-                                size: 24,
-                              ),
-                              label: Text(option.title),
-                              onSelected: (_) =>
-                                  setState(() => _kind = option.kind),
+                      children: [
+                        if (Platform.isAndroid)
+                          ChoiceChip(
+                            selected: _openList,
+                            label: const Text('OpenList'),
+                            avatar: Image.asset(
+                              openListSourceBrand.asset!,
+                              width: 24,
+                              height: 24,
                             ),
-                          )
-                          .toList(),
+                            onSelected: (_) =>
+                                _selectKind(SourceKind.webdav, openList: true),
+                          ),
+                        ...musicSourceOptions
+                            .where((option) => option.kind != SourceKind.local)
+                            .map(
+                              (option) => ChoiceChip(
+                                selected: !_openList && _kind == option.kind,
+                                avatar: MusicSourceIcon(
+                                  kind: option.kind,
+                                  size: 24,
+                                ),
+                                label: Text(option.title),
+                                onSelected: (_) => _selectKind(option.kind),
+                              ),
+                            )
+                            .toList(),
+                      ],
                     ),
                   const SizedBox(height: 22),
                   Text('服务器信息', style: theme.textTheme.titleMedium),
@@ -182,6 +278,7 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                   TextFormField(
                     key: const ValueKey('source-host'),
                     controller: _host,
+                    readOnly: _openList,
                     keyboardType: TextInputType.url,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
@@ -190,7 +287,9 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                       hintText: _kind == SourceKind.fnMusic
                           ? 'https://nas.example.com:5001/music'
                           : 'https://music.example.com/path',
-                      helperText: _kind == SourceKind.fnMusic
+                      helperText: _openList
+                          ? '内置本机服务；请先在 OpenList 设置中启用并添加网盘'
+                          : _kind == SourceKind.fnMusic
                           ? '填写飞牛音乐入口，地址以 /music 结尾'
                           : '可包含反向代理路径；请尽量使用 HTTPS',
                     ),
@@ -200,6 +299,7 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                   TextFormField(
                     key: const ValueKey('source-port'),
                     controller: _port,
+                    readOnly: _openList,
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
@@ -255,13 +355,56 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                         '使用飞牛「音乐」里创建的独立账号；首期支持曲库、播放、封面和歌词，暂不支持云歌单写入与 FN Connect 自动寻址。',
                       ),
                     ),
-                  if (_kind == SourceKind.webdav)
+                  if (_kind == SourceKind.webdav) ...[
+                    Text(
+                      _openList ? 'OpenList 音乐目录' : '扫描范围',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      key: const ValueKey('webdav-base-directory'),
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.folder_outlined),
+                      title: const Text('基础目录'),
+                      subtitle: Text(
+                        _webdavBasePath.isEmpty
+                            ? '/（服务器地址对应的目录）'
+                            : '/${Uri.parse(_webdavBasePath).pathSegments.join('/')}',
+                      ),
+                      trailing: OutlinedButton(
+                        onPressed: widget.browseWebDavDirectories == null
+                            ? null
+                            : _chooseWebDavDirectory,
+                        child: const Text('选择目录'),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: const ValueKey('webdav-scan-depth'),
+                      controller: _webdavDepth,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: '扫描子目录层级',
+                        prefixIcon: Icon(Icons.account_tree_outlined),
+                        helperText: '-1 = 不限制，0 = 仅基础目录，1 = 包含一级子目录，以此类推',
+                      ),
+                      validator: (value) {
+                        final depth = int.tryParse(value?.trim() ?? '');
+                        return depth == null || depth < -1
+                            ? '请输入 -1 或非负整数'
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.info_outline),
                       title: Text('WebDAV 说明'),
-                      subtitle: Text('递归读取音乐目录，支持同名歌词文件与文件夹封面；云端歌单为只读。'),
+                      subtitle: Text('仅扫描所选目录及指定层级，支持同名歌词与文件夹封面；云歌单为只读。'),
                     ),
+                  ],
                   if (_editing &&
                       _kind != SourceKind.emby &&
                       _kind != SourceKind.fnMusic)

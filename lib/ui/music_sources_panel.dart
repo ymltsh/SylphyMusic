@@ -181,9 +181,17 @@ class _SourceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final kind = sourceOptionFor(source.kind);
+    final baseDirectory = Uri.parse(source.webdavBasePath).pathSegments
+        .join('/');
+    final depthDescription = source.webdavMaxDepth < 0
+        ? '不限'
+        : '${source.webdavMaxDepth}';
+    final scanScope = source.kind == SourceKind.webdav
+        ? ' · 基础目录: /$baseDirectory · 层级: $depthDescription'
+        : '';
     final detail = source.kind == SourceKind.local
         ? '本地音乐'
-        : '${source.url}${source.url.startsWith('http:') ? ' · 未加密连接' : ''}';
+        : '${source.url}${source.url.startsWith('http:') ? ' · 未加密连接' : ''}$scanScope';
     return Card.outlined(
       margin: EdgeInsets.zero,
       child: Column(

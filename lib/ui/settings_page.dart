@@ -311,7 +311,8 @@ class _SettingsPageState extends State<SettingsPage> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => const OpenListLiteSettingsPage(),
+              builder: (_) =>
+                  OpenListLiteSettingsPage(setEnabled: app.setOpenListEnabled),
             ),
           ),
         ),

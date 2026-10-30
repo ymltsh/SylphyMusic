@@ -158,6 +158,26 @@ class SylphyApp extends ChangeNotifier {
         );
     final db = AppDb(root);
     await db.open();
+    // The embedded server is the same installation; retain IDs, credentials,
+    // playlists and cache while moving only its loopback port.
+    await db.db.transaction((tx) async {
+      final rows = await tx.query(
+        'sources',
+        where: 'kind=?',
+        whereArgs: [SourceKind.webdav.name],
+      );
+      for (final row in rows) {
+        final url = OpenListLite.upgradedLegacyUrl(row['url'] as String);
+        if (url != null) {
+          await tx.update(
+            'sources',
+            {'url': url},
+            where: 'id=?',
+            whereArgs: [row['id']],
+          );
+        }
+      }
+    });
     final diagnostics = DiagnosticLogs(
       Directory(p.join(root.path, 'diagnostics')),
     );
@@ -399,6 +419,8 @@ class SylphyApp extends ChangeNotifier {
     required String url,
     required String username,
     required String password,
+    String webdavBasePath = '',
+    int webdavMaxDepth = -1,
   }) async {
     final source = SourceProfile(
       id: const Uuid().v4(),
@@ -406,6 +428,8 @@ class SylphyApp extends ChangeNotifier {
       kind: kind,
       url: url,
       username: username,
+      webdavBasePath: webdavBasePath,
+      webdavMaxDepth: webdavMaxDepth,
     );
     final adapter = factory.create(source);
     try {
@@ -420,6 +444,31 @@ class SylphyApp extends ChangeNotifier {
     await reload();
     // Connection creation is an explicit user action: protect the first index.
     await syncSourceForeground(source);
+  }
+
+  Future<List<WebDavDirectory>> browseWebDavDirectories(
+    String url,
+    String username,
+    String password,
+    String path,
+    String? sourceId,
+  ) async {
+    final profile = SourceProfile(
+      id: sourceId ?? 'webdav-directory-preview',
+      name: '',
+      kind: SourceKind.webdav,
+      url: url,
+      username: username,
+    );
+    final adapter = WebDavAdapter(profile, vault);
+    try {
+      return await adapter.listDirectories(
+        path,
+        password: sourceId != null && password.isEmpty ? null : password,
+      );
+    } finally {
+      adapter.close();
+    }
   }
 
   void _interruptForegroundSync() {
@@ -619,8 +668,16 @@ class SylphyApp extends ChangeNotifier {
     required String name,
     required String url,
     required String password,
+    String? webdavBasePath,
+    int? webdavMaxDepth,
   }) async {
     final target = url.trim();
+    final basePath = webdavBasePath ?? source.webdavBasePath;
+    final maxDepth = webdavMaxDepth ?? source.webdavMaxDepth;
+    final scopeChanged =
+        source.kind == SourceKind.webdav &&
+        (basePath != source.webdavBasePath ||
+            maxDepth != source.webdavMaxDepth);
     if ((source.kind == SourceKind.subsonic ||
             source.kind == SourceKind.webdav) &&
         target != source.url) {
@@ -633,10 +690,15 @@ class SylphyApp extends ChangeNotifier {
       kind: source.kind,
       url: target,
       username: source.username,
+      webdavBasePath: basePath,
+      webdavMaxDepth: maxDepth,
     );
     final adapter = factory.create(candidate);
     try {
-      await adapter.login(password);
+      final secret = source.kind == SourceKind.webdav && password.isEmpty
+          ? (await vault.read(source.id, 'password') ?? '')
+          : password;
+      await adapter.login(secret);
       if (source.kind == SourceKind.emby || source.kind == SourceKind.fnMusic) {
         final oldServer = await vault.read(source.id, 'serverId');
         final newServer = await vault.read(candidate.id, 'serverId');
@@ -648,6 +710,10 @@ class SylphyApp extends ChangeNotifier {
                 (oldServer == null || newServer == null))) {
           throw StateError('无法确认是原服务器和原账号，已保留原连接；请添加独立来源');
         }
+      }
+      if (scopeChanged) {
+        await index.cancelAndWait(source.id);
+        await metadataEnricher.cancelAndWait(source.id);
       }
       if (playback.currentRef?.sourceId == source.id) await playback.pause();
       playback.invalidateSource(source.id);
@@ -662,12 +728,19 @@ class SylphyApp extends ChangeNotifier {
           kind: source.kind,
           url: target,
           username: source.username,
+          remoteUserId: source.remoteUserId,
           enabled: source.enabled,
           lastSync: source.lastSync,
+          webdavBasePath: basePath,
+          webdavMaxDepth: maxDepth,
         ),
       );
       artwork.invalidate();
       await reload();
+      if (scopeChanged && source.enabled) {
+        final updated = await db.source(source.id);
+        if (updated != null) await syncSourceForeground(updated);
+      }
     } finally {
       adapter.close();
       await vault.delete(candidate.id);
@@ -699,6 +772,17 @@ class SylphyApp extends ChangeNotifier {
       _sourceChanges.remove(source.id);
       await reload();
     }
+  }
+
+  Future<void> setOpenListEnabled(bool enabled) async {
+    // Close the native gate first so pending producers cannot restart the server.
+    await OpenListLite.setEnabled(enabled);
+    if (!enabled) {
+      for (final source in List<SourceProfile>.of(sources)) {
+        if (OpenListLite.managesUrl(source.url)) await _suspendSource(source);
+      }
+    }
+    notifyListeners();
   }
 
   Future<void> _suspendSource(SourceProfile source) async {

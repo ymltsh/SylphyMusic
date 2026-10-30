@@ -4,7 +4,7 @@
 
 ## OpenList Android 分支
 
-`feature/android-openlist-lite` 使用独立 Android 包名和分支更新清单。`OpenListLite` 经 MethodChannel 调用进程内 Go OpenList 服务，原生管理智能运行、持续运行通知与本机 WebView。WebDAV 扫描、媒体代理、缓存和播放获取运行租约，服务仅监听 `127.0.0.1:5244`。应用退出在停止媒体与资源读取后，通过 `disposeAsync()` 释放租约、停止 OpenList 与通知，再关闭应用数据库。构建及使用方式见 [OpenList Lite](OPENLIST_LITE_ANDROID.md)。
+`feature/android-openlist-lite` 使用独立 Android 包名和分支更新清单。`OpenListLite` 经 MethodChannel 和非导出的 Messenger 服务调用专用 `:openlist` 进程中的 Go OpenList 服务，主进程仅持有 IPC 客户端。原生管理智能运行、持续运行通知与本机 WebView。WebDAV 扫描、媒体代理、缓存和播放获取运行租约，服务仅监听 `127.0.0.1:10486`。总开关持久化保存；关闭后封锁 ensure / acquire / 后台恢复，停止常驻通知、清除租约并退出专用进程，释放 Go 运行时与驱动任务。Flutter 协调取消匹配来源的在线工作并暂停相关播放，保留来源索引、完整缓存和网盘配置。应用退出在停止媒体与资源读取后，通过 `disposeAsync()` 释放租约、停止 OpenList 与通知，再关闭应用数据库。初始化仅补充缺失的 sylphy/sylphy 普通账号，授予 WebDAV 读取和管理权限，已有账号不重置；admin 用于网盘后台管理。添加音乐源的 OpenList 选项预填本机连接，复用 WebDAV 身份和扫描范围。构建及使用方式见 [OpenList Lite](OPENLIST_LITE_ANDROID.md)。
 
 ## 结构与模块
 
@@ -121,7 +121,7 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 
 ## 持久化
 
-应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **6**，迁移由 `AppDb.open()` 负责。
+应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **8**，迁移由 `AppDb.open()` 负责。
 
 | 表 / 位置 | 内容 |
 |---|---|
@@ -176,3 +176,5 @@ WebDAV 的 `WebDavTags` 由 SylphyApp 共享给 ArtworkStore / LyricsStore：按
 WebDAV 文本标签通过 WebDavTags.onTags 回调交给 AppDb 事务保存；SQLite v7 新增 webdav_track_tags，并为索引暂存补充 resource_version。commitIndex 仅合并匹配资源版本的标签，避免 PROPFIND 重扫覆盖已解析的艺术家 / 专辑。WebDavMetadataEnricher 在进程内按 50 首分页渐进补全，可见曲目优先，catalogRevision 最多每两秒通知；退出时先停止补全生产，再取消标签读取，等待遍历与可见任务后关闭 SQLite。
 
 手动同步通过 SyncForeground / SyncForegroundService 管理 dataSync 通知与取消；Android 引擎由 audio_service 创建和正常销毁，SylphyApplication 获取该实例并注册同步 / 缓存 Channel。EngineLeaseManager 让同步与缓存各持独立租约，共用 AudioService 绑定，最后任务退出才解绑；不拦截引擎销毁或异步恢复缓存。普通暂停等待 Dart 清理回执，系统超时立即停服。Windows 同步复用相同业务入口，桥接不调用 Android Channel。退出等待前台同步 future 与标签遍历后关闭数据库；详见 [Android 同步服务](ANDROID_SYNC_FGS.md)。
+
+WebDAV 扫描范围保存于来源配置：SQLite v8 为 sources 增加 webdav_base_path 与 webdav_max_depth，默认空路径和 -1 保留原递归行为。目录选择通过只读 Depth: 1 PROPFIND 逐层浏览；扫描从基础目录开始按层级限制遍历，曲目 ID 仍相对于服务器 URL。修改范围先取消旧索引与标签补全，再重新同步；提交索引前核对扫描范围，拒绝过期结果，失败保留旧索引。

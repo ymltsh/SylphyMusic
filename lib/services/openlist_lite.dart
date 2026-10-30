@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 
 /// Android-only embedded OpenList. Other platforms never call the channel.
 /// A fixed localhost WebDAV URL is deliberately a different source from a
-/// remote OpenList instance: only localhost:5244/dav is managed by us.
+/// remote OpenList instance: only localhost:10486/dav is managed by us.
 class OpenListLite {
   OpenListLite._();
-  static const String baseUrl = 'http://127.0.0.1:5244';
+  static const String baseUrl = 'http://127.0.0.1:10486';
+  static const String webDavUsername = 'sylphy';
+  static const String webDavPassword = 'sylphy';
   static const String webDavUrl = '$baseUrl/dav/';
   static const MethodChannel _channel = MethodChannel(
     'music.sylphy/openlist_lite',
@@ -17,8 +19,22 @@ class OpenListLite {
       Platform.isAndroid &&
       uri.scheme == 'http' &&
       uri.host == '127.0.0.1' &&
-      uri.port == 5244 &&
+      uri.port == 10486 &&
       (uri.path == '/dav' || uri.path.startsWith('/dav/'));
+
+  /// Preserve source/track identity when upgrading the embedded server port.
+  static String? upgradedLegacyUrl(String text) {
+    if (!Platform.isAndroid) return null;
+    final uri = Uri.tryParse(text);
+    if (uri == null ||
+        uri.scheme != 'http' ||
+        uri.host != '127.0.0.1' ||
+        uri.port != 5244 ||
+        uri.userInfo.isNotEmpty ||
+        (uri.path != '/dav' && !uri.path.startsWith('/dav/')))
+      return null;
+    return uri.replace(port: 10486).toString();
+  }
 
   static bool managesUrl(String text) {
     final uri = Uri.tryParse(text);
@@ -68,6 +84,10 @@ class OpenListLite {
   static Future<void> shutdown() async {
     if (!Platform.isAndroid) return;
     await _channel.invokeMethod<void>('shutdown');
+  }
+
+  static Future<void> setEnabled(bool enabled) async {
+    await _channel.invokeMethod<void>('enabled', {'value': enabled});
   }
 
   static Future<void> setMode(String mode) async {

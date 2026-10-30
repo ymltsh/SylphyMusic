@@ -43,7 +43,7 @@ func prepareConfig(dir string) error {
 	}
 	conf["force"] = true // disallow OPENLIST_* environment overrides
 	conf["scheme"] = map[string]interface{}{
-		"address": "127.0.0.1", "http_port": 5244, "https_port": -1,
+		"address": "127.0.0.1", "http_port": 10486, "https_port": -1,
 		"force_https": false, "enable_h3": false,
 	}
 	conf["s3"] = map[string]interface{}{"enable": false}
@@ -51,7 +51,7 @@ func prepareConfig(dir string) error {
 	conf["sftp"] = map[string]interface{}{"enable": false}
 	conf["mcp"] = map[string]interface{}{"enable": false}
 	conf["cors"] = map[string]interface{}{
-		"allow_origins": []string{"http://127.0.0.1:5244"},
+		"allow_origins": []string{"http://127.0.0.1:10486"},
 		"allow_methods": []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PROPFIND", "HEAD"},
 		"allow_headers": []string{"Authorization", "Content-Type", "Depth", "Range"},
 	}
@@ -105,6 +105,21 @@ func Init(dir, adminPassword string) error {
 		}
 	} else if err != nil {
 		return fmt.Errorf("read OpenList administrator: %w", err)
+	}
+	// This public bootstrap account is for the embedded WebDAV source. Preserve
+	// any account/password the user has already configured, including disabled users.
+	_, err = op.GetUserByName("sylphy")
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		user := &model.User{
+			Username: "sylphy", Role: model.GENERAL, BasePath: "/", Authn: "[]",
+			Permission: (1 << 8) | (1 << 9), // WebDAV read and manage
+		}
+		user.SetPassword("sylphy")
+		if err := op.CreateUser(user); err != nil {
+			return fmt.Errorf("create OpenList WebDAV user: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("read OpenList WebDAV user: %w", err)
 	}
 	marker := filepath.Join(dir, ".sylphy_admin_initialized")
 	if _, err := os.Stat(marker); os.IsNotExist(err) {

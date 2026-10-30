@@ -16,7 +16,7 @@ class OpenListKeepAliveService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
         super.onCreate()
-        OpenListRuntime.bind(applicationContext)
+        OpenListHost.bind(applicationContext)
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(NotificationChannel("sylphy_openlist_lite",
@@ -48,11 +48,11 @@ class OpenListKeepAliveService : Service() {
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "switch_to_smart") {
-            OpenListRuntime.disableContinuousFromNotification()
+            OpenListHost.disableContinuousFromNotification()
             return START_NOT_STICKY
         }
-        if (!OpenListRuntime.isContinuous()) { stopSelf(); return START_NOT_STICKY }
-        OpenListRuntime.ensureAsync()
+        if (!OpenListHost.isContinuous()) { stopSelf(); return START_NOT_STICKY }
+        OpenListHost.ensureAsync()
         return START_STICKY
     }
 }

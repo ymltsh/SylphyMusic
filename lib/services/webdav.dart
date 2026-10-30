@@ -7,6 +7,15 @@ class _DavEntry {
   final bool directory;
 }
 
+/// Directory choice returned by a read-only WebDAV PROPFIND.
+class WebDavDirectory {
+  const WebDavDirectory(this.path, this.name);
+
+  /// Percent-encoded path relative to the WebDAV URL.
+  final String path;
+  final String name;
+}
+
 /// Read-only WebDAV source. All hrefs stay inside the configured collection;
 /// credentials never occur in URLs or in persisted track metadata.
 class WebDavAdapter extends MusicAdapter {
@@ -14,6 +23,33 @@ class WebDavAdapter extends MusicAdapter {
   final AuthVault vault;
   final StrictTransport transport = StrictTransport();
   Uri get _root => appendPath(profile, '');
+
+  Uri _directory(String relativePath) {
+    if (relativePath.isEmpty) return _root;
+    final relative = Uri.parse(relativePath);
+    if (relative.hasScheme ||
+        relative.hasAuthority ||
+        relative.hasQuery ||
+        relative.hasFragment ||
+        relative.path.startsWith('/') ||
+        relative.pathSegments.any(
+          (s) =>
+              s.isEmpty ||
+              s == '.' ||
+              s == '..' ||
+              s.contains('/') ||
+              s.contains('\\'),
+        )) {
+      throw const FormatException('无效的 WebDAV 基础目录');
+    }
+    final uri = _root.resolve(
+      Uri(pathSegments: [...relative.pathSegments, '']).toString(),
+    );
+    if (!_inside(uri)) throw const FormatException('WebDAV 目录超出服务器根路径');
+    return uri;
+  }
+
+  Uri get _scanRoot => _directory(profile.webdavBasePath);
   static const _propfind = '''<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getetag/><d:getcontenttype/></d:prop></d:propfind>''';
 
@@ -129,15 +165,39 @@ class WebDavAdapter extends MusicAdapter {
     return result;
   }
 
+  /// Browse one level at a time. Never stores the password or downloads files.
+  Future<List<WebDavDirectory>> listDirectories(
+    String path, {
+    String? password,
+  }) async {
+    final directory = _directory(path);
+    final entries = await _list(directory, password: password);
+    final depth = directory.pathSegments.where((s) => s.isNotEmpty).length;
+    return entries
+        .where(
+          (e) =>
+              e.directory &&
+              e.uri.pathSegments.where((s) => s.isNotEmpty).length == depth + 1,
+        )
+        .map(
+          (e) => WebDavDirectory(
+            _id(e.uri),
+            e.uri.pathSegments.where((s) => s.isNotEmpty).last,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
   @override
   Future<void> login(String password) async {
-    await _list(_root, password: password);
+    await _list(_scanRoot, password: password);
     await vault.write(profile.id, 'password', password);
   }
 
   @override
   Future<void> validateConnection() async {
-    await _list(_root);
+    await _list(_scanRoot);
   }
 
   @override
@@ -149,12 +209,11 @@ class WebDavAdapter extends MusicAdapter {
   Stream<List<Track>> libraryPages() async* {
     await OpenListLite.acquireScan(profile.url, profile.id);
     try {
-      final pending = <Uri>[_root],
-          visited = <String>{},
-          seenTracks = <String>{};
+      final pending = <(Uri, int)>[(_scanRoot, 0)];
+      final visited = <String>{}, seenTracks = <String>{};
       var page = <Track>[];
       while (pending.isNotEmpty) {
-        final directory = pending.removeLast();
+        final (directory, level) = pending.removeLast();
         final dirId = _id(directory);
         if (!visited.add(dirId)) continue;
         if (visited.length > 100000) throw StateError('WebDAV 目录数量过多，已停止扫描');
@@ -173,13 +232,16 @@ class WebDavAdapter extends MusicAdapter {
         };
         for (final entry in children) {
           if (entry.directory) {
-            pending.add(
-              entry.uri.path.endsWith('/')
-                  ? entry.uri
-                  : entry.uri.replace(
-                      pathSegments: [...entry.uri.pathSegments, ''],
-                    ),
-            );
+            if (profile.webdavMaxDepth < 0 || level < profile.webdavMaxDepth) {
+              pending.add((
+                entry.uri.path.endsWith('/')
+                    ? entry.uri
+                    : entry.uri.replace(
+                        pathSegments: [...entry.uri.pathSegments, ''],
+                      ),
+                level + 1,
+              ));
+            }
             continue;
           }
           final name = entry.uri.pathSegments.last;

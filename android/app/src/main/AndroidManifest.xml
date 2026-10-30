@@ -136,7 +136,8 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <activity android:name=".OpenListWebActivity" android:exported="false" />
-        <service android:name=".OpenListKeepAliveService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="specialUse">
+        <service android:name=".OpenListProcessService" android:exported="false" android:process=":openlist" />
+        <service android:name=".OpenListKeepAliveService" android:process=":openlist" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User opt-in local file server for personal cloud music" />
         </service>
         <service android:name=".CacheForegroundService" android:foregroundServiceType="dataSync" android:exported="false" />

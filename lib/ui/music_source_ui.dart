@@ -116,7 +116,7 @@ MusicSourceBrand sourceBrandFor(SourceKind kind, {SourceProfile? source}) {
     final uri = Uri.tryParse(source.url);
     if (uri != null &&
         const ['127.0.0.1', 'localhost', '::1'].contains(uri.host) &&
-        uri.port == 5244) {
+        uri.port == 10486) {
       return openListSourceBrand;
     }
   }

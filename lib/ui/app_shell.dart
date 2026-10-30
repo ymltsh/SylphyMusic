@@ -1047,7 +1047,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Future<void> _addSource({SourceKind initialKind = SourceKind.emby}) async {
     final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
       MaterialPageRoute(
-        builder: (_) => MusicSourceConnectionPage(initialKind: initialKind),
+        builder: (_) => MusicSourceConnectionPage(
+          initialKind: initialKind,
+          browseWebDavDirectories: app.browseWebDavDirectories,
+        ),
       ),
     );
     if (!mounted || draft == null) return;
@@ -1058,6 +1061,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         url: draft.url,
         username: draft.username,
         password: draft.password,
+        webdavBasePath: draft.webdavBasePath,
+        webdavMaxDepth: draft.webdavMaxDepth,
       ),
     );
   }
@@ -1065,7 +1070,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Future<void> _editSource(SourceProfile source) async {
     final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
       MaterialPageRoute(
-        builder: (_) => MusicSourceConnectionPage(source: source),
+        builder: (_) => MusicSourceConnectionPage(
+          source: source,
+          browseWebDavDirectories: app.browseWebDavDirectories,
+        ),
       ),
     );
     if (!mounted || draft == null) return;
@@ -1075,6 +1083,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         name: draft.name,
         url: draft.url,
         password: draft.password,
+        webdavBasePath: draft.webdavBasePath,
+        webdavMaxDepth: draft.webdavMaxDepth,
       ),
     );
   }
