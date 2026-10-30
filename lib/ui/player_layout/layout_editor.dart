@@ -33,7 +33,7 @@ class PlayerLayoutEditor extends StatefulWidget {
 class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
   late final draft = PlayerLayoutDraft(widget.initial);
   bool snapping = true, preview = false, saving = false;
-  int divisions = 3;
+  int divisions = 4;
   String? error;
   Rect? gestureFrame;
   Offset gestureDelta = Offset.zero;
@@ -486,6 +486,30 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     ],
   );
 
+  Widget _pill({
+    required Widget label,
+    required bool selected,
+    required ValueChanged<bool>? onSelected,
+    Key? key,
+  }) => SizedBox(
+    width: 96,
+    height: 40,
+    child: ChoiceChip(
+      key: key,
+      label: SizedBox(
+        width: double.infinity,
+        child: Center(child: label),
+      ),
+      selected: selected,
+      onSelected: onSelected,
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      labelPadding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+  );
+
   Widget _inspector(Size canvas, {bool wide = false}) {
     final e = draft.selected;
     final frame = e == null ? Rect.zero : draft.value.frameFor(e, canvas);
@@ -515,22 +539,28 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
             ),
           ],
         ),
-        DropdownButtonFormField<String>(
-          key: ValueKey(draft.selectedId),
-          initialValue: e?.id,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: '选择组件（含隐藏项）'),
-          items: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
             for (final v in draft.value.elements)
-              DropdownMenuItem(
-                value: v.id,
-                child: Text(
-                  '${partLabels[v.type]}${v.hidden ? ' · 隐藏' : ''}${v.locked ? ' · 锁定' : ''}',
+              Tooltip(
+                message:
+                    '${partLabels[v.type]}${v.hidden ? ' · 隐藏' : ''}${v.locked ? ' · 锁定' : ''}',
+                child: _pill(
+                  key: ValueKey('component-${v.id}'),
+                  label: Text(
+                    '${partLabels[v.type]}${v.hidden ? ' · 隐藏' : ''}${v.locked ? ' · 锁定' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  selected: draft.selectedId == v.id,
+                  onSelected: (_) => draft.select(v.id),
                 ),
               ),
           ],
-          onChanged: draft.select,
         ),
+        const SizedBox(height: 12),
         if (e != null) ...[
           Row(
             children: [
@@ -552,17 +582,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                 icon: const Icon(Icons.delete_outline),
               ),
               const Spacer(),
-              if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
-                PopupMenuButton<String>(
-                  tooltip: '对齐',
-                  enabled: !e.locked,
-                  onSelected: (v) => draft.update(e.copyWith(align: v)),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'left', child: Text('左对齐')),
-                    PopupMenuItem(value: 'center', child: Text('居中')),
-                    PopupMenuItem(value: 'right', child: Text('右对齐')),
-                  ],
-                ),
             ],
           ),
           AbsorbPointer(
@@ -660,6 +679,27 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                     ),
                   ],
                   if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final align in const {
+                            'left': '左对齐',
+                            'center': '居中',
+                            'right': '右对齐',
+                          }.entries)
+                            _pill(
+                              label: Text(align.value),
+                              selected: e.align == align.key,
+                              onSelected: (_) =>
+                                  draft.update(e.copyWith(align: align.key)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
                     _slider(
                       '字号',
                       e.fontSize,
@@ -668,28 +708,30 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                       (v) => draft.update(e.copyWith(fontSize: v)),
                     ),
                   if (e.type == PlayerPart.lyrics) ...[
-                    DropdownButtonFormField<double>(
-                      key: ValueKey(
-                        'editor-mini-font/${widget.app.appearance.miniLyricFontSize}',
-                      ),
-                      initialValue: widget.app.appearance.miniLyricFontSize,
-                      decoration: const InputDecoration(labelText: '迷你歌词字号'),
-                      items: [
-                        for (final size in Appearance.miniLyricFontSizes)
-                          DropdownMenuItem(
-                            value: size,
-                            child: Text(
-                              '${Appearance.miniLyricFontLabel(size)} · ${size.toInt()}',
-                            ),
-                          ),
-                      ],
-                      onChanged: saving
-                          ? null
-                          : (value) => _run(
-                              () => widget.app.appearance.update(
-                                miniLyricFont: value,
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final size in Appearance.miniLyricFontSizes)
+                            _pill(
+                              label: Text(
+                                '${Appearance.miniLyricFontLabel(size)} · ${size.toInt()}',
                               ),
+                              selected:
+                                  widget.app.appearance.miniLyricFontSize ==
+                                  size,
+                              onSelected: saving
+                                  ? null
+                                  : (_) => _run(
+                                      () => widget.app.appearance.update(
+                                        miniLyricFont: size,
+                                      ),
+                                    ),
                             ),
+                        ],
+                      ),
                     ),
                     const Text(
                       '字号自动保存；完整歌词字号在歌词页内调整。',
@@ -755,10 +797,11 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                   if (e.type != PlayerPart.cover &&
                       e.type != PlayerPart.favorite) ...[
                     Wrap(
-                      spacing: 4,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         if (e.type == PlayerPart.lyrics)
-                          ChoiceChip(
+                          _pill(
                             key: const ValueKey('editor-lyric-default-color'),
                             label: const Text('默认'),
                             selected:
@@ -777,7 +820,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           0xffe8bca3,
                           0xffb3d6a6,
                         ])
-                          ChoiceChip(
+                          _pill(
                             label: c == null
                                 ? const Text('主题')
                                 : Icon(Icons.circle, color: Color(c), size: 18),
@@ -809,24 +852,23 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
         ],
         const Divider(height: 32),
         Text('页面', style: Theme.of(context).textTheme.titleMedium),
-        DropdownButtonFormField<PlayerBackground>(
-          key: ValueKey(draft.value.background),
-          initialValue: draft.value.background,
-          decoration: const InputDecoration(labelText: '背景'),
-          items: const [
-            DropdownMenuItem(
-              value: PlayerBackground.album,
-              child: Text('封面模糊'),
-            ),
-            DropdownMenuItem(
-              value: PlayerBackground.gradient,
-              child: Text('主题渐变'),
-            ),
-            DropdownMenuItem(value: PlayerBackground.solid, child: Text('纯色')),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final item in const {
+              PlayerBackground.album: '封面模糊',
+              PlayerBackground.gradient: '主题渐变',
+              PlayerBackground.solid: '纯色',
+            }.entries)
+              _pill(
+                label: Text(item.value),
+                selected: draft.value.background == item.key,
+                onSelected: (_) =>
+                    draft.change(draft.value.copyWith(background: item.key)),
+              ),
           ],
-          onChanged: (v) {
-            if (v != null) draft.change(draft.value.copyWith(background: v));
-          },
         ),
         _slider(
           '背景浓度',
@@ -1099,8 +1141,8 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                               Expanded(child: canvas),
                               SizedBox(
                                 height: math.min(
-                                  260,
-                                  constraints.maxHeight * .43,
+                                  360,
+                                  constraints.maxHeight * .48,
                                 ),
                                 child: _inspector(canvasSize),
                               ),

@@ -48,12 +48,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   SylphyApp get app => widget.app;
-  String get _themeLabel => switch (app.appearance.mode) {
-    ThemeMode.system => '跟随系统',
-    ThemeMode.light => '浅色',
-    ThemeMode.dark => '深色',
-  };
-
   Future<void> _act(Future<void> Function() action) async {
     try {
       await action();
@@ -116,21 +110,23 @@ class _SettingsPageState extends State<SettingsPage> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
-              child: ListView(
-                key: PageStorageKey(section ?? 'settings'),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: section == null
-                    ? _directory(context)
-                    : section == _Section.lyrics
-                    ? _lyricCards()
-                    : [
-                        Card(
-                          margin: EdgeInsets.zero,
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(children: _controls(section)),
-                        ),
-                      ],
-              ),
+              child: section == _Section.icon
+                  ? const LauncherIconPicker()
+                  : ListView(
+                      key: PageStorageKey(section ?? 'settings'),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: section == null
+                          ? _directory(context)
+                          : section == _Section.lyrics
+                          ? _lyricCards()
+                          : [
+                              Card(
+                                margin: EdgeInsets.zero,
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(children: _controls(section)),
+                              ),
+                            ],
+                    ),
             ),
           ),
         ),
@@ -223,11 +219,11 @@ class _SettingsPageState extends State<SettingsPage> {
     ]),
     _group('播放页迷你歌词', [_controls(_Section.lyrics)[1]]),
     if (!kIsWeb && Platform.isAndroid)
-      _group('Android 桌面歌词（悬浮窗）', [
+      _group('桌面歌词', [
         SwitchListTile(
           secondary: const Icon(Icons.picture_in_picture_alt_outlined),
           title: const Text('显示桌面歌词'),
-          subtitle: const Text('需授予悬浮窗权限；背景自动隐藏，触摸歌词后可拖动或点 × 关闭'),
+          subtitle: const Text('在其他应用上方显示歌词'),
           value: app.appearance.desktopLyricsEnabled,
           onChanged: (value) => _act(() async {
             final enabled = await app.desktopLyrics.setEnabled(value);
@@ -322,82 +318,33 @@ class _SettingsPageState extends State<SettingsPage> {
       ListTile(
         leading: _entryIcon(Icons.dns_outlined),
         title: const Text('音乐源管理'),
-        subtitle: Text('${app.sources.length} 个来源 · 连接与同步'),
+        subtitle: const Text('管理已连接的音乐源'),
         trailing: const Icon(Icons.chevron_right),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: widget.onSources,
       ),
-      _entry(
-        Icons.sync_outlined,
-        '同步与收藏',
-        '${app.autoSyncMinutes == 0 ? '不自动同步' : '每 ${app.autoSyncMinutes} 分钟同步'} · 默认${app.cloudFavoritesByDefault ? '云端' : '本地'}收藏',
-        _Section.sync,
-      ),
-      _entry(
-        Icons.storage_outlined,
-        '下载与缓存',
-        '缓存上限 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB · 任务与清理',
-        _Section.cache,
-      ),
+      _entry(Icons.sync_outlined, '同步与收藏', '自动同步与收藏偏好', _Section.sync),
+      _entry(Icons.storage_outlined, '下载与缓存', '管理离线音乐与空间', _Section.cache),
     ]),
     _group('播放与阅读', [
-      _entry(
-        Icons.tune_rounded,
-        '播放器设置',
-        '${app.playback.speed.toStringAsFixed(2)}× · 音量 ${app.playback.volume.round()}% · ReplayGain',
-        _Section.playback,
-      ),
-      _entry(
-        Icons.lyrics_outlined,
-        '歌词设置',
-        '完整歌词 ${Appearance.lyricFontLabel(app.appearance.lyricFontSize)} · 迷你歌词 ${Appearance.miniLyricFontLabel(app.appearance.miniLyricFontSize)}',
-        _Section.lyrics,
-      ),
+      _entry(Icons.tune_rounded, '播放器设置', '音量、播放速度与音效', _Section.playback),
+      _entry(Icons.lyrics_outlined, '歌词设置', '调整歌词显示效果', _Section.lyrics),
     ]),
     _group('外观与个性化', [
-      _entry(
-        Icons.palette_outlined,
-        '主题与配色',
-        '$_themeLabel · ${app.appearance.seedHex}',
-        _Section.theme,
-      ),
-      _entry(
-        Icons.wallpaper_outlined,
-        '页面背景',
-        app.appearance.solidBackground
-            ? '纯色背景 · 跟随深浅色'
-            : app.appearance.backgroundFile != null
-            ? '自定义图片 · 可见度 ${(app.appearance.backgroundVisibility * 100).round()}%'
-            : '默认主题背景',
-        _Section.background,
-      ),
-      _entry(
-        Icons.album_outlined,
-        '播放器外观',
-        '${app.appearance.disc ? '唱片样式' : '方形封面'} · 封面模糊${app.appearance.ambient ? '开启' : '关闭'}',
-        _Section.player,
-      ),
+      _entry(Icons.palette_outlined, '主题与配色', '打造你喜欢的色彩', _Section.theme),
+      _entry(Icons.wallpaper_outlined, '页面背景', '自定义页面背景', _Section.background),
+      _entry(Icons.album_outlined, '播放器外观', '定制你的播放界面', _Section.player),
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
-        _entry(
-          Icons.apps_outlined,
-          '应用图标',
-          '选择桌面启动图标 · 仅 Android',
-          _Section.icon,
-        ),
+        _entry(Icons.apps_outlined, '应用图标', '选择你喜欢的图标', _Section.icon),
     ]),
     _group('网络与接口', [
-      _entry(
-        Icons.api_outlined,
-        'API 设置',
-        '每日一言 · GitHub 加速 · 在线歌词',
-        _Section.api,
-      ),
+      _entry(Icons.api_outlined, 'API 设置', '管理在线服务', _Section.api),
     ]),
     _group('应用与支持', [
       ListTile(
         leading: _entryIcon(Icons.system_update_alt),
         title: const Text('检查更新'),
-        subtitle: const Text('手动检查新版本与发布说明'),
+        subtitle: const Text('查看新版本与更新内容'),
         trailing: const Icon(Icons.chevron_right),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: () => Navigator.push(
@@ -413,7 +360,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _entry(
         Icons.bug_report_outlined,
         '诊断与反馈',
-        app.diagnostics.enabled ? '诊断日志记录中 · 导出或分享日志' : '默认关闭 · 记录、导出与分享本机日志',
+        '日志与问题反馈',
         _Section.diagnostics,
       ),
       _entry(
@@ -429,7 +376,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _Section.sync => [
       ListTile(
         title: const Text('自动同步间隔'),
-        subtitle: const Text('仅在应用前台检查，按需更新到期音源'),
+        subtitle: const Text('在前台自动更新音乐库'),
         trailing: DropdownButton<int>(
           value: app.autoSyncMinutes,
           items: const [
@@ -447,16 +394,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       SwitchListTile(
-        title: const Text('自动同步系统通知'),
-        subtitle: const Text('同步结束时发送系统通知，需允许系统通知权限'),
+        title: const Text('同步完成通知'),
+        subtitle: const Text('同步完成时通知我'),
         value: app.autoSyncNotice,
         onChanged: (v) => _act(() => app.setAutoSyncNotice(v)),
       ),
       ListTile(
         title: const Text('默认收藏位置'),
-        subtitle: const Text(
-          '云端收藏支持 Emby、Navidrome / OpenSubsonic，其余来源仍使用本地收藏',
-        ),
+        subtitle: const Text('云端收藏自动跟随歌曲来源'),
         trailing: DropdownButton<bool>(
           value: app.cloudFavoritesByDefault,
           items: const [
@@ -464,7 +409,15 @@ class _SettingsPageState extends State<SettingsPage> {
             DropdownMenuItem(value: true, child: Text('云端')),
           ],
           onChanged: (v) {
-            if (v != null) _act(() => app.setCloudFavoritesByDefault(v));
+            if (v == null) return;
+            _act(() async {
+              if (v &&
+                  !await _confirm(
+                    '云端收藏会更新歌曲所属服务器账号的收藏；支持 Emby、Navidrome 和 OpenSubsonic，其他来源仍保存到本地。是否使用云端收藏？',
+                  ))
+                return;
+              await app.setCloudFavoritesByDefault(v);
+            });
           },
         ),
       ),
@@ -487,15 +440,17 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        title: const Text('ReplayGain 响度调整'),
-        subtitle: const Text('默认关闭，可选按曲目或按专辑调整'),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.equalizer),
-          onSelected: (v) => _act(() => app.playback.setReplayGain(v)),
-          itemBuilder: (ctx) => const [
-            PopupMenuItem(value: 'no', child: Text('关闭')),
-            PopupMenuItem(value: 'track', child: Text('Track')),
-            PopupMenuItem(value: 'album', child: Text('Album')),
+        title: const Text('响度均衡'),
+        trailing: DropdownButton<String>(
+          value: app.playback.replayGain,
+          underline: const SizedBox(),
+          onChanged: (v) {
+            if (v != null) _act(() => app.playback.setReplayGain(v));
+          },
+          items: const [
+            DropdownMenuItem(value: 'no', child: Text('关闭')),
+            DropdownMenuItem(value: 'track', child: Text('按曲目')),
+            DropdownMenuItem(value: 'album', child: Text('按专辑')),
           ],
         ),
       ),
@@ -537,7 +492,7 @@ class _SettingsPageState extends State<SettingsPage> {
         leading: const Icon(Icons.text_fields_rounded),
         title: const Text('迷你歌词字号'),
         subtitle: Text(
-          '${Appearance.miniLyricFontLabel(app.appearance.miniLyricFontSize)} · 仅播放页迷你歌词区',
+          Appearance.miniLyricFontLabel(app.appearance.miniLyricFontSize),
         ),
         trailing: DropdownButton<double>(
           value: app.appearance.miniLyricFontSize,
@@ -580,7 +535,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _Section.background => [
       SwitchListTile(
         title: const Text('纯色背景'),
-        subtitle: const Text('一级页面与播放页基础底色跟随深浅色使用白 / 黑；播放页封面模糊开启时叠加封面模糊'),
+        subtitle: const Text('使用简洁的纯色背景'),
         value: app.appearance.solidBackground,
         onChanged: (v) => _act(() => app.appearance.update(solid: v)),
       ),
@@ -588,10 +543,10 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text('自定义背景图'),
         subtitle: Text(
           app.appearance.backgroundFile == null
-              ? '选择图片，仅在四个主页面显示'
+              ? '选择背景图片'
               : app.appearance.solidBackground
-              ? '已选择图片 · 纯色背景开启时不显示'
-              : '四个主页面 · 保持比例自适应铺满',
+              ? '已选择 · 关闭纯色背景后显示'
+              : '已设置背景图片',
         ),
         leading: const Icon(Icons.wallpaper_outlined),
         trailing: app.appearance.backgroundFile == null
@@ -625,14 +580,13 @@ class _SettingsPageState extends State<SettingsPage> {
     ],
     _Section.player => [
       ListTile(
-        title: const Text('播放器控制'),
-        subtitle: const Text('每次启动的默认样式，使用中可手动切换'),
+        title: const Text('默认播放器样式'),
         trailing: DropdownButton<bool>(
           value: app.appearance.playerFab,
           underline: const SizedBox(),
           items: const [
             DropdownMenuItem(value: false, child: Text('横条')),
-            DropdownMenuItem(value: true, child: Text('FAB 悬浮按钮')),
+            DropdownMenuItem(value: true, child: Text('悬浮按钮')),
           ],
           onChanged: (value) =>
               _act(() => app.appearance.update(playerFab: value)),
@@ -640,25 +594,21 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       SwitchListTile(
         title: const Text('唱片播放样式'),
-        subtitle: const Text('系统默认与自定义播放页共用；关闭时使用方形封面'),
         value: app.appearance.disc,
         onChanged: (v) => _act(() => app.appearance.update(record: v)),
       ),
       SwitchListTile(
         title: const Text('封面模糊背景'),
-        subtitle: const Text('播放页布局背景为封面模糊时生效；关闭时使用主题 / 纯色底色'),
         value: app.appearance.ambient,
         onChanged: (v) => _act(() => app.appearance.update(background: v)),
       ),
       SwitchListTile(
         title: const Text('磨砂迷你播放器'),
-        subtitle: const Text('实验性效果，默认关闭'),
         value: app.appearance.glass,
         onChanged: (v) => _act(() => app.appearance.update(frost: v)),
       ),
       SwitchListTile(
         title: const Text('唱片旋转'),
-        subtitle: const Text('播放时旋转唱片，暂停时保持角度'),
         value: app.appearance.discRotation,
         onChanged: app.appearance.disc
             ? (v) => _act(() => app.appearance.update(rotateDisc: v))
@@ -668,7 +618,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _Section.icon => [const LauncherIconPicker()],
     _Section.cache => [
       ListTile(
-        title: const Text('缓存空间与逐曲清理'),
+        title: const Text('管理音乐缓存'),
         leading: const Icon(Icons.storage),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.push(
@@ -677,17 +627,16 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        title: const Text('清理全部完整歌曲缓存'),
-        subtitle: const Text('同时取消受到影响的任务；不会删除服务器或本地原始音频'),
+        title: const Text('清空音乐缓存'),
         trailing: const Icon(Icons.delete_outline),
         onTap: () async {
-          if (await _confirm('确认清理全部音频缓存？')) {
+          if (await _confirm('清空已缓存的音乐，并取消相关下载任务？服务器和本地原始音乐不会被删除。')) {
             await _act(() => app.clearCache());
           }
         },
       ),
       ListTile(
-        title: const Text('缓存预算'),
+        title: const Text('最大缓存空间'),
         subtitle: Text(
           '当前 ${(app.cache.maxBytes / 1073741824).toStringAsFixed(1)} GiB',
         ),
@@ -695,7 +644,7 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _changeBudget,
       ),
       ListTile(
-        title: const Text('查看缓存任务与进度'),
+        title: const Text('下载任务'),
         trailing: const Icon(Icons.chevron_right),
         onTap: _downloads,
       ),
@@ -722,16 +671,20 @@ class _SettingsPageState extends State<SettingsPage> {
       SwitchListTile(
         key: const ValueKey('api-lrc-enabled'),
         secondary: const Icon(Icons.lyrics_outlined),
-        title: const Text('LrcApi 在线歌词补充'),
-        subtitle: const Text('现有来源无歌词时，将歌名、艺术家和专辑发送至所配置接口'),
+        title: const Text('补充在线歌词'),
+        subtitle: const Text('自动补充缺失的歌词'),
         value: app.apiSettings.lrcApiEnabled,
-        onChanged: (value) =>
-            _act(() => app.apiSettings.setLrcApiEnabled(value)),
+        onChanged: (value) => _act(() async {
+          if (value &&
+              !await _confirm('开启后，将歌曲名称、艺术家和专辑发送到歌词服务，以查找缺失的歌词。是否开启？'))
+            return;
+          await app.apiSettings.setLrcApiEnabled(value);
+        }),
       ),
       ListTile(
         key: const ValueKey('api-lrc-url'),
         leading: const Icon(Icons.link_outlined),
-        title: const Text('LrcApi 接口地址'),
+        title: const Text('歌词服务地址'),
         subtitle: Text(app.apiSettings.lrcApiUrl),
         trailing: const Icon(Icons.edit_outlined),
         onTap: _editLrcApiUrl,
@@ -739,16 +692,10 @@ class _SettingsPageState extends State<SettingsPage> {
       ListTile(
         key: const ValueKey('api-lrc-auth'),
         leading: const Icon(Icons.key_outlined),
-        title: const Text('LrcApi 鉴权密钥'),
-        subtitle: const Text('可选；保存在系统安全存储中'),
+        title: const Text('歌词服务密钥'),
+        subtitle: const Text('可选'),
         trailing: const Icon(Icons.edit_outlined),
         onTap: _editLrcApiToken,
-      ),
-      const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text(
-          'GitHub 加速地址使用 HTTPS。LrcApi 默认使用 HTTPS；自部署支持 HTTP，带鉴权密钥时仅允许 HTTPS 或本机回环地址。',
-        ),
       ),
     ],
     _Section.diagnostics => [
@@ -756,9 +703,7 @@ class _SettingsPageState extends State<SettingsPage> {
         key: const ValueKey('diagnostics-toggle'),
         secondary: const Icon(Icons.bug_report_outlined),
         title: const Text('记录诊断日志'),
-        subtitle: const Text(
-          '默认关闭。开启后记录播放、切歌、缓冲与网络代理事件；不记录歌曲名、账号和地址。最多保留约 1.5 MiB。',
-        ),
+        subtitle: const Text('记录播放问题，便于排查'),
         value: app.diagnostics.enabled,
         onChanged: (v) => _act(() => app.setDiagnosticLogging(v)),
       ),
@@ -766,16 +711,14 @@ class _SettingsPageState extends State<SettingsPage> {
         key: const ValueKey('diagnostics-export'),
         leading: const Icon(Icons.save_alt),
         title: const Text('导出诊断日志'),
-        subtitle: const Text('保存为可阅读的文本文件，关闭记录后也可导出'),
+        subtitle: const Text('保存到文件'),
         onTap: () => _act(_exportDiagnosticLogs),
       ),
       ListTile(
         key: const ValueKey('diagnostics-share'),
         leading: const Icon(Icons.share_outlined),
         title: const Text('分享诊断日志'),
-        subtitle: Text(
-          Platform.isLinux ? 'Linux 不支持直接分享附件，改为导出文件' : '通过系统分享面板发送日志附件',
-        ),
+        subtitle: Text(Platform.isLinux ? '保存到文件' : '通过系统分享'),
         onTap: () => _act(_shareDiagnosticLogs),
       ),
       ListTile(

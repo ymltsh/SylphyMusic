@@ -53,31 +53,62 @@ class MusicSourcesPanel extends StatelessWidget {
               margin: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: app.busy ? null : onAdd,
-                      icon: const Icon(Icons.add),
-                      label: const Text('添加音乐源'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: app.busy ? null : onSyncAll,
-                      icon: const Icon(Icons.sync),
-                      label: const Text('同步全部'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: app.busy ? null : onImportFiles,
-                      icon: const Icon(Icons.audio_file_outlined),
-                      label: const Text('导入本地文件'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: app.busy ? null : onImportFolder,
-                      icon: const Icon(Icons.create_new_folder_outlined),
-                      label: const Text('添加音乐文件夹'),
-                    ),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 640 ? 4 : 2;
+                    final width =
+                        (constraints.maxWidth - (columns - 1) * 8) / columns;
+                    final style = ButtonStyle(
+                      minimumSize: const WidgetStatePropertyAll(Size.zero),
+                      padding: const WidgetStatePropertyAll(
+                        EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      shape: WidgetStatePropertyAll(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    );
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final button in <Widget>[
+                          FilledButton.icon(
+                            style: style,
+                            onPressed: app.busy ? null : onAdd,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('添加来源', maxLines: 1),
+                          ),
+                          OutlinedButton.icon(
+                            style: style,
+                            onPressed: app.busy ? null : onSyncAll,
+                            icon: const Icon(Icons.sync, size: 18),
+                            label: const Text('同步全部', maxLines: 1),
+                          ),
+                          OutlinedButton.icon(
+                            style: style,
+                            onPressed: app.busy ? null : onImportFiles,
+                            icon: const Icon(
+                              Icons.audio_file_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('导入文件', maxLines: 1),
+                          ),
+                          OutlinedButton.icon(
+                            style: style,
+                            onPressed: app.busy ? null : onImportFolder,
+                            icon: const Icon(
+                              Icons.create_new_folder_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('添加文件夹', maxLines: 1),
+                          ),
+                        ])
+                          SizedBox(width: width, height: 48, child: button),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -110,9 +141,12 @@ class MusicSourcesPanel extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _SourceCard(
                     source: source,
-                    progress: app.index.progress[source.id]?.message,
-                    syncing: app.index.progress[source.id]?.state == 'reading',
-                    busy: app.busy,
+                    progress:
+                        app.sourceSyncMessages[source.id] ??
+                        app.index.progress[source.id]?.message,
+                    syncing: app.sourceSyncing(source.id),
+                    changing: app.sourceChanging(source.id),
+                    canStartSync: !app.busy,
                     onOpen: () => onSelect(source),
                     onAction: (action) => onAction(source, action),
                   ),
@@ -130,7 +164,8 @@ class _SourceCard extends StatelessWidget {
     required this.source,
     required this.progress,
     required this.syncing,
-    required this.busy,
+    required this.changing,
+    required this.canStartSync,
     required this.onOpen,
     required this.onAction,
   });
@@ -138,7 +173,7 @@ class _SourceCard extends StatelessWidget {
   final SourceProfile source;
   final String? progress;
   final bool syncing;
-  final bool busy;
+  final bool changing, canStartSync;
   final VoidCallback onOpen;
   final ValueChanged<String> onAction;
 
@@ -156,7 +191,7 @@ class _SourceCard extends StatelessWidget {
         children: [
           ListTile(
             contentPadding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
-            leading: MusicSourceIcon(kind: source.kind),
+            leading: MusicSourceIcon(kind: source.kind, source: source),
             title: Text(
               source.name,
               maxLines: 1,
@@ -173,38 +208,47 @@ class _SourceCard extends StatelessWidget {
             onTap: onOpen,
             trailing: PopupMenuButton<String>(
               tooltip: '更多来源操作',
-              enabled: !busy || syncing,
+              enabled: !changing,
               onSelected: onAction,
               itemBuilder: (context) => [
                 if (syncing)
                   const PopupMenuItem(
                     value: 'cancel_sync',
-                    child: Text('取消索引同步'),
+                    child: Text('取消同步'),
                   ),
-                if (!busy && source.kind != SourceKind.local)
+                if (!changing && !syncing && source.kind != SourceKind.local)
                   const PopupMenuItem(
                     value: 'edit',
                     child: Text('编辑连接 / 重新登录'),
                   ),
-                if (!busy &&
+                if (!changing &&
+                    !syncing &&
                     source.kind == SourceKind.local &&
                     source.url != 'file:///')
                   const PopupMenuItem(value: 'scan', child: Text('重新扫描文件夹')),
-                if (!busy && source.kind != SourceKind.local)
+                if (canStartSync &&
+                    !changing &&
+                    !syncing &&
+                    source.enabled &&
+                    source.kind != SourceKind.local)
                   const PopupMenuItem(value: 'sync', child: Text('同步此来源')),
-                if (!busy && source.kind == SourceKind.webdav)
+                if (canStartSync &&
+                    !changing &&
+                    !syncing &&
+                    source.enabled &&
+                    source.kind == SourceKind.webdav)
                   const PopupMenuItem(
                     value: 'tags',
                     child: Text('补全 WebDAV 标签'),
                   ),
-                if (!busy)
+                if (!changing)
                   PopupMenuItem(
                     value: 'toggle',
                     child: Text(source.enabled ? '停用来源' : '重新启用'),
                   ),
-                if (!busy)
+                if (!changing && !syncing)
                   const PopupMenuItem(value: 'cache', child: Text('清除此来源缓存')),
-                if (!busy)
+                if (!changing && !syncing)
                   const PopupMenuItem(value: 'delete', child: Text('删除来源')),
               ],
             ),
@@ -222,17 +266,30 @@ class _SourceCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 12, 0),
             child: Row(
               children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onOpen,
-                    icon: const Icon(Icons.library_music_outlined, size: 18),
-                    label: const Text('查看曲库'),
-                  ),
+                TextButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.library_music_outlined, size: 18),
+                  label: const Text('查看曲库'),
                 ),
-                Text('启用', style: Theme.of(context).textTheme.bodySmall),
+                const Spacer(),
+                if (changing) ...[
+                  const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  changing
+                      ? '处理中'
+                      : source.enabled
+                      ? '已启用'
+                      : '已停用',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 Switch.adaptive(
                   value: source.enabled,
-                  onChanged: busy ? null : (_) => onAction('toggle'),
+                  onChanged: changing ? null : (_) => onAction('toggle'),
                 ),
               ],
             ),

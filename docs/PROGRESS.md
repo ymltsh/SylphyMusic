@@ -999,3 +999,33 @@ Android API35 专用 AVD 两组原生集成通过：系统短时限回调及时�
 ## 2026-10-30 应用自动同步、云端收藏与路由播放栏补丁
 
 按用户要求，将 `sylphymusic-sync-stars-player.patch` 同时应用到 main 与 feature/android-openlist-lite。适配两处界面上下文，歌单详情保留既有播放栏，避免重复参数；退出时等待自动同步任务结束再关闭数据库。OpenList 分支三个 ABI Android Release 编译成功，本轮不运行 analyze、测试或设备验证；既有 OpenList 未提交工作保留，不推送或发布该分支。主分支准备 1.0.14+27 Android / Windows 正式更新，发布结果另记。
+
+## 2026-10-30 播放页打开开销与设置界面优化
+
+按用户要求定位迷你播放器打开播放页的卡顿路径：原播放页在播放进度刷新时重复调用 sylphyTheme 生成整套主题；LyricsPreview 每次构建重新解析歌词并测量窗口；封面取色与歌词读取在路由入场时启动。现复用应用主题与内置布局，延后取色 / 歌词到入场动画结束后；增加有界配色请求缓存，迷你歌词只在文本变化时解析，窗口按当前句和展示参数复用。未做运行时性能采样，不将代码路径优化表述为设备流畅度验收通过。
+
+编辑器组件选择、文字对齐、迷你歌词字号、颜色与页面背景改为直接可见的圆角矩形胶囊按钮，统一尺寸、间距、左边界与换行；增加手机属性面板可用高度。参考用户 1.txt 简化设置首页摘要、图标页和二级页面说明，显示当前响度模式；保留清理缓存、云端收藏与在线歌词请求的操作后果确认。两个分支同步修改，保留 OpenList 既有开发内容。本轮仅本地编译与打包，不提交、推送或发布，不运行 analyze、测试或设备验收。
+
+编译交付：主分支 `tool/build_review.ps1` 成功，Android 三个 ABI 与 Windows Release 均构建成功，内部便携 ZIP / APK 位于 `sylphy_music_main/build/internal-review/`；打包脚本完成已跟踪输入和包内容检查。OpenList 分支三个 ABI Android Release 构建成功，位于原工程 `build/app/outputs/flutter-apk/`。未执行功能测试、启动或性能实测；本轮未提交、推送或发布。
+
+追加调整：编辑器默认辅助网格改为 16 宫格（4×4），吸附同步使用四等分；保留顶部切回 9 宫格。主分支 Android / Windows 编译和内部打包成功，OpenList 三个 ABI Android Release 编译成功；未运行测试、未发布。
+
+## 2026-10-30 我的音乐空间音源叠卡
+
+按用户提供的 logo/source 五份 PNG 原样加入 assets/source/。我的音乐空间整卡进入音乐来源，右侧展示已添加音源的 Logo 卡牌堆叠并循环切换，背景使用对应品牌颜色渐变；单源 / 空源、停留后台、路由不可见和系统减少动画均有静态处理。来源管理、连接类型选择和首次引导复用对应品牌图标；本地文件夹保留图标回退。主分支与 OpenList 分支同步修改，保留既有未提交工作；不运行 analyze、测试或设备检查，不提交、推送或发布。
+
+编译结果：主分支 Android 三个 ABI、Windows Release 与内部便携 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。主分支产物更新到 `sylphy_music_main/build/internal-review/`。轮播视觉与交互留待用户在设备确认；本轮未运行功能测试、启动应用、推送或发布。
+
+## 2026-10-30 管理按钮对齐与音源启停解锁
+
+编辑器胶囊宽度 120→96 dp。音乐来源顶部四个操作统一尺寸与圆角，按可用宽度两列 / 四列排布，卡片底部曲库入口左对齐、启停状态与开关右对齐。定位到重新启用回调等待完整同步，以及 syncSource 使用全局 busyRun 导致所有来源操作禁用。现远程重新启用通过连接验证后启动按来源合并的后台同步；启停验证 / 清理仅锁定当前来源，其他来源独立管理，同步中仍可取消或停用。自动同步跳过正在启停 / 同步的来源，手动启停和取消记录重试间隔，避免立即重启任务。
+
+停用取消索引、标签读取以及歌单 / 收藏刷新，刷新请求按来源关闭连接并以代次及最新启用状态拒绝过期结果；退出等待在途来源同步。旧索引、完整缓存与个人引用保留，重新启用保持暂停。两个分支同步修改；不运行 analyze、测试或设备验收，不提交、推送或发布。
+
+编译交付：主分支 Android 三个 ABI、Windows Release 与内部 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。产物更新至主分支 `build/internal-review/` 和 OpenList `build/app/outputs/flutter-apk/`。未做实际服务器启停 / 取消交互或设备验证，交由用户验收。
+
+## 2026-10-30 应用图标选择页原型
+
+应用用户提供的 SylphyMusic_icon_picker_design_and_flutter.zip 设计及 Flutter 示例，适配现有设置页。图标页面采用当前图标卡、8 项网格、点击预览、故事 / 彩蛋及固定底部应用按钮；仅按应用后调用原生选择，完成后重新读取系统状态。深浅色沿用应用主题。用户 logo/ 素材导入并更新 Android 各密度图标、别名 / 目录 / nodpi 和 Windows ICO；新增吹响！上低音号，已有 6 款备用图标 ID / 路径均保留。about.png 不纳入选择。主分支和 OpenList 分支同步修改，保留其他未提交工作，不运行 analyze、测试或设备验证，不提交、推送或发布。
+
+编译交付：主分支 Android 三个 ABI、Windows Release 和内部 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。主分支产物更新至 `sylphy_music_main/build/internal-review/`。页面视觉及 Android 桌面切换行为未在设备上验收，交由用户验证；本轮未提交、推送或发布。

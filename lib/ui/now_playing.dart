@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../core/player_layout.dart';
-import 'app_theme.dart';
 import 'cover_palette.dart';
 import 'lyrics_page.dart';
 import 'player_layout/layout_editor.dart';
@@ -20,10 +19,15 @@ class NowPlayingPage extends StatefulWidget {
 }
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
+  final _fallbackLayout = playerTemplate();
   String? lyricsKey;
   Future<String?>? lyrics;
   String? _paletteKey;
   Future<ColorScheme?>? _paletteFuture;
+  Animation<double>? _entryAnimation;
+  bool _entryReady = false;
+  ThemeData? _themeBase, _playerTheme;
+  ColorScheme? _themePalette;
   double _dragOffset = 0;
   bool _dragging = false;
   double _horizontalOffset = 0;
@@ -32,6 +36,41 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   void initState() {
     super.initState();
     widget.app.assets.addListener(_assetChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (!identical(animation, _entryAnimation)) {
+      _entryAnimation?.removeStatusListener(_entryStatusChanged);
+      _entryAnimation = animation;
+      animation?.addStatusListener(_entryStatusChanged);
+    }
+    if (animation == null || animation.status == AnimationStatus.completed) {
+      _entryReady = true;
+    }
+  }
+
+  void _entryStatusChanged(AnimationStatus status) {
+    if (status != AnimationStatus.completed || _entryReady || !mounted) return;
+    // Let the transition's final frame finish before cover quantization / I/O.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_entryReady) setState(() => _entryReady = true);
+    });
+  }
+
+  ThemeData _themeFor(ThemeData base, ColorScheme? palette) {
+    if (!identical(base, _themeBase) || !identical(palette, _themePalette)) {
+      _themeBase = base;
+      _themePalette = palette;
+      final scheme = _withCoverPalette(base.colorScheme, palette);
+      _playerTheme = base.copyWith(
+        colorScheme: scheme,
+        scaffoldBackgroundColor: scheme.surface,
+      );
+    }
+    return _playerTheme!;
   }
 
   void _assetChanged() {
@@ -50,12 +89,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   @override
   void dispose() {
+    _entryAnimation?.removeStatusListener(_entryStatusChanged);
     widget.app.assets.removeListener(_assetChanged);
     super.dispose();
   }
 
   PlayerLayout get _layout =>
-      widget.app.playerLayouts.active ?? playerTemplate();
+      widget.app.playerLayouts.active ?? _fallbackLayout;
 
   Future<ColorScheme?> _paletteFor(Track track, Brightness brightness) {
     final key =
@@ -222,23 +262,18 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       }
       final nextLyricsKey =
           '${track.ref.key}/${track.resourceVersion}/${widget.app.lyrics.revision(track)}';
-      if (lyricsKey != nextLyricsKey) {
+      if (_entryReady && lyricsKey != nextLyricsKey) {
         lyricsKey = nextLyricsKey;
         lyrics = widget.app.loadLyrics(track);
       }
       final layout = _layout;
-      final brightness = Theme.of(context).brightness;
-      // Share the global charcoal surfaces with the immersive player.
-      final baseTheme = sylphyTheme(widget.app.appearance, brightness);
-      final baseScheme = baseTheme.colorScheme;
+      // The app already generated this theme; playback ticks only reuse it.
+      final baseTheme = Theme.of(context);
+      final brightness = baseTheme.brightness;
       return FutureBuilder<ColorScheme?>(
-        future: _paletteFor(track, brightness),
+        future: _entryReady ? _paletteFor(track, brightness) : null,
         builder: (context, paletteSnapshot) {
-          final scheme = _withCoverPalette(baseScheme, paletteSnapshot.data);
-          final theme = baseTheme.copyWith(
-            colorScheme: scheme,
-            scaffoldBackgroundColor: scheme.surface,
-          );
+          final theme = _themeFor(baseTheme, paletteSnapshot.data);
           return Theme(
             data: theme,
             child: AppSystemBars(

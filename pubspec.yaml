@@ -42,3 +42,4 @@ flutter:
     - assets/icon.png
     - assets/about.png
     - assets/launcher_icons/
+    - assets/source/

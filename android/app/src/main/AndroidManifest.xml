@@ -82,6 +82,18 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
+            android:name=".LauncherIcon_alt_36db1bfca8a6"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_alt_36db1bfca8a6"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
             android:name=".LauncherIcon_alt_a644bb7bced9"
             android:targetActivity=".MainActivity"
             android:enabled="false"

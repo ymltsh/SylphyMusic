@@ -377,7 +377,7 @@ class _LyricsViewState extends State<LyricsView> {
   }
 }
 
-class LyricsPreview extends StatelessWidget {
+class LyricsPreview extends StatefulWidget {
   const LyricsPreview({
     super.key,
     required this.text,
@@ -393,27 +393,73 @@ class LyricsPreview extends StatelessWidget {
   final Color? highlightColor;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final merged = mergedLyricLines(text);
-    final plain = merged.isEmpty;
-    final plainLines = plain
+  State<LyricsPreview> createState() => _LyricsPreviewState();
+}
+
+class _LyricsPreviewState extends State<LyricsPreview> {
+  Object? _windowInputs;
+  Widget? _window;
+  late List<LrcLine> _merged;
+  late List<String> _lines;
+  String get text => widget.text;
+  Duration get position => widget.position;
+  double get fontSize => widget.fontSize;
+  double get lineHeight => widget.lineHeight;
+  Color? get highlightColor => widget.highlightColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _parse();
+  }
+
+  @override
+  void didUpdateWidget(LyricsPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != text) _parse();
+  }
+
+  void _parse() {
+    _merged = mergedLyricLines(text);
+    _lines = _merged.isEmpty
         ? text
               .split('\n')
               .map((line) => line.trim())
               .where((line) => line.isNotEmpty)
               .toList()
-        : const <String>[];
+        : [for (final line in _merged) line.text.split('\n').first.trim()];
+    if (_lines.isEmpty) _lines = ['···'];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final merged = _merged;
+    final plain = merged.isEmpty;
     final active = plain ? 0 : activeLrcIndex(merged, position);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final lines = plain
-            ? (plainLines.isEmpty ? ['···'] : plainLines)
-            : [for (final line in merged) line.text.split('\n').first.trim()];
+        final lines = _lines;
         final current = plain || active < 0 ? 0 : active;
         final scaler = MediaQuery.textScalerOf(context);
         final locale = Localizations.maybeLocaleOf(context);
+        final inputs = (
+          text,
+          current,
+          constraints,
+          theme,
+          scaler,
+          locale,
+          fontSize,
+          lineHeight,
+          highlightColor,
+          Directionality.of(context),
+          DefaultTextStyle.of(context).style,
+          MediaQuery.disableAnimationsOf(context),
+        );
+        if (_windowInputs == inputs && _window != null) return _window!;
+        _windowInputs = inputs;
         TextStyle styleFor(int index) => DefaultTextStyle.of(context).style
             .merge(
               (theme.textTheme.titleLarge ?? const TextStyle()).copyWith(
@@ -475,7 +521,7 @@ class LyricsPreview extends StatelessWidget {
             constraints.maxHeight > 0 && constraints.maxHeight.isFinite
             ? (windowHeight / count / constraints.maxHeight).clamp(0.0, 1.0)
             : .2;
-        return ClipRect(
+        return _window = ClipRect(
           child: AnimatedSwitcher(
             duration: duration,
             switchInCurve: Curves.easeInOutCubic,

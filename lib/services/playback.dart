@@ -42,6 +42,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Duration position = Duration.zero, duration = Duration.zero;
   String? error;
   int failures = 0;
+  String replayGain = 'no';
   double speed = 1.0;
   double volume = 100;
   bool _opening = false, _userPaused = false;
@@ -410,7 +411,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     await player.setVolume(volume);
     await _configureAndroidAudioOutput();
     await _setMpvOption('gapless-audio', 'weak');
-    await _setMpvOption('replaygain', await db.setting('replaygain') ?? 'no');
+    final savedGain = await db.setting('replaygain');
+    replayGain = const ['no', 'track', 'album'].contains(savedGain)
+        ? savedGain!
+        : 'no';
+    await _setMpvOption('replaygain', replayGain);
     await _setMpvOption('audio-pitch-correction', 'yes');
     // Lyrics are resolved by SylphyApp, not mpv's external subtitle loader.
     // Autoloading a sidecar LRC can emit a fatal stream error on Windows
@@ -555,6 +560,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (!const ['no', 'track', 'album'].contains(mode)) return;
     await _setMpvOption('replaygain', mode);
     await db.setSetting('replaygain', mode);
+    replayGain = mode;
     notifyListeners();
   }
 

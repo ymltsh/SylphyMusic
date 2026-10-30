@@ -136,7 +136,10 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                   if (_editing)
                     Card.filled(
                       child: ListTile(
-                        leading: MusicSourceIcon(kind: _kind),
+                        leading: MusicSourceIcon(
+                          kind: _kind,
+                          source: widget.source,
+                        ),
                         title: Text(sourceOptionFor(_kind).title),
                         subtitle: const Text('现有连接的类型不可修改'),
                       ),
@@ -150,7 +153,10 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                           .map(
                             (option) => ChoiceChip(
                               selected: _kind == option.kind,
-                              avatar: Icon(option.icon, size: 18),
+                              avatar: MusicSourceIcon(
+                                kind: option.kind,
+                                size: 24,
+                              ),
                               label: Text(option.title),
                               onSelected: (_) =>
                                   setState(() => _kind = option.kind),

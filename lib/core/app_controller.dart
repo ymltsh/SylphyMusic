@@ -87,6 +87,13 @@ class SylphyApp extends ChangeNotifier {
   final _lastAutoSyncAttempt = <String, int>{};
   Future<void>? _autoSyncTask;
   Timer? _autoSyncTimer;
+  final Set<String> _sourceChanges = {};
+  final Map<String, Future<void>> _sourceSyncs = {};
+  final Set<String> _cancelledSourceSyncs = {};
+  final Map<String, String> sourceSyncMessages = {};
+  bool sourceChanging(String id) => _sourceChanges.contains(id);
+  bool sourceSyncing(String id) =>
+      _sourceSyncs.containsKey(id) || index.progress[id]?.active == true;
   int _busyOperations = 0;
   Timer? _catalogRefreshTimer;
   bool _foregroundSyncRunning = false;
@@ -131,7 +138,8 @@ class SylphyApp extends ChangeNotifier {
     onEnabled: (source) async {
       if (_disposed) return;
       if (source.kind != SourceKind.local) {
-        await syncSource(source);
+        // Connection validation finishes independently from the full index.
+        unawaited(syncSource(source).catchError((Object _) {}));
       } else if (source.url != 'file:///') {
         await rescanLocal(source);
       }
@@ -278,6 +286,8 @@ class SylphyApp extends ChangeNotifier {
           (source) =>
               source.kind != SourceKind.local &&
               source.enabled &&
+              !sourceChanging(source.id) &&
+              !sourceSyncing(source.id) &&
               now - source.lastSync > autoSyncMinutes * 60 * 1000 &&
               now - (_lastAutoSyncAttempt[source.id] ?? 0) >
                   autoSyncMinutes * 60 * 1000,
@@ -418,6 +428,8 @@ class SylphyApp extends ChangeNotifier {
     if (id != null) {
       index.cancel(id);
       metadataEnricher.cancel(id);
+      _cancelledSourceSyncs.add(id);
+      cloud.cancelRefresh(id);
     }
   }
 
@@ -434,6 +446,11 @@ class SylphyApp extends ChangeNotifier {
   }
 
   void cancelActiveSync(String sourceId) {
+    _cancelledSourceSyncs.add(sourceId);
+    _lastAutoSyncAttempt[sourceId] = DateTime.now().millisecondsSinceEpoch;
+    sourceSyncMessages[sourceId] = '已取消同步';
+    cloud.cancelRefresh(sourceId);
+    metadataEnricher.cancel(sourceId);
     if (_foregroundSourceId == sourceId) {
       _interruptForegroundSync();
     } else {
@@ -474,6 +491,9 @@ class SylphyApp extends ChangeNotifier {
       for (final source in selected) {
         if (_foregroundSyncCancelled || _disposed) break;
         if (!source.enabled || source.kind == SourceKind.local) continue;
+        final current = await db.source(source.id);
+        if (current == null || !current.enabled || sourceChanging(source.id))
+          continue;
         _foregroundSourceId = source.id;
         await syncForeground.update(
           '风灵音乐 · 同步索引',
@@ -540,18 +560,57 @@ class SylphyApp extends ChangeNotifier {
   Future<void> syncAllForeground() =>
       _runForegroundSync([...sources], includeCloud: true);
 
-  Future<void> syncSource(SourceProfile source) async {
-    await busyRun(() async {
-      await index.sync(source);
-      if (_disposed || index.progress[source.id]?.state != 'completed') return;
-      artwork.invalidate();
-      await cloud.refreshCloudForSource(source);
-      await cloud.refreshStarredForSource(source);
+  Future<void> syncSource(SourceProfile source) {
+    if (_disposed || sourceChanging(source.id) && !source.enabled)
+      return Future.value();
+    final existing = _sourceSyncs[source.id];
+    if (existing != null) return existing;
+    _cancelledSourceSyncs.remove(source.id);
+    sourceSyncMessages.remove(source.id);
+    final task = _syncSource(source);
+    _sourceSyncs[source.id] = task;
+    notifyListeners();
+    return task.whenComplete(() {
+      if (identical(_sourceSyncs[source.id], task))
+        _sourceSyncs.remove(source.id);
+      if (!_disposed) notifyListeners();
     });
-    if (!_disposed &&
-        index.progress[source.id]?.state == 'completed' &&
-        source.kind == SourceKind.webdav) {
-      metadataEnricher.start(source);
+  }
+
+  Future<bool> _sourceCanSync(SourceProfile source) async {
+    if (_disposed || _cancelledSourceSyncs.contains(source.id)) return false;
+    final current = await db.source(source.id);
+    return !_disposed &&
+        !_cancelledSourceSyncs.contains(source.id) &&
+        current != null &&
+        current.enabled &&
+        current.kind == source.kind &&
+        current.url == source.url &&
+        current.username == source.username;
+  }
+
+  Future<void> _syncSource(SourceProfile source) async {
+    try {
+      if (!await _sourceCanSync(source)) return;
+      await index.sync(source);
+      if (!await _sourceCanSync(source) ||
+          index.progress[source.id]?.state != 'completed')
+        return;
+      artwork.invalidate();
+      sourceSyncMessages[source.id] = '正在同步歌单与收藏';
+      notifyListeners();
+      await cloud.refreshCloudForSource(source);
+      if (!await _sourceCanSync(source)) return;
+      await cloud.refreshStarredForSource(source);
+      if (!await _sourceCanSync(source)) return;
+      sourceSyncMessages.remove(source.id);
+      if (source.kind == SourceKind.webdav) metadataEnricher.start(source);
+    } catch (_) {
+      if (!await _sourceCanSync(source)) return;
+      sourceSyncMessages[source.id] = '同步未完成，保留原数据；可重试';
+      rethrow;
+    } finally {
+      if (!_disposed) await reload();
     }
   }
 
@@ -631,14 +690,22 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<void> toggleSource(SourceProfile source) async {
+    if (_disposed || !_sourceChanges.add(source.id)) return;
+    _lastAutoSyncAttempt[source.id] = DateTime.now().millisecondsSinceEpoch;
+    notifyListeners();
     try {
       await connections.toggle(source.id);
     } finally {
+      _sourceChanges.remove(source.id);
       await reload();
     }
   }
 
   Future<void> _suspendSource(SourceProfile source) async {
+    if (_foregroundSourceId == source.id) _interruptForegroundSync();
+    _cancelledSourceSyncs.add(source.id);
+    cloud.cancelRefresh(source.id);
+    sourceSyncMessages.remove(source.id);
     metadataEnricher.cancel(source.id);
     playback.invalidateSource(source.id);
     if (playback.currentRef?.sourceId == source.id) await playback.pause();
@@ -649,6 +716,8 @@ class SylphyApp extends ChangeNotifier {
     await jobs.sourceUnavailable(source.id);
     await cache.cancelSource(source.id);
     await index.cancelAndWait(source.id);
+    await metadataEnricher.cancelAndWait(source.id);
+    await _sourceSyncs[source.id]?.catchError((Object _) {});
   }
 
   Future<void> deleteSource(SourceProfile source) async {
@@ -929,6 +998,14 @@ class SylphyApp extends ChangeNotifier {
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
+    for (final id in _sourceSyncs.keys.toList()) {
+      cloud.cancelRefresh(id);
+    }
+    await Future.wait(
+      _sourceSyncs.values.toList().map(
+        (task) => task.catchError((Object _) {}),
+      ),
+    );
     await connections.shutdown();
     await jobs.shutdown();
     await desktopLyrics.shutdown();
