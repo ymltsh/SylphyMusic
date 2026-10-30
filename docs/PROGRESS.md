@@ -1,5 +1,13 @@
 # 实施与验证记录
 
+## 2026-10-30 合并 AudioTrack 验证分支并发布 1.0.13+26
+
+用户确认 AudioTrack 补丁有效，授权合并 `validation/android-audiotrack`。已合入 main 并推送，保留验证版的音频输出顺序与实际后端诊断逻辑，移除实验专用命名并更新验证说明；源码提交 `2926907`。
+
+正式版 [1.0.13+26](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.13%2B26) 已发布，Android 三 ABI、Windows Release 与安装程序编译成功，Android 正式签名校验通过。六个远端附件大小及 SHA-256 与本地一致，GitHub latest、原始与加速正式清单均指向本版，清单提交 `7e5bb80` 已推送。产物位于 `build/releases/1.0.13-26/`，日志为 `build/test_logs/release-1.0.13.log`。
+
+本轮未运行静态分析、测试或设备验证；补丁有效性依据用户对 Beta 版的验证反馈，Windows 未代码签名。
+
 ## 2026-10-30 AudioTrack 验证分支与测试更新 1.0.13-beta+25
 
 在 `validation/android-audiotrack` 分支应用 `SylphyMusic-android-audiotrack-validation.patch`，基于当前已发布的耳机控制改动：Android 请求优先 AudioTrack、回退 OpenSL ES，并在每首曲目进度超过 500ms 后记录实际 `current-ao`。实验代码未合入 main；main 仅更新测试清单。
