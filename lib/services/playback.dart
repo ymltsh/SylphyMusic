@@ -79,6 +79,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   // Track *actual position advancement*, not just the player's playing flag.
   // A libmpv stream can remain buffering without ever emitting stream.error.
   final Stopwatch _progressWatch = Stopwatch()..start();
+  // mpv can leave buffering/open flags set after the audio clock advances.
+  // Keep this independent of the stall watchdog, which resets on play/open.
+  final Stopwatch _mediaProgressWatch = Stopwatch()..start();
+  bool _mediaProgressObserved = false;
   Timer? _stallTimer;
   int? _lastWatchdogTickMs;
   int _playIntentGeneration = 0;
@@ -456,9 +460,18 @@ class PlaybackCoordinator extends ChangeNotifier {
             nextMs >= 500) {
           unawaited(_probeAndroidAudioOutput());
         }
-        if (nextMs > _watchdogPositionMs + 400) {
+        final previousProgressMs = _watchdogPositionMs;
+        if (nextMs > previousProgressMs + 400) {
           _watchdogPositionMs = nextMs;
           _progressWatch.reset();
+          // The first sample or a seek jump is not proof of audible playback.
+          if (_playRequested &&
+              playing &&
+              previousProgressMs >= 0 &&
+              nextMs - previousProgressMs <= 4000) {
+            _mediaProgressObserved = true;
+            _mediaProgressWatch.reset();
+          }
         }
         if (error != null && playing && !buffering && v > position) {
           error = null;
@@ -490,6 +503,7 @@ class PlaybackCoordinator extends ChangeNotifier {
             details: {'index': snapshot.index},
           );
           _finishingTrack = true;
+          _mediaProgressObserved = false;
           _transitionStallLogged = false;
           _progressWatch.reset();
           _publish();
@@ -526,6 +540,15 @@ class PlaybackCoordinator extends ChangeNotifier {
         );
       }
       _checkForStall();
+      // No new position event will arrive during a real stall. Expire the
+      // previous proof so a stale mpv buffering flag is shown again.
+      if (_mediaProgressObserved &&
+          _mediaProgressWatch.elapsed >= const Duration(seconds: 5)) {
+        _mediaProgressObserved = false;
+        if (_opening || _finishingTrack || (_playRequested && buffering)) {
+          _publish();
+        }
+      }
     });
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
@@ -741,6 +764,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     _playRequested = autoplay;
     _androidAudioOutputProbed = false;
     ++_loadGeneration;
+    _mediaProgressObserved = false;
     _watchdogPositionMs = -1;
     _openStallLogged = false;
     _progressWatch.reset();
@@ -1024,6 +1048,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       await _loadCurrent(autoplay: true, manual: true);
       return;
     }
+    if (!_playRequested) _mediaProgressObserved = false;
     _playRequested = true;
     _progressWatch.reset();
     _publish();
@@ -1060,6 +1085,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {'system': system},
     );
     _playRequested = false;
+    _mediaProgressObserved = false;
     // Allow a resume to continue unfinished ahead warming.
     _aheadPlan = null;
     ++_aheadGeneration;
@@ -1426,10 +1452,18 @@ class PlaybackCoordinator extends ChangeNotifier {
     final h = handler;
     final t = current;
     if (h == null) return;
+    // Android maps buffering to STATE_BUFFERING (a spinner), even when the
+    // playback intent is true. Advancing audio is stronger evidence than
+    // mpv's occasionally stale buffering / opening / transition flags.
+    final recentlyAdvanced =
+        _playRequested &&
+        _mediaProgressObserved &&
+        _mediaProgressWatch.elapsed < const Duration(seconds: 5);
     var processing = AudioProcessingState.ready;
     if (t == null) {
       processing = AudioProcessingState.idle;
-    } else if (_opening || _finishingTrack || (_playRequested && buffering)) {
+    } else if (!recentlyAdvanced &&
+        (_opening || _finishingTrack || (_playRequested && buffering))) {
       processing = AudioProcessingState.buffering;
     }
     _syncNotificationArtwork(t);
