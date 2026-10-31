@@ -1,5 +1,72 @@
 # 实施与验证记录
 
+## 2026-10-31 发布统一缓存更新：普通版 1.0.19+32 与 OpenList 1.0.14-openlist.4+30
+
+按用户授权发布两个通道，并将清理旧缓存提醒置于发布页与应用更新说明首条：升级后到「设置 → 下载与缓存 → 清理所有缓存资源」，再重新缓存歌曲 / 歌单；旧缓存不自动转换或回填关联，手动导入歌词与原始音乐保留。未新增旧缓存关联兼容层。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.19%2B32 ：Android 三 ABI、Windows Release、安装程序和便携 ZIP 构建成功，三份 APK 正式签名校验通过。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.4%2B30 ：独立预发布，仅 Android arm64-v8a，正式签名匹配、包内 ABI 确认；附本轮应用源码及对应 OpenList 后端 / 前端源码快照和摘要。后端 JNI 与上一版二进制摘要一致，对应源码沿用固定版本；本轮 Dart / Flutter 改动及测试配置纳入新快照。
+
+仅版本清单提交并推送：main `1149a2a`，OpenList `d53ccfe`，两个提交都仅包含 version.json，源码修改继续保留本地。远端普通版 6 个附件、OpenList 3 个附件大小与 SHA-256 均与本地一致。两个分支的原始与加速清单均返回新版本；GitHub 普通版 Latest 确认保持为 v1.0.19+32，OpenList 专版未替换它。
+
+产物分别位于普通版工作区 `build/releases/1.0.19-32/` 和 OpenList 工作区 `build/releases/1.0.14-openlist.4-30/`。日志：普通版 `build/test_logs/release-1.0.19.log`、`build/test_logs/dual-cache-release-verification.log`；OpenList `build/test_logs/openlist-release-30-build.log`、`build/test_logs/openlist-release-30-publish.log`。发布时重建新版本，沿用本轮已完成的全量与原生离线验证，未重复运行测试或实机验收。Windows 未代码签名。
+
+
+## 2026-10-31 通用统一缓存改动同步 main
+
+后续按用户要求将本轮补丁、可靠性修复及通用测试进程隔离同步到 main 的现有工作区，保留两分支的版本、发布入口和 OpenList 专有服务差异。main 独立静态分析无问题，构建 Debug 原生库后连续两次全量测试均为 258 项通过、5 项真实服务器条件跳过；Windows 原生离线资源集成测试 1 项通过。此计数比本分支少两项 OpenList 设置专属测试。具体普通版构建与验证证据维护在 main 工作区 docs/PROGRESS.md。本分支此前“未同步其他分支”的描述为历史执行范围，不再代表当前 main 状态；未提交、推送或发布。
+
+
+## 2026-10-31 收敛全量验证失败与 Windows 测试进程异常
+
+承接用户要求妥善处理上一轮未通过项。在当前 OpenList 分支保留此前工作，修正 6 项旧测试断言 / 定位方式：关于页下载链接使用本分支发布入口；外观断言遵守已文档化的浅色纯白 / 深色炭灰主题；歌词预览等待 AnimatedSwitcher 稳定并检查真实继承样式；连接表单明确定位主 ListView，避免误把输入框横向 Scrollable 当成页面滚动容器。未删除失败用例或关闭检查，也未为迁就旧测试改变既有下载、主题和歌词动画行为。
+
+旧歌词套件异常结束的日志中出现 NativeReferenceHolder 的 Located（恢复已有地址），Windows 应用事件同时记录 flutter_tester 原生访问违规 0xc0000005。检查固定依赖 media_kit 1.2.6 源码发现，其调试指针文件仅按 PID 命名，Windows 复用 PID 时可读入已退出进程的地址。新增根目录 flutter_test_config.dart，在 MediaKit 初始化前及测试结束后只清理当前工作进程的指针文件，避免跨进程复用地址；新增陈旧指针和异常路径清理测试，不影响正式版或其他进程。
+
+同时清理此前静态分析的 2 条 warning 与 24 条 info：补齐控制流括号、简化集合 / 已知非空判断、OpenList 模式选择迁至 RadioGroup，并使用与传入 BuildContext 匹配的 mounted 检查。新增模式写入期间禁用交互及页面离开后迟到凭据回调测试。
+
+最终证据：
+
+- `flutter analyze --no-pub`：**No issues found**，退出码 0；`build/test_logs/validation-repair-analyze.log`。
+- `flutter test --no-pub` 连续执行两次：每次 **260 项通过、5 项条件跳过、0 失败、0 未完成**，退出码均 0；`build/test_logs/validation-repair-full.log`、`build/test_logs/validation-repair-full-repeat.log`。15 项歌词缓存用例均在同次全量运行完成；新增 4 项回归。跳过项为未提供凭据 / 写入授权的真实服务器测试，未连接私人服务器。
+- Windows 原生 `integration_test/media_assets_test.dart` 复测 **1 项通过**，覆盖关闭本地模拟服务器后重建服务 / 数据库的离线封面解码、显示和歌词读取；日志 `build/test_logs/validation-repair-native.log`。
+- 最终普通 `lib/main.dart` 入口 Android arm64 Release 和 Windows Release 均编译成功，版本保持 `1.0.14-openlist.3+29`；日志 `build/test_logs/validation-repair-android-build.log`、`build/test_logs/validation-repair-windows-build.log`。最新 APK 为 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`，Windows 完整运行目录为 `build/windows/x64/runner/Release/`。
+- 保留原有完整性、迁移、并发、取消、离线与 UI 用例；`git diff --check` 无空白错误。
+
+本条记录更新上一条的未解决结论；上一条保留为真实历史执行记录。本轮未提交、推送或发布。
+
+
+## 2026-10-31 统一音频 / 封面 / 歌词缓存补丁与可靠性验证
+
+在当前 `feature/android-openlist-lite` 工作区应用 `SylphyMusic-unified-audio-cover-lyrics-cache.patch`，保留此前未提交改动。补丁基线落后：数据库 v8 已用于 WebDAV 范围，因此歌曲资源关联表以前向迁移加入 v9，不覆盖 v8 迁移；兼容当前设置页并补齐缓存服务导入。
+
+音频、封面、歌词共用额度和跨类型 LRU，缓存页展示歌曲资源引用及去重后的总占用；任务完成音频后尝试可选封面 / 歌词。可靠性修复包括：资源读写 / 清理与配额淘汰共享互斥锁，保护准入时复用的共享文件，唯一文件覆盖写入抵扣旧版本，选择性清理阻止尚未落盘的迟到结果，读取中的文件在租约释放后删除；任务请求可选资源时保护刚完成的音频，并在封面 / 歌词步骤前复查取消状态。手动歌词保持 pinned，不参加普通清理或自动淘汰。
+
+验证结果：
+
+- 新增 12 项回归；8 个相关测试文件合计 **88 项全部通过**，包含数据库 v1 / v5 / v6 / v8 升级、并发音频 / 歌词准入、共享封面、完整校验、200 首缓存任务、取消与离线资源展示。日志：`build/test_logs/unified-cache-focused.log`。
+- Windows 原生 `integration_test/media_assets_test.dart` **1 项通过**：模拟服务器关闭后重建应用服务与真实 SQLite，离线封面解码 / 显示及歌词读取保持有效。首次默认目录遭遇 Windows ACL 拒绝访问，按既有文档改用项目内 TEMP / TMP 和 `SYLPHY_ASSET_TEST_ROOT` 后通过，未修改系统权限。日志：`build/test_logs/unified-cache-native.log`。
+- 全量测试最后一次为 **235 项通过、5 项跳过、6 项断言失败，另 15 项歌词缓存用例由运行器报告 did not complete**。这 15 项单独执行全部通过，且已包含在上述 88 项中；未将单次全量执行描述为通过。日志：`build/test_logs/unified-cache-all-tests.log`、`build/test_logs/unified-cache-lyrics-isolated.log`。
+- 6 项断言失败均在以 HEAD 加补丁前工作区 diff 重建的隔离副本复现：关于页下载链接、深色纯色背景、歌词预览行距 / 三行高亮 / 长句高亮、连接表单空端口。副本保存在 `.private/unified-cache-baseline/`；日志：`build/test_logs/unified-cache-baseline-tests.log`。未扩大范围修复这些既有行为。全量运行器未完成歌词套件的原因尚未定位。
+- `flutter analyze --no-pub` 无 error，仍有 2 条既有 playlist_page 空值检查 warning 和 24 条 info，命令返回非零；未称静态分析完全通过。日志：`build/test_logs/unified-cache-analyze.log`。`git diff --check` 无空白错误。
+- 最终普通 `lib/main.dart` 入口 Android arm64 Release 与 Windows Release 均编译成功，版本保持 `1.0.14-openlist.3+29`。产物：`build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`（50,836,111 字节）、`build/windows/x64/runner/Release/`（运行时须保留整个目录）。日志：`build/test_logs/unified-cache-android-build.log`、`build/test_logs/unified-cache-windows-build.log`。
+
+本轮未使用真实服务器凭据、未执行远程写入、未提交 / 推送 / 发布。Android 物理设备后台、强杀和存储硬件故障仍未验收。此次仅修改当前工作区，未同步其他分支。
+
+
+## 2026-10-30 缓存任务取消 / 移除补丁与双通道更新
+
+将 `SylphyMusic-cache-job-cancel-remove.patch` 同时应用到 main 和 `feature/android-openlist-lite`。CacheJobs 按任务登记 TransferToken，在最后数据库状态检查前建立取消所有权；取消 / 暂停中断对应传输，移除活跃任务时先取消，再事务删除任务及条目。迟到的工作结果通过条件更新跳过已移除条目，已下载并校验完成的整曲缓存保留。缓存任务页统一提供关闭按钮，失败任务同时保留重试，异步结束检查 mounted 并提示移除错误。同步更新架构说明。
+
+普通版 [1.0.18+31](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.18%2B31) 已发布：Android 三 ABI、Windows Release、安装程序与便携 ZIP 构建成功，三份 APK 正式签名匹配。OpenList [1.0.14-openlist.3+29](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.3%2B29) 作为独立预发布特别版发布，仅 arm64-v8a APK（签名匹配且仅含该 ABI），另附源码快照和摘要；包含此前未发布的启动就绪媒体通知改动，不替换普通版 Latest。
+
+普通版六个、OpenList 三个远端附件大小与 SHA-256 均匹配本地产物，两个分支原始 / 加速清单均返回各自新版本。仅版本清单提交并推送：main `ae85484`，OpenList `0637f35`，源码改动保留本地。产物分别位于主工作区 `build/releases/1.0.18-31/` 与 OpenList 工作区 `build/releases/1.0.14-openlist.3-29/`。日志为各自 `build/test_logs/release-1.0.18.log`、`build/test_logs/openlist-release-29-build.log`、`build/test_logs/openlist-release-29-publish.log`。未运行静态分析、测试或设备验收，取消与移除交互由用户验证；Windows 未代码签名。
+
+## 2026-10-30 应用启动就绪媒体通知补丁
+
+按用户要求将 `SylphyMusic-startup-ready-media-notification.patch` 同时应用到 main 和 `feature/android-openlist-lite`。启动装配媒体控制前，以暂停状态预备恢复队列中的当前曲目并复用后两首预取；发布状态区分无曲目的 idle、打开 / 切曲 / 播放中缓冲的 buffering 与 ready。本地 audio_service 为带元数据的暂停 ready 会话发布初始 Android 媒体通知，取消通知后重置创建状态，元数据更新复用同一路径。
+
+OpenList 分支 Android arm64 Release 编译成功，版本保持 `1.0.14-openlist.2+28`；APK 为 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`，日志为 `build/test_logs/startup-ready-android-build.log`。保留已有关于页改动，更新第三方补丁说明与架构文档。本分支未提交、推送或发布，未运行静态分析、测试或设备验收。主分支另按本轮授权发布更新。
+
 ## 2026-10-30 发布 OpenList-Lite 特别版 1.0.14-openlist.2+28
 
 按用户授权发布独立 OpenList 特别版，仅提供 Android arm64-v8a 安装包；GitHub 采用预发布并显式不设为 Latest，普通版 Latest 保持 `v1.0.15+28`。Android arm64 Release 编译成功、正式签名校验通过，APK 原生库仅含 arm64-v8a。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.2%2B28 。

@@ -16,6 +16,11 @@ class AppDb {
     sha256 TEXT NOT NULL,fetched_at INTEGER NOT NULL,last_used INTEGER NOT NULL,
     expires_at INTEGER NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,
     etag TEXT,last_modified TEXT,PRIMARY KEY(source_id,asset_key))''';
+  static const _assetLinks = '''CREATE TABLE cache_asset_links(
+    track_key TEXT NOT NULL,kind TEXT NOT NULL,source_id TEXT NOT NULL,
+    asset_key TEXT NOT NULL,PRIMARY KEY(track_key,kind))''';
+  static const _assetLinksIndex =
+      'CREATE INDEX idx_cache_links_asset ON cache_asset_links(source_id,asset_key)';
   static const _assetsIndex =
       'CREATE INDEX idx_assets_lru ON media_assets(kind,pinned,last_used)';
   static const _assetMigrations =
@@ -76,7 +81,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 8,
+      version: 9,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -138,6 +143,10 @@ class AppDb {
             'ALTER TABLE sources ADD COLUMN webdav_max_depth INTEGER NOT NULL DEFAULT -1',
           );
         }
+        if (oldVersion < 9) {
+          await database.execute(_assetLinks);
+          await database.execute(_assetLinksIndex);
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -161,6 +170,8 @@ class AppDb {
           _assetsTable,
           _assetsIndex,
           _assetMigrations,
+          _assetLinks,
+          _assetLinksIndex,
           _webDavTagsTable,
         ]) {
           await d.execute(sql);

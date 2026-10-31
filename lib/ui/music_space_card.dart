@@ -85,8 +85,9 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
   void _advance(AnimationStatus status) {
     if (status != AnimationStatus.completed || !mounted) return;
     setState(() {
-      if (widget.sources.isNotEmpty)
+      if (widget.sources.isNotEmpty) {
         _index = (_index + 1) % widget.sources.length;
+      }
       _motion.reset();
     });
   }

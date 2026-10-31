@@ -107,8 +107,9 @@ class PlaylistSyncService {
       );
     } finally {
       _refreshAdapters[source.id]?.remove(adapter);
-      if (_refreshAdapters[source.id]?.isEmpty == true)
+      if (_refreshAdapters[source.id]?.isEmpty == true) {
         _refreshAdapters.remove(source.id);
+      }
       adapter.close();
     }
   }
@@ -173,8 +174,9 @@ class PlaylistSyncService {
       }
     } finally {
       _refreshAdapters[source.id]?.remove(adapter);
-      if (_refreshAdapters[source.id]?.isEmpty == true)
+      if (_refreshAdapters[source.id]?.isEmpty == true) {
         _refreshAdapters.remove(source.id);
+      }
       adapter.close();
     }
   }

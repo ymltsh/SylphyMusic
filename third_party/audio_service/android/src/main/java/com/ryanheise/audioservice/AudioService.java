@@ -582,7 +582,8 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (oldProcessingState != AudioProcessingState.idle && processingState == AudioProcessingState.idle) {
             // TODO: Handle completed state as well?
             stop();
-        } else if (processingState != AudioProcessingState.idle && notificationChanged) {
+        } else if (processingState != AudioProcessingState.idle
+                && !publishPreparedNotificationIfNeeded() && notificationChanged) {
             updateNotification();
         }
     }
@@ -759,6 +760,19 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
     }
 
+    // The normal foreground-service path starts with PLAYING. On app launch,
+    // expose the restored, PAUSED session to notification shade/SystemUI too,
+    // without claiming to be actively playing or starting an Android FGS.
+    private boolean publishPreparedNotificationIfNeeded() {
+        if (notificationCreated || playing || processingState != AudioProcessingState.ready
+                || mediaMetadata == null) return false;
+        activateMediaSession();
+        mediaSession.setSessionActivity(contentIntent);
+        getNotificationManager().notify(NOTIFICATION_ID, buildNotification());
+        notificationCreated = true;
+        return true;
+    }
+
     private void updateNotification() {
         if (notificationCreated) {
             getNotificationManager().notify(NOTIFICATION_ID, buildNotification());
@@ -812,6 +826,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
         // Force cancellation of the notification
         getNotificationManager().cancel(NOTIFICATION_ID);
+        notificationCreated = false;
     }
 
     private void releaseMediaSession() {
@@ -866,7 +881,9 @@ public class AudioService extends MediaBrowserServiceCompat {
         this.mediaMetadata = mediaMetadata;
         mediaSession.setMetadata(mediaMetadata);
         handler.removeCallbacksAndMessages(null);
-        handler.post(this::updateNotification);
+        handler.post(() -> {
+            if (!publishPreparedNotificationIfNeeded()) updateNotification();
+        });
     }
 
     private MediaMetadataCompat putArtToMetadata(MediaMetadataCompat mediaMetadata) {

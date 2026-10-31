@@ -105,7 +105,7 @@ class SylphyApp extends ChangeNotifier {
   bool _disposed = false;
   String? message;
   DesktopControls? desktop;
-  late final assets = MediaAssetStore(db, root);
+  late final assets = MediaAssetStore(db, root, quota: cache.quota);
   late final webDavTags = WebDavTags(
     factory,
     cache: cache,
@@ -244,8 +244,15 @@ class SylphyApp extends ChangeNotifier {
     );
     app.playback.setLyricsLoader((track) => app.loadLyrics(track));
     app.playback.setArtworkLoader((track) => app.artwork.load(track));
+    app.jobs.attachMediaLoaders(
+      cover: (track) => app.artwork.load(track),
+      lyrics: (track) => app.loadLyrics(track),
+    );
     if (platformIntegration) await app.desktopLyrics.initialize();
     if (platformIntegration) {
+      // Open the restored track paused before exposing media controls. This
+      // also starts the existing look-ahead prefetch without auto-playing.
+      await playback.prepareRestoredQueue();
       if (Platform.isAndroid) {
         playback.attachNotificationArtwork(app.artwork);
       }
@@ -541,8 +548,9 @@ class SylphyApp extends ChangeNotifier {
         if (_foregroundSyncCancelled || _disposed) break;
         if (!source.enabled || source.kind == SourceKind.local) continue;
         final current = await db.source(source.id);
-        if (current == null || !current.enabled || sourceChanging(source.id))
+        if (current == null || !current.enabled || sourceChanging(source.id)) {
           continue;
+        }
         _foregroundSourceId = source.id;
         await syncForeground.update(
           '风灵音乐 · 同步索引',
@@ -610,8 +618,9 @@ class SylphyApp extends ChangeNotifier {
       _runForegroundSync([...sources], includeCloud: true);
 
   Future<void> syncSource(SourceProfile source) {
-    if (_disposed || sourceChanging(source.id) && !source.enabled)
+    if (_disposed || sourceChanging(source.id) && !source.enabled) {
       return Future.value();
+    }
     final existing = _sourceSyncs[source.id];
     if (existing != null) return existing;
     _cancelledSourceSyncs.remove(source.id);
@@ -620,8 +629,9 @@ class SylphyApp extends ChangeNotifier {
     _sourceSyncs[source.id] = task;
     notifyListeners();
     return task.whenComplete(() {
-      if (identical(_sourceSyncs[source.id], task))
+      if (identical(_sourceSyncs[source.id], task)) {
         _sourceSyncs.remove(source.id);
+      }
       if (!_disposed) notifyListeners();
     });
   }
@@ -643,8 +653,9 @@ class SylphyApp extends ChangeNotifier {
       if (!await _sourceCanSync(source)) return;
       await index.sync(source);
       if (!await _sourceCanSync(source) ||
-          index.progress[source.id]?.state != 'completed')
+          index.progress[source.id]?.state != 'completed') {
         return;
+      }
       artwork.invalidate();
       sourceSyncMessages[source.id] = '正在同步歌单与收藏';
       notifyListeners();
@@ -991,6 +1002,11 @@ class SylphyApp extends ChangeNotifier {
   Future<void> clearCache({String? sourceId, Set<String>? keys}) async {
     await jobs.cancelAffected(sourceId: sourceId, trackKeys: keys);
     await cache.clear(sourceId: sourceId, keys: keys);
+    if (keys != null) {
+      await assets.clearTracks(keys);
+    } else {
+      await assets.clear(sourceId: sourceId);
+    }
     notifyListeners();
   }
 

@@ -82,12 +82,14 @@ void main() {
       await tester.pumpWidget(
         view(lrc, const Duration(seconds: 2), height: 300, lineHeight: 1),
       );
+      await tester.pumpAndSettle();
       final compact =
           tester.getCenter(find.text('第四句')).dy -
           tester.getCenter(find.text('第三句')).dy;
       await tester.pumpWidget(
         view(lrc, const Duration(seconds: 2), height: 300, lineHeight: 2.5),
       );
+      await tester.pumpAndSettle();
       final loose =
           tester.getCenter(find.text('第四句')).dy -
           tester.getCenter(find.text('第三句')).dy;
@@ -96,6 +98,7 @@ void main() {
       await tester.pumpWidget(
         view(lrc, const Duration(seconds: 2), height: 108, lineHeight: 2.5),
       );
+      await tester.pumpAndSettle();
       expect(find.text('第三句'), findsOneWidget);
       expect(find.byType(Text), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -112,10 +115,14 @@ void main() {
       expect(find.text('第三句'), findsOneWidget);
       expect(find.text('第四句'), findsOneWidget);
       expect(find.text('第五句'), findsOneWidget);
-      expect(tester.widget<Text>(find.text('第四句')).style?.color, Colors.orange);
+      expect(
+        DefaultTextStyle.of(tester.element(find.text('第四句'))).style.color,
+        Colors.orange,
+      );
       await tester.pumpWidget(
         view(lrc, const Duration(seconds: 3), height: 72),
       );
+      await tester.pumpAndSettle();
       expect(find.byType(Text), findsNWidgets(2));
       expect(find.text('第四句'), findsOneWidget);
       expect(find.text('第五句'), findsOneWidget);
@@ -137,7 +144,7 @@ void main() {
     expect(paragraph.size.height, greaterThan(36));
     expect(paragraph.size.height, lessThanOrEqualTo(72));
     expect(
-      tester.widget<Text>(find.text(sentence)).style?.color,
+      DefaultTextStyle.of(tester.element(find.text(sentence))).style.color,
       Colors.orange,
     );
     expect(tester.takeException(), isNull);

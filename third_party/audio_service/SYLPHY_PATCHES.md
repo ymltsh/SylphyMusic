@@ -24,3 +24,5 @@ upgrading the upstream package, review and reapply this change.
 Headset transport handling rejects missing KeyEvents and consumes repeated
 ACTION_DOWN events without forwarding another media command to Dart. The
 app-owned audio handler separately limits external play/pause/toggle bursts.
+
+Startup-ready media notification patch: a restored paused session in READY with metadata can publish its initial Android notification without entering the playing foreground-service path. Paused player buffering does not keep the session in BUFFERING; an empty current track publishes IDLE. Notification cancellation resets notificationCreated, and metadata updates reuse the prepared-notification path. Review these changes when upgrading upstream.

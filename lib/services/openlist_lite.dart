@@ -31,8 +31,9 @@ class OpenListLite {
         uri.host != '127.0.0.1' ||
         uri.port != 5244 ||
         uri.userInfo.isNotEmpty ||
-        (uri.path != '/dav' && !uri.path.startsWith('/dav/')))
+        (uri.path != '/dav' && !uri.path.startsWith('/dav/'))) {
       return null;
+    }
     return uri.replace(port: 10486).toString();
   }
 
@@ -91,8 +92,9 @@ class OpenListLite {
   }
 
   static Future<void> setMode(String mode) async {
-    if (!{'smart', 'continuous'}.contains(mode))
+    if (!{'smart', 'continuous'}.contains(mode)) {
       throw ArgumentError.value(mode);
+    }
     await _channel.invokeMethod<String>('mode', {'value': mode});
   }
 

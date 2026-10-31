@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'dart:collection';
 
 import 'package:flutter/material.dart';
 
-final _palettes = LinkedHashMap<String, Future<ColorScheme?>>();
+final _palettes = <String, Future<ColorScheme?>>{};
 
 /// Extracts an M3 palette from locally cached cover artwork. The playback page
 /// uses the current app brightness so a system light theme gets a light
@@ -26,8 +25,9 @@ Future<ColorScheme?> coverColorScheme(
     _palettes.remove(_palettes.keys.first);
   }
   final result = await pending;
-  if (result == null && identical(_palettes[key], pending))
+  if (result == null && identical(_palettes[key], pending)) {
     _palettes.remove(key);
+  }
   return result;
 }
 

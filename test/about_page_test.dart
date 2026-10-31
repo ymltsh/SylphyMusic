@@ -65,7 +65,8 @@ void main() {
     final targets = {
       '官方网站': 'https://sylphy.ymltsh.com',
       'GitHub 源码仓库': 'https://github.com/ymltsh/SylphyMusic',
-      '版本发布与下载': 'https://github.com/ymltsh/SylphyMusic/releases/latest',
+      '版本发布与下载':
+          'https://github.com/ymltsh/SylphyMusic/releases?q=openlist-lite',
     };
     for (final entry in targets.entries) {
       await tester.scrollUntilVisible(find.text(entry.key), 200);

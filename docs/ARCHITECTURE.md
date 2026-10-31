@@ -121,7 +121,7 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 
 ## 持久化
 
-应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **8**，迁移由 `AppDb.open()` 负责。
+应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **9**，迁移由 `AppDb.open()` 负责。
 
 | 表 / 位置 | 内容 |
 |---|---|
@@ -132,7 +132,7 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 | `cache`、`cache_jobs`、`cache_job_items` | 完整缓存、下载任务及其曲目状态 |
 | `audio/ready/`、`audio/tmp/` | 完整音频与临时残片 |
 | `covers/`、`artwork/`、`lyrics/`、`local/` | 远程封面、本地提取图片、歌词和导入文件 |
-| media_assets / media_asset_migrations | 封面、歌词资源索引与旧文件迁移标记 |
+| media_assets / media_asset_migrations / cache_asset_links | 封面、歌词资源索引与旧文件迁移标记 |
 | media_assets/objects/ / media_assets/tmp/ | 不可变资源文件和原子写入临时文件 |
 | 系统安全存储 | `AuthVault` 管理 Token、密码及用户 / 服务器身份 |
 
@@ -178,3 +178,9 @@ WebDAV 文本标签通过 WebDavTags.onTags 回调交给 AppDb 事务保存；SQ
 手动同步通过 SyncForeground / SyncForegroundService 管理 dataSync 通知与取消；Android 引擎由 audio_service 创建和正常销毁，SylphyApplication 获取该实例并注册同步 / 缓存 Channel。EngineLeaseManager 让同步与缓存各持独立租约，共用 AudioService 绑定，最后任务退出才解绑；不拦截引擎销毁或异步恢复缓存。普通暂停等待 Dart 清理回执，系统超时立即停服。Windows 同步复用相同业务入口，桥接不调用 Android Channel。退出等待前台同步 future 与标签遍历后关闭数据库；详见 [Android 同步服务](ANDROID_SYNC_FGS.md)。
 
 WebDAV 扫描范围保存于来源配置：SQLite v8 为 sources 增加 webdav_base_path 与 webdav_max_depth，默认空路径和 -1 保留原递归行为。目录选择通过只读 Depth: 1 PROPFIND 逐层浏览；扫描从基础目录开始按层级限制遍历，曲目 ID 仍相对于服务器 URL。修改范围先取消旧索引与标签补全，再重新同步；提交索引前核对扫描范围，拒绝过期结果，失败保留旧索引。
+
+启动恢复队列时，在装配媒体控制前调用 prepareRestoredQueue，以暂停状态预备当前曲目并复用后两首预取链路；不自动播放。媒体状态按当前曲目与实际打开 / 播放意图区分 idle、buffering 和 ready。Android 的本地 audio_service 补丁可为已有元数据的暂停 ready 会话发布首条媒体通知，不经播放中的前台服务启动路径，通知取消后重置创建状态。设备上的通知与恢复表现仍由用户验收。
+
+缓存任务按 jobId 持有当前曲目的 TransferToken，先登记令牌再核对数据库状态；取消或暂停会取消令牌，避免状态检查与 fetchWhole 之间的竞态启动新请求。移除任务先取消仍活跃的工作，再事务删除任务条目及任务记录；已完成且校验通过的整曲缓存保留。下载结束后的状态更新附带原状态条件，任务记录已移除时不重新创建；失败任务同时提供重试和移除入口。
+
+统一缓存额度由 CacheManager 与 MediaAssetStore 共享的 UnifiedCacheQuota 管理，音频、封面和歌词按物理文件计费并跨类型 LRU 淘汰；手动歌词计入用量但不自动删除。SQLite v9 新增歌曲资源关联表 cache_asset_links，保留 v8 WebDAV 范围迁移。资源读取、写入、清理和配额淘汰共用互斥锁，准入保留将复用的共享文件；清理读取中的资源延迟到租约释放后删除。缓存任务下载可选封面 / 歌词期间保护刚完成的音频，每一步核对取消状态；可选资源失败不使完整音频任务失败。

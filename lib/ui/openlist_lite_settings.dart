@@ -37,11 +37,12 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
         _busy = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _error = '$e';
         });
+      }
     }
   }
 
@@ -92,23 +93,29 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
                     : (value) => _run(() => widget.setEnabled(value)),
               ),
               const Divider(height: 1),
-              RadioListTile<String>(
-                title: const Text('智能运行（推荐）'),
-                subtitle: const Text('需要时启动，空闲约 3 分钟后自动停止'),
-                value: 'smart',
+              RadioGroup<String>(
                 groupValue: _mode,
-                onChanged: _busy || !_enabled
-                    ? null
-                    : (_) => _run(() => OpenListLite.setMode('smart')),
-              ),
-              RadioListTile<String>(
-                title: const Text('持续运行'),
-                subtitle: const Text('用户主动保持本地服务；受 Android 后台限制，不保证永久存活'),
-                value: 'continuous',
-                groupValue: _mode,
-                onChanged: _busy || !_enabled
-                    ? null
-                    : (_) => _run(() => OpenListLite.setMode('continuous')),
+                onChanged: (value) {
+                  if (!_busy && _enabled && value != null) {
+                    _run(() => OpenListLite.setMode(value));
+                  }
+                },
+                child: Column(
+                  children: [
+                    RadioListTile<String>(
+                      title: const Text('智能运行（推荐）'),
+                      subtitle: const Text('需要时启动，空闲约 3 分钟后自动停止'),
+                      value: 'smart',
+                      enabled: !_busy && _enabled,
+                    ),
+                    RadioListTile<String>(
+                      title: const Text('持续运行'),
+                      subtitle: const Text('用户主动保持本地服务；受 Android 后台限制，不保证永久存活'),
+                      value: 'continuous',
+                      enabled: !_busy && _enabled,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -141,7 +148,7 @@ class _OpenListLiteSettingsPageState extends State<OpenListLiteSettingsPage> {
               ? null
               : () => _run(() async {
                   final password = await OpenListLite.adminPassword();
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   await showDialog<void>(
                     context: context,
                     builder: (ctx) => AlertDialog(

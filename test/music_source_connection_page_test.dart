@@ -34,12 +34,19 @@ void main() {
   }
 
   Future<void> enter(WidgetTester tester, String key, String value) async {
+    // Validation and the WebDAV scope section can scroll earlier fields out
+    // of the lazy list. Start from the top before locating the next field.
+    final scrolling = find
+        .descendant(
+          of: find.byType(ListView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final scrollable = tester.state<ScrollableState>(scrolling);
+    scrollable.position.jumpTo(scrollable.position.minScrollExtent);
+    await tester.pumpAndSettle();
     final field = find.byKey(ValueKey(key));
-    await tester.scrollUntilVisible(
-      field,
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
+    await tester.scrollUntilVisible(field, 120, scrollable: scrolling);
     await tester.enterText(field, value);
     tester.testTextInput.hide();
     await tester.pump();

@@ -57,6 +57,12 @@ flutter test integration_test/large_library_test.dart -d emulator-5580
 
 原生测试会创建临时数据目录，使用自行生成的音频，默认不连接私人服务器。纯单元测试中的 libmpv 用例需要先构建 Windows Debug，或设置 `SYLPHY_MPV_LIBRARY` 指向本机 libmpv。Linux 无显示环境的集成测试使用 Xvfb 和 `--dart-define=SYLPHY_HEADLESS_AUDIO=true`。集成测试会覆盖构建输出，完整验收清单见 [TEST_PLAN](docs/TEST_PLAN.md)。
 
+### Windows 测试进程的原生指针隔离
+
+项目根目录 `flutter_test_config.dart` 在每个 Windows 测试工作进程启动前、结束后清理仅属于当前 PID 的 media_kit 调试指针文件。media_kit 1.2.6 的 NativeReferenceHolder 文件名只包含 PID；Windows 复用旧进程号时，残留地址不属于新进程，曾导致 flutter_tester 原生访问违规并出现 `did not complete`。清理发生在测试 main / MediaKit 初始化之前，不删除其他进程的文件，不跳过原生播放或歌词测试；正常 Release 不使用这一调试指针文件。升级 media_kit 后应复核其文件命名 / 生命周期。
+
+`test/native_test_config_test.dart` 覆盖陈旧指针、异常退出清理及无关文件保留。若原生集成测试默认应用目录或 TEMP 遭遇本机 ACL 拒绝访问，按媒体资源文档将当前命令的 TEMP / TMP 和 `SYLPHY_ASSET_TEST_ROOT` 指向项目内独立目录，无需修改系统权限。
+
 ## 私密联调
 
 以下仅供用户主动联调时参考，默认不执行。真实服务器测试默认跳过；凭据由环境变量指向私密三行文件（URL、用户名、密码），不把密码放入命令行、`--dart-define` 或源码，也不输出文件内容。

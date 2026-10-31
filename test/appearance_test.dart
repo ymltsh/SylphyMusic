@@ -153,7 +153,7 @@ void main() {
     for (final brightness in [Brightness.light, Brightness.dark]) {
       await tester.pumpWidget(
         MaterialApp(
-          theme: ThemeData(brightness: brightness),
+          theme: sylphyTheme(appearance, brightness),
           home: AppBackground(
             appearance: appearance,
             child: const SizedBox.expand(),
@@ -171,7 +171,7 @@ void main() {
       );
       expect(
         box.color,
-        brightness == Brightness.dark ? Colors.black : Colors.white,
+        brightness == Brightness.dark ? const Color(0xff0f1417) : Colors.white,
       );
     }
     await tester.pumpWidget(const SizedBox());

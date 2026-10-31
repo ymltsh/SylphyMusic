@@ -8,6 +8,7 @@ import 'package:sylphy_music/data/app_db.dart';
 import 'package:sylphy_music/services/byte_range.dart';
 import 'package:sylphy_music/services/cache.dart';
 import 'package:sylphy_music/services/cache_jobs.dart';
+import 'package:sylphy_music/services/media_assets.dart';
 import 'package:sylphy_music/services/media_proxy.dart';
 import 'package:sylphy_music/services/sources.dart';
 
@@ -500,6 +501,163 @@ void main() {
       } finally {
         if (!gate!.isCompleted) gate!.complete();
         await jobs.shutdown();
+      }
+    },
+  );
+  test('audio and assets share one LRU and preserve leased audio on admission failure', () async {
+    final assets = MediaAssetStore(
+      db,
+      root,
+      quota: cache.quota,
+      freeSpace: () async => 1000,
+    );
+    try {
+      await assets.initialize();
+      cache.maxBytes = bytes.length + 5;
+      await cache.fetchWhole(track, profile);
+      cache.lease(track.ref);
+      await expectLater(
+        assets.put('a', 'lyrics', 'lyrics', 'v1', [65, 66, 67, 68, 69, 70]),
+        throwsStateError,
+      );
+      expect(await cache.contains(track.ref), true);
+      cache.release(track.ref);
+      await assets.put('a', 'lyrics', 'lyrics', 'v1', [65, 66, 67, 68, 69, 70]);
+      expect(await cache.contains(track.ref), false);
+      expect((await cache.quota.usage()).total, 6);
+    } finally {
+      await assets.shutdown();
+    }
+  });
+  test(
+    'optional media cannot evict the song a cache job just completed',
+    () async {
+      final assets = MediaAssetStore(
+        db,
+        root,
+        quota: cache.quota,
+        freeSpace: () async => 1000,
+      );
+      final jobs = CacheJobs(db, cache)..paused = true;
+      var covers = 0, lyrics = 0;
+      jobs.attachMediaLoaders(
+        cover: (_) async {
+          covers++;
+          await assets.put('a', 'optional', 'lyrics', 'v1', [
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+          ]);
+          return null;
+        },
+        lyrics: (_) async {
+          lyrics++;
+          throw StateError('optional unavailable');
+        },
+      );
+      try {
+        await assets.initialize();
+        cache.maxBytes = bytes.length + 5;
+        final id = await jobs.schedule('fixture', [track.ref]);
+        jobs.paused = false;
+        await jobs.run();
+        expect(covers, 1);
+        expect(lyrics, 1);
+        expect(await cache.contains(track.ref), true);
+        expect(
+          (await db.db.query(
+            'cache_jobs',
+            where: 'id=?',
+            whereArgs: [id],
+          )).single['state'],
+          'completed',
+        );
+      } finally {
+        await jobs.shutdown();
+        await assets.shutdown();
+      }
+    },
+  );
+  test(
+    'cancel during cover loading skips lyrics and retains complete audio',
+    () async {
+      final jobs = CacheJobs(db, cache)..paused = true;
+      final started = Completer<void>(), finish = Completer<void>();
+      var lyrics = 0;
+      jobs.attachMediaLoaders(
+        cover: (_) async {
+          started.complete();
+          await finish.future;
+          return null;
+        },
+        lyrics: (_) async {
+          lyrics++;
+          return null;
+        },
+      );
+      final id = await jobs.schedule('fixture', [track.ref]);
+      jobs.paused = false;
+      final running = jobs.run();
+      try {
+        await started.future.timeout(const Duration(seconds: 5));
+        await jobs.cancelJob(id);
+        finish.complete();
+        await running;
+        expect(lyrics, 0);
+        expect(await cache.contains(track.ref), true);
+        expect(
+          (await db.db.query(
+            'cache_jobs',
+            where: 'id=?',
+            whereArgs: [id],
+          )).single['state'],
+          'cancelled',
+        );
+      } finally {
+        if (!finish.isCompleted) finish.complete();
+        await jobs.shutdown();
+      }
+    },
+  );
+  test(
+    'concurrent audio and lyric commits cannot oversubscribe the shared budget',
+    () async {
+      final assets = MediaAssetStore(
+        db,
+        root,
+        quota: cache.quota,
+        freeSpace: () async => 1000,
+      );
+      try {
+        await assets.initialize();
+        cache.maxBytes = bytes.length + 2;
+        await Future.wait([
+          cache.fetchWhole(track, profile),
+          assets
+              .put('a', 'remote', 'lyrics', 'v1', [65, 66, 67, 68, 69, 70])
+              .then<void>(
+                (_) {},
+                onError: (Object e) {
+                  expect(e, isStateError);
+                },
+              ),
+        ]);
+        final usage = await cache.quota.usage();
+        expect(usage.total, lessThanOrEqualTo(cache.maxBytes));
+        final audio = await cache.find(track.ref);
+        final lyric = await assets.read('a', 'remote');
+        expect(audio != null || lyric != null, true);
+        if (audio != null) {
+          expect(await audio.file.readAsBytes(), bytes);
+        }
+        if (lyric != null) {
+          expect(await lyric.file.readAsBytes(), [65, 66, 67, 68, 69, 70]);
+        }
+      } finally {
+        await assets.shutdown();
       }
     },
   );

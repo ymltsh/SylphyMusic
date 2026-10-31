@@ -112,7 +112,7 @@ class _AboutPageState extends State<AboutPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '让音乐库回归简单，让每一首歌自由流动。',
+                          '让听音乐回归简单，让每一首歌自由流动。',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(height: 1.55),

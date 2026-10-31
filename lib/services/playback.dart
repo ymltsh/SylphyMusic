@@ -681,6 +681,16 @@ class PlaybackCoordinator extends ChangeNotifier {
     _publish();
   }
 
+  /// Open the restored track and fill the existing two-track look-ahead while
+  /// remaining paused. A cold launch must not request audio focus or play.
+  Future<void> prepareRestoredQueue() async {
+    if (currentRef == null || current == null) return;
+    await _loadCurrent(autoplay: false);
+    if (error == null) {
+      _scheduleAhead(allowPaused: true);
+    }
+  }
+
   Future<void> setQueue(
     List<TrackRef> tracks, {
     int start = 0,
@@ -907,8 +917,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     _aheadDownloads.clear();
   }
 
-  void _scheduleAhead() {
-    if (!_playRequested || currentRef == null) return;
+  void _scheduleAhead({bool allowPaused = false}) {
+    if ((!_playRequested && !allowPaused) || currentRef == null) return;
     final indices = _aheadIndices();
     final targets = [
       for (final index in indices) TrackRef.parse(snapshot.tracks[index]),
@@ -923,10 +933,16 @@ class PlaybackCoordinator extends ChangeNotifier {
       _aheadDownloads.remove(ref);
       unawaited(cache.cancel(ref, automaticOnly: true));
     }
-    if (indices.isNotEmpty) unawaited(_warmAhead(indices, generation));
+    if (indices.isNotEmpty) {
+      unawaited(_warmAhead(indices, generation, allowPaused: allowPaused));
+    }
   }
 
-  Future<void> _warmAhead(List<int> indices, int generation) async {
+  Future<void> _warmAhead(
+    List<int> indices,
+    int generation, {
+    bool allowPaused = false,
+  }) async {
     final ready = <({Track track, SourceProfile source})>[];
     // Warm the first two covers and lyrics before downloading either audio.
     for (final index in indices) {
@@ -949,7 +965,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     // P1 is a verified whole-file cache. P2 only consumes bandwidth after P1.
     for (var rank = 0; rank < ready.length; rank++) {
-      if (generation != _aheadGeneration || !_playRequested) return;
+      if (generation != _aheadGeneration || (!_playRequested && !allowPaused)) {
+        return;
+      }
       final item = ready[rank];
       _aheadDownloads.add(item.track.ref);
       try {
@@ -1419,6 +1437,12 @@ class PlaybackCoordinator extends ChangeNotifier {
     final h = handler;
     final t = current;
     if (h == null) return;
+    var processing = AudioProcessingState.ready;
+    if (t == null) {
+      processing = AudioProcessingState.idle;
+    } else if (_opening || _finishingTrack || (_playRequested && buffering)) {
+      processing = AudioProcessingState.buffering;
+    }
     _syncNotificationArtwork(t);
     if (t == null) {
       if (_lastMediaItem != null) {
@@ -1449,9 +1473,7 @@ class PlaybackCoordinator extends ChangeNotifier {
           MediaControl.skipToNext,
         ],
         systemActions: const {MediaAction.seek},
-        processingState: buffering || _opening || _finishingTrack
-            ? AudioProcessingState.buffering
-            : AudioProcessingState.ready,
+        processingState: processing,
         // The OS must not leave foreground service between two tracks.
         // Real user/system pause still sets this to false immediately.
         playing: _playRequested,

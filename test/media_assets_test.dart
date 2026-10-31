@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/data/app_db.dart';
 import 'package:sylphy_music/services/media_assets.dart';
+import 'package:sylphy_music/services/unified_cache_quota.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +28,7 @@ void main() {
         root,
         clock: () => now,
         freeSpace: () async => free,
-        lyricsBudget: lyricsBudget,
+        quota: UnifiedCacheQuota(db, root)..maxBytes = lyricsBudget,
       );
   Future<MediaAsset?> save(
     String key,
@@ -74,6 +75,9 @@ void main() {
     await db.db.execute(
       'ALTER TABLE index_tracks DROP COLUMN resource_version',
     );
+    await db.db.execute('DROP TABLE cache_asset_links');
+    await db.db.execute('ALTER TABLE sources DROP COLUMN webdav_base_path');
+    await db.db.execute('ALTER TABLE sources DROP COLUMN webdav_max_depth');
     await db.db.execute('PRAGMA user_version=5');
     await db.close();
     db = AppDb(root);
@@ -83,7 +87,7 @@ void main() {
     expect((await db.source('one'))?.username, 'test');
     expect(
       (await db.db.rawQuery('PRAGMA user_version')).single.values.single,
-      7,
+      9,
     );
     expect(await db.db.query('media_assets'), isEmpty);
   });
@@ -272,16 +276,17 @@ void main() {
   );
   test('LRU protects manual lyrics and active readers; ordinary clear preserves manual imports', () async {
     await store.shutdown();
-    store = make(lyricsBudget: 7);
+    store = make(lyricsBudget: 26);
     await store.initialize();
     await save('manual', 'manual content', pinned: true);
     await save('old', '123456');
     store.retain('one', 'old');
     now = now.add(const Duration(seconds: 1));
-    await save('new', 'abcdef');
+    await expectLater(save('new', 'abcdefg'), throwsStateError);
     expect(await store.read('one', 'old'), isNotNull);
     store.release('one', 'old');
     await store.waitForIdle();
+    await save('new', 'abcdefg');
     expect(await store.read('one', 'old'), isNull);
     expect(await store.read('one', 'manual'), isNotNull);
     await store.clear();
@@ -290,6 +295,111 @@ void main() {
     await store.clear(sourceId: 'one', includePinned: true);
     expect(await store.read('one', 'manual'), isNull);
   });
+  test('v8 upgrade preserves cached assets and WebDAV scope', () async {
+    await save('existing', 'persisted');
+    await store.shutdown();
+    await db.db.execute(
+      "UPDATE sources SET webdav_base_path='music',webdav_max_depth=2",
+    );
+    await db.db.execute('DROP TABLE cache_asset_links');
+    await db.db.execute('PRAGMA user_version=8');
+    await db.close();
+    db = AppDb(root);
+    await db.open();
+    store = make();
+    await store.initialize();
+    expect(await db.db.query('cache_asset_links'), isEmpty);
+    expect((await db.db.query('sources')).single['webdav_base_path'], 'music');
+    expect((await db.db.query('sources')).single['webdav_max_depth'], 2);
+    expect(
+      await (await store.read('one', 'existing'))!.file.readAsString(),
+      'persisted',
+    );
+  });
+  test(
+    'shared cover is charged once and survives until the last song clears',
+    () async {
+      final png = await File('test/fixtures/cover.png').readAsBytes();
+      final asset = await store.put('one', 'album', 'cover', 'v1', png);
+      const a = TrackRef('one', 'a'), b = TrackRef('one', 'b');
+      await store.link(a, 'album', 'cover');
+      await store.link(b, 'album', 'cover');
+      expect((await store.quota.usage()).cover, png.length);
+      await store.clearTracks({a.key});
+      expect(await store.read('one', 'album'), isNotNull);
+      await store.clearTracks({b.key});
+      expect(await store.read('one', 'album'), isNull);
+      expect(await asset!.file.exists(), false);
+    },
+  );
+  test(
+    'selective clear preserves leased bytes until release and manual lyrics',
+    () async {
+      const ref = TrackRef('one', 'a');
+      final leased = await save('remote', 'remote');
+      await save('manual', 'manual', pinned: true);
+      await store.link(ref, 'remote', 'lyrics');
+      await store.link(ref, 'manual', 'manual');
+      store.retain('one', 'remote');
+      await store.clearTracks({ref.key});
+      expect(await store.read('one', 'remote'), isNull);
+      expect(await leased!.file.exists(), true);
+      expect(await store.read('one', 'manual'), isNotNull);
+      store.release('one', 'remote');
+      await store.waitForIdle();
+      expect(await leased.file.exists(), false);
+    },
+  );
+  test(
+    'selective clear invalidates a delayed first download with no manifest',
+    () async {
+      const ref = TrackRef('one', 'a');
+      await store.link(ref, 'pending', 'lyrics');
+      final started = Completer<void>();
+      final gate = Completer<AssetPayload?>();
+      final work = store.get(source, 'pending', 'lyrics', 'v1', (_) {
+        started.complete();
+        return gate.future;
+      });
+      await started.future;
+      await store.clearTracks({ref.key});
+      gate.complete(AssetPayload(utf8.encode('late bytes')));
+      await work;
+      expect(await store.read('one', 'pending'), isNull);
+    },
+  );
+  test(
+    'simultaneous admissions stay within one budget and protect pinned data',
+    () async {
+      store.quota.maxBytes = 20;
+      await save('manual', 'manual', pinned: true);
+      await Future.wait(List.generate(20, (i) => save('key$i', 'line$i')));
+      expect((await store.quota.usage()).total, lessThanOrEqualTo(20));
+      expect(await store.read('one', 'manual'), isNotNull);
+      expect(await db.db.query('media_assets'), hasLength(3));
+    },
+  );
+  test('replacement at full budget credits the previous unique file', () async {
+    store.quota.maxBytes = 6;
+    final old = await save('remote', '123456');
+    final fresh = await save('remote', 'abcdef');
+    expect(await fresh!.file.readAsString(), 'abcdef');
+    expect(await old!.file.exists(), false);
+    expect((await store.quota.usage()).total, 6);
+  });
+  test(
+    'deduplicated incoming file is protected while older resources trim',
+    () async {
+      final old = await save('a', '123456');
+      await save('b', 'abcdef');
+      store.quota.maxBytes = 6;
+      final shared = await save('c', '123456');
+      expect(shared!.file.path, old!.file.path);
+      expect(await shared.file.readAsString(), '123456');
+      expect((await store.quota.usage()).total, 6);
+      expect(await store.read('one', 'b'), isNull);
+    },
+  );
   test('undecodable image responses never enter the manifest', () async {
     await expectLater(
       store.put('one', 'bad', 'cover', 'v1', utf8.encode('<html>error</html>')),

@@ -1,7 +1,7 @@
 # SylphyMusic OpenList Edition (Android arm64) — preview
 
 > Branch: `feature/android-openlist-lite` · Special edition:
-> `1.0.14-openlist.2+28` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
+> `1.0.14-openlist.3+29` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
 >
 > The original archive is a **source patch** without a precompiled AAR/APK.
 > The local Windows environment has now compiled the AAR and arm64 Release APK;
@@ -146,7 +146,7 @@ compilation is required, while functional and device checks remain with the user
 ## Remote branch
 
 The remote `feature/android-openlist-lite` branch now hosts the separate update
-manifest. Version `1.0.14-openlist.2+28` is published as an independent GitHub
+manifest. Version `1.0.14-openlist.4+30` is published as an independent GitHub
 prerelease without changing the ordinary edition's Latest release. Only the
 manifest was committed for this publication; the exact application/backend/frontend
 build source is attached as `sylphy-music-openlist-source.zip`. GitHub's automatic

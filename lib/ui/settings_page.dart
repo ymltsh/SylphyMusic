@@ -415,8 +415,9 @@ class _SettingsPageState extends State<SettingsPage> {
               if (v &&
                   !await _confirm(
                     '云端收藏会更新歌曲所属服务器账号的收藏；支持 Emby、Navidrome 和 OpenSubsonic，其他来源仍保存到本地。是否使用云端收藏？',
-                  ))
+                  )) {
                 return;
+              }
               await app.setCloudFavoritesByDefault(v);
             });
           },
@@ -628,10 +629,10 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
       ListTile(
-        title: const Text('清空音乐缓存'),
+        title: const Text('清理所有缓存资源'),
         trailing: const Icon(Icons.delete_outline),
         onTap: () async {
-          if (await _confirm('清空已缓存的音乐，并取消相关下载任务？服务器和本地原始音乐不会被删除。')) {
+          if (await _confirm('清理音频、封面和远程歌词，并取消相关下载任务？手动歌词和原始音乐将保留。')) {
             await _act(() => app.clearCache());
           }
         },
@@ -677,8 +678,9 @@ class _SettingsPageState extends State<SettingsPage> {
         value: app.apiSettings.lrcApiEnabled,
         onChanged: (value) => _act(() async {
           if (value &&
-              !await _confirm('开启后，将歌曲名称、艺术家和专辑发送到歌词服务，以查找缺失的歌词。是否开启？'))
+              !await _confirm('开启后，将歌曲名称、艺术家和专辑发送到歌词服务，以查找缺失的歌词。是否开启？')) {
             return;
+          }
           await app.apiSettings.setLrcApiEnabled(value);
         }),
       ),

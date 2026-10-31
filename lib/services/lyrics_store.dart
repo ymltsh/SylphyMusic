@@ -82,7 +82,10 @@ class LyricsStore {
       );
       if (manual != null) await oldManual.delete();
     }
-    if (manual != null) return manual.file.readAsString();
+    if (manual != null) {
+      await assets.link(track.ref, manualKey(track), 'manual');
+      return manual.file.readAsString();
+    }
     if (source.kind == SourceKind.local) {
       final lrc = File(
         p.setExtension(
@@ -125,6 +128,7 @@ class LyricsStore {
         }
       }
     }
+    await assets.link(track.ref, key(track), 'lyrics');
     final asset = await assets.get(
       source,
       key(track),
@@ -207,6 +211,7 @@ class LyricsStore {
       pinned: true,
     );
     if (imported == null) throw StateError('来源不可用，未修改手动歌词');
+    await assets.link(track.ref, manualKey(track), 'manual');
   }
 
   void suspendSource(String id) {

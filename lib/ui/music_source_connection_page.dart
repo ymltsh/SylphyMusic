@@ -256,8 +256,7 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                                 label: Text(option.title),
                                 onSelected: (_) => _selectKind(option.kind),
                               ),
-                            )
-                            .toList(),
+                            ),
                       ],
                     ),
                   const SizedBox(height: 22),
