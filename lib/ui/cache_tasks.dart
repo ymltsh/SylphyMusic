@@ -88,20 +88,28 @@ class _CacheTasksPageState extends State<CacheTasksPage> {
                     ),
                   ],
                 ),
-                trailing: r['state'] == 'failed'
-                    ? IconButton(
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (r['state'] == 'failed')
+                      IconButton(
                         tooltip: '重试失败项',
                         icon: const Icon(Icons.refresh),
                         onPressed: () async {
                           await widget.app.jobs.retry(r['id'] as String);
-                          reload();
+                          if (mounted) reload();
                         },
-                      )
-                    : IconButton(
-                        tooltip: '取消任务',
-                        icon: const Icon(Icons.close),
-                        onPressed: () => _cancel(r['id'] as String),
                       ),
+                    IconButton(
+                      tooltip:
+                          r['state'] == 'pending' || r['state'] == 'running'
+                          ? '取消并移除任务'
+                          : '移除任务记录',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => _remove(r['id'] as String),
+                    ),
+                  ],
+                ),
               ),
             );
           }).toList(),
@@ -109,8 +117,15 @@ class _CacheTasksPageState extends State<CacheTasksPage> {
       },
     ),
   );
-  Future<void> _cancel(String id) async {
-    await widget.app.jobs.cancelJob(id);
-    reload();
+  Future<void> _remove(String id) async {
+    try {
+      await widget.app.jobs.removeJob(id);
+      if (mounted) reload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('无法取消或移除缓存任务：$e')));
+      }
+    }
   }
 }

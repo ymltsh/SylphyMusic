@@ -1,5 +1,65 @@
 # 实施与验证记录
 
+## 2026-10-31 发布统一缓存更新：普通版 1.0.19+32 与 OpenList 1.0.14-openlist.4+30
+
+按用户授权发布两个通道，并将清理旧缓存提醒置于发布页与应用更新说明首条：升级后到「设置 → 下载与缓存 → 清理所有缓存资源」，再重新缓存歌曲 / 歌单；旧缓存不自动转换或回填关联，手动导入歌词与原始音乐保留。未新增旧缓存关联兼容层。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.19%2B32 ：Android 三 ABI、Windows Release、安装程序和便携 ZIP 构建成功，三份 APK 正式签名校验通过。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.4%2B30 ：独立预发布，仅 Android arm64-v8a，正式签名匹配、包内 ABI 确认；附本轮应用源码及对应 OpenList 后端 / 前端源码快照和摘要。后端 JNI 与上一版二进制摘要一致，对应源码沿用固定版本；本轮 Dart / Flutter 改动及测试配置纳入新快照。
+
+仅版本清单提交并推送：main `1149a2a`，OpenList `d53ccfe`，两个提交都仅包含 version.json，源码修改继续保留本地。远端普通版 6 个附件、OpenList 3 个附件大小与 SHA-256 均与本地一致。两个分支的原始与加速清单均返回新版本；GitHub 普通版 Latest 确认保持为 v1.0.19+32，OpenList 专版未替换它。
+
+产物分别位于普通版工作区 `build/releases/1.0.19-32/` 和 OpenList 工作区 `build/releases/1.0.14-openlist.4-30/`。日志：普通版 `build/test_logs/release-1.0.19.log`、`build/test_logs/dual-cache-release-verification.log`；OpenList `build/test_logs/openlist-release-30-build.log`、`build/test_logs/openlist-release-30-publish.log`。发布时重建新版本，沿用本轮已完成的全量与原生离线验证，未重复运行测试或实机验收。Windows 未代码签名。
+
+
+## 2026-10-31 main 同步统一缓存补丁与可靠性修复
+
+按用户追问，将 OpenList 工作区本轮统一音频 / 封面 / 歌词缓存改动及通用验证修复同步到现有 main 工作区。按改动块合入，保留 main 先前未提交的图标、来源、WebDAV、界面、版本与平台修改。main 保持普通版 `1.0.18+31` 和普通下载入口；未引入 OpenList 服务、租约、设置或专版下载链接。同步数据库 v9 前向迁移、共用配额 / LRU、资源关联与缓存空间页、任务可选资源读取及取消保护，以及共享文件、租约延迟删除和迟到写入边界。
+
+同步旧测试约定修复、Windows 原生测试 PID 指针文件隔离与回归测试，并收敛通用静态分析提示。CacheJobs、MediaAssetStore、UnifiedCacheQuota、AppDb 及核心缓存回归文件与已验证的 OpenList 版本内容一致；播放 / 应用装配 / 下载仍保留普通版和 OpenList 的来源协议差异。
+
+main 独立验证：
+
+- `flutter analyze --no-pub`：**No issues found**，退出码 0；`build/test_logs/unified-main-analyze.log`。
+- 首轮发现本工作区缺少 Windows Debug libmpv，原生用例按既有规则跳过；随后实际构建 Debug 原生应用，再完整重跑两次。最终每次 **258 项通过、5 项真实服务器条件跳过、0 失败、0 未完成**，退出码均 0；`build/test_logs/unified-main-full.log`、`build/test_logs/unified-main-full-repeat.log`。相对 OpenList 的 260 项少两项专版设置测试，通用原生播放、歌词和缓存 UI 用例均实际执行。
+- Windows 原生 `integration_test/media_assets_test.dart` **1 项通过**：模拟服务关闭后重建应用与 SQLite，离线封面读取 / 解码 / 显示和歌词保持有效。TEMP / TMP 与数据根目录使用本轮项目内独立目录；`build/test_logs/unified-main-native.log`。
+- 最终普通 `lib/main.dart` 入口 Android Release 三 ABI（arm64-v8a / armeabi-v7a / x86_64）与 Windows Release 均编译成功，保持 `1.0.18+31`；日志 `build/test_logs/unified-main-android-build.log`、`build/test_logs/unified-main-windows-build.log`。APK 位于 `build/app/outputs/flutter-apk/`，Windows 完整运行目录为 `build/windows/x64/runner/Release/`。
+- `git diff --check` 无空白错误。
+
+未使用真实服务器凭据，未执行远程写入、提交、推送或发布。OpenList 工作区及其已验证改动保留。
+
+
+## 2026-10-30 缓存任务取消 / 移除补丁与双通道更新
+
+将 `SylphyMusic-cache-job-cancel-remove.patch` 同时应用到 main 和 `feature/android-openlist-lite`。CacheJobs 按任务登记 TransferToken，在最后数据库状态检查前建立取消所有权；取消 / 暂停中断对应传输，移除活跃任务时先取消，再事务删除任务及条目。迟到的工作结果通过条件更新跳过已移除条目，已下载并校验完成的整曲缓存保留。缓存任务页统一提供关闭按钮，失败任务同时保留重试，异步结束检查 mounted 并提示移除错误。同步更新架构说明。
+
+普通版 [1.0.18+31](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.18%2B31) 已发布：Android 三 ABI、Windows Release、安装程序与便携 ZIP 构建成功，三份 APK 正式签名匹配。OpenList [1.0.14-openlist.3+29](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.3%2B29) 作为独立预发布特别版发布，仅 arm64-v8a APK（签名匹配且仅含该 ABI），另附源码快照和摘要；包含此前未发布的启动就绪媒体通知改动，不替换普通版 Latest。
+
+普通版六个、OpenList 三个远端附件大小与 SHA-256 均匹配本地产物，两个分支原始 / 加速清单均返回各自新版本。仅版本清单提交并推送：main `ae85484`，OpenList `0637f35`，源码改动保留本地。产物分别位于主工作区 `build/releases/1.0.18-31/` 与 OpenList 工作区 `build/releases/1.0.14-openlist.3-29/`。日志为各自 `build/test_logs/release-1.0.18.log`、`build/test_logs/openlist-release-29-build.log`、`build/test_logs/openlist-release-29-publish.log`。未运行静态分析、测试或设备验收，取消与移除交互由用户验证；Windows 未代码签名。
+
+## 2026-10-30 启动就绪媒体通知补丁与普通版 1.0.17+30
+
+将 `SylphyMusic-startup-ready-media-notification.patch` 同时应用到 main 和 `feature/android-openlist-lite`。启动装配媒体控制前，以暂停状态预备恢复队列中的当前曲目，并复用后两首预取，不自动播放。媒体发布状态区分无曲目的 idle、打开 / 切曲 / 播放意图下缓冲的 buffering 和 ready；Android 本地 audio_service 为有元数据的暂停 ready 会话发布初始媒体通知，取消后重置创建状态，元数据更新复用该路径。同步维护架构与第三方补丁记录。
+
+普通版 [1.0.17+30](https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.17%2B30) 已发布：Android 三 ABI、Windows Release、安装程序和便携包编译成功，三份 APK 正式签名匹配。六个远端附件大小及 SHA-256 与本地一致；GitHub Latest、原始和加速 main 正式清单均返回本版。仅清单提交 `e85121b` 已推送 main，源码修改保留本地。产物为 `build/releases/1.0.17-30/`，日志为 `build/test_logs/release-1.0.17.log`。
+
+OpenList 分支 Android arm64 Release 编译成功，APK 为其工作区 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`，日志为 `build/test_logs/startup-ready-android-build.log`；本轮未提交、推送或发布该分支，线上版本仍为 `1.0.14-openlist.2+28`。两个分支均未运行静态分析、测试或设备验收，启动恢复与通知表现由用户验证；Windows 未代码签名。
+
+## 2026-10-30 修复来源曲库跳转并发布普通版 1.0.16+29
+
+用户反馈点击来源卡片 /「查看曲库」会意外返回上一级。定位到来源页可从设置二级路由进入，旧逻辑设置主界面的来源筛选后只 pop 一层，仍露出设置页。现先设置所选来源、歌曲视图及音乐库导航，再 popUntil 根路由，直接展示主界面的所选来源曲库。
+
+本轮普通版同时交付 WebDAV 基础目录与扫描层级、图标选择页与素材、音乐空间音源叠卡、播放页打开路径与设置 / 编辑器布局优化，以及按来源独立的同步和启停管理。原 `v1.0.16+29` 草稿在发布前被暂停，修复后重新编译并替换全部草稿附件，未向用户发布中间构建。
+
+正式版：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.16%2B29 。Android 三 ABI、Windows Release、安装程序与便携 ZIP 构建成功，三份 APK 正式签名匹配，六个远端附件大小及 SHA-256 与本地一致。GitHub Latest、原始与加速 main 正式清单均为 `1.0.16+29`；OpenList 分支清单仍为 `1.0.14-openlist.2+28`。仅清单提交 `9a20c75` 已推送 main，源码修改保留本地。
+
+产物：`build/releases/1.0.16-29/`。日志：`build/test_logs/release-1.0.16-fixed-build.log`、`build/test_logs/release-1.0.16-fixed-publish.log`。未运行静态分析、测试或设备验收，导航交互由用户确认；Windows 未代码签名。
+
+## 2026-10-30 应用 WebDAV 扫描范围补丁
+
+在 main 的现有工作区应用 `sylphymusic-webdav-scan.patch`，保留已有未提交改动。新增 WebDAV 基础目录浏览选择、扫描子目录层级与来源范围展示；SQLite 升至 v8，以前向迁移保存范围，旧来源默认保持根目录与不限层级。修改范围取消旧索引及标签补全并重新同步，索引提交检查范围防止过期结果覆盖。补丁同时应用于 `feature/android-openlist-lite`，适配其扫描租约。
+
+Android 三 ABI Release 与 Windows Release 编译成功。APK 位于 `build/app/outputs/flutter-apk/`，Windows 位于 `build/windows/x64/runner/Release/`；日志为 `build/test_logs/webdav-scan-android-build.log`、`build/test_logs/webdav-scan-windows-build.log`。未运行静态分析、测试或设备验证，未提交、推送或发布；功能由用户验证。
+
 ## 2026-10-30 合并 AudioTrack 验证分支并发布 1.0.13+26
 
 用户确认 AudioTrack 补丁有效，授权合并 `validation/android-audiotrack`。已合入 main 并推送，保留验证版的音频输出顺序与实际后端诊断逻辑，移除实验专用命名并更新验证说明；源码提交 `2926907`。
@@ -999,3 +1059,33 @@ Emby 收藏分页读取当前用户的 Audio 收藏，通过 FavoriteItems POST 
 编译结果：主分支 Android 三个 ABI 与 Windows Release、Windows 安装程序和便携包均成功；OpenList 分支三个 ABI Android Release 成功。功能和通知显示、Emby 服务端联动由用户验收。
 
 发布完成：源码 `2ef6f92`，清单 `0b73b44`，正式标签 `v1.0.15+28`。六个附件远端大小和 SHA-256 均与本地一致，Android 三份正式签名校验通过；原始 / 加速正式清单均返回 1.0.15+28。OpenList 修正提交 `499c417`，仅本地，保留原有未提交开发内容。发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.15%2B28
+
+## 2026-10-30 播放页打开开销与设置界面优化
+
+按用户要求定位迷你播放器打开播放页的卡顿路径：原播放页在播放进度刷新时重复调用 sylphyTheme 生成整套主题；LyricsPreview 每次构建重新解析歌词并测量窗口；封面取色与歌词读取在路由入场时启动。现复用应用主题与内置布局，延后取色 / 歌词到入场动画结束后；增加有界配色请求缓存，迷你歌词只在文本变化时解析，窗口按当前句和展示参数复用。未做运行时性能采样，不将代码路径优化表述为设备流畅度验收通过。
+
+编辑器组件选择、文字对齐、迷你歌词字号、颜色与页面背景改为直接可见的圆角矩形胶囊按钮，统一尺寸、间距、左边界与换行；增加手机属性面板可用高度。参考用户 1.txt 简化设置首页摘要、图标页和二级页面说明，显示当前响度模式；保留清理缓存、云端收藏与在线歌词请求的操作后果确认。两个分支同步修改，保留 OpenList 既有开发内容。本轮仅本地编译与打包，不提交、推送或发布，不运行 analyze、测试或设备验收。
+
+编译交付：主分支 `tool/build_review.ps1` 成功，Android 三个 ABI 与 Windows Release 均构建成功，内部便携 ZIP / APK 位于 `sylphy_music_main/build/internal-review/`；打包脚本完成已跟踪输入和包内容检查。OpenList 分支三个 ABI Android Release 构建成功，位于原工程 `build/app/outputs/flutter-apk/`。未执行功能测试、启动或性能实测；本轮未提交、推送或发布。
+
+追加调整：编辑器默认辅助网格改为 16 宫格（4×4），吸附同步使用四等分；保留顶部切回 9 宫格。主分支 Android / Windows 编译和内部打包成功，OpenList 三个 ABI Android Release 编译成功；未运行测试、未发布。
+
+## 2026-10-30 我的音乐空间音源叠卡
+
+按用户提供的 logo/source 五份 PNG 原样加入 assets/source/。我的音乐空间整卡进入音乐来源，右侧展示已添加音源的 Logo 卡牌堆叠并循环切换，背景使用对应品牌颜色渐变；单源 / 空源、停留后台、路由不可见和系统减少动画均有静态处理。来源管理、连接类型选择和首次引导复用对应品牌图标；本地文件夹保留图标回退。主分支与 OpenList 分支同步修改，保留既有未提交工作；不运行 analyze、测试或设备检查，不提交、推送或发布。
+
+编译结果：主分支 Android 三个 ABI、Windows Release 与内部便携 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。主分支产物更新到 `sylphy_music_main/build/internal-review/`。轮播视觉与交互留待用户在设备确认；本轮未运行功能测试、启动应用、推送或发布。
+
+## 2026-10-30 管理按钮对齐与音源启停解锁
+
+编辑器胶囊宽度 120→96 dp。音乐来源顶部四个操作统一尺寸与圆角，按可用宽度两列 / 四列排布，卡片底部曲库入口左对齐、启停状态与开关右对齐。定位到重新启用回调等待完整同步，以及 syncSource 使用全局 busyRun 导致所有来源操作禁用。现远程重新启用通过连接验证后启动按来源合并的后台同步；启停验证 / 清理仅锁定当前来源，其他来源独立管理，同步中仍可取消或停用。自动同步跳过正在启停 / 同步的来源，手动启停和取消记录重试间隔，避免立即重启任务。
+
+停用取消索引、标签读取以及歌单 / 收藏刷新，刷新请求按来源关闭连接并以代次及最新启用状态拒绝过期结果；退出等待在途来源同步。旧索引、完整缓存与个人引用保留，重新启用保持暂停。两个分支同步修改；不运行 analyze、测试或设备验收，不提交、推送或发布。
+
+编译交付：主分支 Android 三个 ABI、Windows Release 与内部 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。产物更新至主分支 `build/internal-review/` 和 OpenList `build/app/outputs/flutter-apk/`。未做实际服务器启停 / 取消交互或设备验证，交由用户验收。
+
+## 2026-10-30 应用图标选择页原型
+
+应用用户提供的 SylphyMusic_icon_picker_design_and_flutter.zip 设计及 Flutter 示例，适配现有设置页。图标页面采用当前图标卡、8 项网格、点击预览、故事 / 彩蛋及固定底部应用按钮；仅按应用后调用原生选择，完成后重新读取系统状态。深浅色沿用应用主题。用户 logo/ 素材导入并更新 Android 各密度图标、别名 / 目录 / nodpi 和 Windows ICO；新增吹响！上低音号，已有 6 款备用图标 ID / 路径均保留。about.png 不纳入选择。主分支和 OpenList 分支同步修改，保留其他未提交工作，不运行 analyze、测试或设备验证，不提交、推送或发布。
+
+编译交付：主分支 Android 三个 ABI、Windows Release 和内部 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。主分支产物更新至 `sylphy_music_main/build/internal-review/`。页面视觉及 Android 桌面切换行为未在设备上验收，交由用户验证；本轮未提交、推送或发布。

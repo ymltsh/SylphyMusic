@@ -137,8 +137,9 @@ class AndroidDesktopLyrics with WidgetsBindingObserver {
     if (_shown &&
         _lastText == text &&
         _lastColor == argb &&
-        _lastFontSize == fontSize)
+        _lastFontSize == fontSize) {
       return;
+    }
     try {
       // Permission can have been revoked outside the app.
       if (await _channel.invokeMethod<bool>('permission') != true) {
@@ -148,8 +149,9 @@ class AndroidDesktopLyrics with WidgetsBindingObserver {
       }
       if (_closed ||
           !appearance.desktopLyricsEnabled ||
-          playback.currentRef != track.ref)
+          playback.currentRef != track.ref) {
         return;
+      }
       await _channel.invokeMethod<void>('show', {
         'text': text,
         'color': argb,

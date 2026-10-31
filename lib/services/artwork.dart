@@ -82,6 +82,7 @@ class ArtworkStore {
         '${_hash('${track.ref.key}/$oldVersion')}.image',
       ),
     );
+    await assets.link(track.ref, key(track), 'cover');
     final asset = await assets.get(
       source,
       key(track),

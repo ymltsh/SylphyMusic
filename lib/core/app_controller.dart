@@ -86,6 +86,13 @@ class SylphyApp extends ChangeNotifier {
   final _lastAutoSyncAttempt = <String, int>{};
   Future<void>? _autoSyncTask;
   Timer? _autoSyncTimer;
+  final Set<String> _sourceChanges = {};
+  final Map<String, Future<void>> _sourceSyncs = {};
+  final Set<String> _cancelledSourceSyncs = {};
+  final Map<String, String> sourceSyncMessages = {};
+  bool sourceChanging(String id) => _sourceChanges.contains(id);
+  bool sourceSyncing(String id) =>
+      _sourceSyncs.containsKey(id) || index.progress[id]?.active == true;
   int _busyOperations = 0;
   Timer? _catalogRefreshTimer;
   bool _foregroundSyncRunning = false;
@@ -97,7 +104,7 @@ class SylphyApp extends ChangeNotifier {
   bool _disposed = false;
   String? message;
   DesktopControls? desktop;
-  late final assets = MediaAssetStore(db, root);
+  late final assets = MediaAssetStore(db, root, quota: cache.quota);
   late final webDavTags = WebDavTags(
     factory,
     cache: cache,
@@ -130,7 +137,8 @@ class SylphyApp extends ChangeNotifier {
     onEnabled: (source) async {
       if (_disposed) return;
       if (source.kind != SourceKind.local) {
-        await syncSource(source);
+        // Connection validation finishes independently from the full index.
+        unawaited(syncSource(source).catchError((Object _) {}));
       } else if (source.url != 'file:///') {
         await rescanLocal(source);
       }
@@ -215,8 +223,15 @@ class SylphyApp extends ChangeNotifier {
     );
     app.playback.setLyricsLoader((track) => app.loadLyrics(track));
     app.playback.setArtworkLoader((track) => app.artwork.load(track));
+    app.jobs.attachMediaLoaders(
+      cover: (track) => app.artwork.load(track),
+      lyrics: (track) => app.loadLyrics(track),
+    );
     if (platformIntegration) await app.desktopLyrics.initialize();
     if (platformIntegration) {
+      // Open the restored track paused before exposing media controls. This
+      // also starts the existing look-ahead prefetch without auto-playing.
+      await playback.prepareRestoredQueue();
       if (Platform.isAndroid) {
         playback.attachNotificationArtwork(app.artwork);
       }
@@ -277,6 +292,8 @@ class SylphyApp extends ChangeNotifier {
           (source) =>
               source.kind != SourceKind.local &&
               source.enabled &&
+              !sourceChanging(source.id) &&
+              !sourceSyncing(source.id) &&
               now - source.lastSync > autoSyncMinutes * 60 * 1000 &&
               now - (_lastAutoSyncAttempt[source.id] ?? 0) >
                   autoSyncMinutes * 60 * 1000,
@@ -388,6 +405,8 @@ class SylphyApp extends ChangeNotifier {
     required String url,
     required String username,
     required String password,
+    String webdavBasePath = '',
+    int webdavMaxDepth = -1,
   }) async {
     final source = SourceProfile(
       id: const Uuid().v4(),
@@ -395,6 +414,8 @@ class SylphyApp extends ChangeNotifier {
       kind: kind,
       url: url,
       username: username,
+      webdavBasePath: webdavBasePath,
+      webdavMaxDepth: webdavMaxDepth,
     );
     final adapter = factory.create(source);
     try {
@@ -411,12 +432,39 @@ class SylphyApp extends ChangeNotifier {
     await syncSourceForeground(source);
   }
 
+  Future<List<WebDavDirectory>> browseWebDavDirectories(
+    String url,
+    String username,
+    String password,
+    String path,
+    String? sourceId,
+  ) async {
+    final profile = SourceProfile(
+      id: sourceId ?? 'webdav-directory-preview',
+      name: '',
+      kind: SourceKind.webdav,
+      url: url,
+      username: username,
+    );
+    final adapter = WebDavAdapter(profile, vault);
+    try {
+      return await adapter.listDirectories(
+        path,
+        password: sourceId != null && password.isEmpty ? null : password,
+      );
+    } finally {
+      adapter.close();
+    }
+  }
+
   void _interruptForegroundSync() {
     _foregroundSyncCancelled = true;
     final id = _foregroundSourceId;
     if (id != null) {
       index.cancel(id);
       metadataEnricher.cancel(id);
+      _cancelledSourceSyncs.add(id);
+      cloud.cancelRefresh(id);
     }
   }
 
@@ -433,6 +481,11 @@ class SylphyApp extends ChangeNotifier {
   }
 
   void cancelActiveSync(String sourceId) {
+    _cancelledSourceSyncs.add(sourceId);
+    _lastAutoSyncAttempt[sourceId] = DateTime.now().millisecondsSinceEpoch;
+    sourceSyncMessages[sourceId] = '已取消同步';
+    cloud.cancelRefresh(sourceId);
+    metadataEnricher.cancel(sourceId);
     if (_foregroundSourceId == sourceId) {
       _interruptForegroundSync();
     } else {
@@ -473,6 +526,10 @@ class SylphyApp extends ChangeNotifier {
       for (final source in selected) {
         if (_foregroundSyncCancelled || _disposed) break;
         if (!source.enabled || source.kind == SourceKind.local) continue;
+        final current = await db.source(source.id);
+        if (current == null || !current.enabled || sourceChanging(source.id)) {
+          continue;
+        }
         _foregroundSourceId = source.id;
         await syncForeground.update(
           '风灵音乐 · 同步索引',
@@ -539,18 +596,60 @@ class SylphyApp extends ChangeNotifier {
   Future<void> syncAllForeground() =>
       _runForegroundSync([...sources], includeCloud: true);
 
-  Future<void> syncSource(SourceProfile source) async {
-    await busyRun(() async {
-      await index.sync(source);
-      if (_disposed || index.progress[source.id]?.state != 'completed') return;
-      artwork.invalidate();
-      await cloud.refreshCloudForSource(source);
-      await cloud.refreshStarredForSource(source);
+  Future<void> syncSource(SourceProfile source) {
+    if (_disposed || sourceChanging(source.id) && !source.enabled) {
+      return Future.value();
+    }
+    final existing = _sourceSyncs[source.id];
+    if (existing != null) return existing;
+    _cancelledSourceSyncs.remove(source.id);
+    sourceSyncMessages.remove(source.id);
+    final task = _syncSource(source);
+    _sourceSyncs[source.id] = task;
+    notifyListeners();
+    return task.whenComplete(() {
+      if (identical(_sourceSyncs[source.id], task)) {
+        _sourceSyncs.remove(source.id);
+      }
+      if (!_disposed) notifyListeners();
     });
-    if (!_disposed &&
-        index.progress[source.id]?.state == 'completed' &&
-        source.kind == SourceKind.webdav) {
-      metadataEnricher.start(source);
+  }
+
+  Future<bool> _sourceCanSync(SourceProfile source) async {
+    if (_disposed || _cancelledSourceSyncs.contains(source.id)) return false;
+    final current = await db.source(source.id);
+    return !_disposed &&
+        !_cancelledSourceSyncs.contains(source.id) &&
+        current != null &&
+        current.enabled &&
+        current.kind == source.kind &&
+        current.url == source.url &&
+        current.username == source.username;
+  }
+
+  Future<void> _syncSource(SourceProfile source) async {
+    try {
+      if (!await _sourceCanSync(source)) return;
+      await index.sync(source);
+      if (!await _sourceCanSync(source) ||
+          index.progress[source.id]?.state != 'completed') {
+        return;
+      }
+      artwork.invalidate();
+      sourceSyncMessages[source.id] = '正在同步歌单与收藏';
+      notifyListeners();
+      await cloud.refreshCloudForSource(source);
+      if (!await _sourceCanSync(source)) return;
+      await cloud.refreshStarredForSource(source);
+      if (!await _sourceCanSync(source)) return;
+      sourceSyncMessages.remove(source.id);
+      if (source.kind == SourceKind.webdav) metadataEnricher.start(source);
+    } catch (_) {
+      if (!await _sourceCanSync(source)) return;
+      sourceSyncMessages[source.id] = '同步未完成，保留原数据；可重试';
+      rethrow;
+    } finally {
+      if (!_disposed) await reload();
     }
   }
 
@@ -559,8 +658,16 @@ class SylphyApp extends ChangeNotifier {
     required String name,
     required String url,
     required String password,
+    String? webdavBasePath,
+    int? webdavMaxDepth,
   }) async {
     final target = url.trim();
+    final basePath = webdavBasePath ?? source.webdavBasePath;
+    final maxDepth = webdavMaxDepth ?? source.webdavMaxDepth;
+    final scopeChanged =
+        source.kind == SourceKind.webdav &&
+        (basePath != source.webdavBasePath ||
+            maxDepth != source.webdavMaxDepth);
     if ((source.kind == SourceKind.subsonic ||
             source.kind == SourceKind.webdav) &&
         target != source.url) {
@@ -573,10 +680,15 @@ class SylphyApp extends ChangeNotifier {
       kind: source.kind,
       url: target,
       username: source.username,
+      webdavBasePath: basePath,
+      webdavMaxDepth: maxDepth,
     );
     final adapter = factory.create(candidate);
     try {
-      await adapter.login(password);
+      final secret = source.kind == SourceKind.webdav && password.isEmpty
+          ? (await vault.read(source.id, 'password') ?? '')
+          : password;
+      await adapter.login(secret);
       if (source.kind == SourceKind.emby || source.kind == SourceKind.fnMusic) {
         final oldServer = await vault.read(source.id, 'serverId');
         final newServer = await vault.read(candidate.id, 'serverId');
@@ -588,6 +700,10 @@ class SylphyApp extends ChangeNotifier {
                 (oldServer == null || newServer == null))) {
           throw StateError('无法确认是原服务器和原账号，已保留原连接；请添加独立来源');
         }
+      }
+      if (scopeChanged) {
+        await index.cancelAndWait(source.id);
+        await metadataEnricher.cancelAndWait(source.id);
       }
       if (playback.currentRef?.sourceId == source.id) await playback.pause();
       playback.invalidateSource(source.id);
@@ -602,12 +718,19 @@ class SylphyApp extends ChangeNotifier {
           kind: source.kind,
           url: target,
           username: source.username,
+          remoteUserId: source.remoteUserId,
           enabled: source.enabled,
           lastSync: source.lastSync,
+          webdavBasePath: basePath,
+          webdavMaxDepth: maxDepth,
         ),
       );
       artwork.invalidate();
       await reload();
+      if (scopeChanged && source.enabled) {
+        final updated = await db.source(source.id);
+        if (updated != null) await syncSourceForeground(updated);
+      }
     } finally {
       adapter.close();
       await vault.delete(candidate.id);
@@ -630,14 +753,22 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<void> toggleSource(SourceProfile source) async {
+    if (_disposed || !_sourceChanges.add(source.id)) return;
+    _lastAutoSyncAttempt[source.id] = DateTime.now().millisecondsSinceEpoch;
+    notifyListeners();
     try {
       await connections.toggle(source.id);
     } finally {
+      _sourceChanges.remove(source.id);
       await reload();
     }
   }
 
   Future<void> _suspendSource(SourceProfile source) async {
+    if (_foregroundSourceId == source.id) _interruptForegroundSync();
+    _cancelledSourceSyncs.add(source.id);
+    cloud.cancelRefresh(source.id);
+    sourceSyncMessages.remove(source.id);
     metadataEnricher.cancel(source.id);
     playback.invalidateSource(source.id);
     if (playback.currentRef?.sourceId == source.id) await playback.pause();
@@ -648,6 +779,8 @@ class SylphyApp extends ChangeNotifier {
     await jobs.sourceUnavailable(source.id);
     await cache.cancelSource(source.id);
     await index.cancelAndWait(source.id);
+    await metadataEnricher.cancelAndWait(source.id);
+    await _sourceSyncs[source.id]?.catchError((Object _) {});
   }
 
   Future<void> deleteSource(SourceProfile source) async {
@@ -837,6 +970,11 @@ class SylphyApp extends ChangeNotifier {
   Future<void> clearCache({String? sourceId, Set<String>? keys}) async {
     await jobs.cancelAffected(sourceId: sourceId, trackKeys: keys);
     await cache.clear(sourceId: sourceId, keys: keys);
+    if (keys != null) {
+      await assets.clearTracks(keys);
+    } else {
+      await assets.clear(sourceId: sourceId);
+    }
     notifyListeners();
   }
 
@@ -928,6 +1066,14 @@ class SylphyApp extends ChangeNotifier {
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
+    for (final id in _sourceSyncs.keys.toList()) {
+      cloud.cancelRefresh(id);
+    }
+    await Future.wait(
+      _sourceSyncs.values.toList().map(
+        (task) => task.catchError((Object _) {}),
+      ),
+    );
     await connections.shutdown();
     await jobs.shutdown();
     await desktopLyrics.shutdown();

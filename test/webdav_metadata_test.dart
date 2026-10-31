@@ -151,6 +151,9 @@ void main() {
       await db.db.execute(
         'ALTER TABLE index_tracks DROP COLUMN resource_version',
       );
+      await db.db.execute('DROP TABLE cache_asset_links');
+      await db.db.execute('ALTER TABLE sources DROP COLUMN webdav_base_path');
+      await db.db.execute('ALTER TABLE sources DROP COLUMN webdav_max_depth');
       await db.db.execute('PRAGMA user_version=6');
       await db.close();
       db = AppDb(folder);
@@ -158,7 +161,7 @@ void main() {
       expect((await db.track(track.ref))!.title, 'original');
       expect(
         (await db.db.rawQuery('PRAGMA user_version')).single.values.single,
-        7,
+        9,
       );
       const tags = EmbeddedTags(artist: 'tag artist', album: 'tag album');
       await db.putSource(

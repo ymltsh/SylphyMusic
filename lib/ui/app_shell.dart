@@ -23,6 +23,7 @@ import 'app_identity.dart';
 import 'player_cover.dart';
 import 'settings_page.dart';
 import 'music_sources_panel.dart';
+import 'music_space_card.dart';
 import 'music_source_connection_page.dart';
 import 'quick_start_wizard.dart';
 import '../data/library_catalog.dart';
@@ -453,20 +454,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Widget _personal() => ListView(
     padding: const EdgeInsets.fromLTRB(20, 20, 20, 116),
     children: [
-      Card.filled(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.air_rounded, size: 40),
-              const SizedBox(height: 16),
-              Text('我的音乐空间', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('${app.playlists.length} 个歌单 · ${app.sources.length} 个音乐来源'),
-            ],
-          ),
-        ),
+      MusicSpaceCard(
+        sources: app.sources,
+        playlistCount: app.playlists.length,
+        onTap: () => _open('音乐来源', _sources),
       ),
       const SizedBox(height: 16),
       ListTile(
@@ -1023,12 +1014,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onSyncAll: () => _act(app.syncAllForeground),
     onImportFiles: () => _act(app.importLocalFiles),
     onImportFolder: () => _act(app.importLocalFolder),
-    onSelect: (source) => setState(() {
-      sourceFilter = source.id;
-      tab = 1;
-      libraryView = 0;
-      Navigator.pop(context);
-    }),
+    onSelect: (source) {
+      setState(() {
+        sourceFilter = source.id;
+        tab = 1;
+        libraryView = 0;
+      });
+      // Sources can be opened above nested settings routes. Reveal the shell's
+      // filtered library rather than just exposing the previous settings page.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    },
     onAction: _handleSourceAction,
   );
 
@@ -1056,7 +1051,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Future<void> _addSource({SourceKind initialKind = SourceKind.emby}) async {
     final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
       MaterialPageRoute(
-        builder: (_) => MusicSourceConnectionPage(initialKind: initialKind),
+        builder: (_) => MusicSourceConnectionPage(
+          initialKind: initialKind,
+          browseWebDavDirectories: app.browseWebDavDirectories,
+        ),
       ),
     );
     if (!mounted || draft == null) return;
@@ -1067,6 +1065,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         url: draft.url,
         username: draft.username,
         password: draft.password,
+        webdavBasePath: draft.webdavBasePath,
+        webdavMaxDepth: draft.webdavMaxDepth,
       ),
     );
   }
@@ -1074,7 +1074,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Future<void> _editSource(SourceProfile source) async {
     final draft = await Navigator.of(context).push<MusicSourceConnectionDraft>(
       MaterialPageRoute(
-        builder: (_) => MusicSourceConnectionPage(source: source),
+        builder: (_) => MusicSourceConnectionPage(
+          source: source,
+          browseWebDavDirectories: app.browseWebDavDirectories,
+        ),
       ),
     );
     if (!mounted || draft == null) return;
@@ -1084,6 +1087,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         name: draft.name,
         url: draft.url,
         password: draft.password,
+        webdavBasePath: draft.webdavBasePath,
+        webdavMaxDepth: draft.webdavMaxDepth,
       ),
     );
   }

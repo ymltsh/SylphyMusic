@@ -58,11 +58,19 @@ class SourceProfile {
     this.remoteUserId = '',
     this.enabled = true,
     this.lastSync = 0,
+    this.webdavBasePath = '',
+    this.webdavMaxDepth = -1,
   });
   final String id, name, url, username, remoteUserId;
   final SourceKind kind;
   final bool enabled;
   final int lastSync;
+
+  /// Path relative to the configured WebDAV URL (not part of track IDs).
+  final String webdavBasePath;
+
+  /// -1: unlimited; 0: current folder only; N: N descendant levels.
+  final int webdavMaxDepth;
   Map<String, Object?> toRow() => {
     'id': id,
     'name': name,
@@ -72,6 +80,8 @@ class SourceProfile {
     'remote_user_id': remoteUserId,
     'enabled': enabled ? 1 : 0,
     'last_sync': lastSync,
+    'webdav_base_path': webdavBasePath,
+    'webdav_max_depth': webdavMaxDepth,
   };
   factory SourceProfile.fromRow(Map<String, Object?> row) => SourceProfile(
     id: row['id'] as String,
@@ -82,6 +92,8 @@ class SourceProfile {
     remoteUserId: row['remote_user_id'] as String? ?? '',
     enabled: row['enabled'] == 1,
     lastSync: row['last_sync'] as int? ?? 0,
+    webdavBasePath: row['webdav_base_path'] as String? ?? '',
+    webdavMaxDepth: row['webdav_max_depth'] as int? ?? -1,
   );
 }
 

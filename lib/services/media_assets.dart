@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/models.dart';
 import '../data/app_db.dart';
+import 'unified_cache_quota.dart';
 
 class AssetPayload {
   const AssetPayload(
@@ -46,19 +47,28 @@ class MediaAssetStore extends ChangeNotifier {
   MediaAssetStore(
     this.db,
     this.root, {
-    this.coverBudget = 200 * 1024 * 1024,
-    this.lyricsBudget = 20 * 1024 * 1024,
+    UnifiedCacheQuota? quota,
     DateTime Function()? clock,
     Future<double?> Function()? freeSpace,
-  }) : clock = clock ?? DateTime.now,
+  }) : quota = quota ?? UnifiedCacheQuota(db, root),
+       clock = clock ?? DateTime.now,
        freeSpace =
-           freeSpace ?? (() => DiskSpace.getFreeDiskSpaceForPath(root.path));
+           freeSpace ?? (() => DiskSpace.getFreeDiskSpaceForPath(root.path)) {
+    this.quota.assetProtected = (source, key) =>
+        (_leases[_identity(source, key)] ?? 0) > 0;
+    this.quota.onAssetEvicted = (source, key, kind) {
+      final id = _identity(source, key);
+      _revisions[id] = (_revisions[id] ?? 0) + 1;
+      lastChange = (sourceId: source, key: key, kind: kind);
+      notifyListeners();
+    };
+  }
   final AppDb db;
   final Directory root;
-  final int coverBudget, lyricsBudget;
+  final UnifiedCacheQuota quota;
   final DateTime Function() clock;
   final Future<double?> Function() freeSpace;
-  final Lock _lock = Lock();
+  Lock get _lock => quota.lock;
   final Map<String, Future<MediaAsset?>> _pending = {};
   final Map<String, ({int until, Object? error})> _backoff = {};
   final Map<String, String> _verified = {};
@@ -68,7 +78,6 @@ class MediaAssetStore extends ChangeNotifier {
   final Map<String, String> _desiredVersions = {};
   Future<void>? _initializing;
   bool _stopped = false;
-  bool _trimNeeded = false;
   AssetChange? lastChange;
   Directory get directory => Directory(p.join(root.path, 'media_assets'));
   String _hash(String value) => sha256.convert(utf8.encode(value)).toString();
@@ -82,13 +91,14 @@ class MediaAssetStore extends ChangeNotifier {
         count = (_leases[_identity(source, key)] ?? 0) - 1;
     if (count <= 0) {
       _leases.remove(id);
-      if (!_stopped && (_retired.containsKey(id) || _trimNeeded)) {
-        final work = _lock.synchronized(() async {
-          for (final file in _retired.remove(id) ?? <File>[]) {
-            await _unlinkUnused(file);
-          }
-          await _trim();
-        });
+      if (!_stopped) {
+        final work = _lock
+            .synchronized(() async {
+              for (final file in _retired.remove(id) ?? <File>[]) {
+                await _unlinkUnused(file);
+              }
+            })
+            .then((_) => quota.enforce());
         _maintenance.add(work);
         unawaited(
           work.then<void>(
@@ -109,6 +119,18 @@ class MediaAssetStore extends ChangeNotifier {
   }
 
   Future<void> initialize() => _initializing ??= _initialize();
+
+  /// Associate a cached resource with a song without duplicating its file.
+  Future<void> link(TrackRef ref, String key, String kind) async {
+    await initialize();
+    await db.db.insert('cache_asset_links', {
+      'track_key': ref.key,
+      'kind': kind,
+      'source_id': ref.sourceId,
+      'asset_key': key,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
   Future<bool> migratedLegacy(String source, String key) async =>
       (await db.db.query(
         'media_asset_migrations',
@@ -125,6 +147,7 @@ class MediaAssetStore extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
+    await quota.initialize();
     await db.db.execute(
       'DELETE FROM media_asset_migrations WHERE source_id NOT IN (SELECT id FROM sources)',
     );
@@ -171,7 +194,7 @@ class MediaAssetStore extends ChangeNotifier {
         await entry.delete();
       }
     }
-    await _trim();
+    await quota.enforce();
   }
 
   Future<MediaAsset?> read(String source, String key) async {
@@ -372,118 +395,132 @@ class MediaAssetStore extends ChangeNotifier {
     await initialize();
     await _validate(kind, bytes);
     final epoch = _epochs[source] ?? 0;
-    return _lock.synchronized(() async {
-      if (_stopped ||
-          epoch != (_epochs[source] ?? 0) ||
-          (await db.source(source))?.enabled != true ||
-          (guard != null && !await guard())) {
-        return null;
-      }
-      double? free;
-      try {
-        free = await freeSpace();
-      } catch (_) {
-        /* bounded write still handles filesystem ENOSPC */
-      }
-      if (free != null && free < 64 + bytes.length / (1024 * 1024)) {
-        throw StateError('磁盘可用空间不足，已保留原缓存');
-      }
-      final digest = sha256.convert(bytes).toString();
-      final relative = p.join('objects', _hash(source), '$digest.$kind');
-      final target = _file(relative);
-      await target.parent.create(recursive: true);
-      final temp = File(
-        p.join(directory.path, 'tmp', '${const Uuid().v4()}.part'),
-      );
-      final before = await db.db.query(
-        'media_assets',
-        where: 'source_id=? AND asset_key=?',
-        whereArgs: [source, key],
-        limit: 1,
-      );
-      try {
-        await temp.writeAsBytes(bytes, flush: true);
-        if (guard != null && !await guard()) return null;
-        // Unique temporary names prevent concurrent writers replacing a half file.
-        if (await target.exists()) {
-          if ((await sha256.bind(target.openRead()).first).toString() !=
-              digest) {
-            await temp.rename(target.path);
-          }
-        } else {
-          await temp.rename(target.path);
-        }
-        final now = clock().millisecondsSinceEpoch;
-        final row = <String, Object?>{
-          'source_id': source,
-          'asset_key': key,
-          'kind': kind,
-          'version': version,
-          'relative_file': relative,
-          'bytes': bytes.length,
-          'sha256': digest,
-          'fetched_at': now,
-          'last_used': now,
-          'expires_at': clock().add(ttl).millisecondsSinceEpoch,
-          'pinned': pinned ? 1 : 0,
-          'etag': etag,
-          'last_modified': lastModified,
-        };
+    final digestForQuota = sha256.convert(bytes).toString();
+    final fileForQuota = p.join(
+      'objects',
+      _hash(source),
+      '$digestForQuota.$kind',
+    );
+    return quota.admit(
+      bytes.length,
+      () async {
         if (_stopped ||
             epoch != (_epochs[source] ?? 0) ||
             (await db.source(source))?.enabled != true ||
             (guard != null && !await guard())) {
-          await _unlinkUnused(target);
           return null;
         }
-        var committed = false;
-        await db.db.transaction((txn) async {
-          final active = await txn.query(
-            'sources',
-            columns: ['id'],
-            where: 'id=? AND enabled=1',
-            whereArgs: [source],
-          );
-          if (active.isEmpty || _stopped || epoch != (_epochs[source] ?? 0)) {
-            return;
-          }
-          await txn.insert(
-            'media_assets',
-            row,
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-          committed = true;
-        });
-        if (!committed) {
-          await _unlinkUnused(target);
-          return null;
+        double? free;
+        try {
+          free = await freeSpace();
+        } catch (_) {
+          /* bounded write still handles filesystem ENOSPC */
         }
-        if (before.isNotEmpty && before.single['relative_file'] != relative) {
-          final oldFile = _file(before.single['relative_file'] as String);
-          final id = _identity(source, key);
-          if ((_leases[id] ?? 0) > 0) {
-            _retired.putIfAbsent(id, () => []).add(oldFile);
+        if (free != null && free < 64 + bytes.length / (1024 * 1024)) {
+          throw StateError('磁盘可用空间不足，已保留原缓存');
+        }
+        final digest = sha256.convert(bytes).toString();
+        final relative = p.join('objects', _hash(source), '$digest.$kind');
+        final target = _file(relative);
+        await target.parent.create(recursive: true);
+        final temp = File(
+          p.join(directory.path, 'tmp', '${const Uuid().v4()}.part'),
+        );
+        final before = await db.db.query(
+          'media_assets',
+          where: 'source_id=? AND asset_key=?',
+          whereArgs: [source, key],
+          limit: 1,
+        );
+        try {
+          await temp.writeAsBytes(bytes, flush: true);
+          if (guard != null && !await guard()) return null;
+          // Unique temporary names prevent concurrent writers replacing a half file.
+          if (await target.exists()) {
+            if ((await sha256.bind(target.openRead()).first).toString() !=
+                digest) {
+              await temp.rename(target.path);
+            }
           } else {
-            await _unlinkUnused(oldFile);
+            await temp.rename(target.path);
           }
+          final now = clock().millisecondsSinceEpoch;
+          final row = <String, Object?>{
+            'source_id': source,
+            'asset_key': key,
+            'kind': kind,
+            'version': version,
+            'relative_file': relative,
+            'bytes': bytes.length,
+            'sha256': digest,
+            'fetched_at': now,
+            'last_used': now,
+            'expires_at': clock().add(ttl).millisecondsSinceEpoch,
+            'pinned': pinned ? 1 : 0,
+            'etag': etag,
+            'last_modified': lastModified,
+          };
+          if (_stopped ||
+              epoch != (_epochs[source] ?? 0) ||
+              (await db.source(source))?.enabled != true ||
+              (guard != null && !await guard())) {
+            await _unlinkUnused(target);
+            return null;
+          }
+          var committed = false;
+          await db.db.transaction((txn) async {
+            final active = await txn.query(
+              'sources',
+              columns: ['id'],
+              where: 'id=? AND enabled=1',
+              whereArgs: [source],
+            );
+            if (active.isEmpty || _stopped || epoch != (_epochs[source] ?? 0)) {
+              return;
+            }
+            await txn.insert(
+              'media_assets',
+              row,
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            committed = true;
+          });
+          if (!committed) {
+            await _unlinkUnused(target);
+            return null;
+          }
+          if (before.isNotEmpty && before.single['relative_file'] != relative) {
+            final oldFile = _file(before.single['relative_file'] as String);
+            final id = _identity(source, key);
+            if ((_leases[id] ?? 0) > 0) {
+              _retired.putIfAbsent(id, () => []).add(oldFile);
+            } else {
+              await _unlinkUnused(oldFile);
+            }
+          }
+          if (before.isEmpty ||
+              before.single['sha256'] != digest ||
+              before.single['version'] != version) {
+            final id = _identity(source, key);
+            _revisions[id] = (_revisions[id] ?? 0) + 1;
+            lastChange = (sourceId: source, key: key, kind: kind);
+            notifyListeners();
+          }
+          return MediaAsset(target, row);
+        } finally {
+          if (await temp.exists()) await temp.delete();
         }
-        await _trim(keep: relative);
-        if (before.isEmpty ||
-            before.single['sha256'] != digest ||
-            before.single['version'] != version) {
-          final id = _identity(source, key);
-          _revisions[id] = (_revisions[id] ?? 0) + 1;
-          lastChange = (sourceId: source, key: key, kind: kind);
-          notifyListeners();
-        }
-        return MediaAsset(target, row);
-      } finally {
-        if (await temp.exists()) await temp.delete();
-      }
-    });
+      },
+      assetSource: source,
+      assetKey: key,
+      assetFile: fileForQuota,
+    );
   }
 
   Future<void> _unlinkUnused(File file) async {
+    if (_retired.values.any((files) => files.any((f) => f.path == file.path))) {
+      return;
+    }
     final count = await db.db.rawQuery(
       'SELECT COUNT(*) AS n FROM media_assets WHERE relative_file=?',
       [p.relative(file.path, from: directory.path)],
@@ -494,49 +531,63 @@ class MediaAssetStore extends ChangeNotifier {
     }
   }
 
-  Future<void> _trim({String? keep}) async {
-    var pending = false;
-    for (final kind in ['cover', 'lyrics']) {
-      final sum = await db.db.rawQuery(
-        'SELECT COALESCE(SUM(bytes),0) AS n FROM (SELECT relative_file,MAX(bytes) AS bytes FROM media_assets WHERE kind=? AND pinned=0 AND relative_file NOT IN (SELECT relative_file FROM media_assets WHERE pinned=1) GROUP BY relative_file)',
-        [kind],
-      );
-      var total = sum.single['n'] as int;
-      final budget = kind == 'cover' ? coverBudget : lyricsBudget;
-      if (total <= budget) continue;
-      var afterUsed = -1, afterRow = 0;
-      while (total > budget) {
-        final candidates = await db.db.rawQuery(
-          'SELECT rowid AS asset_row,* FROM media_assets WHERE kind=? AND pinned=0 AND (last_used>? OR (last_used=? AND rowid>?)) ORDER BY last_used,rowid LIMIT 128',
-          [kind, afterUsed, afterUsed, afterRow],
+  /// Delete the unprotected resources of selected songs. Keep an album cover
+  /// if another song still refers to it, and never delete a manually imported
+  /// pinned lyric.
+  Future<void> clearTracks(Set<String> trackKeys) async {
+    await initialize();
+    if (trackKeys.isEmpty) return;
+    await _lock.synchronized(() async {
+      for (final trackKey in trackKeys) {
+        final links = await db.db.rawQuery(
+          '''
+          SELECT l.source_id,l.asset_key,l.kind,a.pinned,a.relative_file
+          FROM cache_asset_links l LEFT JOIN media_assets a
+          ON a.source_id=l.source_id AND a.asset_key=l.asset_key
+          WHERE l.track_key=?
+        ''',
+          [trackKey],
         );
-        if (candidates.isEmpty) break;
-        for (final row in candidates) {
-          afterUsed = row['last_used'] as int;
-          afterRow = row['asset_row'] as int;
-          if (total <= budget) break;
-          if (row['relative_file'] == keep ||
-              (_leases[_identity(
-                        row['source_id'] as String,
-                        row['asset_key'] as String,
-                      )] ??
-                      0) >
-                  0) {
+        for (final link in links) {
+          if (link['pinned'] == 1) continue;
+          final source = link['source_id'] as String;
+          final key = link['asset_key'] as String;
+          _desiredVersions[_identity(source, key)] = 'cleared';
+          await db.db.delete(
+            'cache_asset_links',
+            where: 'track_key=? AND kind=?',
+            whereArgs: [trackKey, link['kind']],
+          );
+          final remaining = await db.db.rawQuery(
+            'SELECT COUNT(*) AS n FROM cache_asset_links WHERE source_id=? AND asset_key=?',
+            [source, key],
+          );
+          if (remaining.single['n'] != 0 || link['relative_file'] == null) {
             continue;
           }
           await db.db.delete(
             'media_assets',
-            where: 'source_id=? AND asset_key=?',
-            whereArgs: [row['source_id'], row['asset_key']],
+            where: 'source_id=? AND asset_key=? AND pinned=0',
+            whereArgs: [source, key],
           );
-          final file = _file(row['relative_file'] as String);
-          await _unlinkUnused(file);
-          if (!await file.exists()) total -= row['bytes'] as int;
+          final file = _file(link['relative_file'] as String);
+          final idForLease = _identity(source, key);
+          if ((_leases[idForLease] ?? 0) > 0) {
+            _retired.putIfAbsent(idForLease, () => []).add(file);
+          } else {
+            await _unlinkUnused(file);
+          }
+          final id = _identity(source, key);
+          _revisions[id] = (_revisions[id] ?? 0) + 1;
+          lastChange = (
+            sourceId: source,
+            key: key,
+            kind: link['kind'] as String,
+          );
         }
       }
-      if (total > budget) pending = true;
-    }
-    _trimNeeded = pending;
+      notifyListeners();
+    });
   }
 
   void suspendSource(String source) {
@@ -568,6 +619,11 @@ class MediaAssetStore extends ChangeNotifier {
         where: where,
         whereArgs: sourceId == null ? null : [sourceId],
       );
+      await db.db.execute('''
+        DELETE FROM cache_asset_links WHERE NOT EXISTS (
+          SELECT 1 FROM media_assets a WHERE a.source_id=cache_asset_links.source_id
+          AND a.asset_key=cache_asset_links.asset_key)
+      ''');
       if (includePinned && sourceId != null) {
         await db.db.delete(
           'media_asset_migrations',
@@ -576,7 +632,16 @@ class MediaAssetStore extends ChangeNotifier {
         );
       }
       for (final row in rows) {
-        await _unlinkUnused(_file(row['relative_file'] as String));
+        final file = _file(row['relative_file'] as String);
+        final id = _identity(
+          row['source_id'] as String,
+          row['asset_key'] as String,
+        );
+        if ((_leases[id] ?? 0) > 0) {
+          _retired.putIfAbsent(id, () => []).add(file);
+        } else {
+          await _unlinkUnused(file);
+        }
       }
       lastChange = null;
       notifyListeners();

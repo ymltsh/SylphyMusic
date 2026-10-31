@@ -25,6 +25,8 @@ class SourceConnections {
     remoteUserId: source.remoteUserId,
     enabled: enabled,
     lastSync: source.lastSync,
+    webdavBasePath: source.webdavBasePath,
+    webdavMaxDepth: source.webdavMaxDepth,
   );
 
   Future<void> toggle(String id) {
@@ -63,7 +65,9 @@ class SourceConnections {
     if (current == null ||
         current.url != source.url ||
         current.username != source.username ||
-        current.kind != source.kind) {
+        current.kind != source.kind ||
+        current.webdavBasePath != source.webdavBasePath ||
+        current.webdavMaxDepth != source.webdavMaxDepth) {
       throw StateError('来源连接已变更，请重新操作');
     }
     final enabled = _enabled(current, true);

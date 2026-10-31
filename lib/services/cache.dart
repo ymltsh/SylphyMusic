@@ -13,6 +13,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart' show ConflictAlgorithm;
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'sources.dart';
+import 'unified_cache_quota.dart';
 
 class CacheEntry {
   const CacheEntry({
@@ -51,10 +52,17 @@ class AudioPreview {
 }
 
 class CacheManager {
-  CacheManager(this.store, this.factory, this.root);
+  CacheManager(this.store, this.factory, this.root)
+    : quota = UnifiedCacheQuota(store, root.parent) {
+    quota.audioProtected = (key) =>
+        (_leases[key] ?? 0) > 0 ||
+        _active.containsKey(key) ||
+        _downloads.containsKey(key);
+  }
   final AppDb store;
   final AdapterFactory factory;
   final Directory root;
+  final UnifiedCacheQuota quota;
   final Map<String, TransferToken> _active = {};
   final Lock _commits = Lock();
   final Set<Future<void>> _cleanup = {};
@@ -108,7 +116,8 @@ class CacheManager {
   int _previewGeneration = 0;
   HttpClient? _prefetchClient;
   AudioPreview? preview(TrackRef ref) => _previews[ref.key];
-  int maxBytes = 5 * 1024 * 1024 * 1024;
+  int get maxBytes => quota.maxBytes;
+  set maxBytes(int value) => quota.maxBytes = value;
   int get concurrent => _active.length;
   Future<void> _spaceGuard([int requested = 0]) async {
     final path = root.path;
@@ -132,9 +141,7 @@ class CacheManager {
   }
 
   Future<void> initialize() async {
-    if (Platform.isWindows || Platform.isLinux) {
-      maxBytes = 10 * 1024 * 1024 * 1024;
-    }
+    await quota.initialize();
     await Directory(p.join(root.path, 'ready')).create(recursive: true);
     final temp = Directory(p.join(root.path, 'tmp'));
     await temp.create(recursive: true);
@@ -161,8 +168,7 @@ class CacheManager {
         await file.delete();
       }
     }
-    final quota = await store.setting('cache_limit');
-    if (quota != null) maxBytes = int.tryParse(quota) ?? maxBytes;
+    await quota.enforce();
   }
 
   String _filename(TrackRef ref) =>
@@ -325,22 +331,8 @@ class CacheManager {
     }
   }
 
-  Future<void> enforceQuota({int incoming = 0}) async {
-    final rows = await store.db.query('cache', orderBy: 'last_used ASC');
-    var total = rows.fold<int>(0, (n, r) => n + (r['bytes'] as int));
-    for (final row in rows) {
-      if (total + incoming <= maxBytes) break;
-      final key = row['track_key'] as String;
-      if ((_leases[key] ?? 0) > 0) continue;
-      try {
-        await File(p.join(root.path, row['relative_file'] as String)).delete();
-      } catch (_) {
-        continue;
-      }
-      await store.db.delete('cache', where: 'track_key=?', whereArgs: [key]);
-      total -= row['bytes'] as int;
-    }
-  }
+  Future<void> enforceQuota({int incoming = 0}) =>
+      quota.enforce(incoming: incoming);
 
   Future<void> _commit(
     TrackRef ref,
@@ -363,39 +355,34 @@ class CacheManager {
   ) async {
     final hash = (await sha256.bind(tmp.openRead()).first).toString();
     if (token.cancelled) return;
-    await enforceQuota(incoming: bytes);
-    if (token.cancelled) return;
-    final rows = await store.db.query('cache', columns: ['bytes']);
-    if (rows.fold<int>(0, (sum, row) => sum + (row['bytes'] as int)) + bytes >
-        maxBytes) {
-      throw StateError('正在使用的缓存无法淘汰，已暂停新增缓存');
-    }
-    final rel = p.join('ready', '${_filename(ref)}-${const Uuid().v4()}');
-    final dest = File(p.join(root.path, rel));
-    if (await dest.exists()) await dest.delete();
-    await tmp.rename(dest.path); // Same-volume atomic rename.
-    if (token.cancelled) {
-      await dest.delete();
-      return;
-    }
-    await store.db.insert('cache', {
-      'track_key': ref.key,
-      'relative_file': rel,
-      'bytes': bytes,
-      'sha256': hash,
-      'resource_tag': tag,
-      'metadata_version': metadataVersion,
-      'last_used': DateTime.now().millisecondsSinceEpoch,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-    if (token.cancelled) {
-      await store.db.delete(
-        'cache',
-        where: 'track_key=?',
-        whereArgs: [ref.key],
-      );
+    await quota.admit(bytes, () async {
+      if (token.cancelled) return;
+      final rel = p.join('ready', '${_filename(ref)}-${const Uuid().v4()}');
+      final dest = File(p.join(root.path, rel));
       if (await dest.exists()) await dest.delete();
-    }
-    await enforceQuota();
+      await tmp.rename(dest.path); // Same-volume atomic rename.
+      if (token.cancelled) {
+        await dest.delete();
+        return;
+      }
+      await store.db.insert('cache', {
+        'track_key': ref.key,
+        'relative_file': rel,
+        'bytes': bytes,
+        'sha256': hash,
+        'resource_tag': tag,
+        'metadata_version': metadataVersion,
+        'last_used': DateTime.now().millisecondsSinceEpoch,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      if (token.cancelled) {
+        await store.db.delete(
+          'cache',
+          where: 'track_key=?',
+          whereArgs: [ref.key],
+        );
+        if (await dest.exists()) await dest.delete();
+      }
+    }, audioKey: ref.key);
   }
 
   Future<void> captureRelay(

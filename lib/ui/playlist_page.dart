@@ -472,8 +472,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
           if (playlist != null && playlistCanEdit(widget.app, playlist))
             IconButton(
               tooltip: '编辑歌单',
-              onPressed:
-                  playlist == null || playlist.status == SyncStatus.readonly
+              onPressed: playlist.status == SyncStatus.readonly
                   ? null
                   : widget.onEdit,
               icon: const Icon(Icons.edit_outlined),
@@ -481,8 +480,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
           if (playlist != null && playlistCanEdit(widget.app, playlist))
             IconButton(
               tooltip: '添加歌曲',
-              onPressed:
-                  playlist == null || playlist.status == SyncStatus.readonly
+              onPressed: playlist.status == SyncStatus.readonly
                   ? null
                   : widget.onAdd,
               icon: const Icon(Icons.playlist_add),

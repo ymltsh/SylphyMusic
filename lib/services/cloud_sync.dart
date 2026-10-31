@@ -61,6 +61,27 @@ class PlaylistSyncService {
   final AppDb db;
   final AdapterFactory factory;
   final Set<String> busy = {};
+  final Map<String, Set<MusicAdapter>> _refreshAdapters = {};
+  final Map<String, int> _refreshEpochs = {};
+
+  void cancelRefresh(String sourceId) {
+    _refreshEpochs[sourceId] = (_refreshEpochs[sourceId] ?? 0) + 1;
+    for (final adapter
+        in _refreshAdapters.remove(sourceId) ?? <MusicAdapter>{}) {
+      adapter.close();
+    }
+  }
+
+  Future<bool> _refreshValid(SourceProfile source, int epoch) async {
+    if ((_refreshEpochs[source.id] ?? 0) != epoch) return false;
+    final current = await db.source(source.id);
+    return (_refreshEpochs[source.id] ?? 0) == epoch &&
+        current != null &&
+        current.enabled &&
+        current.kind == source.kind &&
+        current.url == source.url &&
+        current.username == source.username;
+  }
 
   static String cloudFavoriteId(String sourceId) => 'cloud-favorites:$sourceId';
 
@@ -68,9 +89,13 @@ class PlaylistSyncService {
   // mirror so server favorites never overwrite cross-source local favorites.
   Future<void> refreshStarredForSource(SourceProfile source) async {
     if (!source.enabled || !source.kind.cloudFavorites) return;
+    final epoch = _refreshEpochs[source.id] ?? 0;
+    if (!await _refreshValid(source, epoch)) return;
     final adapter = factory.create(source);
+    (_refreshAdapters[source.id] ??= {}).add(adapter);
     try {
       final ids = await adapter.fetchStarredIds();
+      if (!await _refreshValid(source, epoch)) return;
       await db.savePlaylistSnapshot(
         PlaylistModel(
           id: cloudFavoriteId(source.id),
@@ -81,17 +106,26 @@ class PlaylistSyncService {
         ids.map((id) => TrackRef(source.id, id).key).toList(),
       );
     } finally {
+      _refreshAdapters[source.id]?.remove(adapter);
+      if (_refreshAdapters[source.id]?.isEmpty == true) {
+        _refreshAdapters.remove(source.id);
+      }
       adapter.close();
     }
   }
 
   Future<void> refreshCloudForSource(SourceProfile source) async {
-    if (!source.kind.cloudPlaylists) return;
+    if (!source.enabled || !source.kind.cloudPlaylists) return;
+    final epoch = _refreshEpochs[source.id] ?? 0;
+    if (!await _refreshValid(source, epoch)) return;
     final adapter = factory.create(source);
+    (_refreshAdapters[source.id] ??= {}).add(adapter);
     try {
       final remote = await adapter.fetchPlaylists();
+      if (!await _refreshValid(source, epoch)) return;
       final current = await db.playlists();
       for (final meta in remote) {
+        if (!await _refreshValid(source, epoch)) return;
         final found = current.where(
           (p) =>
               p.kind == PlaylistKind.cloud &&
@@ -100,6 +134,7 @@ class PlaylistSyncService {
         );
         final existing = found.isEmpty ? null : found.first;
         final detail = await adapter.fetchPlaylist(meta.id);
+        if (!await _refreshValid(source, epoch)) return;
         if (existing == null) {
           final model = PlaylistModel(
             id: const Uuid().v4(),
@@ -138,6 +173,10 @@ class PlaylistSyncService {
         }
       }
     } finally {
+      _refreshAdapters[source.id]?.remove(adapter);
+      if (_refreshAdapters[source.id]?.isEmpty == true) {
+        _refreshAdapters.remove(source.id);
+      }
       adapter.close();
     }
   }

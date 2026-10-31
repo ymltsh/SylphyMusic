@@ -28,11 +28,24 @@ class CacheJobs {
   final CacheManager cache;
   final _heartbeat = NativeHeartbeat(_lifecycle);
   final Set<String> _busy = {};
+  final Map<String, ({TrackRef ref, TransferToken token})> _runningTransfers =
+      {};
   bool _stopping = false;
   bool _pumping = false;
   bool _requested = false;
   bool paused = false;
   Completer<void>? _idle;
+  Future<File?> Function(Track)? _coverLoader;
+  Future<String?> Function(Track)? _lyricsLoader;
+
+  void attachMediaLoaders({
+    required Future<File?> Function(Track) cover,
+    required Future<String?> Function(Track) lyrics,
+  }) {
+    _coverLoader = cover;
+    _lyricsLoader = lyrics;
+  }
+
   Future<String> schedule(String title, List<TrackRef> refs) async {
     if (_stopping) throw StateError('缓存调度器已关闭');
     final id = const Uuid().v4();
@@ -154,8 +167,61 @@ class CacheJobs {
         whereArgs: [ref.key, jobId],
         limit: 1,
       );
-      if (other.isEmpty) cache.cancelDownload(ref);
+      if (other.isEmpty) {
+        final transfer = _runningTransfers[jobId];
+        if (transfer != null && transfer.ref == ref) {
+          transfer.token.cancel();
+        }
+        cache.cancelDownload(ref);
+      }
     }
+  }
+
+  /// Stop an active cache task and remove its persisted task record.
+  /// Already downloaded, verified tracks are intentionally left cached.
+  Future<void> removeJob(String jobId) async {
+    final jobs = await db.db.query(
+      'cache_jobs',
+      columns: ['state'],
+      where: 'id=?',
+      whereArgs: [jobId],
+      limit: 1,
+    );
+    if (jobs.isEmpty) return;
+    if (jobs.single['state'] == 'pending' ||
+        jobs.single['state'] == 'running' ||
+        _runningTransfers.containsKey(jobId)) {
+      await cancelJob(jobId);
+    }
+    // The worker may still be completing an interrupted network request.
+    // All its later item updates are conditional; missing items are skipped.
+    await db.db.transaction((txn) async {
+      await txn.delete(
+        'cache_job_items',
+        where: 'job_id=?',
+        whereArgs: [jobId],
+      );
+      await txn.delete('cache_jobs', where: 'id=?', whereArgs: [jobId]);
+    });
+  }
+
+  Future<bool> _optionalAllowed(
+    String jobId,
+    int position,
+    TransferToken token,
+  ) async {
+    if (_stopping || paused || token.cancelled) return false;
+    final rows = await db.db.query(
+      'cache_job_items',
+      columns: ['state'],
+      where: 'job_id=? AND position=?',
+      whereArgs: [jobId, position],
+    );
+    return !_stopping &&
+        !paused &&
+        !token.cancelled &&
+        rows.isNotEmpty &&
+        rows.single['state'] == 'running';
   }
 
   Future<void> _work(String jobId) async {
@@ -201,6 +267,10 @@ class CacheJobs {
           );
           break;
         }
+        // Register the cancel token before the last DB status check so a
+        // cancellation racing with fetchWhole cannot start an unowned request.
+        final token = TransferToken();
+        _runningTransfers[jobId] = (ref: ref, token: token);
         try {
           if (!await cache.contains(ref)) {
             final track = await db.track(ref);
@@ -214,12 +284,45 @@ class CacheJobs {
               where: 'job_id=? AND position=?',
               whereArgs: [jobId, pos],
             );
-            if (_stopping || paused || current.single['state'] != 'running') {
+            if (_stopping ||
+                paused ||
+                token.cancelled ||
+                current.isEmpty ||
+                current.first['state'] != 'running') {
               throw StateError('缓存任务已暂停或取消');
             }
-            await cache.fetchWhole(track, source);
+            await cache.fetchWhole(track, source, token: token);
           }
           if (!await cache.contains(ref)) throw StateError('整曲缓存尚未完成');
+          cache.lease(ref);
+          try {
+            // Cover and lyrics are separate resources but belong to the same
+            // offline-list task. Absence of optional artwork/lyrics is not a
+            // reason to fail a successfully cached song.
+            final track = await db.track(ref);
+            final cover = _coverLoader;
+            final lyrics = _lyricsLoader;
+            if (track != null &&
+                cover != null &&
+                await _optionalAllowed(jobId, pos, token)) {
+              try {
+                await cover(track);
+              } catch (_) {
+                /* optional media */
+              }
+            }
+            if (track != null &&
+                lyrics != null &&
+                await _optionalAllowed(jobId, pos, token)) {
+              try {
+                await lyrics(track);
+              } catch (_) {
+                /* optional media */
+              }
+            }
+          } finally {
+            cache.release(ref);
+          }
           await db.db.update(
             'cache_job_items',
             {'state': 'done', 'error': ''},
@@ -242,6 +345,10 @@ class CacheJobs {
             where: "job_id=? AND position=? AND state='running'",
             whereArgs: [jobId, pos],
           );
+        } finally {
+          if (identical(_runningTransfers[jobId]?.token, token)) {
+            _runningTransfers.remove(jobId);
+          }
         }
       }
       await _updateJobState(jobId);
@@ -352,6 +459,9 @@ class CacheJobs {
 
   Future<void> pause() async {
     paused = true;
+    for (final transfer in _runningTransfers.values) {
+      transfer.token.cancel();
+    }
     final idle = _idle;
     final items = await db.db.query(
       'cache_job_items',

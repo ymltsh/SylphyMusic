@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:sylphy_music/core/app_controller.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/ui/cover_art.dart';
+import 'package:sylphy_music/ui/cache_storage.dart';
 import 'package:sylphy_music/ui/lyrics_page.dart';
 
 import 'live_emby_test.dart' show MemoryVault;
@@ -191,4 +192,39 @@ void main() {
       await app.assets.waitForIdle();
     });
   }, skip: !available);
+  testWidgets(
+    'cache page lists cover and manual lyric resources without cached audio',
+    (tester) async {
+      await tester.runAsync(() async {
+        await app.assets.put(
+          's',
+          'album',
+          'cover',
+          'v1',
+          await File('test/fixtures/cover.png').readAsBytes(),
+        );
+        await app.assets.link(track.ref, 'album', 'cover');
+        await app.assets.link(const TrackRef('s', 'other'), 'album', 'cover');
+        await app.assets.put(
+          's',
+          'manual',
+          'lyrics',
+          'manual-v1',
+          utf8.encode('manual fixture'),
+          pinned: true,
+        );
+        await app.assets.link(track.ref, 'manual', 'manual');
+      });
+      await tester.pumpWidget(MaterialApp(home: CacheStoragePage(app: app)));
+      await waitFor(tester, () => find.text('fixture').evaluate().isNotEmpty);
+      expect(find.textContaining('2 首关联歌曲'), findsOneWidget);
+      await tester.tap(find.text('fixture'));
+      await tester.pumpAndSettle();
+      expect(find.text('共享文件，全局占用只计算一次'), findsOneWidget);
+      expect(find.textContaining('包含受保护的手动歌词'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+    skip: !available,
+  );
 }
