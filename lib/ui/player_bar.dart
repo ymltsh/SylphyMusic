@@ -331,63 +331,196 @@ class PlayerBar extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .7,
-          child: AnimatedBuilder(
-            animation: app.playback,
-            builder: (context, _) {
-              final player = app.playback;
-              return Column(
-                children: [
-                  ListTile(
-                    title: Text('播放队列 · ${player.snapshot.tracks.length} 首'),
-                    trailing: TextButton(
-                      onPressed: () => _act(context, player.clearQueue),
-                      child: const Text('清空'),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: player.snapshot.tracks.length,
-                      itemBuilder: (context, index) {
-                        final key = player.snapshot.tracks[index];
-                        return TrackLookup(
-                          app: app,
-                          ref: TrackRef.parse(key),
-                          builder: (context, track) => ListTile(
-                            selected: index == player.snapshot.index,
-                            leading: Icon(
-                              index == player.snapshot.index
-                                  ? Icons.equalizer
-                                  : Icons.music_note_outlined,
-                            ),
-                            title: Text(
-                              track?.title ?? '不可用歌曲',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(track?.artist ?? '来源已移除'),
-                            onTap: () =>
-                                _act(context, () => player.jumpTo(index)),
-                            trailing: IconButton(
-                              tooltip: '移出队列',
-                              icon: const Icon(Icons.close),
-                              onPressed: () =>
-                                  _act(context, () => player.removeAt(index)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
+      builder: (context) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * .7,
+        child: _PlaybackQueueSheet(app: app),
       ),
     );
   }
+}
+
+class _PlaybackQueueSheet extends StatefulWidget {
+  const _PlaybackQueueSheet({required this.app});
+
+  final SylphyApp app;
+
+  @override
+  State<_PlaybackQueueSheet> createState() => _PlaybackQueueSheetState();
+}
+
+class _PlaybackQueueSheetState extends State<_PlaybackQueueSheet> {
+  static const double _rowExtent = 76;
+  final ScrollController _scrollController = ScrollController(
+    keepScrollOffset: false,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToCurrent(animate: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _act(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('播放操作失败，请重试')));
+      }
+    }
+  }
+
+  void _scrollToCurrent({bool animate = true}) {
+    if (!_scrollController.hasClients) return;
+    final snapshot = widget.app.playback.snapshot;
+    if (snapshot.tracks.isEmpty) return;
+
+    final position = _scrollController.position;
+    final offset =
+        (snapshot.index * _rowExtent -
+                (position.viewportDimension - _rowExtent) / 2)
+            .clamp(0.0, position.maxScrollExtent)
+            .toDouble();
+    if (animate) {
+      _scrollController.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollController.jumpTo(offset);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: AnimatedBuilder(
+      animation: widget.app.playback,
+      builder: (context, _) {
+        final player = widget.app.playback;
+        final snapshot = player.snapshot;
+        final scheme = Theme.of(context).colorScheme;
+        return Column(
+          children: [
+            ListTile(
+              title: Text('播放队列 · ${snapshot.tracks.length} 首'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: '定位当前播放歌曲',
+                    icon: const Icon(Icons.circle_outlined),
+                    onPressed: snapshot.tracks.isEmpty
+                        ? null
+                        : () => _scrollToCurrent(),
+                  ),
+                  TextButton(
+                    onPressed: snapshot.tracks.isEmpty
+                        ? null
+                        : () => _act(player.clearQueue),
+                    child: const Text('清空'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RawScrollbar(
+                controller: _scrollController,
+                thumbVisibility: true,
+                interactive: true,
+                thickness: 5,
+                radius: const Radius.circular(8),
+                thumbColor: scheme.onSurfaceVariant.withValues(alpha: .38),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(bottom: 8, right: 8),
+                  itemExtent: _rowExtent,
+                  itemCount: snapshot.tracks.length,
+                  itemBuilder: (context, index) {
+                    final key = snapshot.tracks[index];
+                    final isCurrent = index == snapshot.index;
+                    return TrackLookup(
+                      app: widget.app,
+                      ref: TrackRef.parse(key),
+                      builder: (context, track) => ListTile(
+                        selected: isCurrent,
+                        selectedTileColor: scheme.primary.withValues(
+                          alpha: .08,
+                        ),
+                        leading: track == null
+                            ? const SizedBox.square(
+                                dimension: 48,
+                                child: Icon(Icons.music_note_outlined),
+                              )
+                            : SizedBox.square(
+                                dimension: 48,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CoverArt(
+                                      app: widget.app,
+                                      track: track,
+                                      size: 48,
+                                    ),
+                                    if (isCurrent)
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: scheme.primary,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(2),
+                                            child: Icon(
+                                              Icons.equalizer_rounded,
+                                              size: 14,
+                                              color: scheme.onPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                        title: Text(
+                          track?.title ?? '不可用歌曲',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          track?.artist ?? '来源已移除',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _act(() => player.jumpTo(index)),
+                        trailing: IconButton(
+                          tooltip: '移出队列',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => _act(() => player.removeAt(index)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

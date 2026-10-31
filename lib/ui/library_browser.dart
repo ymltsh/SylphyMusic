@@ -38,6 +38,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   final batches = <int, List<CatalogRow>>{};
   final pending = <int>{};
   final failed = <int>{};
+  final ScrollController _scrollController = ScrollController(
+    keepScrollOffset: false,
+  );
 
   void _reset() {
     generation++;
@@ -45,6 +48,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     pending.clear();
     failed.clear();
     page = _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    });
   }
 
   // Virtual rows keep only six SQL batches of metadata, even in a huge library.
@@ -146,6 +154,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   @override
   void dispose() {
     widget.app.removeListener(_changed);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -178,6 +187,39 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           .firstOrNull
           ?.name ??
       '来源已移除';
+  Future<void> _locateCurrentTrack() async {
+    final current = widget.app.playback.currentRef;
+    if (current == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('当前没有播放歌曲')));
+      return;
+    }
+
+    final signature = widget.query.signature;
+    // Fetch only ordered identities, not the whole catalog's metadata.
+    final refs = await widget.app.catalog.queue(widget.query.songs);
+    if (!mounted || signature != widget.query.signature) return;
+
+    final index = refs.indexOf(current);
+    if (index < 0) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('当前歌曲不在此音乐库筛选结果中')));
+      return;
+    }
+    if (!_scrollController.hasClients) return;
+
+    final extent = 76 * MediaQuery.textScalerOf(context).scale(14) / 14;
+    final position = _scrollController.position;
+    final offset = (index * extent - (position.viewportDimension - extent) / 2)
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
+    await _scrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   Future<void> _play([Track? track]) async {
     final refs = await widget.app.catalog.queue(widget.query.songs);
     final start = track == null ? 0 : refs.indexOf(track.ref);
@@ -363,13 +405,23 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   bottomPadding: 84,
                   emptyMessage: emptyMessage,
                 )
-              : ListView.builder(
-                  key: ValueKey('${widget.query.signature}:$generation'),
-                  padding: const EdgeInsets.only(bottom: 96),
-                  itemExtent:
-                      76 * MediaQuery.textScalerOf(context).scale(14) / 14,
-                  itemCount: result.total,
-                  itemBuilder: (_, i) => _virtualRow(i),
+              : RawScrollbar(
+                  controller: _scrollController,
+                  thumbVisibility: true,
+                  interactive: true,
+                  thickness: 5,
+                  radius: const Radius.circular(8),
+                  thumbColor: Theme.of(context).colorScheme.onSurfaceVariant
+                      .withValues(alpha: .38),
+                  child: ListView.builder(
+                    key: ValueKey('${widget.query.signature}:$generation'),
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(bottom: 96),
+                    itemExtent:
+                        76 * MediaQuery.textScalerOf(context).scale(14) / 14,
+                    itemCount: result.total,
+                    itemBuilder: (_, i) => _virtualRow(i),
+                  ),
                 ),
           result: result,
         );
@@ -386,7 +438,27 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             message: '播放全部',
             child: Icon(Icons.play_circle),
           ),
-          title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(result == null ? '—' : '${result.total}', maxLines: 1),
+              if (widget.query.view == 0)
+                IconButton(
+                  key: const ValueKey('locate-current-library-track'),
+                  tooltip: '定位当前播放歌曲',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
+                  ),
+                  icon: const Icon(Icons.circle_outlined, size: 22),
+                  onPressed: result == null || result.total == 0
+                      ? null
+                      : () => _act(_locateCurrentTrack),
+                ),
+            ],
+          ),
           trailing: widget.songActions,
           onTap: result == null || result.total == 0 ? null : () => _act(_play),
         ),

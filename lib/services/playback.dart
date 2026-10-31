@@ -6,6 +6,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
+import 'package:synchronized/synchronized.dart';
 
 import '../core/models.dart';
 import '../data/app_db.dart';
@@ -47,6 +48,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   bool _opening = false, _userPaused = false;
   bool _handlingFailure = false;
   bool _finishingTrack = false;
+  // Covers the await before player.open when navigating away from a track.
+  int _navigationInFlight = 0;
   // GAIN is not permission to restart immediately: video feeds can briefly
   // release focus between clips. Keep resume eligibility separate from focus.
   bool _resumeOnFocusGain = false;
@@ -496,7 +499,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _subscriptions.add(
       player.stream.completed.listen((done) {
-        if (done && !_opening && !_finishingTrack && !_stalledRecoveryRunning) {
+        if (done &&
+            !_opening &&
+            _navigationInFlight == 0 &&
+            !_finishingTrack &&
+            !_stalledRecoveryRunning) {
           diagnostics?.record(
             'playback',
             'track_completed',
@@ -1154,9 +1161,20 @@ class PlaybackCoordinator extends ChangeNotifier {
       order: order,
       history: newHistory,
     );
-    if (old != null) await cache.cancel(old, automaticOnly: true);
-    position = Duration.zero;
-    await _loadCurrent(autoplay: manual || _playRequested, manual: manual);
+    final intentGeneration = _playIntentGeneration;
+    ++_navigationInFlight;
+    try {
+      if (old != null) await cache.cancel(old, automaticOnly: true);
+      position = Duration.zero;
+      // A user pause during cache.cancel must not be undone by the skip.
+      final autoplay =
+          (manual || _playRequested) &&
+          !_userPaused &&
+          intentGeneration == _playIntentGeneration;
+      await _loadCurrent(autoplay: autoplay, manual: manual);
+    } finally {
+      --_navigationInFlight;
+    }
   }
 
   Future<void> previous() async {
@@ -1181,10 +1199,19 @@ class PlaybackCoordinator extends ChangeNotifier {
       order: snapshot.order,
       history: hist,
     );
-    if (old != null) await cache.cancel(old, automaticOnly: true);
-    position = Duration.zero;
-    cache.invalidatePreview();
-    await _loadCurrent(autoplay: true, manual: true);
+    final intentGeneration = _playIntentGeneration;
+    ++_navigationInFlight;
+    try {
+      if (old != null) await cache.cancel(old, automaticOnly: true);
+      position = Duration.zero;
+      cache.invalidatePreview();
+      await _loadCurrent(
+        autoplay: !_userPaused && intentGeneration == _playIntentGeneration,
+        manual: true,
+      );
+    } finally {
+      --_navigationInFlight;
+    }
   }
 
   Future<void> _finished() async {
@@ -1551,6 +1578,8 @@ class PlaybackCoordinator extends ChangeNotifier {
 class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
   SylphyAudioHandler(this.controller);
   final PlaybackCoordinator controller;
+  // Serialize notification transport skips so native player.open cannot overlap.
+  final Lock _notificationSkipLock = Lock();
 
   // Audio focus and noisy-device events use system:true and never come through
   // this gate. Only external MediaSession transport commands are rate-limited;
@@ -1591,6 +1620,15 @@ class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
     return true;
   }
 
+  Future<void> _queueNotificationSkip(Future<void> Function() skip) {
+    final intentGeneration = controller._playIntentGeneration;
+    return _notificationSkipLock.synchronized(() async {
+      // An intervening play/pause/seek invalidates queued navigation commands.
+      if (intentGeneration != controller._playIntentGeneration) return;
+      await skip();
+    });
+  }
+
   @override
   Future<void> play() =>
       _allowTransport('play') ? controller.play() : Future<void>.value();
@@ -1610,9 +1648,9 @@ class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
         await controller.play();
       }
     } else if (button == MediaButton.next) {
-      await controller.next();
+      await skipToNext();
     } else if (button == MediaButton.previous) {
-      await controller.previous();
+      await skipToPrevious();
     }
   }
 
@@ -1620,9 +1658,10 @@ class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> stop() => controller.pause();
   @override
-  Future<void> skipToNext() => controller.next();
+  Future<void> skipToNext() => _queueNotificationSkip(() => controller.next());
   @override
-  Future<void> skipToPrevious() => controller.previous();
+  Future<void> skipToPrevious() =>
+      _queueNotificationSkip(() => controller.previous());
   @override
   Future<void> seek(Duration position) => controller.seek(position);
 }

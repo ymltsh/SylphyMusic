@@ -620,7 +620,12 @@ public class AudioService extends MediaBrowserServiceCompat {
         switch (processingState) {
         case idle: return PlaybackStateCompat.STATE_NONE;
         case loading: return PlaybackStateCompat.STATE_CONNECTING;
-        case buffering: return PlaybackStateCompat.STATE_BUFFERING;
+        case buffering:
+            // Dart keeps playing=true during transitions to retain the FGS.
+            // SystemUI shows STATE_BUFFERING as a spinner and hides pause;
+            // honor the play intent so rapid skips remain controllable.
+            // Dart processingState still reports buffering to app consumers.
+            return playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_BUFFERING;
         case ready: return playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
         case completed: return playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
         case error: return PlaybackStateCompat.STATE_ERROR;
