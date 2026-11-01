@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.14-openlist.8",
-    "build": 34,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8 (arm64-v8a)",
+    "version": "1.0.14-openlist.9",
+    "build": 35,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.9 (arm64-v8a)",
     "date": "2026-11-01",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8+34\n\n- 播放页快捷操作区（睡眠定时、歌词页、收藏、更多）改为独立组件，可分别移动、缩放、锁定并保存手机 / 宽屏坐标，移动进度条不再带动快捷操作区。\n- 读取旧版布局时补充独立快捷组件，保留编辑器入口；快捷操作区不能隐藏或删除，组件上限调整为 33 个（含快捷操作区）。\n- 包含上一轮淡入淡出补丁：暂停及切歌前短暂淡出，播放及恢复时淡入，串行处理原生音量写入，以减少突变爆音。\n- 保留媒体通知专用透明 Logo、Android 媒体恢复及歌单本机拖动排序等已有功能。\n\n仅提供 Android arm64-v8a，独立包名和更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收，布局交互和淡入淡出听感由用户确认。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.9+35\n\n- 歌曲列表增加当前播放项底色高亮和动态均衡器标识，暂停时显示暂停标识；播放队列同步采用动态播放标识。\n- 提前在空闲时预热当前歌曲的大封面，播放页入场动画期间延后大图模糊处理，以减少首次打开时的渲染负担。\n- 播放器外观设置按播放页面、迷你播放器和全屏播放页分组，新增直接编辑播放页面的入口，无歌曲时也可进入编辑器。\n- 布局格式升级为 v3：快捷操作区可隐藏、删除并重新添加，保存后不再自动恢复；旧 v1/v2 布局继续迁移补齐快捷操作区。\n- 保留已发布的淡入淡出、透明通知 Logo、媒体恢复和歌单本机拖动排序等功能。\n\n仅提供 Android arm64-v8a，独立包名与更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码和许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试、性能测量或设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.8%2B34/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.9%2B35/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.8%2B34"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.9%2B35"
   },
   "history": [
+    {
+      "version": "1.0.14-openlist.8",
+      "build": 34,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8+34\n\n- 播放页快捷操作区（睡眠定时、歌词页、收藏、更多）改为独立组件，可分别移动、缩放、锁定并保存手机 / 宽屏坐标，移动进度条不再带动快捷操作区。\n- 读取旧版布局时补充独立快捷组件，保留编辑器入口；快捷操作区不能隐藏或删除，组件上限调整为 33 个（含快捷操作区）。\n- 包含上一轮淡入淡出补丁：暂停及切歌前短暂淡出，播放及恢复时淡入，串行处理原生音量写入，以减少突变爆音。\n- 保留媒体通知专用透明 Logo、Android 媒体恢复及歌单本机拖动排序等已有功能。\n\n仅提供 Android arm64-v8a，独立包名和更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收，布局交互和淡入淡出听感由用户确认。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.8%2B34/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.8%2B34"
+    },
     {
       "version": "1.0.14-openlist.7",
       "build": 33,
