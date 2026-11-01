@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.27",
-    "build": 40,
-    "name": "风灵音乐 v1.0.27",
+    "version": "1.0.28",
+    "build": 41,
+    "name": "风灵音乐 v1.0.28",
     "date": "2026-11-01",
-    "notes": "风灵音乐 1.0.27\n\n- 普通版与 OpenList 版统一使用 1.0.27 基础版本和构建号 40，各自保留独立更新通道。\n- 保留封面取色后台计算、迷你播放器提前预热和切歌旧配色清理，减少首次进入播放页时的界面阻塞。\n- 更新检查页面提示改为“点击获取最新版本安装包”，调整应用图标选择页文案。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。",
+    "notes": "风灵音乐 1.0.28\n\n- 修正 Android 通知进度在远程音频尚未开始、缓冲或播放停滞时仍按墙钟前进的问题，仅在确认真实播放进度后继续计时。\n- 拖动进度时先冻结旧计时，再更新跳转位置；真实播放恢复后通知进度继续前进。\n- 保留缓冲期间的播放意图、前台服务和暂停操作，退出时释放通知计时检查。\n- 保留封面取色后台优化、同步文案和 OpenList 独立更新接口。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。Android 使用既有正式签名。本轮按要求编译、打包及发布，未运行静态分析、测试或设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.28%2B41/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.28%2B41/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.28%2B41/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.28%2B41/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.28%2B41/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27+40"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.28+41"
   },
   "history": [
+    {
+      "version": "1.0.27",
+      "build": 40,
+      "name": "风灵音乐 v1.0.27",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 1.0.27\n\n- 普通版与 OpenList 版统一使用 1.0.27 基础版本和构建号 40，各自保留独立更新通道。\n- 保留封面取色后台计算、迷你播放器提前预热和切歌旧配色清理，减少首次进入播放页时的界面阻塞。\n- 更新检查页面提示改为“点击获取最新版本安装包”，调整应用图标选择页文案。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27+40"
+    },
     {
       "version": "1.0.26",
       "build": 39,
