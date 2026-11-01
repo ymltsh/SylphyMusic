@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.14-openlist.5",
-    "build": 31,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5 (arm64-v8a)",
-    "date": "2026-10-31",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5+31\n\n- 改进 Android 媒体通知播放状态，连续快速切歌时串行处理通知指令，并保留切歌期间的用户暂停操作。\n- 播放队列增加封面、当前歌曲高亮、打开时自动定位及定位按钮；音乐库支持定位当前播放歌曲。\n- 音乐库和队列增加半透明可拖动滚动条，调整可见区域封面加载与重复歌曲组件身份。\n- 定位、排序、升降序按钮统一尺寸并等距排列，移除音乐库顶部来源筛选。\n- 歌单卡片支持长按拖动、目标高亮和边缘自动滚动；显示顺序自动保存在本机，封面流沿用顺序，不更改歌曲顺序或云端歌单。\n\n从 1.0.14-openlist.3 或更早版本升级时，请先到「设置 → 下载与缓存 → 清理所有缓存资源」后重新缓存；已在 openlist.4 完成清理的用户无需重复操作。手动导入歌词和原始音乐保留。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附本轮实际应用源码，以及与内置 OpenList 后端和前端对应的源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收。\n",
+    "version": "1.0.14-openlist.6",
+    "build": 32,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.6 (arm64-v8a)",
+    "date": "2026-10-32",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.6+32\n\n- 修复 Android 媒体服务重建时沿用旧 Flutter 就绪状态的问题，待处理的媒体控制指令在正确的处理器连接完成后分发。\n- 补充 Android 媒体恢复的 recent / 当前媒体项查询与播放入口；只接受当前恢复歌曲的标识，沿用已恢复的队列顺序。\n- 媒体控制诊断仅记录方法名、就绪状态和按键码，不记录歌曲标识、地址或凭据。\n- 保留上一版音乐库与队列定位、可拖动滚动条、按钮等距及歌单卡片本机排序功能。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附实际应用源码，以及与内置 OpenList 后端和前端对应的源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收，系统媒体恢复效果由用户确认。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.5%2B31/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.6%2B32/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.5%2B31"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.6%2B32"
   },
   "history": [
+    {
+      "version": "1.0.14-openlist.5",
+      "build": 31,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5 (arm64-v8a)",
+      "date": "2026-10-31",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5+31\n\n- 改进 Android 媒体通知播放状态，连续快速切歌时串行处理通知指令，并保留切歌期间的用户暂停操作。\n- 播放队列增加封面、当前歌曲高亮、打开时自动定位及定位按钮；音乐库支持定位当前播放歌曲。\n- 音乐库和队列增加半透明可拖动滚动条，调整可见区域封面加载与重复歌曲组件身份。\n- 定位、排序、升降序按钮统一尺寸并等距排列，移除音乐库顶部来源筛选。\n- 歌单卡片支持长按拖动、目标高亮和边缘自动滚动；显示顺序自动保存在本机，封面流沿用顺序，不更改歌曲顺序或云端歌单。\n\n从 1.0.14-openlist.3 或更早版本升级时，请先到「设置 → 下载与缓存 → 清理所有缓存资源」后重新缓存；已在 openlist.4 完成清理的用户无需重复操作。手动导入歌词和原始音乐保留。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附本轮实际应用源码，以及与内置 OpenList 后端和前端对应的源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.5%2B31/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.5%2B31"
+    },
     {
       "version": "1.0.14-openlist.4",
       "build": 30,
