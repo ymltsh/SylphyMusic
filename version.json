@@ -4,7 +4,7 @@
     "build": 40,
     "name": "风灵音乐 v1.0.27",
     "date": "2026-11-01",
-    "notes": "风灵音乐 1.0.27\n\n- 普通版与 OpenList 版统一使用 1.0.27 基础版本和构建号 40，各自保留独立更新通道。\n- 保留封面取色后台计算、迷你播放器提前预热和切歌旧配色清理，减少首次进入播放页时的界面阻塞。\n- 更新检查页面提示改为“点击获取最新版本安装包”，调整应用图标选择页文案。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。Android 使用既有正式签名。本轮执行编译与打包，未运行静态分析、测试或设备性能复测。\n\n同版本更新（2026-11-01）：同步更新页提示与图标选择页文案；新增 version-openlist.json 供 OpenList 独立更新。版本号与构建号不变，已安装同版本可手动下载覆盖安装；自动检查不会因本次重打包提示更高版本。\n",
+    "notes": "风灵音乐 1.0.27\n\n- 普通版与 OpenList 版统一使用 1.0.27 基础版本和构建号 40，各自保留独立更新通道。\n- 保留封面取色后台计算、迷你播放器提前预热和切歌旧配色清理，减少首次进入播放页时的界面阻塞。\n- 更新检查页面提示改为“点击获取最新版本安装包”，调整应用图标选择页文案。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。",
     "urls": {
       "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-arm64-v8a.apk",
       "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27%2B40/sylphy-music-armeabi-v7a.apk",
