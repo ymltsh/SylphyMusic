@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.21",
-    "build": 34,
-    "name": "风灵音乐 v1.0.21",
+    "version": "1.0.22",
+    "build": 35,
+    "name": "风灵音乐 v1.0.22",
     "date": "2026-11-01",
-    "notes": "风灵音乐 1.0.21\n\n- 修复 Android 媒体服务重建时沿用旧 Flutter 就绪状态的问题，待处理的媒体控制指令在正确的处理器连接完成后分发。\n- 补充 Android 媒体恢复的 recent / 当前媒体项查询与播放入口；只接受当前恢复歌曲的标识，沿用已恢复的队列顺序。\n- 媒体控制诊断仅记录方法名、就绪状态和按键码，不记录歌曲标识、地址或凭据。\n- 保留上一版音乐库与队列定位、可拖动滚动条、按钮等距及歌单卡片本机排序功能。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收，Android 系统媒体恢复效果由用户在设备上确认。\n",
+    "notes": "风灵音乐 1.0.22\n\n- Android 媒体通知改用独立透明背景 Logo，不再沿用启动器 App 图标；通知小图标由系统显示为单色轮廓。\n- 兼容已保存的旧启动器图标配置，在媒体服务恢复、Dart 连接前也使用专用图标。\n- 添加资源保留规则，避免发布包压缩时移除动态引用的通知图标。\n- 保留上一版 Android 媒体恢复修复和歌单卡片本机拖动排序等功能。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包、正式签名及资源保留校验，未运行静态分析、功能测试或设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.22%2B35/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.22%2B35/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.22%2B35/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.22%2B35/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.22%2B35/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.21+34"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.22+35"
   },
   "history": [
+    {
+      "version": "1.0.21",
+      "build": 34,
+      "name": "风灵音乐 v1.0.21",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 1.0.21\n\n- 修复 Android 媒体服务重建时沿用旧 Flutter 就绪状态的问题，待处理的媒体控制指令在正确的处理器连接完成后分发。\n- 补充 Android 媒体恢复的 recent / 当前媒体项查询与播放入口；只接受当前恢复歌曲的标识，沿用已恢复的队列顺序。\n- 媒体控制诊断仅记录方法名、就绪状态和按键码，不记录歌曲标识、地址或凭据。\n- 保留上一版音乐库与队列定位、可拖动滚动条、按钮等距及歌单卡片本机排序功能。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收，Android 系统媒体恢复效果由用户在设备上确认。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.21%2B34/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.21+34"
+    },
     {
       "version": "1.0.20",
       "build": 33,
