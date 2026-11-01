@@ -1,0 +1,114 @@
+{
+  "latest": {
+    "version": "1.0.27-openlist.11",
+    "build": 40,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11 (arm64-v8a)",
+    "date": "2026-11-01",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11\n\n- 与普通版对齐为 1.0.27 基础版本和构建号 40，保留独立应用与更新通道。\n- 同步封面取色后台计算、迷你播放器提前预热及切歌旧配色清理，减少首次进入播放页的界面阻塞。\n- 保留 OpenList-Lite 嵌入服务、全驱动列表、Lite Web UI，以及既有智能 / 常驻模式和独立数据。\n\n本特别版仅提供 Android arm64-v8a APK，使用既有正式签名。源码附件包含本次应用源码、对应 OpenList 后端 / 前端源码及许可证；原生 OpenList 部分沿用上一版。普通版和特别版可共存，应用数据不自动互通。本轮仅编译和打包，未运行静态分析、测试或设备验收。\n",
+    "urls": {
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27-openlist.11%2B40/sylphy-music-arm64-v8a.apk"
+    },
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27-openlist.11%2B40"
+  },
+  "history": [
+    {
+      "version": "1.0.14-openlist.10",
+      "build": 36,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10+36\n\n- 歌单卡片与详情页的「更多」新增「添加到播放队列」，按整张歌单的条目顺序一次性追加，保留重复歌曲。\n- 追加时保留现有队列的当前歌曲、进度与播放状态；空队列只准备首曲，不自动播放；空歌单显示提示。操作不修改云端歌单。\n- App 底部导航栏顶部增加轻微渐隐阴影，适配深浅主题，保留原有导航尺寸和背景透明度。\n- 音乐库歌曲更多按钮、筛选与定位操作栏、顶部设置按钮统一尺寸和右侧留白，按图标中心对齐。\n- 保留此前播放页高亮、动态标识、布局 v3、独立编辑入口及媒体恢复等改进。\n\n仅提供 Android arm64-v8a，独立包名与更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码和许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.10%2B36/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.10%2B36"
+    },
+    {
+      "version": "1.0.14-openlist.9",
+      "build": 35,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.9 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.9+35\n\n- 歌曲列表增加当前播放项底色高亮和动态均衡器标识，暂停时显示暂停标识；播放队列同步采用动态播放标识。\n- 提前在空闲时预热当前歌曲的大封面，播放页入场动画期间延后大图模糊处理，以减少首次打开时的渲染负担。\n- 播放器外观设置按播放页面、迷你播放器和全屏播放页分组，新增直接编辑播放页面的入口，无歌曲时也可进入编辑器。\n- 布局格式升级为 v3：快捷操作区可隐藏、删除并重新添加，保存后不再自动恢复；旧 v1/v2 布局继续迁移补齐快捷操作区。\n- 保留已发布的淡入淡出、透明通知 Logo、媒体恢复和歌单本机拖动排序等功能。\n\n仅提供 Android arm64-v8a，独立包名与更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码和许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试、性能测量或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.9%2B35/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.9%2B35"
+    },
+    {
+      "version": "1.0.14-openlist.8",
+      "build": 34,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8+34\n\n- 播放页快捷操作区（睡眠定时、歌词页、收藏、更多）改为独立组件，可分别移动、缩放、锁定并保存手机 / 宽屏坐标，移动进度条不再带动快捷操作区。\n- 读取旧版布局时补充独立快捷组件，保留编辑器入口；快捷操作区不能隐藏或删除，组件上限调整为 33 个（含快捷操作区）。\n- 包含上一轮淡入淡出补丁：暂停及切歌前短暂淡出，播放及恢复时淡入，串行处理原生音量写入，以减少突变爆音。\n- 保留媒体通知专用透明 Logo、Android 媒体恢复及歌单本机拖动排序等已有功能。\n\n仅提供 Android arm64-v8a，独立包名和更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收，布局交互和淡入淡出听感由用户确认。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.8%2B34/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.8%2B34"
+    },
+    {
+      "version": "1.0.14-openlist.7",
+      "build": 33,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7+33\n\n- Android 媒体通知改用独立透明背景 Logo，不再沿用启动器 App 图标；通知小图标由系统显示为单色轮廓。\n- 兼容已保存的旧启动器图标配置，在媒体服务恢复、Dart 连接前也使用专用图标。\n- 添加资源保留规则，避免发布包压缩时移除动态引用的通知图标。\n- 保留上一版 Android 媒体恢复修复和歌单卡片本机拖动排序等功能。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附实际应用源码、对应 OpenList 后端 / 前端源码及许可证。GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及资源保留校验，未运行静态分析、功能测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.7%2B33/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.7%2B33"
+    },
+    {
+      "version": "1.0.14-openlist.6",
+      "build": 32,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.6 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.6+32\n\n- 修复 Android 媒体服务重建时沿用旧 Flutter 就绪状态的问题，待处理的媒体控制指令在正确的处理器连接完成后分发。\n- 补充 Android 媒体恢复的 recent / 当前媒体项查询与播放入口；只接受当前恢复歌曲的标识，沿用已恢复的队列顺序。\n- 媒体控制诊断仅记录方法名、就绪状态和按键码，不记录歌曲标识、地址或凭据。\n- 保留上一版音乐库与队列定位、可拖动滚动条、按钮等距及歌单卡片本机排序功能。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附实际应用源码，以及与内置 OpenList 后端和前端对应的源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收，系统媒体恢复效果由用户确认。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.6%2B32/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.6%2B32"
+    },
+    {
+      "version": "1.0.14-openlist.5",
+      "build": 31,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5 (arm64-v8a)",
+      "date": "2026-10-31",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.5+31\n\n- 改进 Android 媒体通知播放状态，连续快速切歌时串行处理通知指令，并保留切歌期间的用户暂停操作。\n- 播放队列增加封面、当前歌曲高亮、打开时自动定位及定位按钮；音乐库支持定位当前播放歌曲。\n- 音乐库和队列增加半透明可拖动滚动条，调整可见区域封面加载与重复歌曲组件身份。\n- 定位、排序、升降序按钮统一尺寸并等距排列，移除音乐库顶部来源筛选。\n- 歌单卡片支持长按拖动、目标高亮和边缘自动滚动；显示顺序自动保存在本机，封面流沿用顺序，不更改歌曲顺序或云端歌单。\n\n从 1.0.14-openlist.3 或更早版本升级时，请先到「设置 → 下载与缓存 → 清理所有缓存资源」后重新缓存；已在 openlist.4 完成清理的用户无需重复操作。手动导入歌词和原始音乐保留。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附本轮实际应用源码，以及与内置 OpenList 后端和前端对应的源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包和正式签名校验，未运行静态分析、测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.5%2B31/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.5%2B31"
+    },
+    {
+      "version": "1.0.14-openlist.4",
+      "build": 30,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.4 (arm64-v8a)",
+      "date": "2026-10-31",
+      "notes": "【升级必读】本次更换统一缓存关联方式。升级后请先进入「设置 → 下载与缓存 → 清理所有缓存资源」，清理旧版音频、封面和远程歌词缓存，再重新缓存歌曲或歌单。旧缓存不会自动转换或补齐歌曲关联；手动导入歌词将保留，服务器及本地原始音乐不受影响。\n\n- 完整音频、封面与歌词共用缓存空间额度，跨类型自动淘汰；共享专辑封面按实际文件去重计费。\n- 缓存空间页按歌曲展示音频、封面、歌词及手动歌词占用，支持选择性清理；仍被其他歌曲使用的共享封面会保留。\n- 缓存任务完成音频后尝试获取封面和歌词；缺少可选资源不会让完整音频任务失败。\n- 修复并发写入配额、共享文件复用、读取中文件延迟清理、取消任务和迟到结果等边界，保留受保护的手动歌词。\n\n本轮验证：静态分析无问题；完整回归连续两轮均为 260 项通过，5 项真实服务器测试按条件跳过；Windows 原生离线资源持久化集成测试通过。Android 实机后台 / 强杀场景仍需设备验收。\n\nOpenList-Lite 独立专版，仅提供 Android arm64-v8a，使用独立包名和更新通道；作为预发布，不替换普通版 Latest。附本轮应用、固定 OpenList 后端及前端对应源码快照和摘要；GitHub 自动源码归档仅代表标签基线。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.4%2B30/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.4%2B30"
+    },
+    {
+      "version": "1.0.14-openlist.3",
+      "build": 29,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.3 (arm64-v8a)",
+      "date": "2026-10-30",
+      "notes": "风灵音乐 OpenList Lite 特别版 · 1.0.14-openlist.3+29\n\n仅适用于 Android arm64-v8a；独立包名和更新通道，不替代普通版 Latest。\n\n- 缓存任务支持取消并移除记录，已完成或失败的任务也可移除；保留已经下载且校验通过的音乐缓存。\n- 修复取消、暂停与下载启动之间的竞态，使用任务传输令牌中断对应工作，移除后迟到的结果不重新创建记录。\n- 失败任务同时提供重试和移除入口，并显示移除失败提示。\n- 包含此前已应用但尚未发布的启动就绪媒体通知调整：以暂停状态预备恢复队列、复用后两首预取，并发布暂停曲目的媒体通知，不自动播放。\n\n内置服务继续使用 10486 端口，支持总开关；默认 WebDAV 账号 sylphy/sylphy，admin 管理网盘，已有账号不重置。添加音乐源可选 OpenList 目录和扫描层级。\n\nAndroid arm64 Release 编译并校验正式签名后发布。未运行静态分析、测试或设备验收，功能由用户验证。\n安装包仅提供 sylphy-music-arm64-v8a.apk，SHA256SUMS.txt 提供附件摘要。\n实际构建源码及 OpenList 后端、前端源码和许可证见 sylphy-music-openlist-source.zip；GitHub 自动源码归档仅对应标签基线。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.3%2B29/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.3%2B29"
+    },
+    {
+      "version": "1.0.14-openlist.2",
+      "build": 28,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.2 (arm64-v8a)",
+      "date": "2026-10-30",
+      "notes": "风灵音乐 OpenList Lite 特别版 · 1.0.14-openlist.2+28\n\n仅适用于 Android arm64-v8a；独立包名，可与普通版共存，使用独立更新通道。本版本不会替换普通版 Latest。\n\n- 内置 OpenList 网盘服务，提供智能运行、持续运行和服务总开关；关闭后停止专用进程，阻止自动启动。\n- 本机端口改为 10486，WebDAV 地址为 http://127.0.0.1:10486/dav/；旧版内置音源地址自动迁移。\n- 预置 sylphy/sylphy 账号，允许 WebDAV 读取、管理；使用 admin 管理网盘，账号及初始密码可复制，已有账号不重置。\n- 添加音乐源可直接选择 OpenList，预填连接并浏览音乐目录，支持基础目录及扫描层级。\n- 保留音乐索引、完整缓存和歌单引用；停止服务会暂停对应播放，重新启用后由用户继续。\n\nAndroid arm64 Release 已编译并校验正式签名；未运行静态分析、测试或设备验收，网盘登录、服务启停及播放由用户验证。\n\n安装包仅提供 sylphy-music-arm64-v8a.apk。SHA256SUMS.txt 提供附件校验值。\n本次构建的实际源码快照及 OpenList 上游源码、前端源码与许可证见 sylphy-music-openlist-source.zip；GitHub 自动生成的 Source code 归档仅对应标签的 Git 基线。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.2%2B28/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.2%2B28"
+    }
+  ]
+}
