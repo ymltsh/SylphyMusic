@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.14-openlist.7",
-    "build": 33,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7 (arm64-v8a)",
+    "version": "1.0.14-openlist.8",
+    "build": 34,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8 (arm64-v8a)",
     "date": "2026-11-01",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7+33\n\n- Android 媒体通知改用独立透明背景 Logo，不再沿用启动器 App 图标；通知小图标由系统显示为单色轮廓。\n- 兼容已保存的旧启动器图标配置，在媒体服务恢复、Dart 连接前也使用专用图标。\n- 添加资源保留规则，避免发布包压缩时移除动态引用的通知图标。\n- 保留上一版 Android 媒体恢复修复和歌单卡片本机拖动排序等功能。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附实际应用源码、对应 OpenList 后端 / 前端源码及许可证。GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及资源保留校验，未运行静态分析、功能测试或设备验收。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.8+34\n\n- 播放页快捷操作区（睡眠定时、歌词页、收藏、更多）改为独立组件，可分别移动、缩放、锁定并保存手机 / 宽屏坐标，移动进度条不再带动快捷操作区。\n- 读取旧版布局时补充独立快捷组件，保留编辑器入口；快捷操作区不能隐藏或删除，组件上限调整为 33 个（含快捷操作区）。\n- 包含上一轮淡入淡出补丁：暂停及切歌前短暂淡出，播放及恢复时淡入，串行处理原生音量写入，以减少突变爆音。\n- 保留媒体通知专用透明 Logo、Android 媒体恢复及歌单本机拖动排序等已有功能。\n\n仅提供 Android arm64-v8a，独立包名和更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码与许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收，布局交互和淡入淡出听感由用户确认。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.7%2B33/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.8%2B34/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.7%2B33"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.8%2B34"
   },
   "history": [
+    {
+      "version": "1.0.14-openlist.7",
+      "build": 33,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.7+33\n\n- Android 媒体通知改用独立透明背景 Logo，不再沿用启动器 App 图标；通知小图标由系统显示为单色轮廓。\n- 兼容已保存的旧启动器图标配置，在媒体服务恢复、Dart 连接前也使用专用图标。\n- 添加资源保留规则，避免发布包压缩时移除动态引用的通知图标。\n- 保留上一版 Android 媒体恢复修复和歌单卡片本机拖动排序等功能。\n\n仅提供 Android arm64-v8a，保持独立包名和更新通道；作为预发布，不替换普通版 Latest。附实际应用源码、对应 OpenList 后端 / 前端源码及许可证。GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及资源保留校验，未运行静态分析、功能测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.7%2B33/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.7%2B33"
+    },
     {
       "version": "1.0.14-openlist.6",
       "build": 32,
