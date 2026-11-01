@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.14-openlist.10",
-    "build": 36,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10 (arm64-v8a)",
+    "version": "1.0.27-openlist.11",
+    "build": 40,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11 (arm64-v8a)",
     "date": "2026-11-01",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10+36\n\n- 歌单卡片与详情页的「更多」新增「添加到播放队列」，按整张歌单的条目顺序一次性追加，保留重复歌曲。\n- 追加时保留现有队列的当前歌曲、进度与播放状态；空队列只准备首曲，不自动播放；空歌单显示提示。操作不修改云端歌单。\n- App 底部导航栏顶部增加轻微渐隐阴影，适配深浅主题，保留原有导航尺寸和背景透明度。\n- 音乐库歌曲更多按钮、筛选与定位操作栏、顶部设置按钮统一尺寸和右侧留白，按图标中心对齐。\n- 保留此前播放页高亮、动态标识、布局 v3、独立编辑入口及媒体恢复等改进。\n\n仅提供 Android arm64-v8a，独立包名与更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码和许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11\n\n- 与普通版对齐为 1.0.27 基础版本和构建号 40，保留独立应用与更新通道。\n- 同步封面取色后台计算、迷你播放器提前预热及切歌旧配色清理，减少首次进入播放页的界面阻塞。\n- 保留 OpenList-Lite 嵌入服务、全驱动列表、Lite Web UI，以及既有智能 / 常驻模式和独立数据。\n\n本特别版仅提供 Android arm64-v8a APK，使用既有正式签名。源码附件包含本次应用源码、对应 OpenList 后端 / 前端源码及许可证；原生 OpenList 部分沿用上一版。普通版和特别版可共存，应用数据不自动互通。本轮仅编译和打包，未运行静态分析、测试或设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.10%2B36/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27-openlist.11%2B40/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.10%2B36"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27-openlist.11%2B40"
   },
   "history": [
+    {
+      "version": "1.0.14-openlist.10",
+      "build": 36,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10 (arm64-v8a)",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.14-openlist.10+36\n\n- 歌单卡片与详情页的「更多」新增「添加到播放队列」，按整张歌单的条目顺序一次性追加，保留重复歌曲。\n- 追加时保留现有队列的当前歌曲、进度与播放状态；空队列只准备首曲，不自动播放；空歌单显示提示。操作不修改云端歌单。\n- App 底部导航栏顶部增加轻微渐隐阴影，适配深浅主题，保留原有导航尺寸和背景透明度。\n- 音乐库歌曲更多按钮、筛选与定位操作栏、顶部设置按钮统一尺寸和右侧留白，按图标中心对齐。\n- 保留此前播放页高亮、动态标识、布局 v3、独立编辑入口及媒体恢复等改进。\n\n仅提供 Android arm64-v8a，独立包名与更新通道，保持预发布且不替换普通版 Latest。附实际应用及对应 OpenList 后端 / 前端源码和许可证；GitHub 自动源码归档只代表标签基线。\n本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.14-openlist.10%2B36/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.10%2B36"
+    },
     {
       "version": "1.0.14-openlist.9",
       "build": 35,
