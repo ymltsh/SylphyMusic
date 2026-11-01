@@ -1,5 +1,42 @@
 # 实施与验证记录
 
+## 2026-11-01 对齐版本并发布：普通版 1.0.27+40 / OpenList 1.0.27-openlist.11+40
+
+按用户要求，以普通版为基准将两通道基础版本统一至 1.0.27、构建号统一为 40；OpenList 保留 .11 特别版标识、独立包名及更新通道。两版包含此前同步的封面取色后台化、迷你播放器预热和切歌旧配色清理。普通版同时携带当前工作区的更新检查提示与图标选择文案调整；未覆盖其他已有改动。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27%2B40 ：Android 三 ABI、Windows Release、安装 EXE、便携 ZIP 构建发布成功，保持 GitHub Latest。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.27-openlist.11%2B40 ：仅 Android arm64，独立预发布，附本次实际应用源码与对应 OpenList 后端 / 前端源码及许可证；JNI 与上一版一致。四份 APK 正式签名匹配。
+
+远端普通版六个附件、特别版三个附件大小及 SHA-256 均匹配本地；两通道原始 / 加速清单均返回新版本与 2026-11-01 日期、下载链接匹配。仅提交推送各自 version.json：main f0fbf9c、feature/android-openlist-lite b2bb03b；其余源码、版本配置与文档修改保留本地。未运行静态分析、测试、设备安装或性能复测。
+
+普通版产物 build/releases/1.0.27-40/，日志 build/test_logs/release-1.0.27.log，核对 build/test_logs/aligned-main-release-verification.json。特别版产物 build/releases/1.0.27-openlist.11-40/，构建 / 打包 / 发布日志 build/test_logs/openlist-release-40-*.log，发布状态在产物目录 publish-state.json，核对 build/test_logs/aligned-openlist-release-verification.json。
+
+
+## 2026-11-01 发布普通版封面取色性能优化：1.0.26+39
+
+按用户授权发布刚合入主分支的封面取色后台化、迷你播放器预热与切歌旧配色清理。通过 release.py 重新构建普通 lib/main.dart 入口 Android Release 三 ABI、Windows Release、Inno 安装 EXE 与便携 ZIP；三份 APK 的正式签名匹配既有证书。发布页 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.26%2B39 ，保持普通版 Latest。
+
+GitHub 六份附件（含摘要清单）的大小及 SHA-256 均与本地一致；原始 / 加速 version.json 均返回 1.0.26+39、日期 2026-11-01，下载链接匹配。仅提交并推送 version.json：f4cef1d；源码、依赖与文档修改继续保留本地。OpenList 本轮未更新。未运行 analyze / 测试、设备安装或补丁后性能复测。
+
+产物 build/releases/1.0.26-39/；构建发布日志 build/test_logs/release-1.0.26.log；远端核对 build/test_logs/cover-palette-release-verification.json。
+
+
+## 2026-11-01 应用主分支封面取色后台化补丁
+
+按用户提供的补丁.zip，将其中封面取色性能优化补丁应用于 main，补丁检查通过后直接合入，保留已有进度记录。cover_palette 改为 UI isolate 小图解码 / 像素读取，通过 TransferableTypedData 交给后台 isolate 执行 Celebi 量化、Fidelity 方案与 11 个颜色角色计算；保留按文件版本与亮度区分的 12 项 Future 缓存及失败回退。迷你播放器首帧后预热封面和调色板，补齐窄屏预热；全屏页路由动画结束后应用配色，切歌 / 亮度变化时清除旧 FutureBuilder 结果。material_color_utilities 0.13.0 从间接依赖改为直接依赖，未升级其他依赖。同步架构说明。
+
+已执行 dart format、锁文件约束的 pub get 与 git diff --check。通过 tool/build_review.ps1 完成普通 lib/main.dart 入口 Android Release 三 ABI、Windows Release 编译及本地验收打包，日志 build/test_logs/cover-palette-worker-build.log。产物目录 build/internal-review/：三 ABI APK 和保留运行依赖的 Windows ZIP。版本保持 1.0.25+38；未安装、未运行 analyze / 测试或性能复测，性能改善尚待设备验证。本轮仅修改主分支，OpenList 工作区保持原样；未提交、推送或发布。
+
+
+## 2026-11-01 发布歌单整单入队、底栏阴影及音乐库对齐：普通版 1.0.25+38 / OpenList 1.0.14-openlist.10+36
+
+歌单卡片与详情页的共享「更多」菜单新增「添加到播放队列」。控制器读取本机歌单条目，播放服务一次性追加全部 TrackRef，保留重复歌曲；不更换当前曲目、进度、模式或播放状态。空队列仅准备首曲不自动播放，空歌单显示提示；不写云端歌单。底部导航栏顶部增加 6dp 渐隐阴影。按用户中途补充，音乐库歌曲更多、定位 / 排序行、筛选栏视图切换和顶部设置统一 48dp 占位、右侧 16dp 留白，使图标中心对齐；中止尚在本地构建的发布流程后，将三项改动共同重建发布。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.25%2B38 ：三 ABI Android、Windows Release、安装 EXE 与便携 ZIP 编译打包成功。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.10%2B36 ：Android arm64 独立预发布，附实际应用源码和对应 OpenList 后端 / 前端源码及许可证；JNI 与上一版一致。四份 APK 正式签名匹配，通知图标资源保留。
+
+远端普通版 6 个附件、特别版 3 个附件大小及 SHA-256 均匹配本地，两个通道原始 / 加速清单均返回新版本，日期均为 2026-11-01。普通版保持 Latest。本轮仅提交推送 version.json：main f863b8d，feature/android-openlist-lite 7d403d0；核对过程中保留了主分支另行产生的本地源码提交 3ba9e7f，未额外推送源码。未运行静态分析、功能测试或设备验收。
+
+产物目录：各自 build/releases/1.0.25-38/ 与 build/releases/1.0.14-openlist.10-36/。普通版日志 build/test_logs/release-1.0.25.log，远端核对 build/test_logs/playlist-queue-alignment-release-verification.log；特别版状态 build/releases/1.0.14-openlist.10-36/publish-state.json。
+
 ## 2026-11-01 发布播放器 UI v2 补丁：普通版 1.0.24+37 / OpenList 1.0.14-openlist.9+35
 
 应用 sylphy-player-ui-v2.patch 到两个分支。补丁为无上下文格式，采用逐段唯一 / 位置匹配合入并修正设置页一处原有缩进差异，原文件备份在 .private/player-ui-v2-originals/。新增 PlayingSongTile 与动态均衡器，覆盖首页、音乐库、歌单歌曲和队列播放标识；增加空闲封面预热，入场动画期间延后大图模糊。播放器外观设置增加独立编辑入口并重新分组，无当前歌曲也可编辑。布局元素格式升级 v3，快捷操作区可隐藏、删除及重新添加，新保存不再补回；旧 v1/v2 仍迁移。设置容器版本及数据库结构不变，架构 / 编辑器说明同步更新。

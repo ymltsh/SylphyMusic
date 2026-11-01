@@ -1,12 +1,13 @@
 name: sylphy_music
 description: 风灵音乐 / Sylphy Music - multi-source music player
 publish_to: none
-version: 1.0.25+38
+version: 1.0.27+40
 environment:
   sdk: '>=3.13.0 <4.0.0'
 dependencies:
   flutter:
     sdk: flutter
+  material_color_utilities: 0.13.0
   media_kit: ^1.2.6
   media_kit_libs_audio: ^1.0.7
   audio_service:

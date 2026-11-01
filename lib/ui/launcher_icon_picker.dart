@@ -25,14 +25,14 @@ class _IconCopy {
 
 class _LauncherIconPickerState extends State<LauncherIconPicker> {
   static const _copy = <String, _IconCopy>{
-    '微风与低音': _IconCopy('默认 · 自由之风', '风起之时，故事与旋律一起出发。', '《原神》· 微风与少年'),
+    '微风与低音': _IconCopy('默认 · 自由之风', '风起之时，故事与旋律一起出发。', '《蒙德》·蒙德· 微风与少年'),
     '高气压': _IconCopy('轻盈 · 音浪', '气压正在升高，下一阵音浪即将抵达。'),
     '春风拂面': _IconCopy('自然 · 春日', '春风有信，音符有期。'),
     '杨柳依依': _IconCopy('柔和 · 春意', '杨柳依依，旋律随风轻轻摇曳。'),
     '吹响！上低音号': _IconCopy('青春 · 合奏', '四季流转，我们的合奏仍在继续。', '《吹响！上低音号》· 季节与音符'),
-    '点阵白': _IconCopy('星舰 · 晨光', '三十三束火光，等待黎明点火。', 'Starship · 33 台猛禽发动机'),
-    '点阵黑': _IconCopy('星舰 · 夜航', '三十三台引擎，向星海齐声轰鸣。', 'Starship · 33 台猛禽发动机'),
-    '风精灵': _IconCopy('幻想 · 温柔', '有一位风精灵，悄悄住进了旋律里。', '《无职转生》· Sylphy'),
+    '点阵白': _IconCopy('星辰 · 晨光', '三十三束火光，等待黎明点火。', 'Starship · 33 台猛禽发动机'),
+    '点阵黑': _IconCopy('星辰 · 夜航', '三十三台引擎，向星海齐声轰鸣。', 'Starship · 33 台猛禽发动机'),
+    '风精灵': _IconCopy('真挚 · 温柔', '有一位风精灵，悄悄住进了旋律里。', '《Mushoku_Tensei》· Sylphy'),
   };
 
   late Future<LauncherIconSelection> _selection = widget.service.load();

@@ -162,7 +162,7 @@ Android 以 `AudioServiceActivity` 承载媒体服务，另有缓存前台服务
 
 Android 系统栏由 `ui/system_bars.dart` 在应用启动和 MaterialApp.builder 中统一管理：edge-to-edge、透明导航栏与跟随主题的图标明暗；各页面分别处理安全边距，避免全局 SafeArea 造成背景断层或底部双倍留白。API 29+ 原生启动主题同步透明栏样式，详见 [Android 手势条说明](ANDROID_SYSTEM_BARS.md)。
 
-自定义外观由 Appearance 持久化：主色默认 #5094B2，AppBackground 只包围一级页面，不覆盖设置、搜索和播放等次级路由。播放页使用 PlayerBackdrop，跟随 Theme.brightness 选择浅 / 深色封面取色和遮罩；纯色背景作为无封面模糊时的基础底色，封面模糊默认关闭。图片在应用数据目录存储受管副本，归一化、串行替换与关闭等待由 Appearance 管理；详见 [APPEARANCE](APPEARANCE.md)。
+自定义外观由 Appearance 持久化：主色默认 #5094B2，AppBackground 只包围一级页面，不覆盖设置、搜索和播放等次级路由。播放页使用 PlayerBackdrop，跟随 Theme.brightness 选择浅 / 深色封面取色和遮罩；纯色背景作为无封面模糊时的基础底色，封面模糊默认关闭。封面调色板由 UI isolate 解码至最长边 112px，再以 TransferableTypedData 将像素交给后台 isolate 完成 Celebi 量化、Fidelity 色彩方案和 11 个颜色角色计算；迷你播放器首帧后预热，与全屏播放页共用按文件版本 / 亮度区分的 12 项 Future 缓存。路由入场结束后才应用配色，切歌或亮度变化时清除旧 FutureBuilder 结果。图片在应用数据目录存储受管副本，归一化、串行替换与关闭等待由 Appearance 管理；详见 [APPEARANCE](APPEARANCE.md)。
 
 
 睡眠定时由 `SylphyApp.sleepTimer` 持有 `PlaybackSleepTimer`，不依赖播放页路由生命周期。使用应用会话内截止时间调用同一 `PlaybackCoordinator.pause()`，更换 / 取消定时清理旧任务，恢复前台复核截止时间；`disposeAsync()` 在关闭播放服务前取消并等待正在执行的定时任务，不保存跨进程定时设置。

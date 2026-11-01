@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
+import 'cover_palette.dart';
 import 'now_playing.dart';
 import 'playing_song_tile.dart';
 import 'playback_mode_button.dart';
@@ -248,6 +249,7 @@ class PlayerBar extends StatelessWidget {
             : () => Navigator.of(context).push(_nowPlayingRoute(app)),
         child: Row(
           children: [
+            if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
             if (track != null) CoverArt(app: app, track: track),
             const SizedBox(width: 12),
             Expanded(
@@ -360,42 +362,40 @@ class _NowPlayingCoverWarmupState extends State<_NowPlayingCoverWarmup> {
   String? _scheduled;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _schedule();
   }
 
   @override
   void didUpdateWidget(covariant _NowPlayingCoverWarmup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.track.ref != widget.track.ref ||
-        oldWidget.track.artworkVersion != widget.track.artworkVersion) {
-      _schedule();
-    }
+    _schedule();
   }
 
   void _schedule() {
-    final key = '${widget.track.ref.key}/${widget.track.artworkVersion}';
+    final track = widget.track;
+    final brightness = Theme.of(context).brightness;
+    final key =
+        '${track.ref.key}/${track.artworkVersion}/${widget.app.artwork.revision(track)}/${brightness.name}';
     if (_scheduled == key) return;
     _scheduled = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _scheduled != key) return;
-      SchedulerBinding.instance.scheduleTask<void>(
-        () {
-          if (mounted && _scheduled == key) {
-            unawaited(_precache(key, widget.track));
-          }
-        },
-        Priority.idle,
-        debugLabel: 'precache player artwork',
-      );
+      // Start asynchronous I/O and worker quantization immediately after the
+      // first mini-player frame. An idle-priority task can starve while the
+      // player has continuous animation frames.
+      unawaited(_precache(key, track, brightness));
     });
   }
 
-  Future<void> _precache(String key, Track track) async {
+  Future<void> _precache(String key, Track track, Brightness brightness) async {
     try {
       final file = await widget.app.artwork.load(track);
       if (!mounted || _scheduled != key || file == null) return;
+      // Same single-flight palette used by the full-screen player; the CPU-
+      // intensive portion runs on a worker isolate, never on the UI isolate.
+      unawaited(coverColorScheme(file, brightness: brightness));
       // Matches the upper decoding bound used by the large ambient cover.
       await precacheImage(ResizeImage(FileImage(file), width: 1000), context);
     } catch (_) {

@@ -652,7 +652,7 @@ void main() {
         await tester.pageBack();
         await tester.pumpAndSettle();
         await openSetting('检查更新');
-        expect(find.text('仅在点击时检查更新，下载后由你手动安装。'), findsOneWidget);
+        expect(find.text('点击获取最新版本安装包'), findsOneWidget);
         expect(find.text('正在检查…'), findsNothing);
         await capture('settings-update-mobile');
         await tester.pageBack();

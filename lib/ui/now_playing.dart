@@ -23,11 +23,11 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   String? lyricsKey;
   Future<String?>? lyrics;
   String? _paletteKey;
-  Future<ColorScheme?>? _paletteFuture;
+  Future<CoverPalette?>? _paletteFuture;
   Animation<double>? _entryAnimation;
   bool _entryReady = false;
   ThemeData? _themeBase, _playerTheme;
-  ColorScheme? _themePalette;
+  CoverPalette? _themePalette;
   double _dragOffset = 0;
   bool _dragging = false;
   double _horizontalOffset = 0;
@@ -54,13 +54,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   void _entryStatusChanged(AnimationStatus status) {
     if (status != AnimationStatus.completed || _entryReady || !mounted) return;
-    // Let the transition's final frame finish before cover quantization / I/O.
+    // Apply prewarmed colors only after the slide transition has finished.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_entryReady) setState(() => _entryReady = true);
     });
   }
 
-  ThemeData _themeFor(ThemeData base, ColorScheme? palette) {
+  ThemeData _themeFor(ThemeData base, CoverPalette? palette) {
     if (!identical(base, _themeBase) || !identical(palette, _themePalette)) {
       _themeBase = base;
       _themePalette = palette;
@@ -97,7 +97,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   PlayerLayout get _layout =>
       widget.app.playerLayouts.active ?? _fallbackLayout;
 
-  Future<ColorScheme?> _paletteFor(Track track, Brightness brightness) {
+  Future<CoverPalette?> _paletteFor(Track track, Brightness brightness) {
     final key =
         '${track.ref.key}/${track.artworkVersion}/${widget.app.artwork.revision(track)}/${brightness.name}';
     if (_paletteKey != key) {
@@ -107,13 +107,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     return _paletteFuture!;
   }
 
-  Future<ColorScheme?> _loadPalette(Track track, Brightness brightness) async {
+  Future<CoverPalette?> _loadPalette(Track track, Brightness brightness) async {
     final file = await widget.app.artwork.load(track);
     if (file == null) return null;
     return coverColorScheme(file, brightness: brightness);
   }
 
-  ColorScheme _withCoverPalette(ColorScheme base, ColorScheme? cover) {
+  ColorScheme _withCoverPalette(ColorScheme base, CoverPalette? cover) {
     if (cover == null) return base;
     return base.copyWith(
       primary: cover.primary,
@@ -270,10 +270,17 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       // The app already generated this theme; playback ticks only reuse it.
       final baseTheme = Theme.of(context);
       final brightness = baseTheme.brightness;
-      return FutureBuilder<ColorScheme?>(
-        future: _entryReady ? _paletteFor(track, brightness) : null,
+      final paletteFuture = _entryReady ? _paletteFor(track, brightness) : null;
+      return FutureBuilder<CoverPalette?>(
+        // Discard the previous track's result while the next one loads.
+        key: ValueKey(_entryReady ? _paletteKey : 'palette-pending'),
+        future: paletteFuture,
         builder: (context, paletteSnapshot) {
-          final theme = _themeFor(baseTheme, paletteSnapshot.data);
+          final palette =
+              paletteSnapshot.connectionState == ConnectionState.done
+              ? paletteSnapshot.data
+              : null;
+          final theme = _themeFor(baseTheme, palette);
           return Theme(
             data: theme,
             child: AppSystemBars(
