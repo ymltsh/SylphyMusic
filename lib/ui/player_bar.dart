@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
 import 'now_playing.dart';
+import 'playing_song_tile.dart';
 import 'playback_mode_button.dart';
 import 'playback_controls.dart';
 import 'track_lookup.dart';
@@ -155,26 +157,31 @@ class PlayerBar extends StatelessWidget {
           ),
         ),
       );
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.shadow.withValues(alpha: .18),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
+      return Stack(
+        children: [
+          if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: .18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: app.appearance.glass
-              ? BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: bar,
-                )
-              : bar,
-        ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: app.appearance.glass
+                  ? BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: bar,
+                    )
+                  : bar,
+            ),
+          ),
+        ],
       );
     }
     final controls = Row(
@@ -339,6 +346,67 @@ class PlayerBar extends StatelessWidget {
   }
 }
 
+class _NowPlayingCoverWarmup extends StatefulWidget {
+  const _NowPlayingCoverWarmup({required this.app, required this.track});
+
+  final SylphyApp app;
+  final Track track;
+
+  @override
+  State<_NowPlayingCoverWarmup> createState() => _NowPlayingCoverWarmupState();
+}
+
+class _NowPlayingCoverWarmupState extends State<_NowPlayingCoverWarmup> {
+  String? _scheduled;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NowPlayingCoverWarmup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.track.ref != widget.track.ref ||
+        oldWidget.track.artworkVersion != widget.track.artworkVersion) {
+      _schedule();
+    }
+  }
+
+  void _schedule() {
+    final key = '${widget.track.ref.key}/${widget.track.artworkVersion}';
+    if (_scheduled == key) return;
+    _scheduled = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _scheduled != key) return;
+      SchedulerBinding.instance.scheduleTask<void>(
+        () {
+          if (mounted && _scheduled == key) {
+            unawaited(_precache(key, widget.track));
+          }
+        },
+        Priority.idle,
+        debugLabel: 'precache player artwork',
+      );
+    });
+  }
+
+  Future<void> _precache(String key, Track track) async {
+    try {
+      final file = await widget.app.artwork.load(track);
+      if (!mounted || _scheduled != key || file == null) return;
+      // Matches the upper decoding bound used by the large ambient cover.
+      await precacheImage(ResizeImage(FileImage(file), width: 1000), context);
+    } catch (_) {
+      // Prefetch is best-effort; normal artwork loading remains unchanged.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
 class _PlaybackQueueSheet extends StatefulWidget {
   const _PlaybackQueueSheet({required this.app});
 
@@ -487,9 +555,8 @@ class _PlaybackQueueSheetState extends State<_PlaybackQueueSheet> {
                                           ),
                                           child: Padding(
                                             padding: const EdgeInsets.all(2),
-                                            child: Icon(
-                                              Icons.equalizer_rounded,
-                                              size: 14,
+                                            child: PlaybackEqualizer(
+                                              playing: player.playing,
                                               color: scheme.onPrimary,
                                             ),
                                           ),

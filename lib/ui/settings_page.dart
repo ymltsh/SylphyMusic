@@ -8,11 +8,13 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/app_controller.dart';
 import '../core/appearance.dart';
+import '../core/player_layout.dart';
 import 'cache_storage.dart';
 import 'app_update_page.dart';
 import 'launcher_icon_picker.dart';
 import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
+import 'player_layout/layout_editor.dart';
 import 'about_page.dart';
 
 enum _Section {
@@ -77,6 +79,24 @@ class _SettingsPageState extends State<SettingsPage> {
   void _downloads() => Navigator.of(context)
       .push(MaterialPageRoute<void>(builder: (_) => CacheTasksPage(app: app)));
 
+  Future<void> _editPlayerLayout() async {
+    final track = app.playback.current;
+    final theme = Theme.of(context);
+    final layout = app.playerLayouts.active ?? playerTemplate();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PlayerLayoutEditor(
+          app: app,
+          initial: layout,
+          theme: theme,
+          track: track,
+          lyrics: track == null ? null : app.loadLyrics(track),
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([
@@ -118,6 +138,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? _directory(context)
                           : section == _Section.lyrics
                           ? _lyricCards()
+                          : section == _Section.player
+                          ? _playerAppearanceCards()
                           : [
                               Card(
                                 margin: EdgeInsets.zero,
@@ -132,6 +154,66 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     },
   );
+
+  List<Widget> _playerAppearanceCards() => [
+    _group('播放页面', [
+      ListTile(
+        key: const ValueKey('edit-player-layout'),
+        leading: const Icon(Icons.dashboard_customize_outlined),
+        title: const Text('编辑播放页面'),
+        subtitle: Text(
+          '当前布局：${app.playerLayouts.active?.name ?? '系统默认'} · '
+          '可移动、隐藏或删除组件',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _editPlayerLayout,
+      ),
+    ]),
+    _group('迷你播放器', [
+      ListTile(
+        title: const Text('默认播放器样式'),
+        subtitle: const Text('选择底部横条或悬浮按钮'),
+        trailing: DropdownButton<bool>(
+          value: app.appearance.playerFab,
+          underline: const SizedBox(),
+          items: const [
+            DropdownMenuItem(value: false, child: Text('横条')),
+            DropdownMenuItem(value: true, child: Text('悬浮按钮')),
+          ],
+          onChanged: (value) =>
+              _act(() => app.appearance.update(playerFab: value)),
+        ),
+      ),
+      SwitchListTile(
+        title: const Text('磨砂迷你播放器'),
+        subtitle: const Text('为底部播放控件添加模糊质感'),
+        value: app.appearance.glass,
+        onChanged: (v) => _act(() => app.appearance.update(frost: v)),
+      ),
+    ]),
+    _group('全屏播放页', [
+      SwitchListTile(
+        title: const Text('唱片播放样式'),
+        subtitle: const Text('将封面显示为黑胶唱片'),
+        value: app.appearance.disc,
+        onChanged: (v) => _act(() => app.appearance.update(record: v)),
+      ),
+      SwitchListTile(
+        title: const Text('唱片旋转'),
+        subtitle: const Text('播放时旋转黑胶唱片'),
+        value: app.appearance.discRotation,
+        onChanged: app.appearance.disc
+            ? (v) => _act(() => app.appearance.update(rotateDisc: v))
+            : null,
+      ),
+      SwitchListTile(
+        title: const Text('封面模糊背景'),
+        subtitle: const Text('在全屏播放页使用封面氛围背景'),
+        value: app.appearance.ambient,
+        onChanged: (v) => _act(() => app.appearance.update(background: v)),
+      ),
+    ]),
+  ];
 
   Widget _entry(
     IconData icon,
@@ -320,7 +402,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _group('外观与个性化', [
       _entry(Icons.palette_outlined, '主题与配色', '打造你喜欢的色彩', _Section.theme),
       _entry(Icons.wallpaper_outlined, '页面背景', '自定义页面背景', _Section.background),
-      _entry(Icons.album_outlined, '播放器外观', '定制你的播放界面', _Section.player),
+      _entry(Icons.album_outlined, '播放器外观', '编辑播放页、唱片与迷你播放器', _Section.player),
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
         _entry(Icons.apps_outlined, '应用图标', '选择你喜欢的图标', _Section.icon),
     ]),
@@ -566,43 +648,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
     ],
-    _Section.player => [
-      ListTile(
-        title: const Text('默认播放器样式'),
-        trailing: DropdownButton<bool>(
-          value: app.appearance.playerFab,
-          underline: const SizedBox(),
-          items: const [
-            DropdownMenuItem(value: false, child: Text('横条')),
-            DropdownMenuItem(value: true, child: Text('悬浮按钮')),
-          ],
-          onChanged: (value) =>
-              _act(() => app.appearance.update(playerFab: value)),
-        ),
-      ),
-      SwitchListTile(
-        title: const Text('唱片播放样式'),
-        value: app.appearance.disc,
-        onChanged: (v) => _act(() => app.appearance.update(record: v)),
-      ),
-      SwitchListTile(
-        title: const Text('封面模糊背景'),
-        value: app.appearance.ambient,
-        onChanged: (v) => _act(() => app.appearance.update(background: v)),
-      ),
-      SwitchListTile(
-        title: const Text('磨砂迷你播放器'),
-        value: app.appearance.glass,
-        onChanged: (v) => _act(() => app.appearance.update(frost: v)),
-      ),
-      SwitchListTile(
-        title: const Text('唱片旋转'),
-        value: app.appearance.discRotation,
-        onChanged: app.appearance.disc
-            ? (v) => _act(() => app.appearance.update(rotateDisc: v))
-            : null,
-      ),
-    ],
+    _Section.player => [],
     _Section.icon => [const LauncherIconPicker()],
     _Section.cache => [
       ListTile(

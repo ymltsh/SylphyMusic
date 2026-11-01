@@ -7,6 +7,7 @@ import '../core/models.dart';
 import '../data/library_catalog.dart';
 import 'cover_art.dart';
 import 'library_browser.dart';
+import 'playing_song_tile.dart';
 import 'now_playing.dart';
 
 class HomePage extends StatefulWidget {
@@ -385,14 +386,11 @@ class _ListeningHistoryPageState extends State<ListeningHistoryPage> {
         itemCount: items.length,
         itemBuilder: (context, index) {
           final track = items[index];
-          return ListTile(
-            leading: CoverArt(app: widget.app, track: track),
-            title: Text(
-              track.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(track.artist),
+          return PlayingSongTile(
+            app: widget.app,
+            track: track,
+            title: track.title,
+            subtitle: track.artist,
             onTap: () async {
               try {
                 await widget.app.playback.setQueue(

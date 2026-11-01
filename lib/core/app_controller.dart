@@ -931,6 +931,14 @@ class SylphyApp extends ChangeNotifier {
     await reload();
   }
 
+  Future<int> enqueuePlaylist(PlaylistModel playlist) async {
+    final refs = (await db.playlistKeys(playlist.id))
+        .map(TrackRef.parse)
+        .toList();
+    await playback.enqueueAll(refs);
+    return refs.length;
+  }
+
   Future<void> cachePlaylist(PlaylistModel playlist) async {
     final refs = (await db.playlistKeys(playlist.id))
         .map(TrackRef.parse)

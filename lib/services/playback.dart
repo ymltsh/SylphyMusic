@@ -918,6 +918,34 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
   }
 
+  /// Append a playlist in one queue update, keeping duplicate identities.
+  /// Adding to an empty queue prepares it without starting playback.
+  Future<void> enqueueAll(List<TrackRef> refs) async {
+    if (refs.isEmpty) return;
+    if (snapshot.tracks.isEmpty) {
+      await setQueue(refs, autoplay: false);
+      return;
+    }
+    final previousLength = snapshot.tracks.length;
+    final order = snapshot.order.length == previousLength
+        ? [...snapshot.order]
+        : List.generate(previousLength, (i) => i);
+    order.addAll(List.generate(refs.length, (i) => previousLength + i));
+    snapshot = QueueSnapshot(
+      tracks: [...snapshot.tracks, ...refs.map((ref) => ref.key)],
+      index: snapshot.index,
+      positionMs: position.inMilliseconds,
+      repeat: snapshot.repeat,
+      shuffle: snapshot.shuffle,
+      order: order,
+      history: [...snapshot.history],
+    );
+    await save();
+    notifyListeners();
+    cache.invalidatePreview();
+    _scheduleAhead();
+  }
+
   Future<void> enqueue(TrackRef ref, {bool next = false}) async {
     if (snapshot.tracks.isEmpty) {
       await setQueue([ref]);

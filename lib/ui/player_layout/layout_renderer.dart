@@ -316,21 +316,6 @@ class PlayerLayoutRenderer extends StatelessWidget {
                 rect: layout.bounds(e, size),
                 child: PlayerWidgetRegistry.build(context, e, data),
               ),
-            // An old in-memory layout can lack the new component until read
-            // through PlayerLayout.fromJson; keep the editor entry reachable.
-            if (!layout.elements.any((e) => e.type == PlayerPart.quickActions))
-              Positioned.fromRect(
-                rect: layout.actionBounds(size),
-                child: PlayerWidgetRegistry.build(
-                  context,
-                  PlayerElement(
-                    id: 'legacy-quick-actions',
-                    type: PlayerPart.quickActions,
-                    frame: const Rect.fromLTWH(0, 0, 1, 1),
-                  ),
-                  data,
-                ),
-              ),
           ],
         ),
       );

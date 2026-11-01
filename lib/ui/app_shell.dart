@@ -9,6 +9,7 @@ import 'cache_storage.dart';
 import 'playlist_page.dart';
 import 'playlist_reorder_grid.dart';
 import 'player_bar.dart';
+import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
 import 'playback_notice.dart';
 import 'capsule_toggle.dart';
@@ -240,29 +241,37 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             tab == 0 ? appDisplayName() : labels[tab],
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
+          actionsPadding: const EdgeInsetsDirectional.only(end: 16),
           actions: [
-            IconButton(
-              tooltip: '搜索',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SearchPage(app: app, onAction: _trackAction),
-                ),
-              ),
-              icon: const Icon(Icons.search),
-            ),
-            IconButton(
-              tooltip: '设置',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => SettingsPage(
-                    app: app,
-                    onSources: () => _open('音乐源管理', _sources),
+            SizedBox.square(
+              dimension: 48,
+              child: IconButton(
+                tooltip: '搜索',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SearchPage(app: app, onAction: _trackAction),
                   ),
                 ),
+                icon: const Icon(Icons.search),
               ),
-              icon: const Icon(Icons.settings_outlined),
+            ),
+            SizedBox.square(
+              dimension: 48,
+              child: IconButton(
+                tooltip: '设置',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => SettingsPage(
+                      app: app,
+                      onSources: () => _open('音乐源管理', _sources),
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.settings_outlined),
+              ),
             ),
           ],
         ),
@@ -292,30 +301,56 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
         bottomNavigationBar: wide
             ? null
-            : NavigationBar(
-                backgroundColor: dark
-                    ? scheme.surfaceContainerLow.withValues(
-                        alpha: customBackground ? .92 : 1,
-                      )
-                    : solidBackground
-                    ? Colors.transparent
-                    : customBackground
-                    ? scheme.surfaceContainer.withValues(alpha: .90)
-                    : null,
-                surfaceTintColor: dark || solidBackground
-                    ? Colors.transparent
-                    : null,
-                height: _navigationBarHeight(context),
-                maintainBottomViewPadding: true,
-                selectedIndex: tab,
-                onDestinationSelected: (v) => setState(() => tab = v),
-                destinations: List.generate(
-                  labels.length,
-                  (i) => NavigationDestination(
-                    icon: Icon(icons[i]),
-                    label: labels[i],
+            : Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  NavigationBar(
+                    elevation: 0,
+                    backgroundColor: dark
+                        ? scheme.surfaceContainerLow.withValues(
+                            alpha: customBackground ? .92 : 1,
+                          )
+                        : solidBackground
+                        ? Colors.transparent
+                        : customBackground
+                        ? scheme.surfaceContainer.withValues(alpha: .90)
+                        : null,
+                    surfaceTintColor: dark || solidBackground
+                        ? Colors.transparent
+                        : null,
+                    height: _navigationBarHeight(context),
+                    maintainBottomViewPadding: true,
+                    selectedIndex: tab,
+                    onDestinationSelected: (v) => setState(() => tab = v),
+                    destinations: List.generate(
+                      labels.length,
+                      (i) => NavigationDestination(
+                        icon: Icon(icons[i]),
+                        label: labels[i],
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: -6,
+                    left: 0,
+                    right: 0,
+                    height: 6,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: dark ? .18 : .07),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
       ),
     );
@@ -353,16 +388,17 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             ),
           ),
           if (libraryView == 1)
-            IconButton(
-              key: const ValueKey('album-cover-flow-toggle'),
-              tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
-              isSelected: albumCoverFlow,
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-              onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
-              icon: const Icon(Icons.view_carousel_outlined),
-              selectedIcon: const Icon(Icons.view_list_rounded),
+            SizedBox.square(
+              dimension: 48,
+              child: IconButton(
+                key: const ValueKey('album-cover-flow-toggle'),
+                tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
+                isSelected: albumCoverFlow,
+                onPressed: () =>
+                    setState(() => albumCoverFlow = !albumCoverFlow),
+                icon: const Icon(Icons.view_carousel_outlined),
+                selectedIcon: const Icon(Icons.view_list_rounded),
+              ),
             ),
         ],
       ),
@@ -506,18 +542,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           );
         }
         final track = tracks[i - (showPlayAll ? 1 : 0)];
-        return ListTile(
-          leading: CoverArt(app: app, track: track),
-          title: Text(
-            track.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            '${track.artist} · ${track.album} · ${_sourceName(track.ref.sourceId)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+        return PlayingSongTile(
+          app: app,
+          track: track,
+          title: track.title,
+          subtitle:
+              '${track.artist} · ${track.album} · ${_sourceName(track.ref.sourceId)}',
           onTap: () => _act(
             () => app.playback.setQueue(
               tracks.map((t) => t.ref).toList(),
@@ -536,7 +566,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
               const PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
               const PopupMenuItem(value: 'next', child: Text('下一首播放')),
-              const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列末尾')),
+              const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
               const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
               if (onRemove != null)
                 PopupMenuItem(
@@ -862,6 +892,18 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   }
 
   Future<void> _playlistAction(String action, PlaylistModel p) async {
+    if (action == 'enqueue') {
+      await _act(() async {
+        final count = await app.enqueuePlaylist(p);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(count == 0 ? '歌单为空，未添加歌曲' : '已将 $count 首歌曲添加到播放队列'),
+          ),
+        );
+      });
+      return;
+    }
     if (action == 'rename') {
       final name = TextEditingController(text: p.name);
       final accepted = await showDialog<bool>(

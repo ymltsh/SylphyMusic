@@ -183,9 +183,10 @@ class PlayerLayout {
   final double backgroundOpacity;
   final PlayerBackground background;
 
-  /// v2 is the free-form canvas format. Older v2 layouts without a movable
-  /// quick-action row are upgraded in memory when read.
-  static const version = 2;
+  /// v3 preserves a deliberately removed quick-action row. v2 layouts still
+  /// receive the row once when migrated, but new saves never recreate it.
+  static const version = 3;
+  static const freeformVersion = 2;
   static const legacyVersion = 1;
   static const maxElements = 33; // Former 32 plus the quick-action row.
 
@@ -225,12 +226,16 @@ class PlayerLayout {
     final json = _map(value);
     return switch (json['version']) {
       legacyVersion => _migrateLegacy(json),
+      freeformVersion => _fromV2(json, restoreLegacyActions: true),
       version => _fromV2(json),
       _ => throw const FormatException('不支持的布局版本'),
     };
   }
 
-  static PlayerLayout _fromV2(Map<String, dynamic> json) {
+  static PlayerLayout _fromV2(
+    Map<String, dynamic> json, {
+    bool restoreLegacyActions = false,
+  }) {
     final raw = json['elements'];
     if (raw is! List || raw.length > maxElements) {
       throw const FormatException('最多支持 33 个组件');
@@ -238,6 +243,9 @@ class PlayerLayout {
     final elements = raw.map(PlayerElement.fromJson).toList();
     if (elements.map((e) => e.id).toSet().length != elements.length) {
       throw const FormatException('组件 ID 重复');
+    }
+    if (elements.where((e) => e.type == PlayerPart.quickActions).length > 1) {
+      throw const FormatException('快捷操作区只能有一个');
     }
     if (elements.any((e) => e.type == PlayerPart.controls)) {
       elements.removeWhere(
@@ -247,7 +255,7 @@ class PlayerLayout {
     return PlayerLayout(
       id: _string(json['id'], 80),
       name: _string(json['name'], 60),
-      elements: _withQuickActions(elements),
+      elements: restoreLegacyActions ? _withQuickActions(elements) : elements,
       background: _enum(PlayerBackground.values, json['background'] ?? 'album'),
       backgroundOpacity: _number(json['backgroundOpacity'] ?? .65, .1, 1),
     );
@@ -415,13 +423,12 @@ class PlayerLayout {
     return rect;
   }
 
-  /// The action strip now has its own saved frame, independent of progress.
-  /// The legacy fallback is only used to upgrade old layouts on read.
+  /// No action strip is drawn after the user removes (or hides) it.
   Rect actionBounds(Size size) {
     final actions = elements
         .where((e) => e.type == PlayerPart.quickActions && !e.hidden)
         .firstOrNull;
-    return actions == null ? _legacyActionBounds(size) : bounds(actions, size);
+    return actions == null ? Rect.zero : bounds(actions, size);
   }
 
   Rect _legacyActionBounds(Size size) {

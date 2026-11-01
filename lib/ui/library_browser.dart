@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../data/library_catalog.dart';
 import 'cover_flow.dart';
 import 'cover_art.dart';
+import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
 
 class LibraryBrowser extends StatefulWidget {
@@ -258,6 +259,30 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       );
     }
     final album = widget.query.view == 1, grouped = widget.query.view != 0;
+    if (!grouped && !widget.query.blocked) {
+      return PlayingSongTile(
+        app: widget.app,
+        track: track,
+        title: track.title,
+        subtitle: '${track.artist} · ${track.album} · ${_source(track)}',
+        contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+        onTap: () => _act(() => _play(track)),
+        trailing: SizedBox.square(
+          dimension: 48,
+          child: PopupMenuButton<String>(
+            onSelected: (v) => _act(() => widget.onAction(v, track)),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
+              PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
+              PopupMenuItem(value: 'next', child: Text('下一首播放')),
+              PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
+              PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
+              PopupMenuItem(value: 'block', child: Text('加入黑名单')),
+            ],
+          ),
+        ),
+      );
+    }
     return ListTile(
       leading: widget.query.view == 2
           ? const Icon(Icons.person_outline)
@@ -297,7 +322,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                 PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
                 PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
                 PopupMenuItem(value: 'next', child: Text('下一首播放')),
-                PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列末尾')),
+                PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
                 PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
                 PopupMenuItem(value: 'block', child: Text('加入黑名单')),
               ],
@@ -435,6 +460,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       if (widget.selected == null && !widget.query.blocked)
         ListTile(
           key: const ValueKey('song-summary'),
+          contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),
           leading: const Tooltip(
             message: '播放全部',
             child: Icon(Icons.play_circle),

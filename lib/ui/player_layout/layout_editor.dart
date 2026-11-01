@@ -23,7 +23,7 @@ class PlayerLayoutEditor extends StatefulWidget {
   final SylphyApp app;
   final PlayerLayout initial;
   final ThemeData theme;
-  final Track track;
+  final Track? track;
   final Future<String?>? lyrics;
   @override
   State<PlayerLayoutEditor> createState() => _PlayerLayoutEditorState();
@@ -182,7 +182,11 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
         shrinkWrap: true,
         children: [
           for (final type in PlayerPart.values.where(
-            (type) => type != PlayerPart.quickActions,
+            (type) =>
+                type != PlayerPart.quickActions ||
+                !draft.value.elements.any(
+                  (e) => e.type == PlayerPart.quickActions,
+                ),
           ))
             ListTile(
               title: Text(partLabels[type]!),
@@ -568,16 +572,14 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
               ),
               IconButton(
                 tooltip: e.hidden ? '显示组件' : '隐藏组件',
-                onPressed: e.locked || e.type == PlayerPart.quickActions
+                onPressed: e.locked
                     ? null
                     : () => draft.update(e.copyWith(hidden: !e.hidden)),
                 icon: Icon(e.hidden ? Icons.visibility_off : Icons.visibility),
               ),
               IconButton(
                 tooltip: '删除组件',
-                onPressed: e.locked || e.type == PlayerPart.quickActions
-                    ? null
-                    : draft.remove,
+                onPressed: e.locked ? null : draft.remove,
                 icon: const Icon(Icons.delete_outline),
               ),
               const Spacer(),

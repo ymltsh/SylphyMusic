@@ -19,7 +19,7 @@ class NowPlayingPage extends StatefulWidget {
 }
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
-  final _fallbackLayout = playerTemplate();
+  static final _fallbackLayout = playerTemplate();
   String? lyricsKey;
   Future<String?>? lyrics;
   String? _paletteKey;
@@ -287,6 +287,9 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                           track: track,
                           background: layout.background,
                           opacity: layout.backgroundOpacity,
+                          // Avoid the expensive large-image blur while the
+                          // first slide-in transition is being rasterized.
+                          showAmbientBlur: _entryReady,
                         ),
                       ),
                     ),

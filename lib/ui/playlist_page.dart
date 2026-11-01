@@ -316,6 +316,7 @@ List<PopupMenuEntry<String>> playlistMenuItems(
       .firstOrNull;
   final online = source != null && source.enabled;
   return [
+    const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
     const PopupMenuItem(value: 'cache', child: Text('缓存歌单')),
     if (playlist.kind != PlaylistKind.favorites && editable)
       const PopupMenuItem(value: 'rename', child: Text('重命名歌单')),
