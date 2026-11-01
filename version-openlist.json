@@ -4,7 +4,7 @@
     "build": 40,
     "name": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11 (arm64-v8a)",
     "date": "2026-11-01",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11\n\n- 与普通版对齐为 1.0.27 基础版本和构建号 40，保留独立应用与更新通道。\n- 同步封面取色后台计算、迷你播放器提前预热及切歌旧配色清理，减少首次进入播放页的界面阻塞。\n- 保留 OpenList-Lite 嵌入服务、全驱动列表、Lite Web UI，以及既有智能 / 常驻模式和独立数据。\n\n本特别版仅提供 Android arm64-v8a APK，使用既有正式签名。源码附件包含本次应用源码、对应 OpenList 后端 / 前端源码及许可证；原生 OpenList 部分沿用上一版。普通版和特别版可共存，应用数据不自动互通。本轮仅编译和打包，未运行静态分析、测试或设备验收。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.27-openlist.11\n\n- 与普通版对齐为 1.0.27 基础版本和构建号 40，保留独立应用与更新通道。\n- 同步封面取色后台计算、迷你播放器提前预热及切歌旧配色清理，减少首次进入播放页的界面阻塞。\n- 保留 OpenList-Lite 嵌入服务、全驱动列表、Lite Web UI，以及既有智能 / 常驻模式和独立数据。\n\n本特别版仅提供 Android arm64-v8a APK，使用既有正式签名。源码附件包含本次应用源码、对应 OpenList 后端 / 前端源码及许可证；原生 OpenList 部分沿用上一版。普通版和特别版可共存，应用数据不自动互通。本轮仅编译和打包，未运行静态分析、测试或设备验收。\n\n同版本更新（2026-11-01）：同步更新页提示与图标选择页文案，OpenList 版接入独立 version-openlist.json 更新清单并修正特别版识别。版本号与构建号不变，已安装同版本可手动下载覆盖安装；自动检查不会因本次重打包提示更高版本。\n",
     "urls": {
       "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.27-openlist.11%2B40/sylphy-music-arm64-v8a.apk"
     },
