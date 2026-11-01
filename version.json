@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.24",
-    "build": 37,
-    "name": "风灵音乐 v1.0.24",
+    "version": "1.0.25",
+    "build": 38,
+    "name": "风灵音乐 v1.0.25",
     "date": "2026-11-01",
-    "notes": "风灵音乐 1.0.24\n\n- 歌曲列表增加当前播放项底色高亮和动态均衡器标识，暂停时显示暂停标识；播放队列同步采用动态播放标识。\n- 提前在空闲时预热当前歌曲的大封面，播放页入场动画期间延后大图模糊处理，以减少首次打开时的渲染负担。\n- 播放器外观设置按播放页面、迷你播放器和全屏播放页分组，新增直接编辑播放页面的入口，无歌曲时也可进入编辑器。\n- 布局格式升级为 v3：快捷操作区可隐藏、删除并重新添加，保存后不再自动恢复；旧 v1/v2 布局继续迁移补齐快捷操作区。\n- 保留已发布的淡入淡出、透明通知 Logo、媒体恢复和歌单本机拖动排序等功能。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试、性能测量或设备验收。\n",
+    "notes": "风灵音乐 1.0.25\n\n- 歌单卡片与详情页的「更多」新增「添加到播放队列」，按整张歌单的条目顺序一次性追加，保留重复歌曲。\n- 追加时保留现有队列的当前歌曲、进度与播放状态；空队列只准备首曲，不自动播放；空歌单显示提示。操作不修改云端歌单。\n- App 底部导航栏顶部增加轻微渐隐阴影，适配深浅主题，保留原有导航尺寸和背景透明度。\n- 音乐库歌曲更多按钮、筛选与定位操作栏、顶部设置按钮统一尺寸和右侧留白，按图标中心对齐。\n- 保留此前播放页高亮、动态标识、布局 v3、独立编辑入口及媒体恢复等改进。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试或设备验收。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.25%2B38/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.25%2B38/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.25%2B38/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.25%2B38/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.25%2B38/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.24+37"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.25+38"
   },
   "history": [
+    {
+      "version": "1.0.24",
+      "build": 37,
+      "name": "风灵音乐 v1.0.24",
+      "date": "2026-11-01",
+      "notes": "风灵音乐 1.0.24\n\n- 歌曲列表增加当前播放项底色高亮和动态均衡器标识，暂停时显示暂停标识；播放队列同步采用动态播放标识。\n- 提前在空闲时预热当前歌曲的大封面，播放页入场动画期间延后大图模糊处理，以减少首次打开时的渲染负担。\n- 播放器外观设置按播放页面、迷你播放器和全屏播放页分组，新增直接编辑播放页面的入口，无歌曲时也可进入编辑器。\n- 布局格式升级为 v3：快捷操作区可隐藏、删除并重新添加，保存后不再自动恢复；旧 v1/v2 布局继续迁移补齐快捷操作区。\n- 保留已发布的淡入淡出、透明通知 Logo、媒体恢复和歌单本机拖动排序等功能。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。本轮仅编译、打包、正式签名及通知图标资源保留校验，未运行静态分析、测试、性能测量或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.24%2B37/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.24+37"
+    },
     {
       "version": "1.0.23",
       "build": 36,
