@@ -416,6 +416,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   child: ListView.builder(
                     key: ValueKey('${widget.query.signature}:$generation'),
                     controller: _scrollController,
+                    cacheExtent: 0,
                     padding: const EdgeInsets.only(bottom: 96),
                     itemExtent:
                         76 * MediaQuery.textScalerOf(context).scale(14) / 14,
@@ -438,28 +439,25 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             message: '播放全部',
             child: Icon(Icons.play_circle),
           ),
-          title: Row(
+          title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
+          trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(result == null ? '—' : '${result.total}', maxLines: 1),
               if (widget.query.view == 0)
-                IconButton(
-                  key: const ValueKey('locate-current-library-track'),
-                  tooltip: '定位当前播放歌曲',
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 40,
-                    height: 40,
+                SizedBox.square(
+                  dimension: 48,
+                  child: IconButton(
+                    key: const ValueKey('locate-current-library-track'),
+                    tooltip: '定位当前播放歌曲',
+                    icon: const Icon(Icons.gps_fixed_rounded, size: 24),
+                    onPressed: result == null || result.total == 0
+                        ? null
+                        : () => _act(_locateCurrentTrack),
                   ),
-                  icon: const Icon(Icons.circle_outlined, size: 22),
-                  onPressed: result == null || result.total == 0
-                      ? null
-                      : () => _act(_locateCurrentTrack),
                 ),
+              if (widget.songActions != null) widget.songActions!,
             ],
           ),
-          trailing: widget.songActions,
           onTap: result == null || result.total == 0 ? null : () => _act(_play),
         ),
       if (widget.viewControls != null) widget.viewControls!,

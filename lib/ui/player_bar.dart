@@ -419,7 +419,7 @@ class _PlaybackQueueSheetState extends State<_PlaybackQueueSheet> {
                 children: [
                   IconButton(
                     tooltip: '定位当前播放歌曲',
-                    icon: const Icon(Icons.circle_outlined),
+                    icon: const Icon(Icons.gps_fixed_rounded, size: 24),
                     onPressed: snapshot.tracks.isEmpty
                         ? null
                         : () => _scrollToCurrent(),
@@ -443,6 +443,7 @@ class _PlaybackQueueSheetState extends State<_PlaybackQueueSheet> {
                 thumbColor: scheme.onSurfaceVariant.withValues(alpha: .38),
                 child: ListView.builder(
                   controller: _scrollController,
+                  cacheExtent: 0,
                   padding: const EdgeInsets.only(bottom: 8, right: 8),
                   itemExtent: _rowExtent,
                   itemCount: snapshot.tracks.length,
@@ -450,6 +451,7 @@ class _PlaybackQueueSheetState extends State<_PlaybackQueueSheet> {
                     final key = snapshot.tracks[index];
                     final isCurrent = index == snapshot.index;
                     return TrackLookup(
+                      key: ValueKey('queue:$index:$key'),
                       app: widget.app,
                       ref: TrackRef.parse(key),
                       builder: (context, track) => ListTile(

@@ -8,7 +8,6 @@ import '../../core/appearance.dart';
 import '../../core/models.dart';
 import '../../core/player_layout.dart';
 import '../system_bars.dart';
-import '../player_quick_actions.dart';
 import 'layout_editing.dart';
 import 'layout_renderer.dart';
 
@@ -156,6 +155,10 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
         px(width * .08, height * .84, width * .84, 68),
         canvas,
       ),
+      PlayerPart.quickActions => _normalised(
+        px(width * .08, height * .75, width * .84, 48),
+        canvas,
+      ),
       PlayerPart.controls => _normalised(
         px(width * .06, height * .915, width * .88, 70),
         canvas,
@@ -178,14 +181,16 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
       child: ListView(
         shrinkWrap: true,
         children: [
-          for (final type in PlayerPart.values)
+          for (final type in PlayerPart.values.where(
+            (type) => type != PlayerPart.quickActions,
+          ))
             ListTile(
               title: Text(partLabels[type]!),
               onTap: () {
                 final canvas = _playerCanvas(context);
                 Navigator.pop(context);
-                if (draft.value.elements.length >= 32) {
-                  setState(() => error = '最多支持 32 个组件');
+                if (draft.value.elements.length >= PlayerLayout.maxElements) {
+                  setState(() => error = '最多支持 33 个组件');
                   return;
                 }
                 final element = PlayerElement(
@@ -423,16 +428,8 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                 ],
               ),
             ),
-          Positioned.fromRect(
-            rect: draft.value.actionBounds(size),
-            child: IgnorePointer(
-              child: PlayerQuickActions(
-                app: widget.app,
-                track: widget.track,
-                preview: true,
-              ),
-            ),
-          ),
+          // Quick actions are rendered by the same editable component loop
+          // as progress, so moving either frame never changes the other.
           if (!preview && (vertical.isNotEmpty || horizontal.isNotEmpty))
             Positioned.fill(
               child: IgnorePointer(
@@ -571,14 +568,16 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
               ),
               IconButton(
                 tooltip: e.hidden ? '显示组件' : '隐藏组件',
-                onPressed: e.locked
+                onPressed: e.locked || e.type == PlayerPart.quickActions
                     ? null
                     : () => draft.update(e.copyWith(hidden: !e.hidden)),
                 icon: Icon(e.hidden ? Icons.visibility_off : Icons.visibility),
               ),
               IconButton(
                 tooltip: '删除组件',
-                onPressed: e.locked ? null : draft.remove,
+                onPressed: e.locked || e.type == PlayerPart.quickActions
+                    ? null
+                    : draft.remove,
                 icon: const Icon(Icons.delete_outline),
               ),
               const Spacer(),

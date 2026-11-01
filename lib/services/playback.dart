@@ -45,6 +45,14 @@ class PlaybackCoordinator extends ChangeNotifier {
   String replayGain = 'no';
   double speed = 1.0;
   double volume = 100;
+  // Avoid cutting the PCM waveform at an arbitrary non-zero sample on pause.
+  // This envelope is separate from saved volume and Android audio ducking.
+  static const _fadeOutDuration = Duration(milliseconds: 48);
+  static const _fadeInDuration = Duration(milliseconds: 64);
+  static const _fadeStep = Duration(milliseconds: 8);
+  final Lock _volumeWriteLock = Lock();
+  double _playbackGain = 1;
+  int _gainGeneration = 0;
   bool _opening = false, _userPaused = false;
   bool _handlingFailure = false;
   bool _finishingTrack = false;
@@ -261,8 +269,38 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
   }
 
-  Future<void> _applyPlayerVolume() =>
-      player.setVolume(volume * (_ducking ? 0.25 : 1.0));
+  // Serialize native writes so an older fade step cannot overwrite a newer
+  // volume, ducking or playback-intent change while setVolume is in flight.
+  Future<void> _applyPlayerVolume() => _volumeWriteLock.synchronized(() {
+    return player.setVolume(volume * (_ducking ? 0.25 : 1.0) * _playbackGain);
+  });
+
+  Future<void> _setPlaybackGain(double value, int generation) async {
+    if (generation != _gainGeneration) return;
+    _playbackGain = value;
+    await _applyPlayerVolume();
+  }
+
+  Future<void> _fadePlaybackGain(
+    double target,
+    Duration duration,
+    int generation,
+  ) async {
+    final start = _playbackGain;
+    final steps = max(
+      1,
+      (duration.inMilliseconds / _fadeStep.inMilliseconds).ceil(),
+    );
+    for (var i = 1; i <= steps; i++) {
+      if (generation != _gainGeneration) return;
+      final t = i / steps;
+      // Smoothstep has zero slope at both ends, unlike a hard volume cut.
+      final eased = t * t * (3 - 2 * t);
+      _playbackGain = start + (target - start) * eased;
+      await _applyPlayerVolume();
+      if (i < steps) await Future<void>.delayed(_fadeStep);
+    }
+  }
 
   Future<void> _abandonAudioFocus() async {
     if (_session == null) return;
@@ -414,7 +452,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     speed = double.tryParse(await db.setting('speed') ?? '1') ?? 1;
     volume = double.tryParse(await db.setting('volume') ?? '100') ?? 100;
     await player.setRate(speed);
-    await player.setVolume(volume);
+    await _applyPlayerVolume();
     await _configureAndroidAudioOutput();
     await _setMpvOption('gapless-audio', 'weak');
     final savedGain = await db.setting('replaygain');
@@ -601,6 +639,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'music.sylphy.playback',
         androidNotificationChannelName: 'Sylphy Music',
+        androidNotificationIcon: 'drawable/ic_stat_sylphy',
         androidNotificationOngoing: true,
       ),
     );
@@ -819,23 +858,29 @@ class PlaybackCoordinator extends ChangeNotifier {
       _leased = ref;
       diagnostics?.record('playback', 'player_opening');
       final shouldPlay = autoplay && _playRequested;
+      late final Uri uri;
       if (source.kind == SourceKind.local) {
         final f = File(current!.remote['path']?.toString() ?? ref.id);
         if (!await f.exists()) throw StateError('本地原始音频文件不存在');
-        diagnostics?.record('playback', 'native_open_started');
-        await player.open(Media(f.uri.toString()), play: shouldPlay);
+        uri = f.uri;
       } else {
         final cached = await cache.find(ref, touch: true);
-        final uri = cached != null
-            ? cached.file.uri
-            : proxy.ticket(current!, source);
+        uri = cached != null ? cached.file.uri : proxy.ticket(current!, source);
         diagnostics?.record(
           'playback',
           cached == null ? 'remote_ticket_open' : 'cached_file_open',
         );
-        diagnostics?.record('playback', 'native_open_started');
-        await player.open(Media(uri.toString()), play: shouldPlay);
       }
+      // Fade out any previous output before replacing its media source.
+      // Mute before open so the new decoder cannot emit an initial click.
+      final gainGeneration = ++_gainGeneration;
+      if (_playbackGain > 0 && player.state.playlist.medias.isNotEmpty) {
+        await _fadePlaybackGain(0, _fadeOutDuration, gainGeneration);
+      } else {
+        await _setPlaybackGain(0, gainGeneration);
+      }
+      diagnostics?.record('playback', 'native_open_started');
+      await player.open(Media(uri.toString()), play: shouldPlay);
       diagnostics?.record('playback', 'player_opened');
       _watchdogPositionMs = position.inMilliseconds;
       _progressWatch.reset();
@@ -843,7 +888,11 @@ class PlaybackCoordinator extends ChangeNotifier {
         await player.seek(Duration(milliseconds: resumeMs));
       }
       // A pause can arrive while the async track opening was in flight.
-      if (!_playRequested) await player.pause();
+      if (!_playRequested) {
+        await player.pause();
+      } else if (shouldPlay && gainGeneration == _gainGeneration) {
+        await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
+      }
       // Never infer a USER pause from _playRequested: audio focus may have
       // paused us while player.open was still awaiting native preparation.
       diagnostics?.record('playback', 'load_finished');
@@ -1055,7 +1104,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       await _loadCurrent(autoplay: true, manual: true);
       return;
     }
-    if (!_playRequested) _mediaProgressObserved = false;
+    final wasRequested = _playRequested;
+    if (!wasRequested) _mediaProgressObserved = false;
     _playRequested = true;
     _progressWatch.reset();
     _publish();
@@ -1073,14 +1123,28 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     if (_playRequested && intentGeneration == _playIntentGeneration) {
+      final fadeIn = !wasRequested;
+      final gainGeneration = fadeIn ? ++_gainGeneration : _gainGeneration;
+      // If pause already reached mpv, the new play must begin muted. If we
+      // interrupted an unfinished fade-out, ramp back up from its live gain.
+      if (fadeIn && !player.state.playing) {
+        await _setPlaybackGain(0, gainGeneration);
+      }
+      if (!_playRequested || intentGeneration != _playIntentGeneration) return;
       await player.play();
       // Reassert a focus pause if it arrived during the native play Future.
       if (automaticFocusResume && !_playRequested) await player.pause();
-      if (_playRequested) _scheduleAhead();
+      if (_playRequested) {
+        if (fadeIn && gainGeneration == _gainGeneration) {
+          await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
+        }
+        _scheduleAhead();
+      }
     }
   }
 
   Future<void> pause({bool system = false}) async {
+    final wasRequested = _playRequested;
     if (!system) {
       _cancelFocusResume(resetBurst: true);
       _userPaused = true;
@@ -1097,12 +1161,21 @@ class PlaybackCoordinator extends ChangeNotifier {
     _aheadPlan = null;
     ++_aheadGeneration;
     _publish();
+    final gainGeneration = ++_gainGeneration;
+    if ((wasRequested || player.state.playing) && _playbackGain > 0) {
+      await _fadePlaybackGain(0, _fadeOutDuration, gainGeneration);
+    } else {
+      await _setPlaybackGain(0, gainGeneration);
+    }
+    // A new play during the fade must not be paused by this stale request.
+    if (gainGeneration != _gainGeneration || _playRequested) return;
     await player.pause();
     await save();
   }
 
   Future<void> toggle() async {
-    if (playing) {
+    // The native playing stream can lag behind a fade or an in-flight open.
+    if (_playRequested) {
       await pause();
     } else {
       await play();
@@ -1453,12 +1526,18 @@ class PlaybackCoordinator extends ChangeNotifier {
     _cancelFocusResume(resetBurst: true);
     _focusWasLost = false;
     ++_playIntentGeneration;
+    final gainGeneration = ++_gainGeneration;
     diagnostics?.record('playback', 'queue_cleared');
     _playRequested = false;
     _cancelAhead();
     _publish();
     final ref = currentRef;
     if (ref != null) await cache.cancel(ref, automaticOnly: true);
+    if (gainGeneration == _gainGeneration && _playbackGain > 0) {
+      await _fadePlaybackGain(0, _fadeOutDuration, gainGeneration);
+    } else {
+      await _setPlaybackGain(0, gainGeneration);
+    }
     await player.stop();
     await _abandonAudioFocus();
     if (_leased != null) {
@@ -1535,6 +1614,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    ++_gainGeneration;
     _cancelFocusResume();
     _cancelAhead();
     _stallTimer?.cancel();
@@ -1549,6 +1629,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> shutdown() async {
+    ++_gainGeneration;
     _cancelFocusResume();
     _stallTimer?.cancel();
     _stallTimer = null;
@@ -1652,6 +1733,38 @@ class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
     } else if (button == MediaButton.previous) {
       await skipToPrevious();
     }
+  }
+
+  // Android media resumption browses the "recent" root after a session is
+  // reclaimed. Expose only the restored current item, not the private library.
+  @override
+  Future<List<MediaItem>> getChildren(
+    String parentMediaId, [
+    Map<String, dynamic>? options,
+  ]) async {
+    if (parentMediaId != 'recent') return const <MediaItem>[];
+    final track = controller.current;
+    if (track == null) return const <MediaItem>[];
+    return [mediaItemForTrack(track, artUri: controller._notificationArtUri)];
+  }
+
+  @override
+  Future<MediaItem?> getMediaItem(String mediaId) async {
+    final track = controller.current;
+    if (track == null || track.ref.key != mediaId) return null;
+    return mediaItemForTrack(track, artUri: controller._notificationArtUri);
+  }
+
+  @override
+  Future<void> playFromMediaId(
+    String mediaId, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    controller.diagnostics?.record('media_control', 'restore_requested');
+    // Refuse stale/foreign IDs. The queue is already restored by bootstrap;
+    // simply resume it rather than replacing the user's play order.
+    if (controller.current?.ref.key != mediaId) return;
+    await play();
   }
 
   // Stop must remain available even in a transport-command storm.

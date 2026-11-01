@@ -445,10 +445,55 @@ class AppDb {
     return a.isEmpty ? null : Track.fromRow(a.first);
   }
 
-  Future<List<PlaylistModel>> playlists() async => (await db.query(
-    'playlists',
-    orderBy: "CASE kind WHEN 'favorites' THEN 0 WHEN 'local' THEN 1 ELSE 2 END,name COLLATE NOCASE",
-  )).map(PlaylistModel.fromRow).toList();
+  Future<List<PlaylistModel>> playlists() => _orderedPlaylists(db);
+
+  Future<List<PlaylistModel>> _orderedPlaylists(
+    DatabaseExecutor executor,
+  ) async {
+    final items = (await executor.query(
+      'playlists',
+      orderBy: "CASE kind WHEN 'favorites' THEN 0 WHEN 'local' THEN 1 ELSE 2 END,name COLLATE NOCASE",
+    )).map(PlaylistModel.fromRow).toList();
+    final settings = await executor.query(
+      'settings',
+      where: 'key=?',
+      whereArgs: ['playlist_display_order'],
+      limit: 1,
+    );
+    if (settings.isEmpty) return items;
+    final Object? saved;
+    try {
+      saved = jsonDecode(settings.single['value'] as String);
+    } on FormatException {
+      return items;
+    }
+    if (saved is! List) return items;
+    final remaining = {for (final item in items) item.id: item};
+    final ordered = <PlaylistModel>[];
+    for (final id in saved) {
+      final item = remaining.remove(id);
+      if (item != null) ordered.add(item);
+    }
+    return [...ordered, ...remaining.values];
+  }
+
+  // Only local presentation settings change; playlist content and sync state
+  // stay untouched. Resolve IDs inside the transaction to tolerate refreshes.
+  Future<void> movePlaylistDisplay(String id, String targetId) async {
+    if (id == targetId) return;
+    await db.transaction((tx) async {
+      final items = await _orderedPlaylists(tx);
+      final from = items.indexWhere((item) => item.id == id);
+      final to = items.indexWhere((item) => item.id == targetId);
+      if (from < 0 || to < 0) return;
+      items.insert(to, items.removeAt(from));
+      await tx.insert('settings', {
+        'key': 'playlist_display_order',
+        'value': jsonEncode(items.map((item) => item.id).toList()),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<PlaylistModel?> playlist(String id) async {
     final r = await db.query(
       'playlists',

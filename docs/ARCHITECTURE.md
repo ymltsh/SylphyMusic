@@ -28,7 +28,7 @@ flowchart TD
 
 图中展示主要调用和数据流；服务按需共享 `AppDb`。`SylphyApp.bootstrap()` 装配依赖，`disposeAsync()` 关闭资源，无额外依赖注入框架。封面和歌词通过控制器 / `ArtworkStore` 调用适配器，本地来源直接读取文件。
 
-播放页另有展示层配置：`PlayerLayoutStore` 在现有 settings 中保存带版本的模板和当前选择，在数据库关闭前排空写入；`PlayerWidgetRegistry` 为编辑器与 `PlayerLayoutRenderer` 统一创建组件。编辑草稿与实际应用的布局隔离，预览控件不接收指针操作，正常渲染才向同一个 `PlaybackCoordinator` 发命令。播放页无顶栏；`PlayerQuickActions` 独立于用户配置，位于第一个可见进度条上方，没有进度条时显示底部回退行，删空布局后仍可进入编辑器恢复。实现、配置边界及验证入口见 [播放页布局编辑器](PLAYER_LAYOUT_EDITOR.md)。 默认与自定义播放页共用 `PlayerBackdrop`、`PlayerProgress` 和 `PlayerControls`；宽屏几何可独立保存为可选展示属性，竖屏坐标保留。主播放按钮宽高和按钮间距只影响展示，不创建新的播放实例或更改队列状态。
+播放页另有展示层配置：`PlayerLayoutStore` 在现有 settings 中保存带版本的模板和当前选择，在数据库关闭前排空写入；`PlayerWidgetRegistry` 为编辑器与 `PlayerLayoutRenderer` 统一创建组件。编辑草稿与实际应用的布局隔离，预览控件不接收指针操作，正常渲染才向同一个 `PlaybackCoordinator` 发命令。播放页无顶栏；`PlayerQuickActions` 作为不可删除或隐藏的独立快捷操作组件，支持移动、缩放、锁定及手机 / 宽屏坐标保存，不再跟随进度条；旧布局读取时按旧锚点初始化独立坐标，尚未迁移的内存布局保留回退入口。实现、配置边界及验证入口见 [播放页布局编辑器](PLAYER_LAYOUT_EDITOR.md)。 默认与自定义播放页共用 `PlayerBackdrop`、`PlayerProgress` 和 `PlayerControls`；宽屏几何可独立保存为可选展示属性，竖屏坐标保留。主播放按钮宽高和按钮间距只影响展示，不创建新的播放实例或更改队列状态。
 
 | 代码位置 | 职责 |
 |---|---|

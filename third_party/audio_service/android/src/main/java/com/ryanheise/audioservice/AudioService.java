@@ -25,6 +25,7 @@ import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.Log;
 import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
@@ -1003,12 +1004,14 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPlay() {
+            Log.i("SylphyMedia", "session=play listener=" + (listener != null));
             if (listener == null) return;
             listener.onPlay();
         }
 
         @Override
         public void onPlayFromMediaId(final String mediaId, final Bundle extras) {
+            Log.i("SylphyMedia", "session=playFromMediaId listener=" + (listener != null));
             if (listener == null) return;
             listener.onPlayFromMediaId(mediaId, extras);
         }
@@ -1035,6 +1038,7 @@ public class AudioService extends MediaBrowserServiceCompat {
             // Bluetooth/headset key-repeat ACTION_DOWNs are not distinct clicks.
             // Consume them without forwarding a new play/pause command to Dart.
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                Log.i("SylphyMedia", "session=mediaButton keyCode=" + event.getKeyCode());
                 switch (event.getKeyCode()) {
                 case KEYCODE_BYPASS_PLAY:
                     onPlay();
@@ -1089,6 +1093,7 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPause() {
+            Log.i("SylphyMedia", "session=pause listener=" + (listener != null));
             if (listener == null) return;
             listener.onPause();
         }

@@ -849,6 +849,11 @@ class SylphyApp extends ChangeNotifier {
     await reload();
   }
 
+  Future<void> movePlaylistDisplay(String id, String targetId) async {
+    await db.movePlaylistDisplay(id, targetId);
+    await reload();
+  }
+
   Future<void> addPlaylist(String name, {SourceProfile? cloudSource}) async {
     if (cloudSource == null) {
       await cloud.newLocal(name);

@@ -1,5 +1,53 @@
 # 实施与验证记录
 
+## 2026-11-01 发布独立快捷操作组件及淡入淡出：普通版 1.0.23+36 / OpenList 1.0.14-openlist.8+34
+
+应用 SylphyMusic-layout-independent-quick-actions.patch 到两个分支，快捷操作区成为独立的 PlayerPart.quickActions 组件，支持移动、缩放、锁定以及手机 / 宽屏坐标保存；不再跟随进度条，旧 v1/v2 布局读取时补充独立元素，保留旧内存布局回退入口。快捷组件不可隐藏 / 删除，组件上限 33。补丁附带测试源码同步应用并格式化，但未运行测试。同步更新架构说明。此次也发布此前已应用但未发布的暂停 / 切歌淡出、播放 / 恢复淡入与串行音量写入补丁。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.23%2B36 ：三 ABI Android、Windows Release、安装 EXE 和便携 ZIP 编译打包成功。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.8%2B34 ：Android arm64 独立预发布，附本轮实际应用及对应后端 / 前端源码、许可证；JNI 与上一版一致。四份 APK 正式签名匹配，通知图标在压缩后保留。
+
+远端普通版 6 个附件、特别版 3 个附件大小及 SHA-256 全部匹配本地；两分支原始 / 加速清单均返回新版本，日期均为 2026-11-01；普通版保持 Latest。仅提交推送 version.json：main d2aa573、feature/android-openlist-lite 8b2fa3b；源码改动保留本地。未运行静态分析、功能测试、试听或设备验收。
+
+产物目录：各自 build/releases/1.0.23-36/ 与 build/releases/1.0.14-openlist.8-34/。普通版构建发布日志 build/test_logs/release-1.0.23.log，远端核对 build/test_logs/quick-actions-release-verification.log；特别版状态 build/releases/1.0.14-openlist.8-34/publish-state.json。
+
+## 2026-11-01 应用播放防爆音淡入淡出补丁
+
+应用 SylphyMusic-playback-pop-fade.patch 到两个分支，保留已有修改。播放增益独立于保存音量与音频焦点压低音量；原生音量写入串行化。暂停 / 替换媒体前进行 48 ms 淡出，播放 / 恢复进行 64 ms 淡入，每步 8 ms；通过增益代次取消过期淡入淡出，toggle 使用播放意图，清空与退出同步终止旧增益操作。已执行 dart format 与差异检查。
+
+普通版三 ABI Android Release、OpenList arm64 Android Release，以及两个分支的 Windows Release 均编译成功。APK 位于各自 build/app/outputs/flutter-apk/，Windows 位于 build/windows/x64/runner/Release/。本轮未运行静态分析、测试、试听或设备验收，未提交、推送或发布；实际爆音改善效果由用户确认。
+
+## 2026-11-01 发布透明通知 Logo 更新：普通版 1.0.22+35 / OpenList 1.0.14-openlist.7+33
+
+按用户授权发布媒体通知专用透明 Logo 及旧启动器图标配置兼容处理。普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.22%2B35 ：Android 三 ABI、Windows Release、安装 EXE 与便携 ZIP 构建打包成功。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.7%2B33 ：Android arm64 独立预发布，附实际应用源码及对应 OpenList 后端 / 前端源码与许可证；JNI 与上一版一致。四份发布 APK 均通过正式签名校验，AAPT 确认 drawable/ic_stat_sylphy 在资源压缩后保留。
+
+远端普通版 6 个附件、特别版 3 个附件大小与 SHA-256 均匹配本地，原始及加速清单均返回新版本，日期均为 2026-11-01。普通版保持 Latest。仅提交推送 version.json：main 8919243，feature/android-openlist-lite fc32cc7；源码工作区改动保留本地。未运行静态分析、功能测试或设备验收。
+
+产物：各自 build/releases/1.0.22-35/ 与 build/releases/1.0.14-openlist.7-33/。普通版日志 build/test_logs/release-1.0.22.log，远端核对记录 build/test_logs/notification-icon-release-verification.log；特别版状态 build/releases/1.0.14-openlist.7-33/publish-state.json。
+
+## 2026-11-01 媒体通知使用独立透明 Logo
+
+按用户提供的 logo/about.png 原样复制为 Android drawable-nodpi/ic_stat_sylphy.png，保留透明通道；媒体服务明确使用 drawable/ic_stat_sylphy。原生默认值同步更新，并将已保存的 mipmap/ic_launcher 配置迁移到专用图标，覆盖 Dart 连接前的恢复场景。添加 raw/keep.xml 避免资源压缩移除动态引用的图标。Android 按系统规则显示通知小图标的单色轮廓。两个分支均同步，普通版三 ABI、OpenList arm64 Release 编译成功，AAPT 资源表确认全部 APK 中保留专用图标。未运行测试或设备验收，未提交、推送或发布；产物位于各自 build/app/outputs/flutter-apk/。
+
+## 2026-11-01 发布 Android 媒体恢复修复：普通版 1.0.21+34 / OpenList 1.0.14-openlist.6+32
+
+应用用户提供的 SylphyMusic-android-media-resume-fix.patch 到两个分支：引擎连接 / 销毁时重置就绪状态，连接正确处理器后分发待处理媒体命令；提供 recent 根与当前媒体项查询、当前恢复项播放入口，拒绝过期或其他媒体标识，保留已恢复队列。原生诊断仅记录控制方法、就绪状态与按键码，不记录歌曲身份、地址或凭据。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.21%2B34 ：三 ABI Android、Windows Release、安装 EXE 与便携 ZIP 编译打包成功，三份 APK 正式签名校验通过。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.6%2B32 ：仅 Android arm64，正式签名校验通过，独立预发布；附实际应用及对应 OpenList 后端 / 前端源码与许可证，JNI 与上一版一致。
+
+远端普通版 6 个附件、特别版 3 个附件的大小和 SHA-256 均匹配本地产物。普通版保持 Latest；两个通道的原始及加速接口均返回新版本。仅提交推送 version.json：main 7054495，特别版 d11c7e8，随后以 fed33aa 修正特别版清单日期；GitHub 仓库日期确认为 2026-11-01，原始 / 加速地址的日期缓存可能延迟刷新。源码工作区改动继续保留本地。未运行静态分析、功能测试或设备验收，实际系统媒体恢复由用户确认。
+
+产物目录：各自 build/releases/1.0.21-34/ 与 build/releases/1.0.14-openlist.6-32/。普通版发布日志 build/test_logs/release-1.0.21.log，特别版状态 build/releases/1.0.14-openlist.6-32/publish-state.json。
+
+## 2026-10-31 发布播放通知与歌单界面更新：普通版 1.0.20+33 / OpenList 1.0.14-openlist.5+31
+
+按用户授权发布两个通道，包含连续快速切歌的通知指令串行处理、播放状态与暂停意图保护，音乐库和队列的歌曲定位 / 可拖动滚动条 / 封面，定位与排序按钮等距，以及歌单卡片长按排序。歌单显示顺序只保存在本机，不改歌曲顺序或云端数据。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.20%2B33 ：Android 三 ABI、Windows Release、安装 EXE 与便携 ZIP 构建打包成功；三份 APK 正式签名匹配。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.14-openlist.5%2B31 ：仅 Android arm64，正式签名匹配，独立预发布；附本轮实际应用源码与对应后端 / 前端源码及许可证。OpenList JNI 与上一版摘要一致，沿用对应后端 / 前端源码并更新应用源码快照。
+
+远端普通版 6 个附件、特别版 3 个附件的大小及 SHA-256 均与本地一致；原始与加速更新清单均返回新版本。普通版保持 GitHub Latest，特别版未替换它。只提交推送 version.json：main `334915d`、feature/android-openlist-lite `0a82d09`；其他源码改动保留本地。本轮未运行静态分析、测试或设备验收。
+
+产物位于各自工作区 build/releases/1.0.20-33/ 和 build/releases/1.0.14-openlist.5-31/；普通版日志 build/test_logs/release-1.0.20.log，特别版状态 build/releases/1.0.14-openlist.5-31/publish-state.json。
+
 ## 2026-10-31 发布统一缓存更新：普通版 1.0.19+32 与 OpenList 1.0.14-openlist.4+30
 
 按用户授权发布两个通道，并将清理旧缓存提醒置于发布页与应用更新说明首条：升级后到「设置 → 下载与缓存 → 清理所有缓存资源」，再重新缓存歌曲 / 歌单；旧缓存不自动转换或回填关联，手动导入歌词与原始音乐保留。未新增旧缓存关联兼容层。

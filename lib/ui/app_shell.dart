@@ -7,6 +7,7 @@ import '../core/models.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
 import 'playlist_page.dart';
+import 'playlist_reorder_grid.dart';
 import 'player_bar.dart';
 import 'route_player_bar.dart';
 import 'playback_notice.dart';
@@ -43,7 +44,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   bool playerCollapsed = false;
   late bool _defaultPlayerFab;
   bool? onboarding;
-  String? sourceFilter;
   bool descending = false;
   String sort = 'name';
   static const labels = ['首页', '音乐库', '歌单', '我的'];
@@ -246,11 +246,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SearchPage(
-                    app: app,
-                    onAction: _trackAction,
-                    initialSource: sourceFilter,
-                  ),
+                  builder: (_) => SearchPage(app: app, onAction: _trackAction),
                 ),
               ),
               icon: const Icon(Icons.search),
@@ -373,37 +369,31 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _sourceFilterControl() => PopupMenuButton<String>(
-    tooltip: '音乐来源',
-    icon: const Icon(Icons.filter_list),
-    onSelected: (v) => setState(() => sourceFilter = v == 'all' ? null : v),
-    itemBuilder: (ctx) => [
-      const PopupMenuItem(value: 'all', child: Text('全部来源')),
-      ...app.sources.map(
-        (s) => PopupMenuItem(value: s.id, child: Text(s.name)),
-      ),
-    ],
-  );
-
   Widget _sortControls() => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      PopupMenuButton<String>(
-        tooltip: '排序',
-        icon: const Icon(Icons.sort),
-        onSelected: (v) => setState(() => sort = v),
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: 'name', child: Text('名称')),
-          PopupMenuItem(value: 'artist', child: Text('艺术家')),
-          PopupMenuItem(value: 'album', child: Text('专辑')),
-          PopupMenuItem(value: 'duration', child: Text('时长')),
-          PopupMenuItem(value: 'year', child: Text('年份')),
-        ],
+      SizedBox.square(
+        dimension: 48,
+        child: PopupMenuButton<String>(
+          tooltip: '排序',
+          icon: const Icon(Icons.sort),
+          onSelected: (v) => setState(() => sort = v),
+          itemBuilder: (ctx) => const [
+            PopupMenuItem(value: 'name', child: Text('名称')),
+            PopupMenuItem(value: 'artist', child: Text('艺术家')),
+            PopupMenuItem(value: 'album', child: Text('专辑')),
+            PopupMenuItem(value: 'duration', child: Text('时长')),
+            PopupMenuItem(value: 'year', child: Text('年份')),
+          ],
+        ),
       ),
-      IconButton(
-        tooltip: '升序 / 降序',
-        onPressed: () => setState(() => descending = !descending),
-        icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+      SizedBox.square(
+        dimension: 48,
+        child: IconButton(
+          tooltip: '升序 / 降序',
+          onPressed: () => setState(() => descending = !descending),
+          icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+        ),
       ),
     ],
   );
@@ -424,17 +414,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           app: app,
           query: CatalogQuery(
             view: libraryView,
-            sourceId: sourceFilter,
             sort: sort,
             descending: descending,
           ),
           onAction: _trackAction,
           coverFlow: libraryView == 1 && albumCoverFlow,
           viewControls: _libraryFilterBar(),
-          songActions: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [_sourceFilterControl(), _sortControls()],
-          ),
+          songActions: _sortControls(),
         );
       case 2:
         return _playlists();
@@ -660,42 +646,17 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 bottomPadding: 84,
                 emptyMessage: '还没有歌单',
               )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 1200
-                      ? 5
-                      : constraints.maxWidth >= 900
-                      ? 4
-                      : constraints.maxWidth >= 640
-                      ? 3
-                      : 2;
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent:
-                          (constraints.maxWidth - 32 - (columns - 1) * 14) /
-                              columns +
-                          MediaQuery.textScalerOf(context).scale(14) * 2 * 1.5 +
-                          MediaQuery.textScalerOf(context).scale(12) * 2 * 1.3 +
-                          16,
-                    ),
-                    itemCount: app.playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = app.playlists[index];
-                      return PlaylistGridCard(
-                        key: ValueKey('playlist/${playlist.id}'),
-                        app: app,
-                        playlist: playlist,
-                        sourceName: _sourceName(playlist.sourceId ?? ''),
-                        onOpen: () => _playlistDetails(playlist),
-                        onAction: (value) => _playlistAction(value, playlist),
-                      );
-                    },
-                  );
-                },
+            : PlaylistReorderGrid(
+                playlists: app.playlists,
+                onMove: app.movePlaylistDisplay,
+                cardBuilder: (context, playlist) => PlaylistGridCard(
+                  key: ValueKey('playlist/${playlist.id}'),
+                  app: app,
+                  playlist: playlist,
+                  sourceName: _sourceName(playlist.sourceId ?? ''),
+                  onOpen: () => _playlistDetails(playlist),
+                  onAction: (value) => _playlistAction(value, playlist),
+                ),
               ),
       ),
     ],
@@ -1016,12 +977,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onImportFolder: () => _act(app.importLocalFolder),
     onSelect: (source) {
       setState(() {
-        sourceFilter = source.id;
         tab = 1;
         libraryView = 0;
       });
       // Sources can be opened above nested settings routes. Reveal the shell's
-      // filtered library rather than just exposing the previous settings page.
+      // library rather than just exposing the previous settings page.
       Navigator.of(context).popUntil((route) => route.isFirst);
     },
     onAction: _handleSourceAction,
