@@ -47,7 +47,7 @@ flowchart TD
 | `lib/services/local_library.dart`、`artwork.dart`、`lyrics.dart` | 本地导入和标签、封面缓存、LRC 解析 |
 | `lib/services/desktop.dart`、`lib/ui/` | 桌面平台协调，以及库、歌单、来源、播放、缓存和设置页面 |
 
-更新检查由 `AppUpdates` 处理，控制器提供 `checkForUpdates()` 入口，`AppUpdatePage` 仅在用户点击后调用。短生命周期 HTTP 客户端在每次检查结束后关闭，不加入后台同步或应用启动流程；版本来自安装包元数据。发布工具 / 清单和发布边界见 [更新与发布](../update.md)。
+更新检查由 `AppUpdates` 处理，控制器提供 `checkForUpdates()` 入口，`AppUpdatePage` 仅在用户点击后调用。短生命周期 HTTP 客户端在每次检查结束后关闭，不加入后台同步或应用启动流程；版本来自安装包元数据。普通版读取 main/version.json；OpenList 正式更新读取 main/version-openlist.json，旧 feature/android-openlist-lite/version.json 保留兼容，测试入口仍独立。OpenList 客户端验证清单的特别版标识，避免把普通版附件作为特别版更新。发布工具 / 清单和发布边界见 [更新与发布](../update.md)。
 
 可选 `LrcApiClient` 由控制器装配给 `LyricsStore`，仅在本地 / 服务器歌词不可用时尝试在线补充，默认关闭。URL 与开关保存在 settings，独立鉴权密钥保存在 AuthVault；请求只包含歌曲标题、艺术家和专辑，不使用音源凭据。来源停用取消匹配请求，配置切换取消过期请求，`disposeAsync()` 在销毁 API 配置前关闭客户端，再由歌词服务等待读取结束。补充结果沿用每曲 MediaAssetStore 缓存与来源生命周期，详见 [在线歌词补充](LRC_API.md)。
 
@@ -80,6 +80,8 @@ UI 和服务通过 `SourceKind.cloudPlaylists` 判断云歌单读取能力，新
 ## 播放、代理与缓存
 
 可选 Android 桌面歌词由 `AndroidDesktopLyrics` 监听既有播放与外观状态，复用应用歌词加载入口，通过 `music.sylphy/desktop_lyrics` 通道更新原生 `DesktopLyricsOverlay`。原生窗口由 Application 持有，复用现有 audio_service 引擎；用户授权悬浮窗后才显示，不创建第二个播放器。应用关闭时先移除监听、等待通道操作并隐藏悬浮窗，再关闭播放、歌词存储和数据库。Windows 不启用此 Android 服务。
+
+Android 媒体通知区分播放意图和进度时钟：仅原生播放器正在播放且 1.5 秒内观察到真实媒体位置推进时向系统发布非零速度；打开、切换完成中、缓冲停滞和异步 seek 期间冻结系统外推计时，同时保留前台服务与暂停操作。Android 每 500ms 检查时钟状态变化，仅变化时刷新通知；播放协调器在 dispose / disposeAsync 中取消该定时器。
 
 播放失败通知由 `PlaybackNotice` 在应用根页面统一监听，以不阻断点击的浮动吐司显示，3 秒自动移除；恢复后提前收起，重复通知不排队。播放栏不常驻错误文字。播放器确认实际播放进度恢复时清空旧错误；失败后用户再次点击播放会重新加载媒体。
 

@@ -65,6 +65,8 @@ class SylphyApp extends ChangeNotifier {
   final CacheJobs jobs;
   List<SourceProfile> sources = [];
   int catalogRevision = 0;
+  // WebDAV metadata updates must not rebuild the entire app shell.
+  final ValueNotifier<int> catalogListenable = ValueNotifier<int>(0);
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
   late final desktopLyrics = AndroidDesktopLyrics(
@@ -355,7 +357,8 @@ class SylphyApp extends ChangeNotifier {
       _catalogRefreshTimer = null;
       if (_disposed) return;
       catalogRevision++;
-      notifyListeners();
+      // Only catalog consumers need to react to background tag enrichment.
+      catalogListenable.value = catalogRevision;
     });
   }
 
@@ -365,6 +368,7 @@ class SylphyApp extends ChangeNotifier {
     playlists = await db.playlists();
     blacklist = await db.blacklist();
     catalogRevision++;
+    catalogListenable.value = catalogRevision;
     notifyListeners();
   }
 
@@ -1106,5 +1110,6 @@ class SylphyApp extends ChangeNotifier {
     await db.close();
     await syncForeground.stop();
     syncForeground.dispose();
+    catalogListenable.dispose();
   }
 }

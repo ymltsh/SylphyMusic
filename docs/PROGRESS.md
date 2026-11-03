@@ -1,5 +1,38 @@
 # 实施与验证记录
 
+## 2026-11-01 应用通知进度计时补丁并发布：1.0.28+41 / 1.0.28-openlist.12+41
+
+按用户提供的 SylphyMusic-notification-clock-fix.patch 合入两分支，保留已有改动。普通版补丁检查后直接应用；OpenList 保留专用 openlist_lite 导入，适配导入区上下文后按原改动合入并格式化。新增 notification_clock.dart，分离播放意图与通知时钟：只有原生播放、非打开 / 完成切换、已确认媒体位置推进且新鲜度小于 1500ms 时才发布实际速度，否则发布 0 冻结 Android 外推进度；Android 每 500ms 只在时钟状态变化时刷新。seek 前清除旧推进证据，异步前后分别发布位置锚点；两条退出路径均取消定时器。同步补丁附带测试源码，未运行测试。更新架构说明。
+
+普通版 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.28%2B41 ：Android Release 三 ABI、Windows Release、安装 EXE 与便携 ZIP 构建发布成功，保持 Latest。OpenList https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.28-openlist.12%2B41 ：Android arm64 独立预发布，附包含本轮通知 helper、playback 和既有独立更新客户端的实际应用源码及对应 OpenList 后端 / 前端源码；JNI 未变。四份 APK 正式签名通过。
+
+OpenList 首次上传发生 TLS EOF；检查远端原草稿确认无附件后，从该草稿恢复上传，未重复创建 Release。最终普通版六个附件、OpenList 三个附件大小 / SHA-256 及发布说明均与本地一致，八个原始 / 加速清单入口核对通过。仅提交推送清单：普通版 version.json 5deaea0、主分支 version-openlist.json a46b1e7，特性分支 version.json 与 version-openlist.json dec36a1。主分支开始时快进到用户远端清单提交 7f0627a，未覆盖该修改；其余源码和文档继续保留本地。
+
+产物位于各自 build/releases/1.0.28-41/、build/releases/1.0.28-openlist.12-41/。普通版日志 build/test_logs/release-1.0.28.log；特别版 openlist-release-41-build.log、openlist-release-41-package.log、openlist-release-41-publish.log、openlist-release-41-resume.log，状态位于产物目录 publish-state.json。统一核对记录为主分支 build/test_logs/notification-clock-release-verification.json。未运行 analyze / 测试、设备安装或功能验收。
+
+
+## 2026-11-01 同版本重发文案同步与 OpenList 独立更新接口
+
+按用户在“版本不变”约束下的发布要求，更新现有普通版 1.0.27+40 与 OpenList 1.0.27-openlist.11+40 Release 附件，保留 Tag、版本号、构建号及原下载文件名。普通版重新构建 Android 三 ABI、Windows Release 并生成安装 EXE / 便携 ZIP；OpenList 使用上一轮当前源码已编译成功的 arm64 Release APK，重新生成包含新文案、app_updates 路由修正及 version-openlist.json 的实际源码包，复用对应未变的 OpenList 后端 / 前端源码。四份 APK 正式签名一致。
+
+新附件先以临时文件名上传并逐份核对大小 / SHA-256，全部就绪后更换原附件并清理旧远端附件；此前发布包留在各自 .private/same-version-republish/before/。普通版六附件、OpenList 三附件最终大小 / 摘要均匹配本地，普通版保持 Latest，OpenList 保持独立预发布。
+
+两分支仅提交并推送 version.json 与 version-openlist.json 的同版本说明：main c1467a5、feature/android-openlist-lite 44d7288。新旧 OpenList 清单内容一致；两通道原始 / 加速清单、两个分支 version-openlist.json 原始 / 加速入口均核对通过。源码及文档修改保留本地。由于版本与构建号不变，同版本安装用户需要手动下载覆盖安装，自动检查不会显示更高版本。
+
+产物仍在各自 build/releases/1.0.27-40/ 与 build/releases/1.0.27-openlist.11-40/。普通版日志 build/test_logs/same-version-main-prepare.log、same-version-main-publish.log；OpenList 日志 same-version-openlist-package.log、same-version-openlist-publish.log。核对记录分别为 same-version-main-verification.json、same-version-openlist-verification.json；额外新接口核对位于普通版 same-version-openlist-endpoints.json。未运行 analyze / 测试、设备安装或性能复测。
+
+
+## 2026-11-01 同步文案并新增 OpenList 更新接口（版本不变）
+
+按用户要求，以普通版当前文案统一两个工作区的更新页提示与图标选择页；同步现有 UI 用例中的提示断言。新增两分支同内容的 version-openlist.json，latest 保持 1.0.27-openlist.11+40；普通版保持 1.0.27+40。仅提交推送新 JSON：main dffc388、feature/android-openlist-lite d16eb1e；现有 version.json、Release 附件和版本号未修改。
+
+公开入口为 https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json ，默认加速入口加 https://hub.wgen.top/ 前缀。主分支原始 / 加速入口与特性分支原始副本已读取核对，均与当前 OpenList 清单一致。旧 feature/android-openlist-lite/version.json 保留兼容。
+
+OpenList 客户端正式更新改读 main/version-openlist.json，测试入口仍使用特性分支 version-beta.json；正式检查仅接受 openlist.N 特别版，修正此前把 OpenList 清单当作测试版拒绝的问题，避免读取普通版附件。更新相关既有用例夹具和发布文档，记录后续特别版发布需维护新接口及旧接口。源码改动保留本地，未推送源码或替换已发布安装包。
+
+普通版 Android 三 ABI / Windows Release 编译及本地验收打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/internal-review/SylphyMusic-openlist-1.0.27-openlist.11-40-arm64-v8a.apk。各工作区构建日志 build/test_logs/copy-openlist-endpoint-build.log，接口核对记录位于主分支 build/test_logs/openlist-endpoint-verification.json。未运行 analyze / 测试或设备安装。
+
+
 ## 2026-11-01 对齐版本并发布：普通版 1.0.27+40 / OpenList 1.0.27-openlist.11+40
 
 按用户要求，以普通版为基准将两通道基础版本统一至 1.0.27、构建号统一为 40；OpenList 保留 .11 特别版标识、独立包名及更新通道。两版包含此前同步的封面取色后台化、迷你播放器预热和切歌旧配色清理。普通版同时携带当前工作区的更新检查提示与图标选择文案调整；未覆盖其他已有改动。

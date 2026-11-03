@@ -13,11 +13,12 @@ class CatalogQuery {
     this.groupKind,
     this.groupKey,
     this.blocked = false,
+    this.namedAlbumsOnly = false,
   });
   final int view; // 0 songs, 1 albums, 2 artists.
   final String search, sort;
   final String? sourceId, groupKind, groupKey;
-  final bool descending, blocked;
+  final bool descending, blocked, namedAlbumsOnly;
   String get signature => jsonEncode([
     view,
     search,
@@ -27,6 +28,7 @@ class CatalogQuery {
     groupKind,
     groupKey,
     blocked,
+    namedAlbumsOnly,
   ]);
 
   /// All matching songs, preserving scope and sorting from a grouped view.
@@ -80,6 +82,7 @@ class LibraryCatalog {
     final conditions = <String>[
       if (!query.blocked) 't.missing=0',
       if (!query.blocked) 's.enabled=1',
+      if (query.view == 1 && query.namedAlbumsOnly) "trim(t.album)<>''",
       query.blocked ? 'b.track_key IS NOT NULL' : 'b.track_key IS NULL',
     ];
     final args = <Object?>[];

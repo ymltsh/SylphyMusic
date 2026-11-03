@@ -14,6 +14,7 @@ import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
+import 'notification_clock.dart';
 
 /// Metadata sent to Android must include an actual artwork URI; the platform
 /// cannot access Flutter's in-widget Image.file cache automatically.
@@ -95,6 +96,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   final Stopwatch _mediaProgressWatch = Stopwatch()..start();
   bool _mediaProgressObserved = false;
   Timer? _stallTimer;
+  Timer? _notificationClockTimer;
+  bool _lastPublishedNotificationClockRunning = false;
   int? _lastWatchdogTickMs;
   int _playIntentGeneration = 0;
   int _watchdogPositionMs = -1;
@@ -102,6 +105,15 @@ class PlaybackCoordinator extends ChangeNotifier {
   bool _stalledRecoveryRunning = false;
   bool _openStallLogged = false;
   bool _transitionStallLogged = false;
+
+  bool get _notificationClockRunning => notificationClockRunning(
+    playRequested: _playRequested,
+    nativePlaying: playing,
+    opening: _opening,
+    finishingTrack: _finishingTrack,
+    progressObserved: _mediaProgressObserved,
+    sinceProgress: _mediaProgressWatch.elapsed,
+  );
 
   void _checkForStall() {
     if (!_playRequested ||
@@ -595,6 +607,20 @@ class PlaybackCoordinator extends ChangeNotifier {
         }
       }
     });
+    // A stalled native player can stop emitting position events. Publish only
+    // when the inferred clock state changes, rather than refreshing every tick.
+    if (Platform.isAndroid) {
+      _notificationClockTimer = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) {
+          if (handler != null &&
+              _notificationClockRunning !=
+                  _lastPublishedNotificationClockRunning) {
+            _publish();
+          }
+        },
+      );
+    }
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
       _session = await AudioSession.instance;
@@ -939,6 +965,56 @@ class PlaybackCoordinator extends ChangeNotifier {
       shuffle: snapshot.shuffle,
       order: order,
       history: [...snapshot.history],
+    );
+    await save();
+    notifyListeners();
+    cache.invalidatePreview();
+    _scheduleAhead();
+  }
+
+  /// Insert a batch immediately after the current song with one queue save.
+  /// The incoming order is preserved in normal and shuffle playback modes.
+  Future<void> enqueueNextAll(List<TrackRef> refs) async {
+    if (refs.isEmpty) return;
+    if (snapshot.tracks.isEmpty) {
+      await setQueue(refs, autoplay: false);
+      return;
+    }
+    final previousLength = snapshot.tracks.length;
+    final index = snapshot.index;
+    final history = [...snapshot.history];
+    late final List<String> tracks;
+    late final List<int> order;
+    if (!snapshot.shuffle) {
+      final insertion = (index + 1).clamp(0, previousLength);
+      tracks = [
+        ...snapshot.tracks.take(insertion),
+        ...refs.map((ref) => ref.key),
+        ...snapshot.tracks.skip(insertion),
+      ];
+      for (var i = 0; i < history.length; i++) {
+        if (history[i] >= insertion) history[i] += refs.length;
+      }
+      order = List.generate(tracks.length, (i) => i);
+    } else {
+      tracks = [...snapshot.tracks, ...refs.map((ref) => ref.key)];
+      order = snapshot.order.length == previousLength
+          ? [...snapshot.order]
+          : List.generate(previousLength, (i) => i);
+      final at = order.indexOf(index);
+      order.insertAll(
+        at < 0 ? order.length : at + 1,
+        List.generate(refs.length, (i) => previousLength + i),
+      );
+    }
+    snapshot = QueueSnapshot(
+      tracks: tracks,
+      index: index,
+      positionMs: position.inMilliseconds,
+      repeat: snapshot.repeat,
+      shuffle: snapshot.shuffle,
+      order: order,
+      history: history,
     );
     await save();
     notifyListeners();
@@ -1404,11 +1480,15 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> seek(Duration target) async {
     ++_playIntentGeneration;
+    // A seek jump is not proof that audio has started advancing again.
+    _mediaProgressObserved = false;
     _watchdogPositionMs = target.inMilliseconds;
     _progressWatch.reset();
     cache.invalidatePreview();
+    _publish(); // Freeze the old position during the asynchronous seek.
     await player.seek(target);
     position = target;
+    _publish(); // Publish the new anchor; resume on confirmed advancement.
     await save();
     notifyListeners();
   }
@@ -1586,9 +1666,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     final h = handler;
     final t = current;
     if (h == null) return;
-    // Android maps buffering to STATE_BUFFERING (a spinner), even when the
-    // playback intent is true. Advancing audio is stronger evidence than
-    // mpv's occasionally stale buffering / opening / transition flags.
+    final clockRunning = _notificationClockRunning;
+    _lastPublishedNotificationClockRunning = clockRunning;
+    // The local audio_service patch maps buffering + play intent to PLAYING
+    // to retain foreground transport controls. Freeze its extrapolated clock
+    // until mpv actually advances, even if its buffering flag is stale.
     final recentlyAdvanced =
         _playRequested &&
         _mediaProgressObserved &&
@@ -1635,7 +1717,10 @@ class PlaybackCoordinator extends ChangeNotifier {
         // Real user/system pause still sets this to false immediately.
         playing: _playRequested,
         updatePosition: position,
-        speed: speed,
+        // STATE_PLAYING + a nonzero speed makes SystemUI extrapolate from
+        // wall time, even while the remote stream has not produced audio.
+        // Keep play intent for the FGS and pause action; freeze only its clock.
+        speed: clockRunning ? speed : 0.0,
       ),
     );
   }
@@ -1647,6 +1732,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     _cancelAhead();
     _stallTimer?.cancel();
     _stallTimer = null;
+    _notificationClockTimer?.cancel();
+    _notificationClockTimer = null;
     _detachNotificationArtwork();
     if (_leased != null) cache.release(_leased!);
     for (final s in _subscriptions) {
@@ -1661,6 +1748,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     _cancelFocusResume();
     _stallTimer?.cancel();
     _stallTimer = null;
+    _notificationClockTimer?.cancel();
+    _notificationClockTimer = null;
     _playRequested = false;
     _cancelAhead();
     _lyricsLoader = null;

@@ -8,6 +8,8 @@
 | --- | --- |
 | 正式清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
 | 加速地址（默认） | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
+| OpenList 清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json |
+| OpenList 加速地址 | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json |
 | 测试清单 | 将文件名换为 version-beta.json |
 | 发布页 | https://github.com/ymltsh/SylphyMusic/releases/latest |
 
@@ -88,3 +90,9 @@ Invoke-RestMethod "https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh
 ```
 
 确认 latest 是新版本、下载链接对应已上传资产即可。
+
+## OpenList 独立清单
+
+`main/version-openlist.json` 是 OpenList 独立更新入口，结构与 `version.json` 相同，保存特别版的 latest / history，仅指向特别版附件。普通版仍读取 main/version.json。OpenList 客户端正式更新读取新入口；测试更新仍使用 feature/android-openlist-lite/version-beta.json。
+
+两分支均保存 version-openlist.json。旧 feature/android-openlist-lite/version.json 继续保留，供既有安装包使用。后续发布 OpenList 时，将其更新后的 version.json 同步到两分支的 version-openlist.json，并只提交、推送对应清单；普通版发布不覆盖 OpenList 清单。新增接口本身不改变版本号或已发布附件。

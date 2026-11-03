@@ -45,11 +45,13 @@ class PlayerBar extends StatelessWidget {
     required this.app,
     this.compact = false,
     this.immersive = false,
+    this.docked = false,
     this.onCollapse,
   });
   final SylphyApp app;
   final bool compact;
   final bool immersive;
+  final bool docked;
   final VoidCallback? onCollapse;
   Future<void> _act(
     BuildContext context,
@@ -158,6 +160,22 @@ class PlayerBar extends StatelessWidget {
           ),
         ),
       );
+      if (docked) {
+        return Stack(
+          children: [
+            if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
+            // A one-pixel divider replaces the floating shadow/rounded glass
+            // effect in the dedicated desktop footer.
+            ColoredBox(
+              color: scheme.outlineVariant,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: bar,
+              ),
+            ),
+          ],
+        );
+      }
       return Stack(
         children: [
           if (track != null) _NowPlayingCoverWarmup(app: app, track: track),

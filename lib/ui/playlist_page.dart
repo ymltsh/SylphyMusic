@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
+import 'batch_selection.dart';
 import 'cover_art.dart';
 import 'player_bar.dart';
 
@@ -352,7 +353,8 @@ class PlaylistPage extends StatefulWidget {
   final SylphyApp app;
   final String id;
   final Widget Function(List<Track>) buildTracks;
-  final Widget Function(List<Track>, List<String>)? buildEntryTracks;
+  final Widget Function(List<Track>, List<String>, BatchSelection)?
+  buildEntryTracks;
   final ValueChanged<String>? onAction;
   final VoidCallback onEdit, onAdd, onCache;
 
@@ -363,6 +365,11 @@ class PlaylistPage extends StatefulWidget {
 class _PlaylistPageState extends State<PlaylistPage> {
   late Future<({List<Track> tracks, List<String> entryIds})> tracks = _load();
   bool starting = false;
+  final BatchSelection _selection = BatchSelection();
+
+  void _selectionChanged() {
+    if (mounted) setState(() {});
+  }
 
   Future<({List<Track> tracks, List<String> entryIds})> _load() async {
     final entries = await widget.app.db.playlistEntries(widget.id);
@@ -386,6 +393,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   void initState() {
     super.initState();
     widget.app.addListener(_refresh);
+    _selection.addListener(_selectionChanged);
   }
 
   @override
@@ -410,6 +418,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void dispose() {
     widget.app.removeListener(_refresh);
+    _selection.removeListener(_selectionChanged);
+    _selection.dispose();
     super.dispose();
   }
 
@@ -459,6 +469,33 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
+  Future<void> _batchSelected(
+    List<Track> items,
+    List<String> entryIds,
+    PlaylistModel playlist,
+  ) async {
+    final selected = _selection;
+    final success = await showBatchTrackActions(
+      context,
+      widget.app,
+      count: selected.count,
+      resolve: () async => [
+        for (var i = 0; i < items.length; i++)
+          if (selected.contains(entryIds[i]) && !items[i].missing) items[i].ref,
+      ],
+      removalPlaylistId: playlistCanEdit(widget.app, playlist)
+          ? playlist.id
+          : null,
+      resolveRemovalEntries: playlistCanEdit(widget.app, playlist)
+          ? () async => {
+              for (final id in entryIds)
+                if (selected.contains(id)) id,
+            }
+          : null,
+    );
+    if (success) selected.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     final playlist = widget.app.playlists
@@ -466,192 +503,237 @@ class _PlaylistPageState extends State<PlaylistPage> {
         .firstOrNull;
     final scheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('歌单详情'),
-        actions: [
-          if (playlist != null && playlistCanEdit(widget.app, playlist))
-            IconButton(
-              tooltip: '编辑歌单',
-              onPressed: playlist.status == SyncStatus.readonly
-                  ? null
-                  : widget.onEdit,
-              icon: const Icon(Icons.edit_outlined),
-            ),
-          if (playlist != null && playlistCanEdit(widget.app, playlist))
-            IconButton(
-              tooltip: '添加歌曲',
-              onPressed: playlist.status == SyncStatus.readonly
-                  ? null
-                  : widget.onAdd,
-              icon: const Icon(Icons.playlist_add),
-            ),
-          IconButton(
-            tooltip: '缓存歌单',
-            onPressed: playlist == null ? null : widget.onCache,
-            icon: const Icon(Icons.download_outlined),
-          ),
-          if (playlist != null && widget.onAction != null)
-            PopupMenuButton<String>(
-              tooltip: '歌单操作',
-              onSelected: widget.onAction,
-              itemBuilder: (_) => playlistMenuItems(widget.app, playlist),
-            ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: FutureBuilder<({List<Track> tracks, List<String> entryIds})>(
-          future: tracks,
-          builder: (context, snapshot) {
-            if (playlist == null) return const Center(child: Text('歌单已移除'));
-            if (snapshot.hasError) {
-              return Center(
-                child: TextButton(
-                  onPressed: _refresh,
-                  child: const Text('读取歌单失败，点击重试'),
-                ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final items = snapshot.data!.tracks;
-            return NestedScrollView(
-              headerSliverBuilder: (context, innerScrolled) => [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final coverSize = (constraints.maxWidth * .42).clamp(
-                          100.0,
-                          220.0,
-                        );
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox.square(
-                              dimension: coverSize,
-                              child: _cover(items, coverSize),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Tooltip(
-                                    message: playlist.name,
-                                    child: Text(
-                                      playlist.name,
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
+    return PopScope(
+      canPop: !_selection.active,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _selection.clear();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: _selection.active
+              ? IconButton(
+                  tooltip: '退出多选',
+                  icon: const Icon(Icons.close),
+                  onPressed: _selection.clear,
+                )
+              : null,
+          title: Text(_selection.active ? '已选 ${_selection.count} 首' : '歌单详情'),
+          actions: [
+            if (!_selection.active &&
+                playlist != null &&
+                playlistCanEdit(widget.app, playlist))
+              IconButton(
+                tooltip: '编辑歌单',
+                onPressed: playlist.status == SyncStatus.readonly
+                    ? null
+                    : widget.onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            if (!_selection.active &&
+                playlist != null &&
+                playlistCanEdit(widget.app, playlist))
+              IconButton(
+                tooltip: '添加歌曲',
+                onPressed: playlist.status == SyncStatus.readonly
+                    ? null
+                    : widget.onAdd,
+                icon: const Icon(Icons.playlist_add),
+              ),
+            if (!_selection.active)
+              IconButton(
+                tooltip: '缓存歌单',
+                onPressed: playlist == null ? null : widget.onCache,
+                icon: const Icon(Icons.download_outlined),
+              ),
+            if (!_selection.active &&
+                playlist != null &&
+                widget.onAction != null)
+              PopupMenuButton<String>(
+                tooltip: '歌单操作',
+                onSelected: widget.onAction,
+                itemBuilder: (_) => playlistMenuItems(widget.app, playlist),
+              ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: FutureBuilder<({List<Track> tracks, List<String> entryIds})>(
+            future: tracks,
+            builder: (context, snapshot) {
+              if (playlist == null) return const Center(child: Text('歌单已移除'));
+              if (snapshot.hasError) {
+                return Center(
+                  child: TextButton(
+                    onPressed: _refresh,
+                    child: const Text('读取歌单失败，点击重试'),
+                  ),
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final items = snapshot.data!.tracks;
+              return NestedScrollView(
+                headerSliverBuilder: (context, innerScrolled) => [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final coverSize = (constraints.maxWidth * .42).clamp(
+                            100.0,
+                            220.0,
+                          );
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox.square(
+                                dimension: coverSize,
+                                child: _cover(items, coverSize),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Tooltip(
+                                      message: playlist.name,
+                                      child: Text(
+                                        playlist.name,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${items.length} 首歌曲${playlist.kind == PlaylistKind.cloud ? ' · 云端' : ''}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: scheme.onSurfaceVariant,
-                                        ),
-                                  ),
-                                  if (playlist.kind == PlaylistKind.cloud)
+                                    const SizedBox(height: 8),
                                     Text(
-                                      '${_syncStatusLabel(playlist.status)}${playlist.message.isEmpty ? '' : ' · ${playlist.message}'}',
+                                      '${items.length} 首歌曲${playlist.kind == PlaylistKind.cloud ? ' · 云端' : ''}',
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodySmall
+                                          .bodyMedium
                                           ?.copyWith(
                                             color: scheme.onSurfaceVariant,
                                           ),
                                     ),
-                                  const SizedBox(height: 16),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      IconButton.filledTonal(
-                                        tooltip: '随机播放歌单',
-                                        onPressed: items.isEmpty || starting
-                                            ? null
-                                            : () => _startPlayback(
-                                                items,
-                                                shuffle: true,
-                                              ),
-                                        icon: const Icon(Icons.shuffle_rounded),
+                                    if (playlist.kind == PlaylistKind.cloud)
+                                      Text(
+                                        '${_syncStatusLabel(playlist.status)}${playlist.message.isEmpty ? '' : ' · ${playlist.message}'}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
                                       ),
-                                      FilledButton.icon(
-                                        key: const ValueKey('playlist-play'),
-                                        onPressed: items.isEmpty || starting
-                                            ? null
-                                            : () => _startPlayback(items),
-                                        icon: const Icon(
-                                          Icons.play_arrow_rounded,
+                                    const SizedBox(height: 16),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        IconButton.filledTonal(
+                                          tooltip: '随机播放歌单',
+                                          onPressed: items.isEmpty || starting
+                                              ? null
+                                              : () => _startPlayback(
+                                                  items,
+                                                  shuffle: true,
+                                                ),
+                                          icon: const Icon(
+                                            Icons.shuffle_rounded,
+                                          ),
                                         ),
-                                        label: const Text('播放'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                        FilledButton.icon(
+                                          key: const ValueKey('playlist-play'),
+                                          onPressed: items.isEmpty || starting
+                                              ? null
+                                              : () => _startPlayback(items),
+                                          icon: const Icon(
+                                            Icons.play_arrow_rounded,
+                                          ),
+                                          label: const Text('播放'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            '歌曲',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const Spacer(),
+                          if (_selection.active) ...[
+                            TextButton(
+                              onPressed: _selection.all
+                                  ? _selection.deselectAll
+                                  : () => _selection.selectAll(items.length),
+                              child: Text(_selection.all ? '取消全选' : '全选'),
                             ),
-                          ],
-                        );
-                      },
+                            IconButton(
+                              key: const ValueKey('playlist-batch-more'),
+                              tooltip: '多选的更多操作',
+                              icon: const Icon(Icons.more_vert),
+                              onPressed:
+                                  _selection.count == 0 || playlist == null
+                                  ? null
+                                  : () => _batchSelected(
+                                      items,
+                                      snapshot.data!.entryIds,
+                                      playlist,
+                                    ),
+                            ),
+                          ] else
+                            Text(
+                              '${items.length} 首',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          '歌曲',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${items.length} 首',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-              body: items.isEmpty
-                  ? const Center(child: Text('这个歌单暂无歌曲'))
-                  : widget.buildEntryTracks?.call(
-                          items,
-                          snapshot.data!.entryIds,
-                        ) ??
-                        widget.buildTracks(items),
-            );
-          },
+                ],
+                body: items.isEmpty
+                    ? const Center(child: Text('这个歌单暂无歌曲'))
+                    : widget.buildEntryTracks?.call(
+                            items,
+                            snapshot.data!.entryIds,
+                            _selection,
+                          ) ??
+                          widget.buildTracks(items),
+              );
+            },
+          ),
         ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-          child: ListenableBuilder(
-            listenable: Listenable.merge([
-              widget.app.playback,
-              widget.app.appearance,
-            ]),
-            builder: (context, _) => PlayerBar(app: widget.app, compact: true),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                widget.app.playback,
+                widget.app.appearance,
+              ]),
+              builder: (context, _) =>
+                  PlayerBar(app: widget.app, compact: true),
+            ),
           ),
         ),
       ),

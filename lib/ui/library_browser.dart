@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../data/library_catalog.dart';
+import 'batch_selection.dart';
 import 'cover_flow.dart';
 import 'cover_art.dart';
 import 'playing_song_tile.dart';
@@ -17,6 +21,7 @@ class LibraryBrowser extends StatefulWidget {
     this.songActions,
     this.viewControls,
     this.coverFlow = false,
+    this.batchSelection,
     this.selected,
     this.onSelection,
   });
@@ -26,6 +31,7 @@ class LibraryBrowser extends StatefulWidget {
   final Widget? songActions;
   final Widget? viewControls;
   final bool coverFlow;
+  final BatchSelection? batchSelection;
   final Set<String>? selected;
   final void Function(Track, bool)? onSelection;
   @override
@@ -36,6 +42,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   int revision = 0;
   late Future<CatalogPage> page;
   int generation = 0;
+  int _catalogRefreshEpoch = 0;
   final batches = <int, List<CatalogRow>>{};
   final pending = <int>{};
   final failed = <int>{};
@@ -43,8 +50,10 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     keepScrollOffset: false,
   );
 
+  // A hard reset is appropriate only when the user's query actually changes.
   void _reset() {
     generation++;
+    _catalogRefreshEpoch++;
     batches.clear();
     pending.clear();
     failed.clear();
@@ -54,6 +63,48 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         _scrollController.jumpTo(0);
       }
     });
+  }
+
+  // Metadata/index updates refresh the currently cached SQL pages in place.
+  // Neither the ScrollController nor ListView key changes during this refresh.
+  Future<void> _refreshCatalog() async {
+    final refresh = ++_catalogRefreshEpoch;
+    final requestedGeneration = generation;
+    final signature = widget.query.signature;
+    final cachedOffsets = batches.keys.where((offset) => offset != 0).toList();
+    // Older in-flight page requests must not overwrite the new rows.
+    pending.clear();
+    try {
+      final latest = await Future.wait([
+        widget.app.catalog.page(widget.query),
+        for (final offset in cachedOffsets)
+          widget.app.catalog.page(widget.query, offset: offset),
+      ]);
+      if (!mounted ||
+          refresh != _catalogRefreshEpoch ||
+          requestedGeneration != generation ||
+          signature != widget.query.signature) {
+        return;
+      }
+      setState(() {
+        // SynchronousFuture avoids a loading frame between refreshed snapshots.
+        page = SynchronousFuture(latest.first);
+        batches.clear();
+        batches[0] = latest.first.rows;
+        for (var index = 0; index < cachedOffsets.length; index++) {
+          final offset = cachedOffsets[index];
+          if (offset < latest.first.total) {
+            batches[offset] = latest[index + 1].rows;
+          }
+        }
+        while (batches.length > 6) {
+          batches.remove(batches.keys.first);
+        }
+        failed.removeWhere((offset) => offset >= latest.first.total);
+      });
+    } catch (_) {
+      // Keep existing rows and scroll position on a transient SQL failure.
+    }
   }
 
   // Virtual rows keep only six SQL batches of metadata, even in a huge library.
@@ -89,11 +140,16 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   void _request(int start) {
     if (!pending.add(start)) return;
     final requestedGeneration = generation;
+    final requestedRefresh = _catalogRefreshEpoch;
     widget.app.catalog
         .page(widget.query, offset: start)
         .then(
           (result) {
-            if (!mounted || requestedGeneration != generation) return;
+            if (!mounted ||
+                requestedGeneration != generation ||
+                requestedRefresh != _catalogRefreshEpoch) {
+              return;
+            }
             setState(() {
               pending.remove(start);
               batches[start] = result.rows;
@@ -106,7 +162,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             });
           },
           onError: (Object error, StackTrace stack) {
-            if (!mounted || requestedGeneration != generation) return;
+            if (!mounted ||
+                requestedGeneration != generation ||
+                requestedRefresh != _catalogRefreshEpoch) {
+              return;
+            }
             setState(() {
               pending.remove(start);
               failed.add(start);
@@ -120,13 +180,16 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     super.initState();
     revision = widget.app.catalogRevision;
     page = _load();
-    widget.app.addListener(_changed);
+    widget.app.catalogListenable.addListener(_changed);
   }
 
   Future<CatalogPage> _load() async {
     final query = widget.query, requestedGeneration = generation;
+    final requestedRefresh = _catalogRefreshEpoch;
     final result = await widget.app.catalog.page(query);
-    if (mounted && requestedGeneration == generation) {
+    if (mounted &&
+        requestedGeneration == generation &&
+        requestedRefresh == _catalogRefreshEpoch) {
       batches[0] = result.rows;
       widget.app.metadataEnricher.prioritize(
         result.rows.map((row) => row.track),
@@ -136,25 +199,27 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   }
 
   void _changed() {
-    if (mounted && revision != widget.app.catalogRevision) {
-      revision = widget.app.catalogRevision;
-      setState(() {
-        _reset();
-      });
-    }
+    if (!mounted || revision == widget.app.catalogRevision) return;
+    revision = widget.app.catalogRevision;
+    unawaited(_refreshCatalog());
   }
 
   @override
   void didUpdateWidget(covariant LibraryBrowser oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.query.signature != widget.query.signature) {
+    if (!identical(oldWidget.app, widget.app)) {
+      oldWidget.app.catalogListenable.removeListener(_changed);
+      widget.app.catalogListenable.addListener(_changed);
+      revision = widget.app.catalogRevision;
+      _reset();
+    } else if (oldWidget.query.signature != widget.query.signature) {
       _reset();
     }
   }
 
   @override
   void dispose() {
-    widget.app.removeListener(_changed);
+    widget.app.catalogListenable.removeListener(_changed);
     _scrollController.dispose();
     super.dispose();
   }
@@ -209,7 +274,10 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     }
     if (!_scrollController.hasClients) return;
 
-    final extent = 76 * MediaQuery.textScalerOf(context).scale(14) / 14;
+    final extent =
+        (MediaQuery.sizeOf(context).width > 750 ? 64 : 76) *
+        MediaQuery.textScalerOf(context).scale(14) /
+        14;
     final position = _scrollController.position;
     final offset = (index * extent - (position.viewportDimension - extent) / 2)
         .clamp(0.0, position.maxScrollExtent)
@@ -259,6 +327,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       );
     }
     final album = widget.query.view == 1, grouped = widget.query.view != 0;
+    final batch = widget.batchSelection;
+    final batchKey = grouped ? row.key : track.ref.key;
+    final selecting = batch?.active == true;
     if (!grouped && !widget.query.blocked) {
       return PlayingSongTile(
         app: widget.app,
@@ -266,24 +337,44 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         title: track.title,
         subtitle: '${track.artist} · ${track.album} · ${_source(track)}',
         contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),
-        onTap: () => _act(() => _play(track)),
+        selectedInBatch: selecting && batch!.contains(batchKey),
+        onLongPress: batch == null ? null : () => batch.begin(batchKey),
+        onTap: selecting
+            ? () => batch!.toggle(batchKey)
+            : () => _act(() => _play(track)),
         trailing: SizedBox.square(
           dimension: 48,
-          child: PopupMenuButton<String>(
-            onSelected: (v) => _act(() => widget.onAction(v, track)),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
-              PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
-              PopupMenuItem(value: 'next', child: Text('下一首播放')),
-              PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
-              PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
-              PopupMenuItem(value: 'block', child: Text('加入黑名单')),
-            ],
-          ),
+          child: selecting
+              ? Checkbox(
+                  value: batch!.contains(batchKey),
+                  onChanged: (_) => batch.toggle(batchKey),
+                )
+              : PopupMenuButton<String>(
+                  onSelected: (v) {
+                    if (v == 'multi_select' && batch != null) {
+                      batch.begin(batchKey);
+                    } else {
+                      _act(() => widget.onAction(v, track));
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'multi_select', child: Text('多选')),
+                    PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
+                    PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
+                    PopupMenuItem(value: 'next', child: Text('下一首播放')),
+                    PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
+                    PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
+                    PopupMenuItem(value: 'block', child: Text('加入黑名单')),
+                  ],
+                ),
         ),
       );
     }
     return ListTile(
+      selected: selecting && batch!.contains(batchKey),
+      onLongPress: batch == null || widget.query.blocked
+          ? null
+          : () => batch.begin(batchKey),
       leading: widget.query.view == 2
           ? const Icon(Icons.person_outline)
           : CoverArt(app: widget.app, track: track),
@@ -305,10 +396,20 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       ),
       onTap: widget.query.blocked
           ? null
+          : selecting
+          ? () => batch!.toggle(batchKey)
           : grouped
           ? () => _group(row)
           : () => _act(() => _play(track)),
-      trailing: grouped
+      trailing: selecting
+          ? SizedBox.square(
+              dimension: 48,
+              child: Checkbox(
+                value: batch!.contains(batchKey),
+                onChanged: (_) => batch.toggle(batchKey),
+              ),
+            )
+          : grouped
           ? null
           : widget.query.blocked
           ? IconButton(
@@ -317,8 +418,15 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
               onPressed: () => _act(() => widget.onAction('block', track)),
             )
           : PopupMenuButton<String>(
-              onSelected: (v) => _act(() => widget.onAction(v, track)),
+              onSelected: (v) {
+                if (v == 'multi_select' && batch != null) {
+                  batch.begin(batchKey);
+                } else {
+                  _act(() => widget.onAction(v, track));
+                }
+              },
               itemBuilder: (_) => const [
+                PopupMenuItem(value: 'multi_select', child: Text('多选')),
                 PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
                 PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
                 PopupMenuItem(value: 'next', child: Text('下一首播放')),
@@ -427,7 +535,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   titleBuilder: _coverFlowTitle,
                   subtitleBuilder: _coverFlowSubtitle,
                   onActivate: _activateCoverFlow,
-                  bottomPadding: 84,
+                  bottomPadding: MediaQuery.sizeOf(context).width > 750
+                      ? 16
+                      : 84,
                   emptyMessage: emptyMessage,
                 )
               : RawScrollbar(
@@ -442,9 +552,13 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                     key: ValueKey('${widget.query.signature}:$generation'),
                     controller: _scrollController,
                     cacheExtent: 0,
-                    padding: const EdgeInsets.only(bottom: 96),
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.sizeOf(context).width > 750 ? 24 : 96,
+                    ),
                     itemExtent:
-                        76 * MediaQuery.textScalerOf(context).scale(14) / 14,
+                        (MediaQuery.sizeOf(context).width > 750 ? 64 : 76) *
+                        MediaQuery.textScalerOf(context).scale(14) /
+                        14,
                     itemCount: result.total,
                     itemBuilder: (_, i) => _virtualRow(i),
                   ),
@@ -457,7 +571,35 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
 
   Widget _withViewControls(Widget content, {CatalogPage? result}) => Column(
     children: [
-      if (widget.selected == null && !widget.query.blocked)
+      if (widget.selected == null &&
+          !widget.query.blocked &&
+          widget.batchSelection?.active == true)
+        ListTile(
+          key: const ValueKey('batch-summary'),
+          contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
+          leading: IconButton(
+            tooltip: '退出多选',
+            icon: const Icon(Icons.close),
+            onPressed: widget.batchSelection!.clear,
+          ),
+          title: Text(
+            '已选 ${widget.batchSelection!.count} '
+            '${widget.query.view == 0
+                ? '首'
+                : widget.query.view == 1
+                ? '张专辑'
+                : '位艺术家'}',
+          ),
+          trailing: TextButton(
+            onPressed: result == null
+                ? null
+                : widget.batchSelection!.all
+                ? widget.batchSelection!.deselectAll
+                : () => widget.batchSelection!.selectAll(result.total),
+            child: Text(widget.batchSelection!.all ? '取消全选' : '全选'),
+          ),
+        )
+      else if (widget.selected == null && !widget.query.blocked)
         ListTile(
           key: const ValueKey('song-summary'),
           contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),

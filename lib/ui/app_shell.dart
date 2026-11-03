@@ -18,6 +18,7 @@ import 'cover_flow.dart';
 import 'library_browser.dart';
 import 'track_lookup.dart';
 import 'track_actions.dart';
+import 'batch_selection.dart';
 import 'home_page.dart';
 import 'search_page.dart';
 import 'app_background.dart';
@@ -39,6 +40,7 @@ class SylphyShell extends StatefulWidget {
 
 class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
+  final BatchSelection _librarySelection = BatchSelection();
   int libraryView = 0;
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
@@ -86,6 +88,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     app.removeListener(_update);
     app.playback.removeListener(_update);
     app.appearance.removeListener(_appearanceChanged);
+    _librarySelection.dispose();
     super.dispose();
   }
 
@@ -141,10 +144,14 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
   }
 
-  void _library([int view = 0]) => setState(() {
-    tab = 1;
-    libraryView = view;
-  });
+  void _library([int view = 0]) {
+    _librarySelection.clear();
+    setState(() {
+      tab = 1;
+      libraryView = view;
+    });
+  }
+
   void _favorites() {
     final favorite = app.playlists
         .where((p) => p.id == 'favorites')
@@ -190,35 +197,38 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       children: [
         if (app.busy) const LinearProgressIndicator(),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(child: _page()),
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: wide ? 16 : 8,
-                child: IgnorePointer(
-                  ignoring: playerCollapsed,
-                  child: AnimatedSlide(
-                    offset: playerCollapsed
-                        ? const Offset(0, 1.4)
-                        : Offset.zero,
-                    duration: playerAnimation,
-                    curve: Curves.easeOutCubic,
-                    child: AnimatedOpacity(
-                      opacity: playerCollapsed ? 0 : 1,
-                      duration: playerAnimation,
-                      curve: Curves.easeOutCubic,
-                      child: wide
-                          ? SafeArea(top: false, child: _playerBar())
-                          : _playerBar(),
+          // The desktop player is docked below the content, never painted over
+          // the scrolled page. Keep the mobile overlay unchanged.
+          child: wide
+              ? _page()
+              : Stack(
+                  children: [
+                    Positioned.fill(child: _page()),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 8,
+                      child: IgnorePointer(
+                        ignoring: playerCollapsed,
+                        child: AnimatedSlide(
+                          offset: playerCollapsed
+                              ? const Offset(0, 1.4)
+                              : Offset.zero,
+                          duration: playerAnimation,
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: playerCollapsed ? 0 : 1,
+                            duration: playerAnimation,
+                            curve: Curves.easeOutCubic,
+                            child: _playerBar(),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
+        if (wide && !playerCollapsed) _desktopPlayerBar(),
       ],
     );
     final solidBackground = app.appearance.solidBackground;
@@ -280,11 +290,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 children: [
                   NavigationRail(
                     extended: MediaQuery.sizeOf(context).width > 1050,
+                    minExtendedWidth: 208,
+                    minWidth: 72,
                     backgroundColor: solidBackground
                         ? Colors.transparent
                         : null,
                     selectedIndex: tab,
-                    onDestinationSelected: (v) => setState(() => tab = v),
+                    onDestinationSelected: (v) {
+                      if (v != 1) _librarySelection.clear();
+                      setState(() => tab = v);
+                    },
                     destinations: List.generate(
                       labels.length,
                       (i) => NavigationRailDestination(
@@ -321,7 +336,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     height: _navigationBarHeight(context),
                     maintainBottomViewPadding: true,
                     selectedIndex: tab,
-                    onDestinationSelected: (v) => setState(() => tab = v),
+                    onDestinationSelected: (v) {
+                      if (v != 1) _librarySelection.clear();
+                      setState(() => tab = v);
+                    },
                     destinations: List.generate(
                       labels.length,
                       (i) => NavigationDestination(
@@ -356,51 +374,66 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _libraryFilterBar() => Align(
-    key: const ValueKey('library-filter-bar'),
-    alignment: Alignment.centerLeft,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: CapsuleToggle<int>(
-              keyPrefix: 'library-filter',
-              selected: libraryView,
-              onChanged: (value) => setState(() => libraryView = value),
-              options: const [
-                CapsuleOption(
-                  value: 0,
-                  label: '歌曲',
-                  icon: Icons.music_note_outlined,
-                ),
-                CapsuleOption(
-                  value: 1,
-                  label: '专辑',
-                  icon: Icons.album_outlined,
-                ),
-                CapsuleOption(
-                  value: 2,
-                  label: '艺术家',
-                  icon: Icons.person_outline,
-                ),
-              ],
-            ),
-          ),
-          if (libraryView == 1)
-            SizedBox.square(
-              dimension: 48,
-              child: IconButton(
-                key: const ValueKey('album-cover-flow-toggle'),
-                tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
-                isSelected: albumCoverFlow,
-                onPressed: () =>
-                    setState(() => albumCoverFlow = !albumCoverFlow),
-                icon: const Icon(Icons.view_carousel_outlined),
-                selectedIcon: const Icon(Icons.view_list_rounded),
+  Widget _libraryFilterBar() => ListenableBuilder(
+    listenable: _librarySelection,
+    builder: (context, _) => Align(
+      key: const ValueKey('library-filter-bar'),
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: CapsuleToggle<int>(
+                keyPrefix: 'library-filter',
+                selected: libraryView,
+                onChanged: (value) {
+                  _librarySelection.clear();
+                  setState(() => libraryView = value);
+                },
+                options: const [
+                  CapsuleOption(
+                    value: 0,
+                    label: '歌曲',
+                    icon: Icons.music_note_outlined,
+                  ),
+                  CapsuleOption(
+                    value: 1,
+                    label: '专辑',
+                    icon: Icons.album_outlined,
+                  ),
+                  CapsuleOption(
+                    value: 2,
+                    label: '艺术家',
+                    icon: Icons.person_outline,
+                  ),
+                ],
               ),
             ),
-        ],
+            if (_librarySelection.active)
+              IconButton(
+                key: const ValueKey('library-batch-more'),
+                tooltip: '多选的更多操作',
+                icon: const Icon(Icons.more_vert),
+                onPressed: _librarySelection.count == 0
+                    ? null
+                    : () => unawaited(_libraryBatchActions()),
+              )
+            else if (libraryView == 1)
+              SizedBox.square(
+                dimension: 48,
+                child: IconButton(
+                  key: const ValueKey('album-cover-flow-toggle'),
+                  tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
+                  isSelected: albumCoverFlow,
+                  onPressed: () =>
+                      setState(() => albumCoverFlow = !albumCoverFlow),
+                  icon: const Icon(Icons.view_carousel_outlined),
+                  selectedIcon: const Icon(Icons.view_list_rounded),
+                ),
+              ),
+          ],
+        ),
       ),
     ),
   );
@@ -413,7 +446,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         child: PopupMenuButton<String>(
           tooltip: '排序',
           icon: const Icon(Icons.sort),
-          onSelected: (v) => setState(() => sort = v),
+          onSelected: (v) {
+            _librarySelection.clear();
+            setState(() => sort = v);
+          },
           itemBuilder: (ctx) => const [
             PopupMenuItem(value: 'name', child: Text('名称')),
             PopupMenuItem(value: 'artist', child: Text('艺术家')),
@@ -427,7 +463,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         dimension: 48,
         child: IconButton(
           tooltip: '升序 / 降序',
-          onPressed: () => setState(() => descending = !descending),
+          onPressed: () {
+            _librarySelection.clear();
+            setState(() => descending = !descending);
+          },
           icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
         ),
       ),
@@ -446,17 +485,22 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           onAction: _trackAction,
         );
       case 1:
-        return LibraryBrowser(
-          app: app,
-          query: CatalogQuery(
-            view: libraryView,
-            sort: sort,
-            descending: descending,
+        return ListenableBuilder(
+          listenable: _librarySelection,
+          builder: (context, _) => LibraryBrowser(
+            app: app,
+            query: CatalogQuery(
+              view: libraryView,
+              sort: sort,
+              descending: descending,
+            ),
+            onAction: _trackAction,
+            batchSelection: _librarySelection,
+            coverFlow:
+                libraryView == 1 && albumCoverFlow && !_librarySelection.active,
+            viewControls: _libraryFilterBar(),
+            songActions: _sortControls(),
           ),
-          onAction: _trackAction,
-          coverFlow: libraryView == 1 && albumCoverFlow,
-          viewControls: _libraryFilterBar(),
-          songActions: _sortControls(),
         );
       case 2:
         return _playlists();
@@ -520,6 +564,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     bool showPlayAll = true,
     Future<void> Function(int)? onRemove,
     bool favorites = false,
+    List<String>? entryIds,
+    BatchSelection? batchSelection,
   }) {
     if (tracks.isEmpty) {
       return const Center(
@@ -542,45 +588,80 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           );
         }
         final track = tracks[i - (showPlayAll ? 1 : 0)];
+        final entryKey = entryIds == null
+            ? track.ref.key
+            : entryIds[i - (showPlayAll ? 1 : 0)];
+        final selecting = batchSelection?.active == true;
         return PlayingSongTile(
           app: app,
           track: track,
           title: track.title,
           subtitle:
               '${track.artist} · ${track.album} · ${_sourceName(track.ref.sourceId)}',
-          onTap: () => _act(
-            () => app.playback.setQueue(
-              tracks.map((t) => t.ref).toList(),
-              start: i - (showPlayAll ? 1 : 0),
-            ),
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'remove_entry' && onRemove != null) {
-                unawaited(_act(() => onRemove(i - (showPlayAll ? 1 : 0))));
-              } else {
-                unawaited(_trackAction(v, track));
-              }
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
-              const PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
-              const PopupMenuItem(value: 'next', child: Text('下一首播放')),
-              const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
-              const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
-              if (onRemove != null)
-                PopupMenuItem(
-                  value: 'remove_entry',
-                  child: Text(favorites ? '从收藏移除' : '从此歌单移除'),
+          selectedInBatch: selecting && batchSelection!.contains(entryKey),
+          onLongPress: batchSelection == null
+              ? null
+              : () => batchSelection.begin(entryKey),
+          onTap: selecting
+              ? () => batchSelection!.toggle(entryKey)
+              : () => _act(
+                  () => app.playback.setQueue(
+                    tracks.map((t) => t.ref).toList(),
+                    start: i - (showPlayAll ? 1 : 0),
+                  ),
                 ),
-              PopupMenuItem(
-                value: 'block',
-                child: Text(
-                  app.blacklist.contains(track.ref.key) ? '取消屏蔽' : '加入黑名单',
+          trailing: selecting
+              ? SizedBox.square(
+                  dimension: 48,
+                  child: Checkbox(
+                    value: batchSelection!.contains(entryKey),
+                    onChanged: (_) => batchSelection.toggle(entryKey),
+                  ),
+                )
+              : PopupMenuButton<String>(
+                  onSelected: (v) {
+                    if (v == 'multi_select' && batchSelection != null) {
+                      batchSelection.begin(entryKey);
+                    } else if (v == 'remove_entry' && onRemove != null) {
+                      unawaited(
+                        _act(() => onRemove(i - (showPlayAll ? 1 : 0))),
+                      );
+                    } else {
+                      unawaited(_trackAction(v, track));
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    if (batchSelection != null)
+                      const PopupMenuItem(
+                        value: 'multi_select',
+                        child: Text('多选'),
+                      ),
+                    PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
+                    const PopupMenuItem(
+                      value: 'playlist',
+                      child: Text('添加到歌单'),
+                    ),
+                    const PopupMenuItem(value: 'next', child: Text('下一首播放')),
+                    const PopupMenuItem(
+                      value: 'enqueue',
+                      child: Text('添加到播放队列'),
+                    ),
+                    const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
+                    if (onRemove != null)
+                      PopupMenuItem(
+                        value: 'remove_entry',
+                        child: Text(favorites ? '从收藏移除' : '从此歌单移除'),
+                      ),
+                    PopupMenuItem(
+                      value: 'block',
+                      child: Text(
+                        app.blacklist.contains(track.ref.key)
+                            ? '取消屏蔽'
+                            : '加入黑名单',
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         );
       },
     );
@@ -595,6 +676,62 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
 
   Future<void> _trackAction(String action, Track track) =>
       _act(() => performTrackAction(context, app, action, track));
+
+  Future<void> _libraryBatchActions() async {
+    final selection = _librarySelection;
+    final query = CatalogQuery(
+      view: libraryView,
+      sort: sort,
+      descending: descending,
+    );
+    final all = selection.all;
+    final chosen = selection.selectedKeys;
+    final excluded = selection.excludedKeys;
+    final count = selection.count;
+    final success = await showBatchTrackActions(
+      context,
+      app,
+      count: count,
+      countUnit: query.view == 0
+          ? '首'
+          : query.view == 1
+          ? '张专辑'
+          : '位艺术家',
+      resolve: () async {
+        if (query.view == 0) {
+          final refs = await app.catalog.queue(query.songs);
+          return [
+            for (final ref in refs)
+              if (all ? !excluded.contains(ref.key) : chosen.contains(ref.key))
+                ref,
+          ];
+        }
+        final kind = query.view == 1 ? 'album' : 'artist';
+        if (all) {
+          final refs = await app.catalog.queue(query.songs);
+          final omitted = <String>{};
+          for (final key in excluded) {
+            final group = await app.catalog.queue(query.songsIn(kind, key));
+            omitted.addAll(group.map((ref) => ref.key));
+          }
+          return [
+            for (final ref in refs)
+              if (!omitted.contains(ref.key)) ref,
+          ];
+        }
+        final seen = <String>{};
+        final refs = <TrackRef>[];
+        for (final key in chosen) {
+          final group = await app.catalog.queue(query.songsIn(kind, key));
+          for (final ref in group) {
+            if (seen.add(ref.key)) refs.add(ref);
+          }
+        }
+        return refs;
+      },
+    );
+    if (success) selection.clear();
+  }
 
   Widget _playlists() => Column(
     children: [
@@ -756,9 +893,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           app: app,
           id: playlist.id,
           buildTracks: (tracks) => _tracks(tracks, showPlayAll: false),
-          buildEntryTracks: (tracks, entryIds) => _tracks(
+          buildEntryTracks: (tracks, entryIds, selection) => _tracks(
             tracks,
             showPlayAll: false,
+            entryIds: entryIds,
+            batchSelection: selection,
             favorites: latest().kind == PlaylistKind.favorites,
             onRemove:
                 (latest().kind == PlaylistKind.favorites ||
@@ -1143,6 +1282,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     builder: (context, _) => PlayerBar(
       app: app,
       compact: true,
+      onCollapse: () => setState(() => playerCollapsed = true),
+    ),
+  );
+
+  Widget _desktopPlayerBar() => ListenableBuilder(
+    listenable: app.appearance,
+    builder: (context, _) => PlayerBar(
+      app: app,
+      compact: true,
+      docked: true,
       onCollapse: () => setState(() => playerCollapsed = true),
     ),
   );

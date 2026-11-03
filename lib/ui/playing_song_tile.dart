@@ -19,6 +19,8 @@ class PlayingSongTile extends StatefulWidget {
     this.leading,
     this.trailing,
     this.onTap,
+    this.onLongPress,
+    this.selectedInBatch = false,
     this.contentPadding,
   });
 
@@ -26,7 +28,8 @@ class PlayingSongTile extends StatefulWidget {
   final Track track;
   final String title, subtitle;
   final Widget? leading, trailing;
-  final VoidCallback? onTap;
+  final VoidCallback? onTap, onLongPress;
+  final bool selectedInBatch;
   final EdgeInsetsGeometry? contentPadding;
 
   @override
@@ -77,12 +80,14 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
-      color: _isCurrent
+      color: widget.selectedInBatch
+          ? scheme.primary.withValues(alpha: .15)
+          : _isCurrent
           ? scheme.primary.withValues(alpha: .09)
           : Colors.transparent,
       child: ListTile(
         contentPadding: widget.contentPadding,
-        selected: _isCurrent,
+        selected: _isCurrent || widget.selectedInBatch,
         selectedColor: scheme.primary,
         leading: SizedBox.square(
           dimension: 48,
@@ -132,6 +137,7 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
           overflow: TextOverflow.ellipsis,
         ),
         onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
         trailing: widget.trailing,
       ),
     );
