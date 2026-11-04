@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum SourceKind { emby, subsonic, local, webdav, fnMusic }
+enum SourceKind { emby, subsonic, local, webdav, fnMusic, jellyfin, plex }
 
 extension SourceCapabilities on SourceKind {
   bool get cloudFavorites =>
@@ -8,6 +8,8 @@ extension SourceCapabilities on SourceKind {
 
   bool get cloudPlaylists =>
       this == SourceKind.emby ||
+      this == SourceKind.jellyfin ||
+      this == SourceKind.plex ||
       this == SourceKind.subsonic ||
       this == SourceKind.fnMusic;
 
@@ -141,6 +143,7 @@ class Track {
     primaryArtwork.tag ??
         [remote['etag'], remote['DateModified'], remote['modified']],
     remote['coverPath'],
+    remote['coverUpdatedAt'],
   ]);
   String get resourceVersion {
     final media = (remote['MediaSources'] as List?)

@@ -15,6 +15,8 @@ import 'lyrics.dart';
 
 part 'webdav.dart';
 part 'fn_music.dart';
+part 'jellyfin.dart';
+part 'plex.dart';
 
 class RemotePlaylist {
   const RemotePlaylist({
@@ -941,6 +943,8 @@ class AdapterFactory {
   final AuthVault vault;
   MusicAdapter create(SourceProfile profile) => switch (profile.kind) {
     SourceKind.emby => EmbyAdapter(profile, vault),
+    SourceKind.jellyfin => JellyfinAdapter(profile, vault),
+    SourceKind.plex => PlexAdapter(profile, vault),
     SourceKind.subsonic => SubsonicAdapter(profile, vault),
     SourceKind.webdav => WebDavAdapter(profile, vault),
     SourceKind.fnMusic => FnMusicAdapter(profile, vault),

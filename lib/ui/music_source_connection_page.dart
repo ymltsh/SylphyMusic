@@ -272,9 +272,13 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     readOnly: _editing,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      labelText: '用户名',
+                      labelText: _kind == SourceKind.plex ? '账号备注（可选）' : '用户名',
                       prefixIcon: const Icon(Icons.person_outline),
-                      helperText: _editing ? '为保护原有曲库身份，账号不可修改' : null,
+                      helperText: _kind == SourceKind.plex
+                          ? '仅用于本机标记，不会作为 Plex 登录凭据'
+                          : _editing
+                          ? '为保护原有曲库身份，账号不可修改'
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -284,7 +288,11 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     obscureText: _obscurePassword,
                     onFieldSubmitted: (_) => _save(),
                     decoration: InputDecoration(
-                      labelText: _editing ? '密码（重新验证）' : '密码',
+                      labelText: _kind == SourceKind.plex
+                          ? '访问令牌（X-Plex-Token）'
+                          : _editing
+                          ? '密码（重新验证）'
+                          : '密码',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         tooltip: _obscurePassword ? '显示密码' : '隐藏密码',
@@ -300,6 +308,15 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
+                  if (_kind == SourceKind.plex)
+                    const ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.info_outline),
+                      title: Text('Plex 基础连接'),
+                      subtitle: Text(
+                        '需要已有 Plex 服务器访问令牌；本版本不提供 Plex 账户 PIN 授权、转码和云歌单写入。请优先使用 HTTPS。',
+                      ),
+                    ),
                   if (_kind == SourceKind.fnMusic)
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -357,8 +374,8 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                     ),
                   ],
                   if (_editing &&
-                      _kind != SourceKind.emby &&
-                      _kind != SourceKind.fnMusic)
+                      (_kind == SourceKind.webdav ||
+                          _kind == SourceKind.subsonic))
                     const ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.shield_outlined),

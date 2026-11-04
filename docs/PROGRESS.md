@@ -1,5 +1,19 @@
 # 实施与验证记录
 
+## 2026-11-04 媒体通知使用白色透明 Logo
+
+按用户要求，将 logo/white.png 原样替换到两分支 android/app/src/main/res/drawable-nodpi/ic_stat_sylphy.png。原图为 1280×1280 RGBA，背景透明、图形纯白；继续使用既有 drawable/ic_stat_sylphy 媒体通知配置和资源保留规则，不更改应用启动图标。修改前资源备份在各自 .private/notification-white-icon-before.png。
+
+普通版 Android Release 三 ABI、OpenList Android arm64 Release 编译成功，APK 在各自 build/app/outputs/flutter-apk/，日志 build/test_logs/notification-white-icon-build.log。AAPT 资源表确认两个 arm64 APK 中保留专用通知图标。仅 Android 资源变更，未重建 Windows；未运行 analyze / 测试或设备验收，未提交、推送或发布。通知栏实际显示效果交由用户确认。
+
+## 2026-11-04 应用 Jellyfin / Plex 基础接入补丁与 Logo
+
+按用户要求，将 SylphyMusic-jellyfin-plex-basic.patch 应用于两分支，保留 OpenList 与其他已有修改。新增独立 Jellyfin / Plex 适配器、来源枚举 / 工厂 / 能力标记、连接表单与曲目信息名称；接入既有分页索引、代理、缓存及适配器关闭链路。Jellyfin 使用账号密码并读取结构化歌词；Plex 使用已有访问令牌，只接受同服务器相对媒体 / 封面地址。两者云歌单仅支持读取，使用本地收藏，不提供转码、PIN 授权或服务器歌单写入。枚举追加成员，数据库 v9 不变。
+
+将用户 logo/source/jellyfin.png 和 plex.png 原样复制至各分支 assets/source/ 并接入品牌图标，APK 内素材与原文件逐字节一致。补充编辑连接的稳定身份提示条件，避免对 Jellyfin / Plex 显示不适用说明。合入补丁附带说明，更新 README 与架构文档。修改前源码备份在各自 .private/jellyfin-plex-before/。
+
+普通版 Android 三 ABI / Windows Release 编译及内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/jellyfin-plex-build.log。未连接真实服务器、运行 analyze / 测试或设备验收，未修改版本或清单，未提交、推送或发布；协议连接及功能交由用户验收。
+
 ## 2026-11-04 应用播放可靠性补丁包
 
 按用户要求，将 SylphyMusic-playback-reliability-package.zip 内的补丁合入两分支。main 直接应用，OpenList 适配专用导入和暂停时释放播放租约的上下文，保留所有既有来源租约与加载代次检查。补丁全部 51 个新增代码块均与合入结果匹配（忽略格式化差异）；包内 README 的测试与新建分支建议仅作为背景，未执行。修改前受影响源码备份在各自 .private/playback-reliability/before/。

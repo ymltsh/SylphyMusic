@@ -689,11 +689,26 @@ class SylphyApp extends ChangeNotifier {
     );
     final adapter = factory.create(candidate);
     try {
-      final secret = source.kind == SourceKind.webdav && password.isEmpty
-          ? (await vault.read(source.id, 'password') ?? '')
+      if (source.kind == SourceKind.plex &&
+          password.trim().isNotEmpty &&
+          password.trim() != await vault.read(source.id, 'token')) {
+        throw StateError('Plex 令牌可能对应其他账号；更换令牌请添加新来源');
+      }
+      final secret =
+          (source.kind == SourceKind.webdav ||
+                  source.kind == SourceKind.plex) &&
+              password.isEmpty
+          ? (await vault.read(
+                  source.id,
+                  source.kind == SourceKind.plex ? 'token' : 'password',
+                ) ??
+                '')
           : password;
       await adapter.login(secret);
-      if (source.kind == SourceKind.emby || source.kind == SourceKind.fnMusic) {
+      if (source.kind == SourceKind.emby ||
+          source.kind == SourceKind.jellyfin ||
+          source.kind == SourceKind.plex ||
+          source.kind == SourceKind.fnMusic) {
         final oldServer = await vault.read(source.id, 'serverId');
         final newServer = await vault.read(candidate.id, 'serverId');
         final oldUser = await vault.read(source.id, 'userId');

@@ -20,6 +20,18 @@ const musicSourceOptions = <MusicSourceOption>[
     Icons.dns_outlined,
   ),
   MusicSourceOption(
+    SourceKind.jellyfin,
+    'Jellyfin',
+    '连接 Jellyfin 私人音乐服务器',
+    Icons.album_outlined,
+  ),
+  MusicSourceOption(
+    SourceKind.plex,
+    'Plex',
+    '连接 Plex Media Server（需要访问令牌）',
+    Icons.audio_file_outlined,
+  ),
+  MusicSourceOption(
     SourceKind.subsonic,
     'Navidrome / OpenSubsonic',
     '连接兼容 OpenSubsonic 协议的音乐库',
@@ -125,6 +137,16 @@ MusicSourceBrand sourceBrandFor(SourceKind kind, {SourceProfile? source}) {
       'assets/source/emby.png',
       Color(0xff51b347),
       Color(0xff9ad962),
+    ),
+    SourceKind.jellyfin => const MusicSourceBrand(
+      'assets/source/jellyfin.png',
+      Color(0xff9a45c7),
+      Color(0xffd08aed),
+    ),
+    SourceKind.plex => const MusicSourceBrand(
+      'assets/source/plex.png',
+      Color(0xffe5a00d),
+      Color(0xfff5d37b),
     ),
     SourceKind.subsonic => const MusicSourceBrand(
       'assets/source/navidrome.png',

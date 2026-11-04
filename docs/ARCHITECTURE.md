@@ -58,6 +58,8 @@ flowchart TD
 | 来源 | 曲目 id | 索引 | 云歌单 | 歌词 / 封面 |
 |---|---|---|---|---|
 | Emby | 服务端 Item Id | 分页 Items 与媒体流等字段 | 支持，遵循账号权限 | 单曲 MediaStreams 的 text / lrc 字幕流；服务器图片 |
+| Jellyfin | 服务端 Item Id | 独立鉴权与分页 Items | 只读，保留重复条目 | 服务器结构化歌词及图片 |
+| Plex | ratingKey | 各音乐 Section 分页曲目 | 只读，保留重复条目 | 同服务器图片；暂不读取服务器歌词 |
 | OpenSubsonic | song id | 协议专辑 / 歌曲列表 | 支持，遵循账号权限 | 结构化歌词及兼容文本接口；封面接口 |
 | 飞牛音乐（fnOS） | track guid | 分页 track/list | 只读浏览，保留重复歌曲 | lyric/list 与 static/cover 接口 |
 | WebDAV | 根目录内编码相对路径 | Depth: 1 递归；文件名标题、目录分组 | 不支持；使用本地歌单 | 同名 LRC / TXT 和目录封面；已有完整缓存可读内嵌歌词 |
@@ -66,6 +68,8 @@ flowchart TD
 UI 和服务通过 `SourceKind.cloudPlaylists` 判断云歌单读取能力，新建 / 复制目标通过 `cloudPlaylistWritable` 判断写入能力；飞牛音乐首期只读，不能将所有远程来源都视为支持云歌单写入。飞牛接入地址以 `/music` 结尾，使用音乐应用独立账号，连接限制见 [FN_MUSIC](FN_MUSIC.md)。WebDAV 不在扫描时下载整首音频或解析远程内嵌标签，限制见 [WEBDAV](WEBDAV.md)。
 
 ## 索引与浏览
+
+Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒体资源生命周期。Jellyfin 使用账号密码换取令牌并核对服务器 / 用户身份；Plex 使用已有访问令牌，绑定服务器 machineIdentifier，更换令牌须添加独立来源。Plex 媒体和封面仅接受同服务器相对路径，凭据只通过请求头传递；不支持账户 PIN 授权或转码。两者云歌单仅可读取，收藏使用本地能力。来源枚举追加成员，沿用数据库 v9，不迁移现有数据。来源 Logo 使用 assets/source/jellyfin.png 和 plex.png。
 
 封面读取优先使用 Emby 单曲 `ImageTags.Primary` 对应的歌曲 ID 和 tag，再使用有 tag 的专辑 / 继承图片；只有 404 才尝试其他候选，不把鉴权失败当作缺图。URL 保留来源配置的反向代理前缀。封面磁盘与请求合并 key 包含图片版本，tag 更新后重新读取；失败请求不永久记忆，网络读取最多六路并发。
 
