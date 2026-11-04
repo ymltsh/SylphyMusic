@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.30-openlist.13",
-    "build": 43,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.30-openlist.13 (arm64-v8a)",
+    "version": "1.0.31-openlist.14",
+    "build": 44,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.31-openlist.14 (arm64-v8a)",
     "date": "2026-11-04",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.30-openlist.13\n\n- 改进后台播放的异常恢复，减少歌曲加载或切换时长时间停滞的情况；改进远程歌曲刚开始加载时的重连处理。\n- 音乐库与歌单支持多选，可批量播放、加入队列、添加到歌单、收藏、缓存或屏蔽；歌单内支持批量移除条目。\n- 优化宽屏布局，播放条停靠底部，首页专辑展示更紧凑。\n- 改进封面背景显示，更新音乐标签时保留列表滚动位置。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.31-openlist.14\n\n- 新增 Jellyfin 与 Plex 音源：支持曲库浏览、原始音频播放、封面及只读云歌单；Jellyfin 可读取服务器歌词。Plex 需要已有访问令牌，暂不提供账户 PIN 授权和转码。\n- 扩大播放进度条的触摸区域，拖动时实时预览进度与时间，松手后跳转，减少进度回跳。\n- 改进播放、暂停、切歌和重连处理，减少连续操作时的异常；过期播放链接可重新获取。\n- 恢复播放页全屏封面模糊背景。\n- Android 媒体通知改用白色透明 Logo。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30-openlist.13%2B43/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.31-openlist.14%2B44/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.30-openlist.13%2B43"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.31-openlist.14%2B44"
   },
   "history": [
+    {
+      "version": "1.0.30-openlist.13",
+      "build": 43,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.30-openlist.13 (arm64-v8a)",
+      "date": "2026-11-04",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.30-openlist.13\n\n- 改进后台播放的异常恢复，减少歌曲加载或切换时长时间停滞的情况；改进远程歌曲刚开始加载时的重连处理。\n- 音乐库与歌单支持多选，可批量播放、加入队列、添加到歌单、收藏、缓存或屏蔽；歌单内支持批量移除条目。\n- 优化宽屏布局，播放条停靠底部，首页专辑展示更紧凑。\n- 改进封面背景显示，更新音乐标签时保留列表滚动位置。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30-openlist.13%2B43/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.30-openlist.13%2B43"
+    },
     {
       "version": "1.0.28-openlist.12",
       "build": 41,
