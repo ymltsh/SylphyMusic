@@ -797,7 +797,7 @@ class SylphyApp extends ChangeNotifier {
     await _suspendSource(source);
     if (playback.currentRef?.sourceId == source.id) {
       await playback.pause();
-      await playback.player.stop();
+      await playback.stopCurrentOutput(sourceId: source.id);
     }
     await jobs.cancelAffected(sourceId: source.id);
     await cache.clear(sourceId: source.id);

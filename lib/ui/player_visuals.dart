@@ -1,9 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../core/player_layout.dart';
-import 'blurred_cover_backdrop.dart';
+import 'cover_art.dart';
 
 /// Shared atmosphere for the live player and layout preview. It follows the
 /// active light/dark theme and the global solid-background preference; the
@@ -56,15 +58,22 @@ class PlayerBackdrop extends StatelessWidget {
           ),
         if (coverBlur)
           ClipRect(
-            child: AnimatedSwitcher(
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 500),
-              child: BlurredCoverBackdrop(
-                key: ValueKey('${track!.ref.key}/${track!.artworkVersion}'),
-                app: app,
-                track: track!,
-                opacity: opacity,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 48, sigmaY: 48),
+              child: AnimatedSwitcher(
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 500),
+                child: Opacity(
+                  key: ValueKey('${track!.ref.key}/${track!.artworkVersion}'),
+                  opacity: opacity,
+                  child: SizedBox.expand(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: CoverArt(app: app, track: track!, size: 640),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

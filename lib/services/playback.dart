@@ -14,7 +14,9 @@ import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
+import 'native_command_gate.dart';
 import 'notification_clock.dart';
+import 'playback_reliability.dart';
 
 /// Metadata sent to Android must include an actual artwork URI; the platform
 /// cannot access Flutter's in-widget Image.file cache automatically.
@@ -52,8 +54,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   static const _fadeInDuration = Duration(milliseconds: 64);
   static const _fadeStep = Duration(milliseconds: 8);
   final Lock _volumeWriteLock = Lock();
-  // Native opens and engine replacement must never overlap.
-  final Lock _nativeOpenLock = Lock();
+  // All native transport operations share the same serialized gate.
+  final NativeCommandGate _nativeCommands = NativeCommandGate();
   bool _nativeEngineBroken = false;
   double _playbackGain = 1;
   int _gainGeneration = 0;
@@ -78,6 +80,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _lastSaved = 0;
   int _reconnects = 0;
   TrackRef? _recoveryRef;
+  DateTime? _steadyProgressSince;
+  DateTime? _lastSteadyProgress;
   AudioSession? _session;
   // Sample the actual mpv AO once per track, after audio advances.
   bool _androidAudioOutputProbed = false;
@@ -527,10 +531,26 @@ class PlaybackCoordinator extends ChangeNotifier {
           // The first sample or a seek jump is not proof of audible playback.
           if (_playRequested &&
               playing &&
+              !buffering &&
               previousProgressMs >= 0 &&
               nextMs - previousProgressMs <= 4000) {
             _mediaProgressObserved = true;
             _mediaProgressWatch.reset();
+            final now = DateTime.now();
+            if (_lastSteadyProgress == null ||
+                now.difference(_lastSteadyProgress!) >
+                    const Duration(seconds: 5)) {
+              _steadyProgressSince = now;
+            }
+            _lastSteadyProgress = now;
+            if (_reconnects > 0 &&
+                _recoveryRef == currentRef &&
+                _steadyProgressSince != null &&
+                now.difference(_steadyProgressSince!) >=
+                    const Duration(seconds: 20)) {
+              _reconnects = 0;
+              diagnostics?.record('playback', 'reconnect_budget_refreshed');
+            }
           }
         }
         if (error != null && playing && !buffering && v > position) {
@@ -596,7 +616,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
   }
 
-  // Called under _nativeOpenLock. Future.timeout cannot cancel native open.
+  // Called under _nativeCommands. Future.timeout cannot cancel native open.
   Future<void> _replaceNativePlayer() async {
     _nativeEngineBroken = true;
     ++_gainGeneration; // Cancel any fade still targeting the retired player.
@@ -628,19 +648,56 @@ class PlaybackCoordinator extends ChangeNotifier {
     Media media, {
     required bool play,
     required int generation,
-  }) => _nativeOpenLock.synchronized(() async {
-    if (generation != _loadGeneration) return;
-    if (_nativeEngineBroken) {
-      throw StateError('原生播放器无法安全恢复，请重新启动应用');
-    }
-    try {
-      await player.open(media, play: play).timeout(const Duration(seconds: 25));
-    } on TimeoutException {
-      diagnostics?.record('playback', 'native_open_timeout');
-      await _replaceNativePlayer();
-      throw TimeoutException('原生播放器打开超时');
-    }
-  });
+    required int resumeMs,
+  }) async {
+    await _nativeCommands.run(() async {
+      if (_nativeEngineBroken) {
+        throw StateError('原生播放器无法安全恢复，请重新启动应用');
+      }
+      try {
+        await player
+            .open(media, play: play && _playRequested)
+            .timeout(const Duration(seconds: 25));
+        if (generation != _loadGeneration) return;
+        if (resumeMs > 0) {
+          await player
+              .seek(Duration(milliseconds: resumeMs))
+              .timeout(const Duration(seconds: 12));
+        }
+        if (!_playRequested) {
+          await player.pause().timeout(const Duration(seconds: 12));
+        }
+      } on TimeoutException {
+        diagnostics?.record('playback', 'native_open_or_restore_timeout');
+        await _replaceNativePlayer();
+        throw TimeoutException('原生播放器打开或恢复超时');
+      }
+    }, isCurrent: () => generation == _loadGeneration);
+  }
+
+  /// Commands queued while an old open/replacement is running cannot touch a
+  /// retired player. The validity predicate is rechecked after lock acquisition.
+  Future<bool> _runNativeCommand(
+    Future<void> Function(Player) command, {
+    int? generation,
+    int? navigationEpoch,
+    bool Function()? allowed,
+  }) => _nativeCommands.run(
+    () async {
+      try {
+        await command(player).timeout(const Duration(seconds: 12));
+      } on TimeoutException {
+        diagnostics?.record('playback', 'native_command_timeout');
+        await _replaceNativePlayer();
+        throw TimeoutException('原生播放器操作超时');
+      }
+    },
+    isCurrent: () =>
+        !_nativeEngineBroken &&
+        (generation == null || generation == _loadGeneration) &&
+        (navigationEpoch == null || navigationEpoch == _navigationEpoch) &&
+        (allowed == null || allowed()),
+  );
 
   // Fallback for blocked pre-open preparation or track transition.
   Future<void> _recoverHungPhase({
@@ -657,11 +714,19 @@ class PlaybackCoordinator extends ChangeNotifier {
     final finishedAt = _transitionStartIndex;
     final oldEngine = player;
     try {
-      await _nativeOpenLock.synchronized(() async {
-        if (identical(player, oldEngine) && !_nativeEngineBroken) {
-          await _replaceNativePlayer();
-        }
-      });
+      await _nativeCommands.run(
+        () async {
+          if (identical(player, oldEngine) && !_nativeEngineBroken) {
+            await _replaceNativePlayer();
+          }
+        },
+        isCurrent: () =>
+            _loadGeneration == generation &&
+            _playIntentGeneration == intent &&
+            currentRef == ref &&
+            _playRequested &&
+            !_userPaused,
+      );
       if (currentRef != ref ||
           _loadGeneration != generation ||
           _playIntentGeneration != intent ||
@@ -934,10 +999,13 @@ class PlaybackCoordinator extends ChangeNotifier {
     _cancelFocusResume(resetBurst: true);
     _focusWasLost = false;
     if (autoplay) _userPaused = false;
+    final navigationEpoch = ++_navigationEpoch;
+    ++_loadGeneration; // Invalidate an older, still resolving load immediately.
     final previousRef = currentRef;
     if (previousRef != null) {
       await cache.cancel(previousRef, automaticOnly: true);
     }
+    if (navigationEpoch != _navigationEpoch) return;
     final safe = start.clamp(0, tracks.length - 1);
     final order = List.generate(tracks.length, (i) => i);
     if (snapshot.shuffle) {
@@ -958,6 +1026,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     cache.beginQueueSession();
     failures = 0;
     await save();
+    if (navigationEpoch != _navigationEpoch) return;
     await _loadCurrent(autoplay: autoplay, manual: true);
   }
 
@@ -977,6 +1046,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     _androidAudioOutputProbed = false;
     final generation = ++_loadGeneration;
     _mediaProgressObserved = false;
+    _steadyProgressSince = null;
+    _lastSteadyProgress = null;
     _watchdogPositionMs = -1;
     _openStallLogged = false;
     _progressWatch.reset();
@@ -991,12 +1062,17 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (ref == null) return;
       position = Duration(milliseconds: snapshot.positionMs);
       duration = Duration.zero;
-      current = await db.track(ref);
+      final loadedTrack = await db.track(ref);
       if (generation != _loadGeneration) return;
-      if (current == null) throw StateError('歌曲索引不存在');
-      if (current!.missing && !await cache.contains(ref)) {
-        throw StateError('服务器歌曲已消失，且本机没有完整缓存');
+      if (loadedTrack == null) throw StateError('歌曲索引不存在');
+      if (loadedTrack.missing) {
+        final available = await cache.contains(ref);
+        if (generation != _loadGeneration) return;
+        if (!available) {
+          throw StateError('服务器歌曲已消失，且本机没有完整缓存');
+        }
       }
+      current = loadedTrack;
       final source = await db.source(ref.sourceId);
       if (generation != _loadGeneration) return;
       if (source == null) throw StateError('来源已删除');
@@ -1011,17 +1087,19 @@ class PlaybackCoordinator extends ChangeNotifier {
       // Start/retain the media playback foreground service *before* opening
       // the next URL or requesting audio focus in the background.
       _publish();
-      if (autoplay &&
-          _playRequested &&
-          _session != null &&
-          !await _session!.setActive(true)) {
-        // Focus denial is not a broken media source. Do not skip tracks.
-        _playRequested = false;
-        error = '系统暂时未授予音频焦点';
-        notifyListeners();
-        _publish();
-        return;
+      if (autoplay && _playRequested && _session != null) {
+        final focusGranted = await _session!.setActive(true);
+        if (generation != _loadGeneration) return;
+        if (!focusGranted) {
+          // Focus denial is not a broken media source. Do not skip tracks.
+          _playRequested = false;
+          error = '系统暂时未授予音频焦点';
+          notifyListeners();
+          _publish();
+          return;
+        }
       }
+      if (generation != _loadGeneration) return;
       cache.lease(ref);
       _leased = ref;
       diagnostics?.record('playback', 'player_opening');
@@ -1054,18 +1132,15 @@ class PlaybackCoordinator extends ChangeNotifier {
         Media(uri.toString()),
         play: shouldPlay,
         generation: generation,
+        resumeMs: resumeMs,
       );
       if (generation != _loadGeneration) return;
       diagnostics?.record('playback', 'player_opened');
       _watchdogPositionMs = position.inMilliseconds;
       _progressWatch.reset();
-      if (resumeMs > 0) {
-        await player.seek(Duration(milliseconds: resumeMs));
-      }
-      // A pause can arrive while the async track opening was in flight.
-      if (!_playRequested) {
-        await player.pause();
-      } else if (shouldPlay && gainGeneration == _gainGeneration) {
+      // _openNative already applies the resume seek and any intervening pause
+      // under the same native command gate.
+      if (_playRequested && shouldPlay && gainGeneration == _gainGeneration) {
         await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
       }
       // Never infer a USER pause from _playRequested: audio focus may have
@@ -1334,6 +1409,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     final focusEpoch = _focusResumeEpoch;
     final intentGeneration = ++_playIntentGeneration;
+    final navigationEpoch = _navigationEpoch;
     diagnostics?.record('playback', 'play_requested');
     _userPaused = false;
     if (current == null) await _prepareCurrent();
@@ -1341,6 +1417,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     final requestedRef = currentRef;
     final source = await db.source(current!.ref.sourceId);
     if (intentGeneration != _playIntentGeneration ||
+        navigationEpoch != _navigationEpoch ||
         currentRef != requestedRef ||
         (automaticFocusResume &&
             (focusEpoch != _focusResumeEpoch ||
@@ -1387,10 +1464,19 @@ class PlaybackCoordinator extends ChangeNotifier {
         await _setPlaybackGain(0, gainGeneration);
       }
       if (!_playRequested || intentGeneration != _playIntentGeneration) return;
-      await player.play();
-      // Reassert a focus pause if it arrived during the native play Future.
-      if (automaticFocusResume && !_playRequested) await player.pause();
-      if (_playRequested) {
+      final started = await _runNativeCommand(
+        (native) async {
+          await native.play();
+          // A focus loss may arrive before the native play Future completes.
+          if (automaticFocusResume && !_playRequested) await native.pause();
+        },
+        navigationEpoch: navigationEpoch,
+        allowed: () =>
+            _playRequested && intentGeneration == _playIntentGeneration,
+      );
+      if (started &&
+          _playRequested &&
+          intentGeneration == _playIntentGeneration) {
         if (fadeIn && gainGeneration == _gainGeneration) {
           await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
         }
@@ -1413,6 +1499,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _playRequested = false;
     _mediaProgressObserved = false;
+    _steadyProgressSince = null;
+    _lastSteadyProgress = null;
     // Allow a resume to continue unfinished ahead warming.
     _aheadPlan = null;
     ++_aheadGeneration;
@@ -1425,7 +1513,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     // A new play during the fade must not be paused by this stale request.
     if (gainGeneration != _gainGeneration || _playRequested) return;
-    await player.pause();
+    await _runNativeCommand((native) async {
+      if (!_playRequested) await native.pause();
+    }, allowed: () => !_playRequested);
     await save();
   }
 
@@ -1468,7 +1558,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     final old = currentRef;
-    final newHistory = [...snapshot.history, snapshot.index];
+    final newHistory = appendPlaybackHistory(snapshot.history, snapshot.index);
     var order = snapshot.order;
     if (snapshot.shuffle &&
         snapshot.repeat == RepeatKind.all &&
@@ -1492,6 +1582,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     final intentGeneration = _playIntentGeneration;
     final navigationEpoch = ++_navigationEpoch;
+    ++_loadGeneration; // Cancel any earlier loading operation before awaiting.
     ++_navigationInFlight;
     try {
       if (old != null) await cache.cancel(old, automaticOnly: true);
@@ -1521,6 +1612,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       index = snapshot.index - 1;
     }
     if (index == null) return;
+    final navigationEpoch = ++_navigationEpoch;
+    ++_loadGeneration;
     final old = currentRef;
     snapshot = QueueSnapshot(
       tracks: snapshot.tracks,
@@ -1534,6 +1627,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_navigationInFlight;
     try {
       if (old != null) await cache.cancel(old, automaticOnly: true);
+      if (navigationEpoch != _navigationEpoch) return;
       position = Duration.zero;
       cache.invalidatePreview();
       await _loadCurrent(
@@ -1550,8 +1644,12 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (!_playRequested) return;
     if (snapshot.repeat == RepeatKind.one) {
       final epoch = _transitionEpoch;
-      await player.seek(Duration.zero);
-      if (epoch == _transitionEpoch && _playRequested) await player.play();
+      await _runNativeCommand((native) async {
+        await native.seek(Duration.zero);
+        if (epoch == _transitionEpoch && _playRequested) {
+          await native.play();
+        }
+      }, allowed: () => epoch == _transitionEpoch && _playRequested);
       return;
     }
     if (_nextIndex() == null) {
@@ -1583,10 +1681,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     final ref = currentRef;
     final recoveryGeneration = _loadGeneration;
     final proxyFailure = ref == null ? null : proxy.failureFor(ref);
-    if (reason.contains('401') ||
-        reason.contains('403') ||
-        const ['401', '403', 'tls'].contains(proxyFailure) ||
-        reason.toLowerCase().contains('certificate')) {
+    final failureKind = classifyPlaybackFailure(reason, proxyFailure);
+    if (failureKind == PlaybackFailureKind.authentication) {
       await pause();
       return;
     }
@@ -1608,7 +1704,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         _reconnects < 2 &&
         !_userPaused &&
         _playRequested &&
-        proxyFailure != '404') {
+        failureKind != PlaybackFailureKind.missing) {
       _reconnects++;
       if (ref != null) await cache.cancel(ref, automaticOnly: true);
       diagnostics?.record(
@@ -1642,13 +1738,25 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> seek(Duration target) async {
     ++_playIntentGeneration;
+    final generation = _loadGeneration;
+    final navigationEpoch = _navigationEpoch;
     // A seek jump is not proof that audio has started advancing again.
     _mediaProgressObserved = false;
+    _steadyProgressSince = null;
+    _lastSteadyProgress = null;
     _watchdogPositionMs = target.inMilliseconds;
     _progressWatch.reset();
     cache.invalidatePreview();
     _publish(); // Freeze the old position during the asynchronous seek.
-    await player.seek(target);
+    final applied = await _runNativeCommand(
+      (native) => native.seek(target),
+      generation: generation,
+      navigationEpoch: navigationEpoch,
+    );
+    if (!applied ||
+        generation != _loadGeneration ||
+        navigationEpoch != _navigationEpoch)
+      return;
     position = target;
     _publish(); // Publish the new anchor; resume on confirmed advancement.
     await save();
@@ -1742,15 +1850,18 @@ class PlaybackCoordinator extends ChangeNotifier {
     _cancelFocusResume(resetBurst: true);
     _focusWasLost = false;
     _userPaused = false;
+    final navigationEpoch = ++_navigationEpoch;
+    ++_loadGeneration;
     final old = currentRef;
     if (old != null) await cache.cancel(old, automaticOnly: true);
+    if (navigationEpoch != _navigationEpoch) return;
     snapshot = QueueSnapshot(
       tracks: snapshot.tracks,
       index: index,
       repeat: snapshot.repeat,
       shuffle: snapshot.shuffle,
       order: snapshot.order,
-      history: [...snapshot.history, snapshot.index],
+      history: appendPlaybackHistory(snapshot.history, snapshot.index),
     );
     position = Duration.zero;
     failures = 0;
@@ -1792,9 +1903,28 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (!wasCurrent) _scheduleAhead();
   }
 
+  /// Used by source removal after pausing; never stops an unrelated new track.
+  Future<void> stopCurrentOutput({required String sourceId}) async {
+    if (currentRef?.sourceId != sourceId) return;
+    final navigationEpoch = _navigationEpoch;
+    ++_loadGeneration;
+    ++_transitionEpoch;
+    _opening = false;
+    _finishingTrack = false;
+    await _runNativeCommand(
+      (native) => native.stop(),
+      navigationEpoch: navigationEpoch,
+      allowed: () => currentRef?.sourceId == sourceId,
+    );
+    _publish();
+  }
+
   Future<void> clearQueue() async {
     _cancelFocusResume(resetBurst: true);
     _focusWasLost = false;
+    final navigationEpoch = ++_navigationEpoch;
+    ++_loadGeneration;
+    ++_transitionEpoch;
     ++_playIntentGeneration;
     final gainGeneration = ++_gainGeneration;
     diagnostics?.record('playback', 'queue_cleared');
@@ -1803,13 +1933,20 @@ class PlaybackCoordinator extends ChangeNotifier {
     _publish();
     final ref = currentRef;
     if (ref != null) await cache.cancel(ref, automaticOnly: true);
+    if (navigationEpoch != _navigationEpoch) return;
     if (gainGeneration == _gainGeneration && _playbackGain > 0) {
       await _fadePlaybackGain(0, _fadeOutDuration, gainGeneration);
     } else {
       await _setPlaybackGain(0, gainGeneration);
     }
-    await player.stop();
+    await _runNativeCommand(
+      (native) => native.stop(),
+      navigationEpoch: navigationEpoch,
+    );
+    if (navigationEpoch != _navigationEpoch) return;
     await _abandonAudioFocus();
+    _opening = false;
+    _finishingTrack = false;
     if (_leased != null) {
       cache.release(_leased!);
       _leased = null;
@@ -1930,7 +2067,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       cache.release(_leased!);
       _leased = null;
     }
-    await player.dispose();
+    await _nativeCommands.run(() => player.dispose(), isCurrent: () => true);
     super.dispose();
   }
 }

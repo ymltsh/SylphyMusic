@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-11-04 应用播放可靠性补丁包
+
+按用户要求，将 SylphyMusic-playback-reliability-package.zip 内的补丁合入两分支。main 直接应用，OpenList 适配专用导入和暂停时释放播放租约的上下文，保留所有既有来源租约与加载代次检查。补丁全部 51 个新增代码块均与合入结果匹配（忽略格式化差异）；包内 README 的测试与新建分支建议仅作为背景，未执行。修改前受影响源码备份在各自 .private/playback-reliability/before/。
+
+新增 NativeCommandGate 与播放失败分类 / 历史辅助逻辑，统一原生传输命令串行入口、补强过期导航和加载保护；连续确认进度推进约 20 秒后恢复同曲重连预算，本地过期票据与远端认证失败分开处理，历史最多 300 项。来源删除通过带来源校验的停止入口操作输出。同步补丁附带的 playback_reliability_test.dart 并格式化，未运行测试。此前进度条触摸优化与全屏封面模糊恢复保留。同步架构说明。
+
+普通版 Android 三 ABI / Windows Release 编译及内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/playback-reliability-build.log。未运行 analyze / 测试、设备验收、提交、推送或发布；未修改版本或发布清单，实际播放可靠性由用户验收。
+
+## 2026-11-04 优化播放进度条触摸与拖动
+
+按用户反馈，两分支共享 PlayerProgress 保留 2dp 轨道与 4dp 滑块，设置 48dp 高度的交互区域，在自定义布局高度受限时自适应收缩；支持整条点击和拖动。拖动期间使用本地进度与时间预览，松手后只执行一次 seek，完成前保留目标位置，避免每次移动都发起异步 seek。曲目、应用实例或预览模式变化时清除拖动状态，过期完成回调不会覆盖新拖动；编辑预览不调用播放器。歌词页及其他复用该组件的页面同步受益。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/player-progress-touch-build.log。未运行 analyze / 测试或设备验证，未提交、推送或发布；操作手感由用户验收。
+
+## 2026-11-04 恢复全屏封面实时模糊
+
+按用户要求，两分支 lib/ui/player_visuals.dart 将 BlurredCoverBackdrop 替换回 ImageFiltered(ImageFilter.blur(sigmaX: 48, sigmaY: 48))，使用 CoverArt 全屏铺满；恢复后的文件与历史版本 3ba9e7f 一致。保留背景开关、透明度、500ms 切换动画、减少动画设置及深浅色遮罩。普通版 Android 三 ABI / Windows Release 与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/fullscreen-cover-blur-build.log。未运行 analyze / 测试、设备验证、提交、推送或发布，保留其他已有修改。
+
 ## 2026-11-04 发布脚本直接报告结果
 
 按用户要求，两分支 release.py 集成附件大小 / SHA-256、已发布 Release 状态 / 标题 / 正文及清单原始 / 加速入口核对，完成后直接输出 Release succeeded，失败沿用 Release failed 与非零退出码。只对清单读取有限重试；上传摘要不匹配时保留草稿，不自动重放远程写操作。--no-push 明确报告清单未推送。更新两分支 update.md，删除本轮单独的 .private/verify-release-43.py，已有历史核对日志保留。仅做 Python 语法与差异检查，未运行测试、重新构建应用或执行远程发布；改动保留本地。

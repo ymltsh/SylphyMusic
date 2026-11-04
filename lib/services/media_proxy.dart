@@ -147,6 +147,10 @@ class MediaProxy {
       }
       final ticket = _tickets[parts[1]];
       if (ticket == null || ticket.expires.isBefore(DateTime.now())) {
+        if (ticket != null) {
+          // An expired local ticket is recoverable; it is not an upstream 403.
+          _failures[ticket.track.ref.key] = 'local_ticket_expired';
+        }
         diagnostics?.record('proxy', 'ticket_rejected');
         req.response.statusCode = HttpStatus.forbidden;
         return;

@@ -883,7 +883,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
             key: const ValueKey('editor-ambient'),
             contentPadding: EdgeInsets.zero,
             title: const Text('封面模糊背景'),
-            subtitle: const Text('自动保存；关闭时使用主题或纯色底色'),
+            subtitle: const Text('默认关闭，win有性能问题'),
             value: widget.app.appearance.ambient,
             onChanged: saving
                 ? null
