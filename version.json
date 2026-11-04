@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.29",
-    "build": 42,
-    "name": "风灵音乐 v1.0.29",
-    "date": "2026-11-03",
-    "notes": "风灵音乐 1.0.29\n\n- 音乐库与歌单支持多选：长按或条目菜单进入，可全选 / 取消全选，并批量播放、下一首播放、加入播放队列、添加到歌单、加入收藏、缓存整首、屏蔽歌曲；歌单内可批量移除条目。\n- 桌面端重新排版：播放条停靠窗口底部，不再遮挡滚动内容；首页专辑改为自适应网格并优先展示有名字的专辑，顶部卡片与快捷入口更紧凑。\n- 播放页封面背景改为先解码 256px 预览图再单次模糊，降低高分屏下的中间层开销，封面切换与淡入动画保持不变。\n- 修复 WebDAV 标签写入后音乐库与首页整页重建、列表跳回顶部的问题，改为原位刷新并保留滚动位置。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。Android 使用既有正式签名。本轮按要求完成编译、打包与发布，未运行静态分析、测试或设备验收。\n",
+    "version": "1.0.30",
+    "build": 43,
+    "name": "风灵音乐 v1.0.30",
+    "date": "2026-11-04",
+    "notes": "风灵音乐 1.0.30\n\n- 改进后台播放的异常恢复，减少歌曲加载或切换时长时间停滞的情况。\n- 改进远程歌曲刚开始加载时的重连处理。\n- 恢复播放时尊重手动暂停；无法恢复时提供明确提示。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30%2B43/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30%2B43/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30%2B43/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30%2B43/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.30%2B43/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.29+42"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.30+43"
   },
   "history": [
+    {
+      "version": "1.0.29",
+      "build": 42,
+      "name": "风灵音乐 v1.0.29",
+      "date": "2026-11-03",
+      "notes": "风灵音乐 1.0.29\n\n- 音乐库与歌单支持多选：长按或条目菜单进入，可全选 / 取消全选，并批量播放、下一首播放、加入播放队列、添加到歌单、加入收藏、缓存整首、屏蔽歌曲；歌单内可批量移除条目。\n- 桌面端重新排版：播放条停靠窗口底部，不再遮挡滚动内容；首页专辑改为自适应网格并优先展示有名字的专辑，顶部卡片与快捷入口更紧凑。\n- 播放页封面背景改为先解码 256px 预览图再单次模糊，降低高分屏下的中间层开销，封面切换与淡入动画保持不变。\n- 修复 WebDAV 标签写入后音乐库与首页整页重建、列表跳回顶部的问题，改为原位刷新并保留滚动位置。\n\n提供 Android 三架构 APK、Windows 安装版和便携版。Android 使用既有正式签名。本轮按要求完成编译、打包与发布，未运行静态分析、测试或设备验收。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.29%2B42/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.29+42"
+    },
     {
       "version": "1.0.28",
       "build": 41,
