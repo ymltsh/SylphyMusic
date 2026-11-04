@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-11-04 发布脚本直接报告结果
+
+按用户要求，两分支 release.py 集成附件大小 / SHA-256、已发布 Release 状态 / 标题 / 正文及清单原始 / 加速入口核对，完成后直接输出 Release succeeded，失败沿用 Release failed 与非零退出码。只对清单读取有限重试；上传摘要不匹配时保留草稿，不自动重放远程写操作。--no-push 明确报告清单未推送。更新两分支 update.md，删除本轮单独的 .private/verify-release-43.py，已有历史核对日志保留。仅做 Python 语法与差异检查，未运行测试、重新构建应用或执行远程发布；改动保留本地。
+
+## 2026-11-04 发布后台播放恢复更新：1.0.30+43 / 1.0.30-openlist.13+43
+
+按用户“推送版本更新”的要求发布两通道，普通版为 `1.0.30+43`，OpenList 为 `1.0.30-openlist.13+43`。两版包含后台播放恢复补丁；特别版同时交付此前已在工作区的多选与桌面界面等改动。Release 标题、正文和 latest 更新说明面向用户，不含签名、编译、测试验收或合入过程描述。
+
+普通版 Android 三 ABI / Windows Release、安装 EXE 和便携 ZIP 构建发布成功，保持 Latest；OpenList Android arm64 独立预发布，附对应应用 / OpenList 后端 / 前端源码及许可证。四份 APK 正式签名一致，OpenList JNI 与上一版一致。普通版六个附件、特别版三个附件大小与 GitHub SHA-256 均匹配本地，Release 正文与本地说明一致。
+
+仅提交推送清单：main `version.json` 为 77d6416、`version-openlist.json` 为 5cb3e11；feature/android-openlist-lite 两份清单为 d9fb0ab。源码、版本配置和流程文档保留本地。普通版产物 `build/releases/1.0.30-43/`、日志 `build/test_logs/release-1.0.30.log`；特别版产物在其 `build/releases/1.0.30-openlist.13-43/`，日志 `build/test_logs/openlist-release-43-*.log`。统一发布 / 清单核对记录 `build/test_logs/release-43-verification.json`。未运行 analyze / 测试或设备验收。
+
+## 2026-11-04 两分支应用后台播放恢复补丁
+
+按用户要求，将 `SylphyMusic-background-playback-recovery.patch` 应用于 main，补齐两个分支：OpenList 工作区已含该补丁，核对两分支全部 28 个新增代码块均匹配（忽略格式化差异）。保留 OpenList 播放租约与租约操作后的加载代次检查。新增原生打开 / 引擎替换互斥、25 秒打开超时重建、50 秒加载 / 切歌卡住恢复，以及过期加载 / 导航 / 切换结果保护；零进度远程歌曲也可按原上限重连，不能安全恢复时停止重试并提示重启。同步架构说明，main 修改前源码位于 `.private/background-playback-recovery-before/playback.dart`。
+
+main 执行 `tool/build_review.ps1` 成功，Android 三 ABI 与 Windows Release 编译及内部打包完成，产物 `build/internal-review/`，日志 `build/test_logs/background-playback-recovery-build.log`。OpenList Android arm64 Release 再次编译成功，产物在其 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`，日志 `build/test_logs/background-playback-recovery-rebuild.log`。保留已有改动，未修改版本与清单，未运行 analyze / 测试、设备验证、提交、推送或发布；实际后台恢复效果交由用户验收。
+
 ## 2026-11-01 应用通知进度计时补丁并发布：1.0.28+41 / 1.0.28-openlist.12+41
 
 按用户提供的 SylphyMusic-notification-clock-fix.patch 合入两分支，保留已有改动。普通版补丁检查后直接应用；OpenList 保留专用 openlist_lite 导入，适配导入区上下文后按原改动合入并格式化。新增 notification_clock.dart，分离播放意图与通知时钟：只有原生播放、非打开 / 完成切换、已确认媒体位置推进且新鲜度小于 1500ms 时才发布实际速度，否则发布 0 冻结 Android 外推进度；Android 每 500ms 只在时钟状态变化时刷新。seek 前清除旧推进证据，异步前后分别发布位置锚点；两条退出路径均取消定时器。同步补丁附带测试源码，未运行测试。更新架构说明。

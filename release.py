@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -201,6 +202,48 @@ def existing_packages(output, version, build):
     return {'version': version, 'build': build, 'artifacts': artifacts, 'sha256': hashes}
 
 
+def verify_published_release(token, tag, latest, output, hashes, *, prerelease=False):
+    prefix = f'/repos/{REPO}'
+    remote = api('GET', prefix + '/releases/tags/' + urllib.parse.quote(tag, safe=''), token)
+    if (remote['draft'] or remote['prerelease'] != prerelease or
+            remote['name'] != latest['name'] or remote['body'] != latest['notes']):
+        raise ValueError('Published release status, title or notes do not match.')
+    assets = remote['assets']
+    if len(assets) != len(hashes) or {a['name'] for a in assets} != set(hashes):
+        raise ValueError('Published release attachments do not match.')
+    for asset in assets:
+        name = asset['name']
+        if (asset['size'] != (output / name).stat().st_size or
+                asset.get('digest') != 'sha256:' + hashes[name]):
+            raise ValueError(f'Published attachment size or SHA-256 mismatch: {name}')
+    if not prerelease and api('GET', prefix + '/releases/latest', token)['tag_name'] != tag:
+        raise ValueError('Published stable release is not Latest.')
+    print(f'PASS: release status, notes and {len(assets)} attachment digests.', flush=True)
+
+
+def verify_manifest(filename, latest, *, branch='main'):
+    raw = f'https://raw.githubusercontent.com/{REPO}/{branch}/{filename}'
+    for label, url in [('raw', raw), ('accelerated', 'https://hub.wgen.top/' + raw)]:
+        # Retry reads only: CDN propagation must never repeat a publication.
+        for attempt in range(3):
+            try:
+                request = urllib.request.Request(url, headers={
+                    'User-Agent': 'SylphyMusic-release', 'Cache-Control': 'no-cache'})
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    data = json.load(response)
+                if data.get('latest') != latest:
+                    raise ValueError('Published manifest does not match the release.')
+                break
+            except (OSError, ValueError) as error:
+                if attempt == 2:
+                    raise ValueError(
+                        f'{filename} ({label}) verification failed; release may already be '
+                        'published. Inspect remote state before retrying publication.'
+                    ) from error
+                time.sleep(2)
+        print(f'PASS: {branch}/{filename} ({label}).', flush=True)
+
+
 def publish(args, record, output, tag, latest):
     token = token_from_environment()
     prefix = f'/repos/{REPO}'
@@ -220,16 +263,24 @@ def publish(args, record, output, tag, latest):
         'draft': True, 'prerelease': filename != 'version.json'})
     upload_base = release['upload_url'].split('{')[0]
     for name in record['sha256']:
-        api('POST', upload_base + '?name=' + urllib.parse.quote(name), token, upload=output / name)
+        asset = api('POST', upload_base + '?name=' + urllib.parse.quote(name), token, upload=output / name)
+        if (asset['size'] != (output / name).stat().st_size or
+                asset.get('digest') != 'sha256:' + record['sha256'][name]):
+            raise ValueError(f'Uploaded attachment mismatch: {name}; draft retained.')
     api('PATCH', prefix + f'/releases/{release["id"]}', token, {'draft': False})
+    verify_published_release(token, tag, latest, output, record['sha256'],
+                             prerelease=filename != 'version.json')
     (ROOT / filename).write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     if not args.no_push:
         run(['git', 'add', '--', filename])
         run(['git', 'commit', '--only', '-m', f'Update release manifest to {tag}', '--', filename])
         run(['git', 'push', 'origin', 'main'])
-    print('Published ' + latest['page'])
+        verify_manifest(filename, latest)
     if args.no_push:
         print('Manifest was not pushed; use the local manifest candidate after publishing.')
+        print('Release succeeded (manifest not pushed): ' + latest['page'], flush=True)
+    else:
+        print('Release succeeded: ' + latest['page'], flush=True)
 
 
 def main(argv=None):
