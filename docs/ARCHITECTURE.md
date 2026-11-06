@@ -89,7 +89,7 @@ Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒�
 
 可选 Android 桌面歌词由 `AndroidDesktopLyrics` 监听既有播放与外观状态，复用应用歌词加载入口，通过 `music.sylphy/desktop_lyrics` 通道更新原生 `DesktopLyricsOverlay`。原生窗口由 Application 持有，复用现有 audio_service 引擎；用户授权悬浮窗后才显示，不创建第二个播放器。应用关闭时先移除监听、等待通道操作并隐藏悬浮窗，再关闭播放、歌词存储和数据库。Windows 不启用此 Android 服务。
 
-Android 媒体通知区分播放意图和进度时钟：仅原生播放器正在播放且 1.5 秒内观察到真实媒体位置推进时向系统发布非零速度；打开、切换完成中、缓冲停滞和异步 seek 期间冻结系统外推计时，同时保留前台服务与暂停操作。Android 每 500ms 检查时钟状态变化，仅变化时刷新通知；播放协调器在 dispose / disposeAsync 中取消该定时器。
+Android 媒体通知区分播放意图、缓冲阶段和真实进度时钟：`MediaNotificationClock` 用单调时间与连续原生位置样本确认推进，加载、切歌、暂停、Seek 和进入缓冲时清除旧证据；已确认播放允许短暂稀疏回调，停止推进后冻结。`MediaSessionPublishGate` 仅在状态 / 倍速 / 歌曲变化、Seek、明显偏差或 20 秒校准时发布锚点。原生缓冲如实映射为 `STATE_BUFFERING`，前台服务继续由独立播放意图维持；标准 MediaStyle 按状态变化刷新通知，不再使用 Android 10 自定义白色按钮 RemoteViews。每秒定时器只检查时钟启停，退出时取消；详见 [媒体通知设计](MEDIA_NOTIFICATION_DESIGN.md)。
 
 播放失败通知由 `PlaybackNotice` 在应用根页面统一监听，以不阻断点击的浮动吐司显示，3 秒自动移除；恢复后提前收起，重复通知不排队。播放栏不常驻错误文字。播放器确认实际播放进度恢复时清空旧错误；失败后用户再次点击播放会重新加载媒体。
 

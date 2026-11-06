@@ -1,5 +1,39 @@
 # 实施与验证记录
 
+## 2026-11-04 发布 1.0.32+45 / 1.0.32-openlist.15+45
+
+按用户「推送版本更新」要求发布两通道，包含音乐缓存管理界面重设计、歌曲 / 歌手 / 专辑 / 来源搜索与排序，以及 Android 媒体通知时钟和标准 MediaStyle 调整。Release 标题、正文和清单说明面向用户，不包含内部协作过程。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附本轮应用及对应 OpenList 后端 / 前端源码和许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+普通版 release.py 输出 Release succeeded、退出码 0；特别版发布入口同样复用 release.py 的结果核对并输出成功、退出码 0。普通版六个附件、特别版三个附件的大小 / SHA-256、Release 状态 / 标题 / 正文，以及四份清单的原始 / 加速入口全部匹配；Latest 保持 v1.0.32+45。只提交推送清单：main/version.json 为 3f186bb、main/version-openlist.json 为 c0f965a，特性分支两份清单为 aa9f42a。源码与其他既有修改保留本地。
+
+OpenList 最初两次创建请求连接中断，每次均读取远端确认没有草稿或标签，未推进清单；随后使用无自动写重试的替代 TLS 传输完成发布。状态 build/releases/1.0.32-openlist.15-45/publish-state.json 为 complete，日志 build/test_logs/openlist-release-45-publish-recovery.log；构建和源码打包日志为同目录 openlist-release-45-build.log、openlist-release-45-package.log。普通版产物 build/releases/1.0.32-45/，日志 build/test_logs/release-1.0.32.log；特别版产物 build/releases/1.0.32-openlist.15-45/。
+
+未运行 analyze / Flutter 或 JVM 测试、真实服务器联调、启动或设备验收。编译与发布成功不代表界面、缓存搜索或媒体通知已通过设备验证，功能由用户确认。
+
+## 2026-11-04 优化音乐缓存管理与搜索
+
+两分支重设计「下载与缓存 → 管理音乐缓存」：空间概览卡与分类占用、搜索和来源筛选、最近使用 / 大小 / 名称排序、歌曲资源卡与展开明细、底部批量清理栏；支持歌曲 / 歌手 / 专辑 / 来源的多关键词搜索。搜索合并输入查询，加载时阻止操作旧结果，关键词和来源变化重置选择，保留全选 / 取消选择与清理确认。继续使用既有 clearCache 链路，保留共享封面、手动歌词和原始文件保护。
+
+新增数据查询层 CacheCatalog，只读取缓存关联身份与匹配元数据，在 SQLite 内聚合、搜索、过滤和排序；使用连接内临时身份表，不依赖 JSON 扩展，不改变持久化结构或数据库版本。同步界面说明，修改前 UI 备份在各自 .private/cache-storage-redesign/。
+
+普通版 Android 三 ABI / Windows Release 与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/cache-storage-redesign-build.log。未运行 analyze / 测试、启动或设备验收，实际显示与操作由用户确认。用户随后授权推送版本更新，发布结果另记。
+
+## 2026-11-04 应用媒体通知重设计补丁
+
+按用户要求，将 SylphyMusic-media-notification-redesign-package.zip 补丁应用于 main 与 feature/android-openlist-lite。main 直接应用；OpenList 仅适配暂停处的上下文，保留播放租约释放与所有已有修改。修改前受影响文件备份在各自 .private/media-notification-redesign/before/。
+
+通知使用单调时间与原生位置样本确认真实推进，加载 / 暂停 / 切歌 / Seek / 进入缓冲时清除旧证据；系统媒体状态按语义变化、偏差或 20 秒校准发布，原生使用标准 MediaStyle 与独立通知刷新策略，缓冲如实报告 BUFFERING，同时按播放意图保留前台服务。Android 10 不再使用自定义白色操作按钮，改用平台默认着色。同步包内设计文档与附带测试文件、架构及文档索引，格式化 Dart 文件；未执行包内新建分支与测试建议。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/media-notification-redesign-build.log。未运行 analyze、Flutter / JVM 测试、启动或设备验收；未修改版本号或更新清单，未提交、推送或发布，通知实际行为由用户验收。
+
+## 2026-11-04 发布 1.0.31+44 / 1.0.31-openlist.14+44
+
+按用户“推送更新”要求发布两版，包含 Jellyfin / Plex 基础接入与 Logo、进度条触摸 / 拖动优化、播放可靠性、全屏封面实时模糊恢复和白色透明媒体通知图标。Release 与清单说明面向用户，不含开发过程描述。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功，保持 Latest；OpenList Android arm64 独立预发布，附对应应用及 OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+结果核对直接由发布脚本调用 release.py 内置函数完成，不使用独立 verify-release 脚本。普通版六个附件、特别版三个附件大小 / SHA-256 与 Release 状态 / 正文均匹配；八个原始 / 加速清单入口匹配，Latest 仍为普通版。两个发布命令均输出 Release succeeded、退出码 0。发布清单提交：main version.json aafe257，main version-openlist.json 3ad7d3d，特性分支两份清单 23f208f。期间主分支用户提交 a9c2a92 已保留，未覆盖或回退。
+
+普通版产物 build/releases/1.0.31-44/，日志 build/test_logs/release-1.0.31.log；特别版产物在其 build/releases/1.0.31-openlist.14-44/，日志 build/test_logs/openlist-release-44-build.log、openlist-release-44-package.log、openlist-release-44-publish.log，publish-state.json 为 complete。未运行 analyze / 测试、真实服务器联调或设备验收。
+
 ## 2026-11-04 媒体通知使用白色透明 Logo
 
 按用户要求，将 logo/white.png 原样替换到两分支 android/app/src/main/res/drawable-nodpi/ic_stat_sylphy.png。原图为 1280×1280 RGBA，背景透明、图形纯白；继续使用既有 drawable/ic_stat_sylphy 媒体通知配置和资源保留规则，不更改应用启动图标。修改前资源备份在各自 .private/notification-white-icon-before.png。

@@ -95,13 +95,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _aheadGeneration = 0;
   final Set<TrackRef> _aheadDownloads = {};
 
-  // Track *actual position advancement*, not just the player's playing flag.
-  // A libmpv stream can remain buffering without ever emitting stream.error.
+  // The stall watchdog and the Android media clock have separate purposes.
   final Stopwatch _progressWatch = Stopwatch()..start();
-  // mpv can leave buffering/open flags set after the audio clock advances.
-  // Keep this independent of the stall watchdog, which resets on play/open.
-  final Stopwatch _mediaProgressWatch = Stopwatch()..start();
-  bool _mediaProgressObserved = false;
+  final MediaNotificationClock _notificationTimeline = MediaNotificationClock();
+  final MediaSessionPublishGate _sessionPublishGate = MediaSessionPublishGate();
   Timer? _stallTimer;
   Timer? _notificationClockTimer;
   bool _lastPublishedNotificationClockRunning = false;
@@ -115,14 +112,14 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _transitionEpoch = 0;
   int _transitionStartIndex = -1;
   int _navigationEpoch = 0;
+  bool _seekPending = false;
 
-  bool get _notificationClockRunning => notificationClockRunning(
+  bool get _notificationClockRunning => _notificationTimeline.isAdvancing(
     playRequested: _playRequested,
     nativePlaying: playing,
-    opening: _opening,
+    opening: _opening || _seekPending,
     finishingTrack: _finishingTrack,
-    progressObserved: _mediaProgressObserved,
-    sinceProgress: _mediaProgressWatch.elapsed,
+    buffering: buffering,
   );
 
   void _checkForStall() {
@@ -503,6 +500,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _registerPlayerSubscription(
       player.stream.buffering.listen((v) {
+        if (v && !buffering) _notificationTimeline.reset();
         buffering = v;
         diagnostics?.record(
           'playback',
@@ -524,18 +522,18 @@ class PlaybackCoordinator extends ChangeNotifier {
             nextMs >= 500) {
           unawaited(_probeAndroidAudioOutput());
         }
+        // Each mpv sample updates the evidence clock. MediaSession itself is
+        // published only on state changes or meaningful anchor corrections.
+        _notificationTimeline.observe(v, nativePlaying: playing);
         final previousProgressMs = _watchdogPositionMs;
         if (nextMs > previousProgressMs + 400) {
           _watchdogPositionMs = nextMs;
           _progressWatch.reset();
-          // The first sample or a seek jump is not proof of audible playback.
           if (_playRequested &&
               playing &&
               !buffering &&
               previousProgressMs >= 0 &&
               nextMs - previousProgressMs <= 4000) {
-            _mediaProgressObserved = true;
-            _mediaProgressWatch.reset();
             final now = DateTime.now();
             if (_lastSteadyProgress == null ||
                 now.difference(_lastSteadyProgress!) >
@@ -589,7 +587,7 @@ class PlaybackCoordinator extends ChangeNotifier {
           _finishingTrack = true;
           final transitionEpoch = ++_transitionEpoch;
           _transitionStartIndex = snapshot.index;
-          _mediaProgressObserved = false;
+          _notificationTimeline.reset();
           _transitionStallLogged = false;
           _progressWatch.reset();
           _publish();
@@ -638,7 +636,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     playing = false;
     buffering = false;
     _androidAudioOutputProbed = false;
-    _mediaProgressObserved = false;
+    _notificationTimeline.reset();
     _attachPlayerListeners();
     _nativeEngineBroken = false;
     diagnostics?.record('playback', 'native_player_replaced');
@@ -802,29 +800,17 @@ class PlaybackCoordinator extends ChangeNotifier {
         );
       }
       _checkForStall();
-      // No new position event will arrive during a real stall. Expire the
-      // previous proof so a stale mpv buffering flag is shown again.
-      if (_mediaProgressObserved &&
-          _mediaProgressWatch.elapsed >= const Duration(seconds: 5)) {
-        _mediaProgressObserved = false;
-        if (_opening || _finishingTrack || (_playRequested && buffering)) {
+    });
+    // If mpv stops emitting position samples, freeze the extrapolated Android
+    // clock at the last known position. Never post notifications on a timer.
+    if (Platform.isAndroid) {
+      _notificationClockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (handler != null &&
+            _notificationClockRunning !=
+                _lastPublishedNotificationClockRunning) {
           _publish();
         }
-      }
-    });
-    // A stalled native player can stop emitting position events. Publish only
-    // when the inferred clock state changes, rather than refreshing every tick.
-    if (Platform.isAndroid) {
-      _notificationClockTimer = Timer.periodic(
-        const Duration(milliseconds: 500),
-        (_) {
-          if (handler != null &&
-              _notificationClockRunning !=
-                  _lastPublishedNotificationClockRunning) {
-            _publish();
-          }
-        },
-      );
+      });
     }
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
@@ -1044,8 +1030,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     _opening = true;
     _playRequested = autoplay;
     _androidAudioOutputProbed = false;
+    _seekPending = false;
     final generation = ++_loadGeneration;
-    _mediaProgressObserved = false;
+    _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;
     _watchdogPositionMs = -1;
@@ -1438,7 +1425,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     final wasRequested = _playRequested;
-    if (!wasRequested) _mediaProgressObserved = false;
+    if (!wasRequested) _notificationTimeline.reset();
     _playRequested = true;
     _progressWatch.reset();
     _publish();
@@ -1498,7 +1485,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {'system': system},
     );
     _playRequested = false;
-    _mediaProgressObserved = false;
+    _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;
     // Allow a resume to continue unfinished ahead warming.
@@ -1741,24 +1728,34 @@ class PlaybackCoordinator extends ChangeNotifier {
     final generation = _loadGeneration;
     final navigationEpoch = _navigationEpoch;
     // A seek jump is not proof that audio has started advancing again.
-    _mediaProgressObserved = false;
+    _seekPending = true;
+    _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;
     _watchdogPositionMs = target.inMilliseconds;
     _progressWatch.reset();
     cache.invalidatePreview();
     _publish(); // Freeze the old position during the asynchronous seek.
-    final applied = await _runNativeCommand(
-      (native) => native.seek(target),
-      generation: generation,
-      navigationEpoch: navigationEpoch,
-    );
+    final applied =
+        await _runNativeCommand(
+          (native) => native.seek(target),
+          generation: generation,
+          navigationEpoch: navigationEpoch,
+        ).whenComplete(() {
+          if (generation == _loadGeneration &&
+              navigationEpoch == _navigationEpoch) {
+            _seekPending = false;
+            _notificationTimeline.reset();
+            _publish(force: true);
+          }
+        });
     if (!applied ||
         generation != _loadGeneration ||
         navigationEpoch != _navigationEpoch)
       return;
     position = target;
-    _publish(); // Publish the new anchor; resume on confirmed advancement.
+    _notificationTimeline.reset(); // An old decoder sample is not seek proof.
+    _publish(force: true); // Always anchor a seek, even a short one.
     await save();
     notifyListeners();
   }
@@ -1812,6 +1809,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     speed = v.clamp(0.5, 2);
     await player.setRate(speed);
     await db.setSetting('speed', '$speed');
+    _publish(); // Keep the Android timeline rate in sync with libmpv.
     notifyListeners();
   }
 
@@ -1961,26 +1959,19 @@ class PlaybackCoordinator extends ChangeNotifier {
     _publish();
   }
 
-  void _publish() {
+  void _publish({bool force = false}) {
     final h = handler;
     final t = current;
     if (h == null) return;
     final clockRunning = _notificationClockRunning;
     _lastPublishedNotificationClockRunning = clockRunning;
-    // The local audio_service patch maps buffering + play intent to PLAYING
-    // to retain foreground transport controls. Freeze its extrapolated clock
-    // until mpv actually advances, even if its buffering flag is stale.
-    final recentlyAdvanced =
-        _playRequested &&
-        _mediaProgressObserved &&
-        _mediaProgressWatch.elapsed < const Duration(seconds: 5);
-    var processing = AudioProcessingState.ready;
-    if (t == null) {
-      processing = AudioProcessingState.idle;
-    } else if (!recentlyAdvanced &&
-        (_opening || _finishingTrack || (_playRequested && buffering))) {
-      processing = AudioProcessingState.buffering;
-    }
+    // Intent keeps the foreground service eligible; the processing phase and
+    // actual, confirmed media progress determine Android's playback state.
+    final processing = t == null
+        ? AudioProcessingState.idle
+        : _playRequested && !clockRunning
+        ? AudioProcessingState.buffering
+        : AudioProcessingState.ready;
     _syncNotificationArtwork(t);
     if (t == null) {
       if (_lastMediaItem != null) {
@@ -1996,12 +1987,21 @@ class PlaybackCoordinator extends ChangeNotifier {
         durationMs: t.durationMs,
         artUri: _notificationArtUri,
       );
-      // Don't resend metadata on every position tick; update only when the
-      // song, its visible metadata, or its downloaded artwork changes.
       if (_lastMediaItem != metadata) {
         _lastMediaItem = metadata;
         h.mediaItem.add(mediaItemForTrack(t, artUri: _notificationArtUri));
       }
+    }
+    final rate = clockRunning ? speed : 0.0;
+    if (!_sessionPublishGate.shouldPublish(
+      mediaId: t?.ref.key,
+      phase: processing.name,
+      playRequested: _playRequested,
+      position: position,
+      rate: rate,
+      force: force,
+    )) {
+      return;
     }
     h.playbackState.add(
       PlaybackState(
@@ -2012,14 +2012,11 @@ class PlaybackCoordinator extends ChangeNotifier {
         ],
         systemActions: const {MediaAction.seek},
         processingState: processing,
-        // The OS must not leave foreground service between two tracks.
-        // Real user/system pause still sets this to false immediately.
+        // Separate foreground-service eligibility from true media progress.
+        // The Android service uses playing to retain the FGS even in BUFFERING.
         playing: _playRequested,
         updatePosition: position,
-        // STATE_PLAYING + a nonzero speed makes SystemUI extrapolate from
-        // wall time, even while the remote stream has not produced audio.
-        // Keep play intent for the FGS and pause action; freeze only its clock.
-        speed: clockRunning ? speed : 0.0,
+        speed: rate,
       ),
     );
   }

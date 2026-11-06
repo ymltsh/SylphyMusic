@@ -65,7 +65,7 @@ class LibrarySync extends ChangeNotifier {
         if (run.cancelled) break;
         await db.stageIndexPage(id, source.id, page);
         count += page.length;
-        _publish(source.id, 'reading', count, '已读取 $count 首，旧索引仍可浏览');
+        _publish(source.id, 'reading', count, '已读取 $count 首，同步不会影响播放');
       }
       if (run.cancelled) {
         _publish(source.id, 'cancelled', count, '已取消，保留原索引');
