@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.33-openlist.16",
-    "build": 46,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.33-openlist.16 (arm64-v8a)",
+    "version": "1.0.34-openlist.17",
+    "build": 47,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17 (arm64-v8a)",
     "date": "2026-11-07",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.33-openlist.16\n\n- Android 播放页“更多”新增“显示桌面歌词”开关，右侧勾选显示开启状态，可直接开启或关闭；首次使用会引导授权悬浮窗。\n- 改进远程音乐长时间暂停后的恢复播放，自动更新接近过期的播放链接，并从保存的位置继续。\n- 播放器长时间无响应时显示明确提示，便于及时处理。\n- 调整缓存容量说明，提示达到容量上限后会自动释放旧缓存。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17\n\n本版继续提供 Android 的 OpenList-Lite 集成功能。\n\n- 可从播放页“更多”开启或关闭桌面歌词，右侧勾选显示开启状态。\n- 桌面歌词支持独立调整颜色和字号，首次使用需授予悬浮窗权限。\n- 保留远程音乐长时间暂停后的恢复播放改进。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.33-openlist.16%2B46/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34-openlist.17%2B47/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.33-openlist.16%2B46"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.34-openlist.17%2B47"
   },
   "history": [
+    {
+      "version": "1.0.33-openlist.16",
+      "build": 46,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.33-openlist.16 (arm64-v8a)",
+      "date": "2026-11-07",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.33-openlist.16\n\n- Android 播放页“更多”新增“显示桌面歌词”开关，右侧勾选显示开启状态，可直接开启或关闭；首次使用会引导授权悬浮窗。\n- 改进远程音乐长时间暂停后的恢复播放，自动更新接近过期的播放链接，并从保存的位置继续。\n- 播放器长时间无响应时显示明确提示，便于及时处理。\n- 调整缓存容量说明，提示达到容量上限后会自动释放旧缓存。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.33-openlist.16%2B46/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.33-openlist.16%2B46"
+    },
     {
       "version": "1.0.32-openlist.15",
       "build": 45,
