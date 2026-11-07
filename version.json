@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.34",
-    "build": 47,
-    "name": "风灵音乐 v1.0.34",
+    "version": "1.0.35",
+    "build": 48,
+    "name": "风灵音乐 v1.0.35",
     "date": "2026-11-07",
-    "notes": "风灵音乐 1.0.34\n\n- 新增 Windows 桌面歌词，可从播放页“更多”或“设置 → 歌词设置”开启。\n- 歌词浮窗置顶显示，可拖动并记住位置，点击右侧 × 关闭；主窗口最小化或隐藏到托盘后仍可显示。\n- 支持独立调整歌词颜色和字号，适配屏幕缩放与显示器工作区。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+    "notes": "风灵音乐 1.0.35\n\n- 改进 Android 从通知或耳机线控恢复播放时的后台服务处理，减少长时间暂停后的恢复异常。\n- 补充后台恢复播放的诊断信息，便于定位系统后台限制与播放停滞。\n- Windows 桌面歌词背景与关闭按钮在静置约 2.5 秒后自动淡出，仅保留歌词；鼠标移到歌词上或拖动时恢复显示。\n- 歌词换行不再延长操作区域的显示时间，调整颜色和字号时会短暂显示操作区域。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35%2B48/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35%2B48/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35%2B48/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35%2B48/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35%2B48/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.34+47"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.35+48"
   },
   "history": [
+    {
+      "version": "1.0.34",
+      "build": 47,
+      "name": "风灵音乐 v1.0.34",
+      "date": "2026-11-07",
+      "notes": "风灵音乐 1.0.34\n\n- 新增 Windows 桌面歌词，可从播放页“更多”或“设置 → 歌词设置”开启。\n- 歌词浮窗置顶显示，可拖动并记住位置，点击右侧 × 关闭；主窗口最小化或隐藏到托盘后仍可显示。\n- 支持独立调整歌词颜色和字号，适配屏幕缩放与显示器工作区。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34%2B47/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.34+47"
+    },
     {
       "version": "1.0.33",
       "build": 46,
