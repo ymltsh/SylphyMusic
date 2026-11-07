@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.34-openlist.17",
-    "build": 47,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17 (arm64-v8a)",
+    "version": "1.0.35-openlist.18",
+    "build": 48,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.35-openlist.18 (arm64-v8a)",
     "date": "2026-11-07",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17\n\n本版继续提供 Android 的 OpenList-Lite 集成功能。\n\n- 可从播放页“更多”开启或关闭桌面歌词，右侧勾选显示开启状态。\n- 桌面歌词支持独立调整颜色和字号，首次使用需授予悬浮窗权限。\n- 保留远程音乐长时间暂停后的恢复播放改进。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.35-openlist.18\n\n- 改进 Android 从通知或耳机线控恢复播放时的后台服务处理，减少长时间暂停后的恢复异常。\n- 补充后台恢复播放的诊断信息，便于定位系统后台限制与播放停滞。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34-openlist.17%2B47/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.35-openlist.18%2B48/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.34-openlist.17%2B47"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.35-openlist.18%2B48"
   },
   "history": [
+    {
+      "version": "1.0.34-openlist.17",
+      "build": 47,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17 (arm64-v8a)",
+      "date": "2026-11-07",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.34-openlist.17\n\n本版继续提供 Android 的 OpenList-Lite 集成功能。\n\n- 可从播放页“更多”开启或关闭桌面歌词，右侧勾选显示开启状态。\n- 桌面歌词支持独立调整颜色和字号，首次使用需授予悬浮窗权限。\n- 保留远程音乐长时间暂停后的恢复播放改进。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.34-openlist.17%2B47/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.34-openlist.17%2B47"
+    },
     {
       "version": "1.0.33-openlist.16",
       "build": 46,
