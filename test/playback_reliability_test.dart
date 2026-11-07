@@ -49,6 +49,81 @@ void main() {
     expect(ran, isFalse);
   });
 
+  test('expired queued native command cannot run after lock release', () async {
+    final gate = NativeCommandGate();
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    var staleExecuted = false;
+    final first = gate.run(() async {
+      entered.complete();
+      await release.future;
+    }, isCurrent: () => true);
+    await entered.future;
+    final pending = gate.run(
+      () async {
+        staleExecuted = true;
+      },
+      isCurrent: () => true,
+      maxQueueWait: const Duration(milliseconds: 10),
+    );
+    await expectLater(pending, throwsA(isA<NativeCommandQueueTimeout>()));
+    release.complete();
+    await first;
+    final next = await gate.run(() async {}, isCurrent: () => true);
+    expect(next, isTrue);
+    expect(staleExecuted, isFalse);
+  });
+
+  test('long-paused proxied media refreshes, but fresh and local do not', () {
+    final now = DateTime.utc(2026, 11, 6, 12);
+    bool refresh({DateTime? ticket, DateTime? paused}) =>
+        shouldRefreshRemotePlaybackSource(
+          ticketIssuedAt: ticket,
+          pausedAt: paused,
+          now: now,
+          ticketLifetime: const Duration(hours: 2),
+        );
+    expect(refresh(), isFalse); // Local file or complete READY cache.
+    expect(refresh(ticket: now.subtract(const Duration(minutes: 5))), isFalse);
+    expect(
+      refresh(
+        ticket: now.subtract(const Duration(minutes: 5)),
+        paused: now.subtract(const Duration(minutes: 16)),
+      ),
+      isTrue,
+    );
+    expect(
+      refresh(
+        ticket: now.subtract(const Duration(minutes: 116)),
+        paused: now.subtract(const Duration(minutes: 1)),
+      ),
+      isTrue,
+    );
+    expect(refresh(ticket: now.add(const Duration(minutes: 1))), isTrue);
+  });
+
+  test('long-paused HTTP proxy is reopened, not cached/local files', () {
+    final now = DateTime.utc(2026, 11, 7, 8);
+    bool reopen(bool proxy, Duration? age) => shouldReopenPausedProxy(
+      usingProxy: proxy,
+      pausedAt: age == null ? null : now.subtract(age),
+      now: now,
+    );
+    expect(reopen(false, const Duration(hours: 3)), isFalse);
+    expect(reopen(true, null), isFalse);
+    expect(reopen(true, const Duration(minutes: 3)), isFalse);
+    expect(reopen(true, const Duration(minutes: 15)), isTrue);
+    expect(reopen(true, const Duration(hours: 3)), isTrue);
+    expect(
+      shouldReopenPausedProxy(
+        usingProxy: true,
+        pausedAt: now.add(const Duration(seconds: 1)),
+        now: now,
+      ),
+      isTrue,
+    );
+  });
+
   test('local 403 is recoverable but upstream 403 is terminal', () {
     expect(
       classifyPlaybackFailure('HTTP 403', 'local_ticket_expired'),

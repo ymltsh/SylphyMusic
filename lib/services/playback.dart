@@ -80,6 +80,11 @@ class PlaybackCoordinator extends ChangeNotifier {
   int _lastSaved = 0;
   int _reconnects = 0;
   TrackRef? _recoveryRef;
+  DateTime? _proxyTicketIssuedAt;
+  DateTime? _pausedAt;
+  bool _openedWithProxy = false;
+  int? _awaitingProgressIntent;
+  DateTime? _lastPlayCommandAt;
   DateTime? _steadyProgressSince;
   DateTime? _lastSteadyProgress;
   AudioSession? _session;
@@ -533,6 +538,24 @@ class PlaybackCoordinator extends ChangeNotifier {
               playing &&
               !buffering &&
               previousProgressMs >= 0 &&
+              nextMs - previousProgressMs <= 4000 &&
+              _awaitingProgressIntent == _playIntentGeneration) {
+            _awaitingProgressIntent = null;
+            final startedAt = _lastPlayCommandAt;
+            diagnostics?.record(
+              'playback',
+              'progress_resumed',
+              details: {
+                'delay_ms': startedAt == null
+                    ? -1
+                    : DateTime.now().difference(startedAt).inMilliseconds,
+              },
+            );
+          }
+          if (_playRequested &&
+              playing &&
+              !buffering &&
+              previousProgressMs >= 0 &&
               nextMs - previousProgressMs <= 4000) {
             final now = DateTime.now();
             if (_lastSteadyProgress == null ||
@@ -642,35 +665,62 @@ class PlaybackCoordinator extends ChangeNotifier {
     diagnostics?.record('playback', 'native_player_replaced');
   }
 
+  void _recordNativeQueueWait(Duration elapsed) {
+    if (elapsed >= const Duration(seconds: 2)) {
+      diagnostics?.record(
+        'playback',
+        'native_queue_delayed',
+        details: {'gap_ms': elapsed.inMilliseconds},
+      );
+    }
+  }
+
+  void _failUnresponsiveNativeQueue() {
+    _nativeEngineBroken = true;
+    _playRequested = false;
+    _userPaused = true;
+    _opening = false;
+    _finishingTrack = false;
+    error = '原生播放器命令队列长时间无响应，请重新启动应用';
+    diagnostics?.record('playback', 'native_queue_timeout');
+    notifyListeners();
+    _publish();
+  }
+
   Future<void> _openNative(
     Media media, {
     required bool play,
     required int generation,
     required int resumeMs,
   }) async {
-    await _nativeCommands.run(() async {
-      if (_nativeEngineBroken) {
-        throw StateError('原生播放器无法安全恢复，请重新启动应用');
-      }
-      try {
-        await player
-            .open(media, play: play && _playRequested)
-            .timeout(const Duration(seconds: 25));
-        if (generation != _loadGeneration) return;
-        if (resumeMs > 0) {
+    await _nativeCommands.run(
+      () async {
+        if (_nativeEngineBroken) {
+          throw StateError('原生播放器无法安全恢复，请重新启动应用');
+        }
+        try {
           await player
-              .seek(Duration(milliseconds: resumeMs))
-              .timeout(const Duration(seconds: 12));
+              .open(media, play: play && _playRequested)
+              .timeout(const Duration(seconds: 25));
+          if (generation != _loadGeneration) return;
+          if (resumeMs > 0) {
+            await player
+                .seek(Duration(milliseconds: resumeMs))
+                .timeout(const Duration(seconds: 12));
+          }
+          if (!_playRequested) {
+            await player.pause().timeout(const Duration(seconds: 12));
+          }
+        } on TimeoutException {
+          diagnostics?.record('playback', 'native_open_or_restore_timeout');
+          await _replaceNativePlayer();
+          throw TimeoutException('原生播放器打开或恢复超时');
         }
-        if (!_playRequested) {
-          await player.pause().timeout(const Duration(seconds: 12));
-        }
-      } on TimeoutException {
-        diagnostics?.record('playback', 'native_open_or_restore_timeout');
-        await _replaceNativePlayer();
-        throw TimeoutException('原生播放器打开或恢复超时');
-      }
-    }, isCurrent: () => generation == _loadGeneration);
+      },
+      isCurrent: () => generation == _loadGeneration,
+      maxQueueWait: const Duration(seconds: 45),
+      onQueueEntered: _recordNativeQueueWait,
+    );
   }
 
   /// Commands queued while an old open/replacement is running cannot touch a
@@ -680,22 +730,38 @@ class PlaybackCoordinator extends ChangeNotifier {
     int? generation,
     int? navigationEpoch,
     bool Function()? allowed,
-  }) => _nativeCommands.run(
-    () async {
-      try {
-        await command(player).timeout(const Duration(seconds: 12));
-      } on TimeoutException {
-        diagnostics?.record('playback', 'native_command_timeout');
-        await _replaceNativePlayer();
-        throw TimeoutException('原生播放器操作超时');
+  }) async {
+    try {
+      return await _nativeCommands.run(
+        () async {
+          try {
+            await command(player).timeout(const Duration(seconds: 12));
+          } on TimeoutException {
+            diagnostics?.record('playback', 'native_command_timeout');
+            await _replaceNativePlayer();
+            throw TimeoutException('原生播放器操作超时');
+          }
+        },
+        isCurrent: () =>
+            !_nativeEngineBroken &&
+            (generation == null || generation == _loadGeneration) &&
+            (navigationEpoch == null || navigationEpoch == _navigationEpoch) &&
+            (allowed == null || allowed()),
+        maxQueueWait: const Duration(seconds: 45),
+        onQueueEntered: _recordNativeQueueWait,
+      );
+    } on NativeCommandQueueTimeout {
+      // An obsolete queued command must not poison a newer play/skip session.
+      if (!_nativeEngineBroken &&
+          (generation == null || generation == _loadGeneration) &&
+          (navigationEpoch == null || navigationEpoch == _navigationEpoch) &&
+          (allowed == null || allowed())) {
+        // Do not race a still-running operation with a new native engine.
+        _failUnresponsiveNativeQueue();
       }
-    },
-    isCurrent: () =>
-        !_nativeEngineBroken &&
-        (generation == null || generation == _loadGeneration) &&
-        (navigationEpoch == null || navigationEpoch == _navigationEpoch) &&
-        (allowed == null || allowed()),
-  );
+      return false;
+    }
+  }
 
   // Fallback for blocked pre-open preparation or track transition.
   Future<void> _recoverHungPhase({
@@ -724,6 +790,8 @@ class PlaybackCoordinator extends ChangeNotifier {
             currentRef == ref &&
             _playRequested &&
             !_userPaused,
+        maxQueueWait: const Duration(seconds: 45),
+        onQueueEntered: _recordNativeQueueWait,
       );
       if (currentRef != ref ||
           _loadGeneration != generation ||
@@ -743,7 +811,15 @@ class PlaybackCoordinator extends ChangeNotifier {
       } else {
         await _failed(transition ? '切歌流程超时' : '歌曲加载流程超时');
       }
-    } catch (_) {
+    } catch (e) {
+      if (e is NativeCommandQueueTimeout &&
+          _loadGeneration == generation &&
+          _playIntentGeneration == intent &&
+          currentRef == ref &&
+          _playRequested &&
+          !_userPaused) {
+        _failUnresponsiveNativeQueue();
+      }
       diagnostics?.record('playback', 'native_recovery_failed');
       if (currentRef == ref &&
           _playIntentGeneration == intent &&
@@ -1017,6 +1093,14 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _loadCurrent({bool autoplay = true, bool manual = false}) async {
+    if (_nativeEngineBroken) {
+      error = '播放器无法安全恢复，请重新启动应用';
+      _playRequested = false;
+      _userPaused = true;
+      notifyListeners();
+      _publish();
+      return;
+    }
     diagnostics?.record(
       'playback',
       'load_started',
@@ -1029,6 +1113,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _opening = true;
     _playRequested = autoplay;
+    if (!autoplay) _pausedAt = DateTime.now();
+    _proxyTicketIssuedAt = null;
+    _openedWithProxy = false;
     _androidAudioOutputProbed = false;
     _seekPending = false;
     final generation = ++_loadGeneration;
@@ -1099,7 +1186,13 @@ class PlaybackCoordinator extends ChangeNotifier {
       } else {
         final cached = await cache.find(ref, touch: true);
         if (generation != _loadGeneration) return;
-        uri = cached != null ? cached.file.uri : proxy.ticket(current!, source);
+        _openedWithProxy = cached == null;
+        if (cached != null) {
+          uri = cached.file.uri;
+        } else {
+          uri = proxy.ticket(current!, source);
+          _proxyTicketIssuedAt = DateTime.now();
+        }
         diagnostics?.record(
           'playback',
           cached == null ? 'remote_ticket_open' : 'cached_file_open',
@@ -1129,6 +1222,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       // under the same native command gate.
       if (_playRequested && shouldPlay && gainGeneration == _gainGeneration) {
         await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
+        if (_playRequested) _pausedAt = null;
       }
       // Never infer a USER pause from _playRequested: audio focus may have
       // paused us while player.open was still awaiting native preparation.
@@ -1145,6 +1239,10 @@ class PlaybackCoordinator extends ChangeNotifier {
         'load_failed',
         details: {'type': e.runtimeType.toString()},
       );
+      if (e is NativeCommandQueueTimeout) {
+        _failUnresponsiveNativeQueue();
+        return;
+      }
       error = e.toString();
       notifyListeners();
       if (autoplay && _playRequested) {
@@ -1397,12 +1495,19 @@ class PlaybackCoordinator extends ChangeNotifier {
     final focusEpoch = _focusResumeEpoch;
     final intentGeneration = ++_playIntentGeneration;
     final navigationEpoch = _navigationEpoch;
+    _awaitingProgressIntent = intentGeneration;
+    _lastPlayCommandAt = DateTime.now();
     diagnostics?.record('playback', 'play_requested');
     _userPaused = false;
-    if (current == null) await _prepareCurrent();
+    if (current == null) {
+      diagnostics?.record('playback', 'play_prepare_current_started');
+      await _prepareCurrent();
+    }
     if (current == null) return;
     final requestedRef = currentRef;
+    diagnostics?.record('playback', 'play_resolve_source_started');
     final source = await db.source(current!.ref.sourceId);
+    diagnostics?.record('playback', 'play_resolve_source_completed');
     if (intentGeneration != _playIntentGeneration ||
         navigationEpoch != _navigationEpoch ||
         currentRef != requestedRef ||
@@ -1418,9 +1523,27 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    final refreshPausedProxy = shouldReopenPausedProxy(
+      usingProxy: _openedWithProxy,
+      pausedAt: _pausedAt,
+      now: DateTime.now(),
+    );
+    final refreshRemote = shouldRefreshRemotePlaybackSource(
+      ticketIssuedAt: _proxyTicketIssuedAt,
+      pausedAt: _pausedAt,
+      now: DateTime.now(),
+      ticketLifetime: MediaProxy.ticketValidity,
+    );
     if (player.state.playlist.medias.isEmpty ||
         _reloadSources.contains(source.id) ||
-        error != null) {
+        error != null ||
+        refreshRemote ||
+        refreshPausedProxy) {
+      if (refreshRemote || refreshPausedProxy) {
+        diagnostics?.record('playback', 'resume_source_refresh');
+      }
+      // A fresh mpv Media URL renews the short-lived proxy ticket and avoids
+      // resuming an abandoned background HTTP connection.
       await _loadCurrent(autoplay: true, manual: true);
       return;
     }
@@ -1451,6 +1574,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         await _setPlaybackGain(0, gainGeneration);
       }
       if (!_playRequested || intentGeneration != _playIntentGeneration) return;
+      diagnostics?.record('playback', 'native_play_started');
       final started = await _runNativeCommand(
         (native) async {
           await native.play();
@@ -1464,9 +1588,11 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (started &&
           _playRequested &&
           intentGeneration == _playIntentGeneration) {
+        diagnostics?.record('playback', 'native_play_completed');
         if (fadeIn && gainGeneration == _gainGeneration) {
           await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
         }
+        if (_playRequested) _pausedAt = null;
         _scheduleAhead();
       }
     }
@@ -1485,6 +1611,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {'system': system},
     );
     _playRequested = false;
+    _pausedAt = DateTime.now();
+    _awaitingProgressIntent = null;
     _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;

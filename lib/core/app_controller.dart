@@ -27,7 +27,7 @@ import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lrc_api.dart';
 import '../services/lyrics_store.dart';
-import '../services/android_desktop_lyrics.dart';
+import '../services/desktop_lyrics.dart';
 import '../services/webdav_tags.dart';
 import '../services/sync_foreground.dart';
 import '../services/webdav_metadata_enricher.dart';
@@ -69,7 +69,7 @@ class SylphyApp extends ChangeNotifier {
   final ValueNotifier<int> catalogListenable = ValueNotifier<int>(0);
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
-  late final desktopLyrics = AndroidDesktopLyrics(
+  late final desktopLyrics = DesktopLyrics(
     playback: playback,
     appearance: appearance,
     loadLyrics: loadLyrics,

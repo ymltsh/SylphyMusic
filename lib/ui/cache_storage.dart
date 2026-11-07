@@ -340,7 +340,7 @@ class _CacheStoragePageState extends State<CacheStoragePage> {
           ),
           const SizedBox(height: 14),
           Text(
-            '共享封面仅计一次，手动歌词受保护',
+            '到达容量限制后将自动释放旧缓存',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceVariant,
             ),

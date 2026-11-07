@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -290,6 +291,16 @@ public class AudioService extends MediaBrowserServiceCompat {
     private int shuffleMode;
     private boolean notificationCreated;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ForegroundResumeState foregroundResume = new ForegroundResumeState();
+    private long lastForegroundDenialMs = -1;
+    private static final long FGS_RETRY_COOLDOWN_MS = 3000;
+    private static final long PROVISIONAL_FOREGROUND_MS = 20000;
+    private final Runnable provisionalForegroundTimeout = () -> {
+        if (!foregroundResume.isProvisional()) return;
+        foregroundResume.cancelProvisional();
+        Log.w("SylphyMedia", "fgs_provisional_timeout");
+        if (!playing) exitForegroundState();
+    };
     private VolumeProviderCompat volumeProvider;
 
     public AudioProcessingState getProcessingState() {
@@ -355,17 +366,22 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     @Override
     public int onStartCommand(final Intent intent, int flags, int startId) {
+        foregroundResume.markStarted();
+        Log.i("SylphyMedia", "fgs_service_started");
         MediaButtonReceiver.handleIntent(mediaSession, intent);
         return START_NOT_STICKY;
     }
 
     public void stop() {
         deactivateMediaSession();
+        foregroundResume.markStopped();
         stopSelf();
     }
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(provisionalForegroundTimeout);
+        Log.i("SylphyMedia", "fgs_service_destroyed active=" + foregroundResume.isForeground());
         super.onDestroy();
         if (listener != null) {
             listener.onDestroy();
@@ -386,6 +402,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         //     notificationManager.cancel(NOTIFICATION_ID);
         // }
         releaseWakeLock();
+        foregroundResume.markDemoted();
         instance = null;
         notificationCreated = false;
     }
@@ -541,7 +558,6 @@ public class AudioService extends MediaBrowserServiceCompat {
             }
         }
         this.compactActionIndices = compactActionIndices;
-        boolean wasPlaying = this.playing;
         AudioProcessingState oldProcessingState = this.processingState;
         this.processingState = processingState;
         this.playing = playing;
@@ -589,9 +605,13 @@ public class AudioService extends MediaBrowserServiceCompat {
         mediaSession.setShuffleMode(shuffleMode);
         mediaSession.setCaptioningEnabled(captioningEnabled);
 
-        if (!wasPlaying && playing) {
-            enterPlayingState();
-        } else if (wasPlaying && !playing) {
+        // Do not equate the Dart intent with a successful Android FGS.
+        // A denied promotion must remain retryable even when playing stays true.
+        if (playing) {
+            handler.removeCallbacks(provisionalForegroundTimeout);
+            foregroundResume.confirmPlaying();
+            enterPlayingState(false, false);
+        } else if (foregroundResume.shouldExitOnPausedState()) {
             exitPlayingState();
         }
 
@@ -751,14 +771,56 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
     }
 
-    private void enterPlayingState() {
-        ContextCompat.startForegroundService(this, new Intent(AudioService.this, AudioService.class));
-        if (!mediaSession.isActive())
-            mediaSession.setActive(true);
+    // Run directly from the native media callback, before Dart/database/HTTP
+    // awaits consume the short user-gesture FGS-start exemption window.
+    private void prepareForegroundForMediaPlay() {
+        Log.i("SylphyMedia", "media_play_request_native");
+        enterPlayingState(!playing, true);
+    }
 
-        acquireWakeLock();
-        mediaSession.setSessionActivity(contentIntent);
-        internalStartForeground();
+    private void cancelProvisionalForeground() {
+        if (!foregroundResume.isProvisional()) return;
+        handler.removeCallbacks(provisionalForegroundTimeout);
+        foregroundResume.cancelProvisional();
+        if (!playing) exitForegroundState();
+    }
+
+    private void enterPlayingState(boolean provisional, boolean userInitiated) {
+        if (foregroundResume.isForeground()) {
+            if (provisional) {
+                foregroundResume.markProvisional();
+                handler.removeCallbacks(provisionalForegroundTimeout);
+                handler.postDelayed(provisionalForegroundTimeout, PROVISIONAL_FOREGROUND_MS);
+            }
+            return;
+        }
+        final long now = SystemClock.elapsedRealtime();
+        if (!userInitiated && lastForegroundDenialMs >= 0
+                && now - lastForegroundDenialMs < FGS_RETRY_COOLDOWN_MS) return;
+        try {
+            // The service is already running here. Do not send another
+            // startForegroundService() for every paused -> playing transition.
+            // An initially bound-only instance still needs a started lifetime.
+            if (foregroundResume.needsStart()) {
+                ContextCompat.startForegroundService(this, new Intent(this, AudioService.class));
+                foregroundResume.markStarted();
+            }
+            if (!mediaSession.isActive()) mediaSession.setActive(true);
+            mediaSession.setSessionActivity(contentIntent);
+            internalStartForeground();
+            foregroundResume.markPromoted(provisional);
+            acquireWakeLock();
+            Log.i("SylphyMedia", "fgs_promoted provisional=" + provisional);
+            if (provisional) {
+                handler.removeCallbacks(provisionalForegroundTimeout);
+                handler.postDelayed(provisionalForegroundTimeout, PROVISIONAL_FOREGROUND_MS);
+            }
+        } catch (IllegalStateException | SecurityException e) {
+            lastForegroundDenialMs = now;
+            // Do not claim success, hold a wake lock, or crash on Xiaomi/Android
+            // background-start refusal. A later eligible play may retry.
+            Log.w("SylphyMedia", "fgs_denied type=" + e.getClass().getSimpleName());
+        }
     }
 
     private void exitPlayingState() {
@@ -768,7 +830,11 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void exitForegroundState() {
-        ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+        if (foregroundResume.isForeground()) {
+            ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+            foregroundResume.markDemoted();
+            Log.i("SylphyMedia", "fgs_demoted");
+        }
         releaseWakeLock();
     }
 
@@ -972,6 +1038,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         public void onPlay() {
             Log.i("SylphyMedia", "session=play listener=" + (listener != null));
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlay();
         }
 
@@ -979,18 +1046,21 @@ public class AudioService extends MediaBrowserServiceCompat {
         public void onPlayFromMediaId(final String mediaId, final Bundle extras) {
             Log.i("SylphyMedia", "session=playFromMediaId listener=" + (listener != null));
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromMediaId(mediaId, extras);
         }
 
         @Override
         public void onPlayFromSearch(final String query, final Bundle extras) {
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromSearch(query, extras);
         }
 
         @Override
         public void onPlayFromUri(final Uri uri, final Bundle extras) {
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromUri(uri, extras);
         }
 
@@ -1036,6 +1106,10 @@ public class AudioService extends MediaBrowserServiceCompat {
                     // These are the "genuine" media button click events
                 case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
                 case KeyEvent.KEYCODE_HEADSETHOOK:
+                    if (!playing && event.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PAUSE
+                            && eventToButton(event) == MediaButton.media) {
+                        prepareForegroundForMediaPlay();
+                    }
                     listener.onClick(eventToButton(event));
                     break;
                 }
@@ -1060,12 +1134,14 @@ public class AudioService extends MediaBrowserServiceCompat {
         @Override
         public void onPause() {
             Log.i("SylphyMedia", "session=pause listener=" + (listener != null));
+            cancelProvisionalForeground();
             if (listener == null) return;
             listener.onPause();
         }
 
         @Override
         public void onStop() {
+            cancelProvisionalForeground();
             if (listener == null) return;
             listener.onStop();
         }

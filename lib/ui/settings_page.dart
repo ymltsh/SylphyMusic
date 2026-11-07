@@ -299,12 +299,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
     ]),
     _group('播放页迷你歌词', [_controls(_Section.lyrics)[1]]),
-    if (!kIsWeb && Platform.isAndroid)
+    if (app.desktopLyrics.supported)
       _group('桌面歌词', [
         SwitchListTile(
           secondary: const Icon(Icons.picture_in_picture_alt_outlined),
           title: const Text('显示桌面歌词'),
-          subtitle: const Text('在其他应用上方显示歌词'),
+          subtitle: Text(
+            Platform.isWindows ? '置顶显示歌词，可拖动调整位置，点击右侧 × 关闭' : '在其他应用上方显示歌词',
+          ),
           value: app.appearance.desktopLyricsEnabled,
           onChanged: (value) => _act(() async {
             final enabled = await app.desktopLyrics.setEnabled(value);

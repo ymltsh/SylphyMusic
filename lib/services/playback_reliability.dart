@@ -33,3 +33,38 @@ PlaybackFailureKind classifyPlaybackFailure(
   }
   return PlaybackFailureKind.retryable;
 }
+
+/// A paused mpv HTTP source may keep a stale connection and a short-lived
+/// loopback ticket. Reopen only proxied media, preserving local/cached files.
+/// A clock jump is treated conservatively as a request to refresh the source.
+bool shouldRefreshRemotePlaybackSource({
+  required DateTime? ticketIssuedAt,
+  required DateTime? pausedAt,
+  required DateTime now,
+  required Duration ticketLifetime,
+  Duration refreshBeforeExpiry = const Duration(minutes: 5),
+  Duration maxPausedAge = const Duration(minutes: 15),
+}) {
+  if (ticketIssuedAt == null) return false;
+  final ticketAge = now.difference(ticketIssuedAt);
+  if (ticketAge.isNegative ||
+      ticketAge >= ticketLifetime - refreshBeforeExpiry) {
+    return true;
+  }
+  if (pausedAt == null) return false;
+  final pausedAge = now.difference(pausedAt);
+  return pausedAge.isNegative || pausedAge >= maxPausedAge;
+}
+
+/// An old mpv HTTP/loopback source can be unusable even when its ticket has
+/// not yet expired. Reopen only remote sources actually using the local proxy.
+bool shouldReopenPausedProxy({
+  required bool usingProxy,
+  required DateTime? pausedAt,
+  required DateTime now,
+  Duration maxPause = const Duration(minutes: 15),
+}) {
+  if (!usingProxy || pausedAt == null) return false;
+  final age = now.difference(pausedAt);
+  return age.isNegative || age >= maxPause;
+}

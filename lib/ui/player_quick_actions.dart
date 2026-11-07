@@ -20,6 +20,23 @@ class PlayerQuickActions extends StatelessWidget {
   final bool preview;
   final VoidCallback? onOpenLyrics, onOpenEditor, onQuality;
 
+  Future<void> _toggleDesktopLyrics(BuildContext context) async {
+    final enabled = !app.appearance.desktopLyricsEnabled;
+    try {
+      final applied = await app.desktopLyrics.setEnabled(enabled);
+      if (enabled && !applied && context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请在系统设置中授权悬浮窗，返回后将自动开启')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('桌面歌词设置失败，请重试')));
+      }
+    }
+  }
+
   void _timerSheet(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -63,7 +80,7 @@ class PlayerQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([app.sleepTimer, app]),
+    listenable: Listenable.merge([app.sleepTimer, app.appearance, app]),
     builder: (context, _) => Row(
       key: const ValueKey('player-quick-actions'),
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -100,6 +117,8 @@ class PlayerQuickActions extends StatelessWidget {
             onSelected: (value) async {
               if (value == 'edit') {
                 onOpenEditor?.call();
+              } else if (value == 'desktopLyrics') {
+                await _toggleDesktopLyrics(context);
               } else if (value == 'quality') {
                 onQuality?.call();
               } else {
@@ -127,6 +146,25 @@ class PlayerQuickActions extends StatelessWidget {
                   ),
                 ),
               ],
+              if (app.desktopLyrics.supported)
+                PopupMenuItem<String>(
+                  value: 'desktopLyrics',
+                  child: Semantics(
+                    checked: app.appearance.desktopLyricsEnabled,
+                    child: Row(
+                      children: [
+                        const Expanded(child: Text('显示桌面歌词')),
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: 24,
+                          child: app.appearance.desktopLyricsEnabled
+                              ? const Icon(Icons.check, size: 24)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
             ],
           ),

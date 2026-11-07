@@ -13,11 +13,20 @@ import 'sources.dart';
 import 'byte_range.dart';
 
 class MediaProxy {
-  MediaProxy(this.db, this.cache, this.factory, {this.diagnostics});
+  MediaProxy(
+    this.db,
+    this.cache,
+    this.factory, {
+    this.diagnostics,
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now;
+
+  static const ticketValidity = Duration(hours: 2);
   final AppDb db;
   final CacheManager cache;
   final AdapterFactory factory;
   final DiagnosticLogs? diagnostics;
+  final DateTime Function() _clock;
   final Lock _lifecycleLock = Lock();
   bool _disposed = false;
   HttpServer? _server;
@@ -112,12 +121,18 @@ class MediaProxy {
   Uri ticket(Track track, SourceProfile profile) {
     _failures.remove(track.ref.key);
     if (_server == null) throw StateError('媒体代理未启动');
-    _tickets.removeWhere((_, value) => value.expires.isBefore(DateTime.now()));
+    final now = _clock();
+    // Retain bounded expired metadata so an old mpv Range request can still
+    // be classified as local expiry rather than an upstream authentication error.
+    // Retained tickets are NEVER accepted after their real expiry.
+    _tickets.removeWhere(
+      (_, value) => value.expires.add(ticketValidity).isBefore(now),
+    );
     final id = '${const Uuid().v4()}-${const Uuid().v4()}';
     _tickets[id] = (
       track: track,
       profile: profile,
-      expires: DateTime.now().add(const Duration(hours: 2)),
+      expires: now.add(ticketValidity),
     );
     return Uri.parse('http://127.0.0.1:$port/audio/$id');
   }
@@ -146,12 +161,16 @@ class MediaProxy {
         return;
       }
       final ticket = _tickets[parts[1]];
-      if (ticket == null || ticket.expires.isBefore(DateTime.now())) {
+      if (ticket == null || ticket.expires.isBefore(_clock())) {
         if (ticket != null) {
           // An expired local ticket is recoverable; it is not an upstream 403.
           _failures[ticket.track.ref.key] = 'local_ticket_expired';
         }
-        diagnostics?.record('proxy', 'ticket_rejected');
+        diagnostics?.record(
+          'proxy',
+          'ticket_rejected',
+          details: {'type': ticket == null ? 'unknown' : 'expired'},
+        );
         req.response.statusCode = HttpStatus.forbidden;
         return;
       }

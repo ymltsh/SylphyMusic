@@ -1,5 +1,43 @@
 # 实施与验证记录
 
+## 2026-11-07 发布 1.0.34+47 / 1.0.34-openlist.17+47
+
+按用户“推送更新”要求发布两通道。普通版新增 Windows 桌面歌词，提供播放页更多及设置入口、置顶拖动浮窗、位置记忆、关闭、颜色字号和 DPI 适配；OpenList 特别版继续提供 Android 桌面歌词，发布说明未将 Windows 能力描述为 Android 新增能力。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+普通版 release.py 和特别版发布入口均输出 Release succeeded，退出码 0；普通版六个附件、特别版三个附件的大小 / SHA-256、Release 状态 / 标题 / 正文，以及四份清单原始 / 加速入口全部匹配。特别版状态 build/releases/1.0.34-openlist.17-47/publish-state.json 为 complete。只提交推送清单：main/version.json 为 6f6d022，main/version-openlist.json 为 92f955f，特性分支 version.json / version-openlist.json 为 1c575b3。源码、版本配置与其他已有修改保留本地。
+
+普通版产物 build/releases/1.0.34-47/，日志 build/test_logs/release-1.0.34.log；特别版产物 build/releases/1.0.34-openlist.17-47/，日志 build/test_logs/openlist-release-47-*.log。未运行 analyze、测试、启动或设备验收；发布成功不代表 Windows 歌词实际显示与多显示器场景已通过功能验证。
+
+## 2026-11-07 Windows 桌面歌词支持
+
+按用户要求，为 Windows 增加桌面歌词。共享 DesktopLyrics 服务复用既有播放位置、歌词解析与加载、颜色和字号设置，Android 原生悬浮窗授权逻辑保留；旧 AndroidDesktopLyrics 名称提供兼容导出。设置页与播放页更多菜单均支持 Windows，更多菜单保留右侧开启勾选。
+
+Windows Runner 新增 DesktopLyricsWindow：独立无所有者置顶分层窗口，不抢焦点、不显示任务栏按钮，主窗口最小化或隐藏到托盘时仍可显示；GDI+ 绘制半透明圆角背景与最多两行歌词，过长省略，支持拖动及右侧 × 关闭。关闭回调同步开关，位置存于 HKCU/Software/SylphyMusic/DesktopLyrics；按 DPI 缩放并在显示器或工作区变化时修正位置，提供中文字体缺失时的字体回退。窗口在 Flutter 引擎释放前销毁，共享服务在既有 disposeAsync 链中关闭。两工作区同步实现与使用说明；修改前文件位于各自 .private/windows-desktop-lyrics-before/。
+
+普通版 Windows Release、Android 三 ABI 构建成功，内部打包成功，Windows 便携包 build/internal-review/SylphyMusic-windows-release-internal.zip；OpenList Android arm64 Release 构建成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。普通版编译日志 build/test_logs/windows-desktop-lyrics-build.log 和 windows-desktop-lyrics-package.log，最终打包日志 windows-desktop-lyrics-package-final.log；特别版日志 build/test_logs/windows-desktop-lyrics-android-build.log。首次原生编译的 GDI+ 重载错误已修复；打包期间保留旧服务兼容入口后重新打包成功。未运行 analyze、测试、启动或设备验收，未修改版本或清单，未提交、推送或发布；实际显示、拖动、多显示器和托盘场景由用户确认。
+
+## 2026-11-07 发布 1.0.33+46 / 1.0.33-openlist.16+46
+
+按用户“推送版本更新”要求发布两通道，包含播放页更多菜单的桌面歌词开关及右侧勾选状态、后台暂停后远程播放恢复改进、播放器长时间无响应提示和缓存容量说明调整。发布标题、正文与清单说明面向用户。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+普通版 release.py 与特别版发布入口均输出 Release succeeded，退出码 0；普通版六个附件、特别版三个附件的大小 / SHA-256、Release 状态 / 标题 / 正文，以及四份清单的原始 / 加速入口全部匹配。特别版状态 build/releases/1.0.33-openlist.16-46/publish-state.json 为 complete。只提交推送清单：main/version.json 为 3e0b133，main/version-openlist.json 为 e55a953，特性分支 version.json / version-openlist.json 为 95637e5。源码、版本配置与其他既有修改保留本地。
+
+普通版产物 build/releases/1.0.33-46/，日志 build/test_logs/release-1.0.33.log；特别版产物 build/releases/1.0.33-openlist.16-46/，构建、打包与发布日志为 build/test_logs/openlist-release-46-*.log。未运行 analyze、测试、启动或设备验收；发布成功不代表后台恢复与桌面歌词已通过设备验证。
+
+## 2026-11-07 播放页更多菜单增加桌面歌词开关
+
+随后按用户要求，将“显示桌面歌词”的勾选标记移到菜单项右侧，保留勾选语义与原开关逻辑；普通版 Android 三 ABI / Windows Release 与内部打包、OpenList Android arm64 Release 重新编译成功。产物位置不变，日志 build/test_logs/player-lyrics-check-right-build.log。未运行测试或设备验收。
+
+两工作区 PlayerQuickActions 的更多菜单增加 Android 专用“显示桌面歌词”勾选项，可开启或关闭并监听 Appearance 同步状态。复用 AndroidDesktopLyrics.setEnabled，未授权时进入系统悬浮窗授权页并提示返回后自动开启，失败显示重试提示；布局编辑预览继续不执行操作。修改前文件保存在各自 .private/player-desktop-lyrics-before/，保留其他已有修改。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-release.apk。日志为各工作区 build/test_logs/player-desktop-lyrics-build.log。未运行 analyze、测试、启动或设备验收，未修改版本或更新清单，未提交、推送或发布；授权与显示效果由用户在设备上确认。
+
+## 2026-11-07 应用 Android 后台暂停恢复补丁
+
+按用户要求，将 SylphyMusic-android-background-resume.patch 直接应用到 main 与 feature/android-openlist-lite，保留已有修改，受影响文件备份在各自 .private/android-background-resume-*/before/。远程代理媒体暂停达到 15 分钟、票据接近过期或时钟回拨时重新打开并恢复保存位置；本地文件与完整缓存继续直接恢复。原生命令入队等待上限 45 秒，超时任务失效并提示重启，不并发销毁仍在运行的原生调用。过期票据保留有限期限的分类元数据，增加不含票据的诊断。包含补丁附带测试文件及说明文档，格式化 Dart 并同步架构与文档索引。
+
+普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-release.apk。各工作区日志 build/test_logs/android-background-resume-build.log。未运行 analyze、测试、启动或设备验收，未修改版本号或更新清单，未提交、推送或发布；编译成功不代表后台恢复功能已通过设备验证。
+
 ## 2026-11-04 发布 1.0.32+45 / 1.0.32-openlist.15+45
 
 按用户「推送版本更新」要求发布两通道，包含音乐缓存管理界面重设计、歌曲 / 歌手 / 专辑 / 来源搜索与排序，以及 Android 媒体通知时钟和标准 MediaStyle 调整。Release 标题、正文和清单说明面向用户，不包含内部协作过程。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附本轮应用及对应 OpenList 后端 / 前端源码和许可证。四份 APK 正式签名一致，OpenList JNI 未变。
