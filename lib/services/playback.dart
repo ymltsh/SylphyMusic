@@ -17,6 +17,7 @@ import 'media_proxy.dart';
 import 'native_command_gate.dart';
 import 'notification_clock.dart';
 import 'playback_reliability.dart';
+import 'transient_focus_policy.dart';
 
 /// Metadata sent to Android must include an actual artwork URI; the platform
 /// cannot access Flutter's in-widget Image.file cache automatically.
@@ -64,19 +65,18 @@ class PlaybackCoordinator extends ChangeNotifier {
   bool _finishingTrack = false;
   // Covers the await before player.open when navigating away from a track.
   int _navigationInFlight = 0;
-  // GAIN is not permission to restart immediately: video feeds can briefly
-  // release focus between clips. Keep resume eligibility separate from focus.
-  bool _resumeOnFocusGain = false;
-  bool _focusWasLost = false;
+  // An Android audio-focus loss is not a user pause. The lease has one owner
+  // and keeps the media FGS alive only for an eligible transient interruption.
+  final TransientFocusPolicy<TrackRef> _focusRecovery =
+      TransientFocusPolicy<TrackRef>();
+  bool get _focusWasLost => _focusRecovery.blocked;
   bool _ducking = false;
-  TrackRef? _focusResumeRef;
   Timer? _focusResumeTimer;
+  Timer? _focusHoldTimer;
   int _focusResumeEpoch = 0;
-  DateTime? _focusBurstStarted;
-  int _focusLossCount = 0;
   static const _focusResumeDelay = Duration(seconds: 2);
-  static const _focusChatterWindow = Duration(seconds: 12);
   static const _focusResumeMaxAge = Duration(seconds: 15);
+  static const _focusHoldLimit = Duration(minutes: 5);
   int _lastSaved = 0;
   int _reconnects = 0;
   TrackRef? _recoveryRef;
@@ -408,21 +408,31 @@ class PlaybackCoordinator extends ChangeNotifier {
   })?
   _lastMediaItem;
 
-  void _cancelFocusResume({
-    bool keepEligibility = false,
-    bool resetBurst = false,
-  }) {
+  void _cancelFocusResume({bool keepEligibility = false}) {
     ++_focusResumeEpoch;
     _focusResumeTimer?.cancel();
     _focusResumeTimer = null;
     if (!keepEligibility) {
-      _resumeOnFocusGain = false;
-      _focusResumeRef = null;
+      _focusRecovery.cancel();
+      _focusHoldTimer?.cancel();
+      _focusHoldTimer = null;
     }
-    if (resetBurst) {
-      _focusBurstStarted = null;
-      _focusLossCount = 0;
-    }
+  }
+
+  /// Bounded by an active foreground media service, not an unbounded pause.
+  /// The timer only *withdraws* permission; it never starts playback.
+  void _holdTransientFocusForeground() {
+    if (!_focusRecovery.foregroundHeld) return;
+    // Repeated focus losses do not extend the bounded CPU wake-lock hold.
+    if (_focusHoldTimer != null) return;
+    _focusHoldTimer = Timer(_focusHoldLimit, () {
+      _focusHoldTimer = null;
+      if (!_focusRecovery.foregroundHeld) return;
+      diagnostics?.record('audio_focus', 'transient_hold_expired');
+      _cancelFocusResume();
+      _publish();
+    });
+    _publish();
   }
 
   // Serialize native writes so an older fade step cannot overwrite a newer
@@ -478,65 +488,60 @@ class PlaybackCoordinator extends ChangeNotifier {
       },
     );
     if (event.begin) {
-      // A new loss always cancels a pending timer. A second rapid loss also
-      // cancels the right to auto-resume, preventing clip-to-clip oscillation.
-      _cancelFocusResume(
-        keepEligibility: event.type == AudioInterruptionType.pause,
-      );
       if (event.type == AudioInterruptionType.duck) {
+        // Duck is a volume decision, not a newer pause/play request. Do not
+        // invalidate an already scheduled transient-focus recovery.
         _ducking = true;
         unawaited(_applyPlayerVolume());
         return;
       }
+      ++_focusResumeEpoch; // Retire any pre-loss async native play.
+      _focusResumeTimer?.cancel();
+      _focusResumeTimer = null;
       if (_ducking) {
         _ducking = false;
         unawaited(_applyPlayerVolume());
       }
-
-      _focusWasLost = true;
-      final wasRequested = _playRequested; // Includes buffering and track open.
+      final wasRequested = _playRequested;
       if (event.type == AudioInterruptionType.pause) {
-        if (wasRequested || _resumeOnFocusGain) {
-          final now = DateTime.now();
-          if (_focusBurstStarted == null ||
-              now.difference(_focusBurstStarted!) > _focusChatterWindow) {
-            _focusBurstStarted = now;
-            _focusLossCount = 0;
-          }
-          ++_focusLossCount;
-          if (_focusLossCount >= 2) {
-            _cancelFocusResume();
-            diagnostics?.record('audio_focus', 'resume_suppressed');
-          } else if (wasRequested) {
-            _resumeOnFocusGain = true;
-            _focusResumeRef = currentRef;
-          }
+        // Repeated transient losses must retain the original resume right.
+        // Arm the FGS hold BEFORE pause(system:true) publishes playing:false.
+        _focusRecovery.transientLoss(
+          wasPlayRequested: wasRequested,
+          track: currentRef,
+        );
+        if (_focusRecovery.foregroundHeld) {
+          diagnostics?.record('audio_focus', 'transient_hold_started');
+          _holdTransientFocusForeground();
         }
       } else {
-        // audio_session maps permanent AUDIOFOCUS_LOSS to `unknown`.
-        // It must never create an automatic resume entitlement.
+        // An unknown interruption represents permanent focus loss. No resume.
+        _focusRecovery.permanentLoss();
         _cancelFocusResume();
       }
-      if (wasRequested) unawaited(pause(system: true));
+      if (wasRequested) {
+        unawaited(pause(system: true));
+      } else {
+        // E.g. permanent loss after we are already paused for a transient
+        // loss: publish the revoked foreground hold immediately.
+        _publish();
+      }
       return;
     }
-
     if (event.type == AudioInterruptionType.duck) {
       _ducking = false;
       unawaited(_applyPlayerVolume());
       return;
     }
-    _focusWasLost = false;
-    if (event.type != AudioInterruptionType.pause ||
-        !_resumeOnFocusGain ||
-        _userPaused) {
-      return;
+    final resumeRef = event.type == AudioInterruptionType.pause
+        ? _focusRecovery.regained()
+        : null;
+    if (event.type != AudioInterruptionType.pause) {
+      _focusRecovery.focusGranted();
     }
-    final resumeRef = _focusResumeRef;
-    if (resumeRef == null) {
-      _cancelFocusResume();
-      return;
-    }
+    // Duplicate GAIN must not revoke a previous pending resume timer.
+    if (resumeRef == null || _userPaused) return;
+    ++_focusResumeEpoch;
     final focusEpoch = _focusResumeEpoch;
     final intentGeneration = _playIntentGeneration;
     final loadGeneration = _loadGeneration;
@@ -546,7 +551,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       _focusResumeTimer = null;
       if (focusEpoch != _focusResumeEpoch ||
           _focusWasLost ||
-          !_resumeOnFocusGain ||
+          !_focusRecovery.foregroundHeld ||
           _userPaused ||
           _playRequested ||
           currentRef != resumeRef ||
@@ -554,9 +559,12 @@ class PlaybackCoordinator extends ChangeNotifier {
           _loadGeneration != loadGeneration ||
           DateTime.now().difference(gainTime) > _focusResumeMaxAge) {
         _cancelFocusResume();
+        _publish();
         return;
       }
-      _cancelFocusResume();
+      // Keep the FGS through pause -> play -> first real progress. Dropping it
+      // at GAIN would recreate the background FGS denial we are fixing.
+      _cancelFocusResume(keepEligibility: true);
       diagnostics?.record('audio_focus', 'resume_after_stable_gain');
       unawaited(play(automaticFocusResume: true));
     });
@@ -653,6 +661,18 @@ class PlaybackCoordinator extends ChangeNotifier {
         if (nextMs > previousProgressMs + 400) {
           _watchdogPositionMs = nextMs;
           _progressWatch.reset();
+          if (_focusRecovery.foregroundHeld &&
+              _playRequested &&
+              playing &&
+              !buffering &&
+              previousProgressMs >= 0 &&
+              nextMs - previousProgressMs <= 4000) {
+            _focusRecovery.progressConfirmed();
+            _focusHoldTimer?.cancel();
+            _focusHoldTimer = null;
+            diagnostics?.record('audio_focus', 'transient_hold_released');
+            _publish();
+          }
           if (_playRequested &&
               playing &&
               !buffering &&
@@ -820,7 +840,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         }
         try {
           await player
-              .open(media, play: play && _playRequested)
+              .open(media, play: play && _playRequested && !_focusWasLost)
               .timeout(const Duration(seconds: 25));
           if (generation != _loadGeneration) return;
           if (resumeMs > 0) {
@@ -828,7 +848,7 @@ class PlaybackCoordinator extends ChangeNotifier {
                 .seek(Duration(milliseconds: resumeMs))
                 .timeout(const Duration(seconds: 12));
           }
-          if (!_playRequested) {
+          if (!_playRequested || _focusWasLost) {
             await player.pause().timeout(const Duration(seconds: 12));
           }
         } on TimeoutException {
@@ -1011,14 +1031,20 @@ class PlaybackCoordinator extends ChangeNotifier {
     await _prepareCurrent(); // Restore metadata only, never autoplay after process restart.
     if (Platform.isAndroid) {
       _session = await AudioSession.instance;
-      await _session!.configure(const AudioSessionConfiguration.music());
+      await _session!.configure(
+        (const AudioSessionConfiguration.music()).copyWith(
+          // Prevent opaque system ducking from leaving the media output
+          // permanently quiet; interruptions now have one Dart owner.
+          androidWillPauseWhenDucked: true,
+        ),
+      );
       _subscriptions.add(
         _session!.interruptionEventStream.listen(_onAudioInterruption),
       );
       _subscriptions.add(
         _session!.becomingNoisyEventStream.listen((_) {
           _cancelFocusResume();
-          _focusWasLost = false;
+          // A disconnected headset is not a transient interruption to resume.
           unawaited(pause(system: true));
         }),
       );
@@ -1178,8 +1204,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     bool autoplay = true,
   }) async {
     if (tracks.isEmpty) return;
-    _cancelFocusResume(resetBurst: true);
-    _focusWasLost = false;
+    _cancelFocusResume();
     if (autoplay) _userPaused = false;
     final navigationEpoch = ++_navigationEpoch;
     ++_loadGeneration; // Invalidate an older, still resolving load immediately.
@@ -1626,8 +1651,9 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> play({bool automaticFocusResume = false}) async {
     if (!automaticFocusResume) {
-      _cancelFocusResume(resetBurst: true);
-      _focusWasLost = false;
+      // Never forge focus-GAIN when the user clicks Play. The outcome of the
+      // actual AudioSession.setActive(true) request is authoritative.
+      _cancelFocusResume();
     }
     final focusEpoch = _focusResumeEpoch;
     final intentGeneration = ++_playIntentGeneration;
@@ -1648,6 +1674,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (intentGeneration != _playIntentGeneration ||
         navigationEpoch != _navigationEpoch ||
         currentRef != requestedRef ||
+        focusEpoch != _focusResumeEpoch ||
         (automaticFocusResume &&
             (focusEpoch != _focusResumeEpoch ||
                 _focusWasLost ||
@@ -1660,6 +1687,34 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    // All play paths (reuse, cached-file reopen, HTTP ticket refresh) obtain
+    // focus BEFORE native open, instead of bypassing focus in the reload arm.
+    var focusGranted = _session == null;
+    try {
+      if (_session != null) focusGranted = await _session!.setActive(true);
+    } catch (e) {
+      diagnostics?.record(
+        'audio_focus',
+        'activation_failed',
+        details: {'type': e.runtimeType.toString()},
+      );
+    }
+    if (intentGeneration != _playIntentGeneration ||
+        navigationEpoch != _navigationEpoch ||
+        currentRef != requestedRef ||
+        focusEpoch != _focusResumeEpoch ||
+        (automaticFocusResume && _focusWasLost)) {
+      return;
+    }
+    if (!focusGranted) {
+      _cancelFocusResume();
+      _playRequested = false;
+      _publish();
+      error = '系统暂时未授予音频焦点';
+      notifyListeners();
+      return;
+    }
+    _focusRecovery.focusGranted();
     final refreshPausedProxy = shouldReopenPausedProxy(
       usingProxy: _openedWithProxy,
       pausedAt: _pausedAt,
@@ -1698,13 +1753,6 @@ class PlaybackCoordinator extends ChangeNotifier {
     _playRequested = true;
     _progressWatch.reset();
     _publish();
-    if (_session != null && !await _session!.setActive(true)) {
-      _playRequested = false;
-      _publish();
-      error = '系统暂时未授予音频焦点';
-      notifyListeners();
-      return;
-    }
     if (automaticFocusResume &&
         (focusEpoch != _focusResumeEpoch || _focusWasLost || _userPaused)) {
       _playRequested = false;
@@ -1719,17 +1767,22 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (fadeIn && !player.state.playing) {
         await _setPlaybackGain(0, gainGeneration);
       }
-      if (!_playRequested || intentGeneration != _playIntentGeneration) return;
+      if (!_playRequested ||
+          intentGeneration != _playIntentGeneration ||
+          _focusWasLost)
+        return;
       diagnostics?.record('playback', 'native_play_started');
       final started = await _runNativeCommand(
         (native) async {
           await native.play();
           // A focus loss may arrive before the native play Future completes.
-          if (automaticFocusResume && !_playRequested) await native.pause();
+          if (!_playRequested || _focusWasLost) await native.pause();
         },
         navigationEpoch: navigationEpoch,
         allowed: () =>
-            _playRequested && intentGeneration == _playIntentGeneration,
+            _playRequested &&
+            intentGeneration == _playIntentGeneration &&
+            !_focusWasLost,
       );
       if (started &&
           _playRequested &&
@@ -1753,7 +1806,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> pause({bool system = false}) async {
     final wasRequested = _playRequested;
     if (!system) {
-      _cancelFocusResume(resetBurst: true);
+      _cancelFocusResume();
       _userPaused = true;
     }
     ++_playIntentGeneration;
@@ -1789,7 +1842,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> toggle() async {
     // The native playing stream can lag behind a fade or an in-flight open.
-    if (_playRequested) {
+    if (_playRequested || _focusRecovery.foregroundHeld) {
       await pause();
     } else {
       await play();
@@ -1809,8 +1862,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> next({bool manual = true}) async {
     if (manual) {
-      _cancelFocusResume(resetBurst: true);
-      _focusWasLost = false;
+      _cancelFocusResume();
       _userPaused = false;
     }
     diagnostics?.record(
@@ -1869,8 +1921,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> previous() async {
     if (snapshot.tracks.isEmpty) return;
-    _cancelFocusResume(resetBurst: true);
-    _focusWasLost = false;
+    _cancelFocusResume();
     _userPaused = false;
     int? index;
     var hist = [...snapshot.history];
@@ -2118,8 +2169,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> retry() async {
-    _cancelFocusResume(resetBurst: true);
-    _focusWasLost = false;
+    _cancelFocusResume();
     _userPaused = false;
     failures = 0;
     await save();
@@ -2128,8 +2178,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> jumpTo(int index) async {
     if (index < 0 || index >= snapshot.tracks.length) return;
-    _cancelFocusResume(resetBurst: true);
-    _focusWasLost = false;
+    _cancelFocusResume();
     _userPaused = false;
     final navigationEpoch = ++_navigationEpoch;
     ++_loadGeneration;
@@ -2152,7 +2201,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> removeAt(int index) async {
     if (index < 0 || index >= snapshot.tracks.length) return;
     final wasCurrent = index == snapshot.index;
-    if (wasCurrent) _cancelFocusResume(resetBurst: true);
+    if (wasCurrent) _cancelFocusResume();
     final wasPlaying = _playRequested;
     final tracks = [...snapshot.tracks]..removeAt(index);
     if (tracks.isEmpty) {
@@ -2201,8 +2250,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> clearQueue() async {
-    _cancelFocusResume(resetBurst: true);
-    _focusWasLost = false;
+    _cancelFocusResume();
     final navigationEpoch = ++_navigationEpoch;
     ++_loadGeneration;
     ++_transitionEpoch;
@@ -2276,10 +2324,11 @@ class PlaybackCoordinator extends ChangeNotifier {
       }
     }
     final rate = clockRunning ? speed : 0.0;
+    final sessionPlaying = _playRequested || _focusRecovery.foregroundHeld;
     if (!_sessionPublishGate.shouldPublish(
       mediaId: t?.ref.key,
       phase: processing.name,
-      playRequested: _playRequested,
+      playRequested: sessionPlaying,
       position: position,
       rate: rate,
       force: force,
@@ -2290,14 +2339,14 @@ class PlaybackCoordinator extends ChangeNotifier {
       PlaybackState(
         controls: [
           MediaControl.skipToPrevious,
-          _playRequested ? MediaControl.pause : MediaControl.play,
+          sessionPlaying ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
         ],
         systemActions: const {MediaAction.seek},
         processingState: processing,
-        // Separate foreground-service eligibility from true media progress.
-        // The Android service uses playing to retain the FGS even in BUFFERING.
-        playing: _playRequested,
+        // Keep FGS for an eligible short focus interruption while the real
+        // audio position remains frozen (speed=0). Manual pauses release it.
+        playing: sessionPlaying,
         updatePosition: position,
         speed: rate,
       ),
@@ -2421,7 +2470,8 @@ class SylphyAudioHandler extends BaseAudioHandler with SeekHandler {
     if (button == MediaButton.media) {
       if (!_allowTransport('toggle')) return;
       // Play intent updates synchronously, while native `playing` can lag.
-      if (controller._playRequested) {
+      if (controller._playRequested ||
+          controller._focusRecovery.foregroundHeld) {
         await controller.pause();
       } else {
         await controller.play();

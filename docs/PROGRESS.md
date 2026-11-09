@@ -1,5 +1,13 @@
 # 实施与验证记录
 
+## 2026-11-09 应用播放与音频焦点架构重构补丁
+
+按用户“应用补丁”要求，将 SylphyMusic-Playback-Architecture-Focus-Refactor-Bundle.zip 同步合并至 main 与 feature/android-openlist-lite，保留其他已有修改。修正补丁四处重复上下文造成的无法直接应用，OpenList 另适配导入及播放租约上下文；引入 TransientFocusPolicy，统一临时失焦恢复资格、阻塞状态与最长 5 分钟前台保留，重复临时失焦不取消原恢复资格。真实进度恢复释放保留；手动暂停、永久失焦及超时撤销恢复资格。显式 play 在缓存 / 代理重开前申请焦点，原生打开与播放检查已知焦点阻塞，保留 V3 同曲有界重开。
+
+补丁附带策略测试及设计说明已纳入，Dart 文件完成格式化，架构正文与文档索引同步更新。初始队列自动播放和直接切歌仍未统一经过焦点申请入口；长时间手动暂停后的实际恢复能力不因本补丁视为已验证。已有文件备份在各自 .private/playback-architecture-focus-before/。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/playback-architecture-focus-build.log。未执行附件中的测试、analyze、ADB 或设备验证建议，未启动应用；未修改版本号或更新清单，未提交、推送或发布。功能与设备效果交由用户确认。
+
 ## 2026-11-09 发布 1.0.36+49 / 1.0.36-openlist.19+49
 
 按用户“推送版本更新”要求发布两通道，包含后台恢复 V3：完整缓存长暂停后重开、Android 本地 / 缓存实际进度检查及同曲一次主动重开、音频焦点与新操作取消保护、原生前台状态重申和恢复诊断。发布标题、正文与清单说明面向用户。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。

@@ -16,6 +16,7 @@
 | [TEST_PLAN](TEST_PLAN.md) | 完整真实环境验收清单 |
 | [RELEASE_GATES](RELEASE_GATES.md) | 独立验收待办，不属于发布流程 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |
+| [播放与音频焦点重构](PLAYBACK_ARCHITECTURE_FOCUS_REFACTOR.md) | 临时失焦恢复资格、5 分钟前台保留及焦点申请边界 |
 | [Android 后台恢复 V3](ANDROID_BACKGROUND_RESUME_V3.md) | 完整缓存恢复、实际进度检查、同曲有界重开与前台状态重申 |
 | [Android 后台恢复 V2](ANDROID_BACKGROUND_RESUME_V2.md) | 媒体回调临时前台服务提升、拒绝重试与恢复进度诊断 |
 | [后台暂停恢复补丁](BACKGROUND_RESUME_PATCH.md) | 远程暂停恢复、票据刷新、原生命令入队超时与用户验证建议 |
