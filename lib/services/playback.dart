@@ -1,19 +1,26 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:synchronized/synchronized.dart';
 
 import '../core/models.dart';
 import '../data/app_db.dart';
+import 'audio_output_recovery_policy.dart';
 import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
+import 'media_session_projection.dart';
 import 'native_command_gate.dart';
 import 'notification_clock.dart';
 import 'playback_reliability.dart';
@@ -86,6 +93,9 @@ class PlaybackCoordinator extends ChangeNotifier {
   bool _openedFromCompleteCache = false;
   Timer? _resumeProgressTimer;
   int? _resumeReopenTriedIntent;
+  TrackRef? _resumeReopenTriedRef;
+  int? _audioOutputReloadTriedIntent;
+  TrackRef? _audioOutputReloadTriedRef;
   int? _awaitingProgressIntent;
   DateTime? _lastPlayCommandAt;
   DateTime? _steadyProgressSince;
@@ -133,6 +143,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   void _checkForStall() {
     if (!_playRequested ||
         _userPaused ||
+        _focusWasLost ||
         currentRef == null ||
         _handlingFailure ||
         _stalledRecoveryRunning) {
@@ -173,16 +184,23 @@ class PlaybackCoordinator extends ChangeNotifier {
     final stuckRef = currentRef;
     final generation = _loadGeneration;
     final intentGeneration = _playIntentGeneration;
-    _stalledRecoveryRunning = true;
-    _handlingFailure = true;
     diagnostics?.record(
       'playback',
       'progress_stalled',
       details: {'index': snapshot.index},
     );
-    error = '播放进度长时间没有变化，正在尝试恢复';
-    notifyListeners();
-    unawaited(_recoverStall(stuckRef, generation, intentGeneration));
+    // One recovery owner for both the 12s resume check and 45s watchdog.
+    // It owns the guards; the watchdog never takes the lock first.
+    _awaitingProgressIntent = intentGeneration;
+    unawaited(
+      _reopenUnconfirmedResume(
+        stuckRef,
+        generation,
+        intentGeneration,
+        _navigationEpoch,
+        fromWatchdog: true,
+      ),
+    );
   }
 
   bool _sameRecovery(TrackRef? ref, int generation, int intentGeneration) =>
@@ -193,50 +211,9 @@ class PlaybackCoordinator extends ChangeNotifier {
       !_userPaused &&
       !_focusWasLost;
 
-  Future<void> _recoverStall(
-    TrackRef? stuckRef,
-    int generation,
-    int intentGeneration,
-  ) async {
-    try {
-      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
-      // A complete cache file does not use the loopback HTTP proxy. Probing
-      // or restarting that proxy cannot heal its stalled AudioTrack.
-      if (_openedWithProxy) {
-        diagnostics?.record('playback', 'local_proxy_probe_started');
-        final healthy = await proxy.ping();
-        diagnostics?.record(
-          'playback',
-          healthy ? 'local_proxy_healthy' : 'local_proxy_unresponsive',
-        );
-        if (!_sameRecovery(stuckRef, generation, intentGeneration)) {
-          diagnostics?.record('playback', 'stall_recovery_cancelled');
-          return;
-        }
-        if (!healthy) {
-          try {
-            await proxy.restart();
-          } catch (_) {
-            // _failed still applies its existing bounded retry/stop policy.
-          }
-        }
-      } else {
-        diagnostics?.record('playback', 'stall_proxy_not_used');
-      }
-      if (!_sameRecovery(stuckRef, generation, intentGeneration)) {
-        diagnostics?.record('playback', 'stall_recovery_cancelled');
-        return;
-      }
-      await _failed('播放进度超过 45 秒没有变化');
-    } catch (_) {
-      // The recovery attempt is best effort; never leave the guard latched.
-      diagnostics?.record('playback', 'stall_recovery_failed');
-    } finally {
-      _handlingFailure = false;
-      _stalledRecoveryRunning = false;
-      _progressWatch.reset();
-    }
-  }
+  // No second _recoverStall entry: the watchdog and resume verification both
+  // enter _reopenUnconfirmedResume. A native output stall is never a reason to
+  // call _failed(), whose source-type retry can advance to another song.
 
   void _cancelResumeProgressTimer() {
     _resumeProgressTimer?.cancel();
@@ -251,88 +228,183 @@ class PlaybackCoordinator extends ChangeNotifier {
     required int generation,
     required int intent,
     required int navigation,
+    bool afterRecovery = false,
   }) {
     _cancelResumeProgressTimer();
-    // Remote streaming may legitimately take longer to buffer. Leave proxy
-    // stalls to the existing 45-second watchdog.
+    // Ordinary remote startup gets the regular 45-second watchdog. After a
+    // forced same-track reopen, both remote and cached media must be verified.
     if (!Platform.isAndroid ||
-        _openedWithProxy ||
+        (_openedWithProxy && !afterRecovery) ||
         _awaitingProgressIntent != intent)
       return;
-    _resumeProgressTimer = Timer(const Duration(seconds: 12), () {
-      _resumeProgressTimer = null;
-      unawaited(_reopenUnconfirmedResume(ref, generation, intent, navigation));
-    });
+    _resumeProgressTimer = Timer(
+      _openedWithProxy
+          ? const Duration(seconds: 30)
+          : const Duration(seconds: 12),
+      () {
+        _resumeProgressTimer = null;
+        unawaited(
+          _reopenUnconfirmedResume(ref, generation, intent, navigation),
+        );
+      },
+    );
   }
 
+  /// The *only* stalled-output recovery executor. Both watchdog and resume
+  /// verification enter here. It never skips a song and is fenced by current
+  /// track, load, play intent and navigation epochs.
   Future<void> _reopenUnconfirmedResume(
     TrackRef? ref,
     int generation,
     int intent,
-    int navigation,
-  ) async {
-    bool allowed() => mayRecoverUnconfirmedResume(
-      stillCurrent:
-          _sameRecovery(ref, generation, intent) &&
-          _navigationEpoch == navigation &&
-          !_opening &&
-          !_finishingTrack &&
-          !_nativeEngineBroken,
+    int navigation, {
+    bool fromWatchdog = false,
+  }) async {
+    bool stillCurrent() =>
+        _sameRecovery(ref, generation, intent) &&
+        _navigationEpoch == navigation &&
+        !_opening &&
+        !_finishingTrack &&
+        !_nativeEngineBroken;
+    if (!mayRecoverUnconfirmedResume(
+      stillCurrent: stillCurrent(),
       playRequested: _playRequested,
       userPaused: _userPaused,
       focusLost: _focusWasLost,
       progressConfirmed: _awaitingProgressIntent != intent,
       recoveryRunning: _handlingFailure || _stalledRecoveryRunning,
-    );
-    if (!allowed()) {
+    )) {
       diagnostics?.record('playback', 'resume_recheck_cancelled');
       return;
     }
     _stalledRecoveryRunning = true;
     _handlingFailure = true;
+    _cancelResumeProgressTimer();
     diagnostics?.record(
       'playback',
-      'resume_progress_timeout',
-      details: {'stage': _openedFromCompleteCache ? 'cached' : 'local'},
+      'output_recovery_started',
+      details: {
+        'trigger': fromWatchdog ? 'watchdog' : 'resume_check',
+        'source': _openedWithProxy
+            ? 'proxy'
+            : (_openedFromCompleteCache ? 'cache' : 'local'),
+      },
     );
     try {
-      // A fresh open has also failed to make progress: stop explicitly.
-      // Never fall back to _failed(), which may retry and skip other tracks.
-      if (_resumeReopenTriedIntent == intent) {
-        diagnostics?.record('playback', 'resume_progress_failed');
-        error = '后台恢复播放失败，请手动重试';
+      // If a fresh same-track open has already failed for this intent, stop.
+      // Repeated timers must not retry forever or advance the queue.
+      final action = nextAudioRecoveryAction(
+        isAndroid: Platform.isAndroid,
+        sourceIsLocal: !_openedWithProxy,
+        audioOutputReloadTried:
+            _audioOutputReloadTriedIntent == intent &&
+            _audioOutputReloadTriedRef == ref,
+        sameTrackReopenTried:
+            _resumeReopenTriedIntent == intent && _resumeReopenTriedRef == ref,
+      );
+      if (action == AudioRecoveryAction.failClosed) {
+        diagnostics?.record('playback', 'output_recovery_exhausted');
+        error = '音频输出未恢复，请手动重试';
         await pause();
         notifyListeners();
         return;
       }
-      // Persist the exact position before _loadCurrent uses snapshot.positionMs.
-      await save();
-      if (!_sameRecovery(ref, generation, intent) ||
-          navigation != _navigationEpoch ||
-          _awaitingProgressIntent != intent) {
-        diagnostics?.record('playback', 'resume_recheck_cancelled');
-        return;
+
+      // First try rebuilding the mpv AO without changing the current song.
+      // This command is experimental, so failure/unsupported builds fall back
+      // to the proven same-track reopen. Only local/complete-cache sources
+      // qualify: a dead HTTP stream is not necessarily an AO failure.
+      if (action == AudioRecoveryAction.reloadAudioOutput) {
+        _audioOutputReloadTriedIntent = intent;
+        _audioOutputReloadTriedRef = ref;
+        bool accepted = false;
+        try {
+          accepted = await _runNativeCommand(
+            (native) async {
+              final platform = native.platform;
+              if (platform is! NativePlayer) {
+                throw UnsupportedError('mpv AO reload unavailable');
+              }
+              await platform.command(['ao-reload']);
+            },
+            generation: generation,
+            navigationEpoch: navigation,
+            allowed: stillCurrent,
+          );
+        } catch (e) {
+          diagnostics?.record(
+            'playback',
+            'audio_output_reload_unsupported',
+            details: {'type': e.runtimeType.toString()},
+          );
+        }
+        if (accepted && stillCurrent()) {
+          diagnostics?.record('playback', 'audio_output_reload_requested');
+          // Completion of ao-reload is not proof of PCM output. Only an
+          // advancing media position can cancel the next verification.
+          _verifyResumeProgress(
+            ref: ref,
+            generation: generation,
+            intent: intent,
+            navigation: navigation,
+            afterRecovery: true,
+          );
+          return;
+        }
+        if (!stillCurrent()) return;
       }
-      _cancelResumeProgressTimer();
-      _resumeReopenTriedIntent =
-          intent; // At most one proactive reload per play.
+
+      // Only an actual proxy source needs a proxy health check. Do not probe
+      // the proxy when a song is opened from a complete cache/local file.
+      if (_openedWithProxy) {
+        diagnostics?.record('playback', 'recovery_proxy_probe');
+        final healthy = await proxy.ping();
+        if (!stillCurrent()) return;
+        if (!healthy) {
+          try {
+            await proxy.restart();
+            diagnostics?.record('playback', 'recovery_proxy_restarted');
+          } catch (e) {
+            diagnostics?.record(
+              'playback',
+              'recovery_proxy_restart_failed',
+              details: {'type': e.runtimeType.toString()},
+            );
+          }
+        }
+      }
+
+      // One same-song open is the known fallback (switching songs proved this
+      // creates a fresh AudioTrack on Xiaomi). Preserve the current position;
+      // manual:true prevents source retry from automatically skipping tracks.
+      await save();
+      if (!stillCurrent() || _awaitingProgressIntent != intent) return;
+      _resumeReopenTriedIntent = intent;
+      _resumeReopenTriedRef = ref;
       diagnostics?.record('playback', 'resume_same_track_reopen');
-      // manual:true prevents an open failure from automatically skipping the
-      // song; manual retry remains available after a clear error.
       await _loadCurrent(autoplay: true, manual: true);
       if (_sameRecovery(ref, _loadGeneration, intent) &&
+          navigation == _navigationEpoch &&
           _awaitingProgressIntent == intent) {
         _verifyResumeProgress(
           ref: ref,
           generation: _loadGeneration,
           intent: intent,
           navigation: navigation,
+          afterRecovery: true,
         );
       }
-    } catch (_) {
-      diagnostics?.record('playback', 'resume_same_track_failed');
-      if (_sameRecovery(ref, _loadGeneration, intent)) {
-        error = '后台恢复播放失败，请手动重试';
+    } catch (e) {
+      diagnostics?.record(
+        'playback',
+        'output_recovery_failed',
+        details: {'type': e.runtimeType.toString()},
+      );
+      if (currentRef == ref &&
+          _playIntentGeneration == intent &&
+          _playRequested &&
+          !_userPaused) {
+        error = '音频输出恢复失败，请手动重试';
         await pause();
         notifyListeners();
       }
@@ -340,6 +412,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       _handlingFailure = false;
       _stalledRecoveryRunning = false;
       _progressWatch.reset();
+      _publish();
     }
   }
 
@@ -1079,7 +1152,13 @@ class PlaybackCoordinator extends ChangeNotifier {
         androidNotificationChannelId: 'music.sylphy.playback',
         androidNotificationChannelName: 'Sylphy Music',
         androidNotificationIcon: 'drawable/ic_stat_sylphy',
-        androidNotificationOngoing: true,
+        // A long manual pause is not an active media foreground session.
+        // Transient focus continuity is carried by the projected playing flag.
+        androidNotificationOngoing: false,
+        androidStopForegroundOnPause: true,
+        // Avoid sending large artwork bitmaps across the MediaSession binder.
+        artDownscaleWidth: 256,
+        artDownscaleHeight: 256,
       ),
     );
     diagnostics?.record('android', 'media_service_ready');
@@ -1146,7 +1225,9 @@ class PlaybackCoordinator extends ChangeNotifier {
     try {
       final file = await store.load(track);
       if (request != _notificationArtworkRequest) return;
-      final uri = file != null && await file.exists() ? file.uri : null;
+      final uri = file != null && await file.exists()
+          ? await _mediaSessionArtUri(file, track)
+          : null;
       if (request != _notificationArtworkRequest) return;
       if (_notificationArtUri != uri) {
         _notificationArtUri = uri;
@@ -1155,6 +1236,31 @@ class PlaybackCoordinator extends ChangeNotifier {
     } catch (_) {
       // Missing/unavailable artwork must never interrupt audio playback.
     }
+  }
+
+  /// SystemUI and Android Auto read the art URI in their own process. Copy
+  /// only this already-cached cover to a narrowly scoped FileProvider cache.
+  /// Never expose source credentials or an arbitrary library directory.
+  Future<Uri> _mediaSessionArtUri(File source, Track track) async {
+    if (!Platform.isAndroid) return source.uri;
+    final cacheDirectory = Directory(
+      p.join((await getTemporaryDirectory()).path, 'media_session_covers'),
+    );
+    await cacheDirectory.create(recursive: true);
+    final name =
+        '${sha256.convert(utf8.encode('${track.ref.key}/${track.artworkVersion}'))}.image';
+    final target = File(p.join(cacheDirectory.path, name));
+    final original = await source.stat();
+    if (!await target.exists() ||
+        (await target.stat()).modified.isBefore(original.modified) ||
+        (await target.stat()).size != original.size) {
+      await source.copy(target.path);
+    }
+    return Uri(
+      scheme: 'content',
+      host: '${(await PackageInfo.fromPlatform()).packageName}.mediaartwork',
+      pathSegments: ['media_artwork', name],
+    );
   }
 
   void _detachNotificationArtwork() {
@@ -2296,13 +2402,19 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (h == null) return;
     final clockRunning = _notificationClockRunning;
     _lastPublishedNotificationClockRunning = clockRunning;
-    // Intent keeps the foreground service eligible; the processing phase and
-    // actual, confirmed media progress determine Android's playback state.
-    final processing = t == null
-        ? AudioProcessingState.idle
-        : _playRequested && !clockRunning
-        ? AudioProcessingState.buffering
-        : AudioProcessingState.ready;
+    // One deterministic projection owns the Android MediaSession contract.
+    // It does not make a playback decision or manipulate the native player.
+    final view = MediaSessionProjection.fromRuntime(
+      hasTrack: t != null,
+      playWhenReady: _playRequested,
+      transientFocusHold: _focusRecovery.foregroundHeld,
+      progressAdvancing: clockRunning,
+      opening: _opening || _seekPending || _finishingTrack,
+      buffering: buffering,
+      recoveryInProgress: _handlingFailure || _stalledRecoveryRunning,
+      terminalError: error != null,
+      playbackSpeed: speed,
+    );
     _syncNotificationArtwork(t);
     if (t == null) {
       if (_lastMediaItem != null) {
@@ -2323,32 +2435,43 @@ class PlaybackCoordinator extends ChangeNotifier {
         h.mediaItem.add(mediaItemForTrack(t, artUri: _notificationArtUri));
       }
     }
-    final rate = clockRunning ? speed : 0.0;
-    final sessionPlaying = _playRequested || _focusRecovery.foregroundHeld;
     if (!_sessionPublishGate.shouldPublish(
       mediaId: t?.ref.key,
-      phase: processing.name,
-      playRequested: sessionPlaying,
+      phase: view.phase.name,
+      playRequested: view.sessionPlaying,
       position: position,
-      rate: rate,
+      rate: view.progressRate,
       force: force,
     )) {
       return;
     }
     h.playbackState.add(
       PlaybackState(
-        controls: [
-          MediaControl.skipToPrevious,
-          sessionPlaying ? MediaControl.pause : MediaControl.play,
-          MediaControl.skipToNext,
-        ],
-        systemActions: const {MediaAction.seek},
-        processingState: processing,
-        // Keep FGS for an eligible short focus interruption while the real
-        // audio position remains frozen (speed=0). Manual pauses release it.
-        playing: sessionPlaying,
+        controls: t == null
+            ? const <MediaControl>[]
+            : [
+                MediaControl.skipToPrevious,
+                view.showPause ? MediaControl.pause : MediaControl.play,
+                MediaControl.skipToNext,
+              ],
+        androidCompactActionIndices: t == null
+            ? const <int>[]
+            : const <int>[0, 1, 2],
+        systemActions: t == null
+            ? const <MediaAction>{}
+            : const {
+                MediaAction.seek,
+                MediaAction.skipToPrevious,
+                MediaAction.skipToNext,
+              },
+        processingState: view.processingState,
+        // The raw exception may contain a remote URL or access token.
+        errorMessage: view.phase == MediaSessionPhase.failed
+            ? '播放失败，请重试'
+            : null,
+        playing: view.sessionPlaying,
         updatePosition: position,
-        speed: rate,
+        speed: view.progressRate,
       ),
     );
   }

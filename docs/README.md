@@ -16,6 +16,8 @@
 | [TEST_PLAN](TEST_PLAN.md) | 完整真实环境验收清单 |
 | [RELEASE_GATES](RELEASE_GATES.md) | 独立验收待办，不属于发布流程 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |
+| [播放生命周期整合](INTEGRATED_PLAYBACK_LIFECYCLE.md) | 统一停滞恢复、实验性 AO 重载、前台系统观测与通知封面共享 |
+| [媒体会话状态投影重构](MEDIA_SESSION_PROJECTION_REDESIGN_2026-11-09.md) | 暂停、焦点保持、缓冲、恢复及错误的统一媒体会话映射 |
 | [播放与音频焦点重构](PLAYBACK_ARCHITECTURE_FOCUS_REFACTOR.md) | 临时失焦恢复资格、5 分钟前台保留及焦点申请边界 |
 | [Android 后台恢复 V3](ANDROID_BACKGROUND_RESUME_V3.md) | 完整缓存恢复、实际进度检查、同曲有界重开与前台状态重申 |
 | [Android 后台恢复 V2](ANDROID_BACKGROUND_RESUME_V2.md) | 媒体回调临时前台服务提升、拒绝重试与恢复进度诊断 |

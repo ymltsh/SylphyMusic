@@ -1,12 +1,12 @@
 # Android 媒体通知：单一媒体会话与稳定时钟
 
-适用：主分支 `3ad7d3db1197db418d5b29bbf19d05758b988a24`，不改变 libmpv 播放/代理/缓存/队列。
+适用：当前普通版与 OpenList 工作区；时钟设计沿用原实现，状态映射已由 [MediaSessionProjection](MEDIA_SESSION_PROJECTION_REDESIGN_2026-11-09.md) 统一管理，不改变 libmpv 播放 / 代理 / 缓存 / 队列。
 
 ## 原则
 
 - 只有一个 Android MediaSession。锁屏通知、媒体中心、耳机和蓝牙控制均以该会话为权威。
 - **播放意图**决定是否需要保留 Android 前台服务与暂停命令；**原生播放器实际推进**决定系统进度时钟是否走时；**缓冲阶段**必须如实向系统报告，不能为了保活伪装成 `STATE_PLAYING`。
-- 音频尚未产生连续的真实位置样本时，向系统发送 `BUFFERING` + `speed=0`，绝不能通过墙上时钟制造“已经播放”的进度。
+- 有播放意图且尚未确认真实进度时，向系统发送 `BUFFERING` + `speed=0`；手动暂停发布 ready / playing=false，临时失焦保留发布 ready / playing=true / speed=0，最终错误且意图取消发布 error / playing=false。不得通过墙上时钟制造进度。
 - 真实开始播放后，发布一次带真实播放位置和倍速的锚点。系统根据位置与时间基准推算，不依赖高频 Dart 位置消息。
 - 正常位置回调只更新 Flutter UI 和进度证据。仅在状态改变、速度改变、Seek、位置明显偏离或每 20 秒定期校准时发布新的 MediaSession 状态。
 - Android 原生通知的重新构建以语义变化（BUFFERING→PLAYING、时钟启停、Seek、大幅跳变、元数据改变）为条件，绝不每隔 1 秒 `notify()`。
@@ -22,7 +22,9 @@
 
 ## 原生生命周期
 
-`AudioService.java` 中 `playing` 继续表达用户的播放意图，控制前台服务启动/停止（`enterPlayingState` / `exitPlayingState`），但 `getPlaybackState()` 将缓冲映射回 Android 的 `STATE_BUFFERING`。即使播放意图为 true，也不会把尚未开始解码的媒体伪装成 `STATE_PLAYING`。
+当前 [播放生命周期整合](INTEGRATED_PLAYBACK_LIFECYCLE.md) 区分前台请求提交与 OS 服务状态观测，`getRunningServices` 仅尽力观察本应用服务，不作为系统授权保证。封面从私有 file URI 改为只读 FileProvider content URI，仅公开 `cacheDir/media_session_covers/` 的指定封面；authority 使用当前 applicationId，普通版与 OpenList 可并存。输出恢复由统一执行器负责，通知状态本身不代表 AudioTrack 已恢复。
+
+`AudioService.java` 中 `playing` 表达投影后的服务连续性意图（播放请求或有界临时焦点保持），控制前台服务启动 / 停止（`enterPlayingState` / `exitPlayingState`）；临时焦点保持虽为 ready / playing=true，但速度为 0。缓冲阶段由 `getPlaybackState()` 映射为 `STATE_BUFFERING`，暂停则不再被残留原生缓冲状态覆盖。通知配置明确暂停后退出前台，允许撤销通知，并将封面降采样至 256×256；空队列不显示控制动作。
 
 Android 10 使用标准 MediaStyle 替代专用白色按钮 RemoteViews，因而该版本的按钮着色可能不同，但优先保证通知行为统一与系统状态同步。没有创建第二个 MediaSession、没有更换 libmpv。
 

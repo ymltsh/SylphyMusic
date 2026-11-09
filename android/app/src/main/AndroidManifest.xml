@@ -136,6 +136,12 @@
             android:value="2" />
         <service android:name=".CacheForegroundService" android:foregroundServiceType="dataSync" android:exported="false" />
         <service android:name=".SyncForegroundService" android:foregroundServiceType="dataSync" android:exported="false" android:stopWithTask="false" />
+        <provider android:name="com.ymltsh.sylphymusic.MediaArtworkFileProvider"
+            android:authorities="${applicationId}.mediaartwork"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/media_artwork_paths" />
+        </provider>
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback" android:exported="true">
             <intent-filter><action android:name="android.media.browse.MediaBrowserService" /></intent-filter>

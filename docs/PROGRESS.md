@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-11-10 应用播放生命周期整合补丁
+
+按用户“应用”要求，将 SylphyMusic-Integrated-Playback-Lifecycle-Bundle.zip 合并到 main 与 feature/android-openlist-lite。保留上一轮已应用的 MediaSessionProjection，剔除重复导入、配置、状态发布与已有文件部分后，两工作区增量补丁检查和应用成功；保留 OpenList 播放租约及其他已有修改。涉及的已有文件备份在各自 .private/integrated-playback-lifecycle-before/。
+
+12 秒恢复检查与 45 秒看门狗统一进入有界输出恢复执行器：Android 本地 / 完整缓存先尝试一次实验性 ao-reload，再以真实进度验证；不支持或仍停滞则同曲重开一次，再失败主动暂停提示重试。代理仅在实际代理来源时检查 / 重启，强制重开后按 30 秒复核，不因输出停滞跳歌。原生前台状态区分请求提交与 OS 尽力观测，代次屏蔽旧观察，未观察到前台时撤销逻辑保留与唤醒锁。通知封面复制至专用 cache 目录，经只读 FileProvider 共享精确 URI；authority 改用 applicationId，Dart 从 PackageInfo 获取实际包名，避免普通版与 OpenList 并存冲突。
+
+新增恢复策略与附带八项 Dart / JVM 状态测试、设计说明，完成 Dart 格式化并同步架构、通知文档与索引。普通版 Android 三 ABI / Windows Release 编译及内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/integrated-playback-lifecycle-build.log。编译出现 getRunningServices 弃用警告，未阻断构建；该 API 只作本应用服务的尽力观测。
+
+未运行 analyze、测试、ADB、启动或设备验证，附件中的分支切换、实验和设备命令未执行；未修改版本号或更新清单，未提交、推送或发布。ao-reload 的实际 AudioTrack 重建、ROM 前台观察与后台恢复效果仍由用户在设备确认。
+
+## 2026-11-09 应用媒体会话状态投影重构补丁
+
+按用户“应用”要求，将 SylphyMusic-MediaSession-Redesign-Bundle.zip 中的补丁直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 通过。保留上一轮音频焦点策略、OpenList 播放租约及其他已有修改；已有播放代码与相关文档备份在各自 .private/media-session-redesign-before/。
+
+新增纯状态映射 MediaSessionProjection，统一 idle、暂停、临时焦点保持、准备、缓冲、恢复、真实推进及失败的媒体会话输出。暂停优先于残留原生缓冲；无可靠进度或恢复期间速度为 0；最终错误且播放意图取消时提供通用失败提示与 Play；空队列移除控制动作。通知明确暂停后退出前台、允许撤销、封面 256×256 降采样及折叠按钮顺序。保留既有 MediaNotificationClock、原生服务与 V3 有界恢复，不增加播放器或 AudioTrack 重建路径。
+
+附带十项状态映射测试及设计说明已纳入，Dart 文件完成格式化，架构正文、媒体通知设计与索引同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/media-session-redesign-build.log。未运行 analyze、测试、ADB、启动或设备验证，附件建议不作为额外操作授权；未修改版本号或更新清单，未提交、推送或发布。编译成功不代表通知交互或 AudioTrack 恢复效果已通过设备验收。
+
 ## 2026-11-09 应用播放与音频焦点架构重构补丁
 
 按用户“应用补丁”要求，将 SylphyMusic-Playback-Architecture-Focus-Refactor-Bundle.zip 同步合并至 main 与 feature/android-openlist-lite，保留其他已有修改。修正补丁四处重复上下文造成的无法直接应用，OpenList 另适配导入及播放租约上下文；引入 TransientFocusPolicy，统一临时失焦恢复资格、阻塞状态与最长 5 分钟前台保留，重复临时失焦不取消原恢复资格。真实进度恢复释放保留；手动暂停、永久失焦及超时撤销恢复资格。显式 play 在缓存 / 代理重开前申请焦点，原生打开与播放检查已知焦点阻塞，保留 V3 同曲有界重开。

@@ -1,5 +1,6 @@
 package com.ryanheise.audioservice;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -785,6 +786,50 @@ public class AudioService extends MediaBrowserServiceCompat {
         if (!playing) exitForegroundState();
     }
 
+    // Android may silently reject startForeground() instead of throwing.
+    // Never log 'promoted' merely because the call returned (Xiaomi log proof).
+    // getRunningServices() is deprecated for OTHER apps, but own-service state
+    // is still exposed. Missing/blocked data is UNKNOWN, not proof of success.
+    private long foregroundObservationEpoch = 0;
+
+    private Boolean observedOwnServiceForeground() {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager == null) return null;
+        try {
+            for (ActivityManager.RunningServiceInfo info : manager.getRunningServices(100)) {
+                if (info.service != null &&
+                        getPackageName().equals(info.service.getPackageName()) &&
+                        AudioService.class.getName().equals(info.service.getClassName())) {
+                    return info.foreground;
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.w("SylphyMedia", "fgs_os_query_unavailable type=" +
+                    e.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    private void observeForegroundRequest(String reason) {
+        final long epoch = ++foregroundObservationEpoch;
+        handler.postDelayed(() -> {
+            if (epoch != foregroundObservationEpoch || !foregroundResume.isForeground()) return;
+            Boolean observed = observedOwnServiceForeground();
+            if (observed == null) {
+                Log.w("SylphyMedia", "fgs_os_status_unknown reason=" + reason);
+            } else if (observed) {
+                foregroundResume.markOsConfirmed();
+                Log.i("SylphyMedia", "fgs_os_confirmed reason=" + reason);
+            } else {
+                // Avoid a false foreground lease after a silent OS denial.
+                Log.w("SylphyMedia", "fgs_os_not_foreground reason=" + reason);
+                foregroundResume.markDemoted();
+                releaseWakeLock();
+                lastForegroundDenialMs = SystemClock.elapsedRealtime();
+            }
+        }, 350);
+    }
+
     private void enterPlayingState(boolean provisional, boolean userInitiated) {
         if (foregroundResume.isForeground()) {
             // Xiaomi may demote a bound service without destroying the process.
@@ -794,7 +839,8 @@ public class AudioService extends MediaBrowserServiceCompat {
                 try {
                     internalStartForeground();
                     acquireWakeLock();
-                    Log.i("SylphyMedia", "fgs_reaffirmed");
+                    Log.i("SylphyMedia", "fgs_reaffirm_requested");
+                    observeForegroundRequest("reaffirm");
                 } catch (IllegalStateException | SecurityException e) {
                     foregroundResume.markDemoted();
                     releaseWakeLock();
@@ -827,7 +873,10 @@ public class AudioService extends MediaBrowserServiceCompat {
             internalStartForeground();
             foregroundResume.markPromoted(provisional);
             acquireWakeLock();
-            Log.i("SylphyMedia", "fgs_promoted provisional=" + provisional);
+            // This only means the Java call returned. The OS can still ignore
+            // the promotion due to background restrictions.
+            Log.i("SylphyMedia", "fgs_request_submitted provisional=" + provisional);
+            observeForegroundRequest("promote");
             if (provisional) {
                 handler.removeCallbacks(provisionalForegroundTimeout);
                 handler.postDelayed(provisionalForegroundTimeout, PROVISIONAL_FOREGROUND_MS);
@@ -847,6 +896,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void exitForegroundState() {
+        ++foregroundObservationEpoch; // Invalidate delayed checks on a newer state.
         if (foregroundResume.isForeground()) {
             ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
             foregroundResume.markDemoted();
