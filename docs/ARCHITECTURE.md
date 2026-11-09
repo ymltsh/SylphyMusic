@@ -91,7 +91,9 @@ Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒�
 
 Android 媒体播放回调在等待 Dart / 数据库前尝试有界的临时前台服务提升，20 秒内未确认播放则撤回。ForegroundResumeState 独立记录服务已启动、前台与临时状态，不将 Dart 播放意图当作原生提升成功；已启动的服务恢复时不重复发送启动请求。系统拒绝仅记录异常类型，普通状态更新按 3 秒冷却重试，用户播放请求可立即再次尝试；不持有永久唤醒锁。播放层同时保留 V1 的票据临期刷新与命令入队超时保护，新增 V2 的代理打开标记和恢复进度诊断。详见 [Android 后台恢复 V2](ANDROID_BACKGROUND_RESUME_V2.md)。
 
-可选桌面歌词由 `DesktopLyrics` 监听既有播放与外观状态，复用应用歌词加载入口，通过 `music.sylphy/desktop_lyrics` 通道更新平台窗口，不创建第二个播放器。Android 的 `DesktopLyricsOverlay` 仍由 Application 持有，用户授权悬浮窗后才显示；Windows Runner 的 `DesktopLyricsWindow` 使用独立无所有者的置顶分层窗口，以 GDI+ 绘制透明圆角歌词面板，不抢焦点、不进入任务栏，主窗口最小化或隐藏到托盘时仍可显示。Windows 窗口支持拖动、右侧 × 关闭、DPI 与显示器工作区适配；位置存于 HKCU/Software/SylphyMusic/DesktopLyrics，关闭窗口回调同步持久化开关。颜色与字号复用 Appearance。退出时先移除监听、等待通道操作并隐藏浮窗，再关闭播放、歌词存储和数据库；Windows Runner 在释放 Flutter 引擎前销毁歌词窗口与绘图资源。
+Android 后台恢复 V3 为完整缓存增加长暂停重开，并对本地 / 完整缓存的显式恢复播放执行 12 秒实际进度检查：同曲目、加载 / 导航代次、播放意图与焦点仍有效时，最多重开同一首歌一次，仍无进度则暂停并提示手动重试，不跳曲。进度确认、暂停、跳转、新加载与关闭均取消检查；代理流仍沿用 45 秒看门狗，本地与缓存停滞不再探测或重启 HTTP 代理。新的原生媒体播放手势会重新申明前台状态，系统拒绝时清除过时状态并释放唤醒锁。详见 [Android 后台恢复 V3](ANDROID_BACKGROUND_RESUME_V3.md)。
+
+可选桌面歌词由 `DesktopLyrics` 监听既有播放与外观状态，复用应用歌词加载入口，通过 `music.sylphy/desktop_lyrics` 通道更新平台窗口，不创建第二个播放器。Android 的 `DesktopLyricsOverlay` 仍由 Application 持有，用户授权悬浮窗后才显示；Windows Runner 的 `DesktopLyricsWindow` 使用独立无所有者的置顶分层窗口，以 GDI+ 绘制透明圆角歌词面板，不抢焦点、不进入任务栏，主窗口最小化或隐藏到托盘时仍可显示。Windows 窗口背景与关闭按钮在无操作 2.5 秒后用 350 毫秒淡出，仅保留歌词，鼠标移动或拖动恢复操作区；歌词变化不重置计时，隐藏和销毁时停止计时器。Windows 窗口支持拖动、右侧 × 关闭、DPI 与显示器工作区适配；位置存于 HKCU/Software/SylphyMusic/DesktopLyrics，关闭窗口回调同步持久化开关。颜色与字号复用 Appearance。退出时先移除监听、等待通道操作并隐藏浮窗，再关闭播放、歌词存储和数据库；Windows Runner 在释放 Flutter 引擎前销毁歌词窗口与绘图资源。
 
 Android 媒体通知区分播放意图、缓冲阶段和真实进度时钟：`MediaNotificationClock` 用单调时间与连续原生位置样本确认推进，加载、切歌、暂停、Seek 和进入缓冲时清除旧证据；已确认播放允许短暂稀疏回调，停止推进后冻结。`MediaSessionPublishGate` 仅在状态 / 倍速 / 歌曲变化、Seek、明显偏差或 20 秒校准时发布锚点。原生缓冲如实映射为 `STATE_BUFFERING`，前台服务继续由独立播放意图维持；标准 MediaStyle 按状态变化刷新通知，不再使用 Android 10 自定义白色按钮 RemoteViews。每秒定时器只检查时钟启停，退出时取消；详见 [媒体通知设计](MEDIA_NOTIFICATION_DESIGN.md)。
 

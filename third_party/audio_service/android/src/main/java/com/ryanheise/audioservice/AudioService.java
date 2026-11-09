@@ -787,6 +787,23 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     private void enterPlayingState(boolean provisional, boolean userInitiated) {
         if (foregroundResume.isForeground()) {
+            // Xiaomi may demote a bound service without destroying the process.
+            // On an explicit media gesture, reassert the actual FGS rather than
+            // trusting only the bookkeeping from an earlier promotion.
+            if (userInitiated) {
+                try {
+                    internalStartForeground();
+                    acquireWakeLock();
+                    Log.i("SylphyMedia", "fgs_reaffirmed");
+                } catch (IllegalStateException | SecurityException e) {
+                    foregroundResume.markDemoted();
+                    releaseWakeLock();
+                    lastForegroundDenialMs = SystemClock.elapsedRealtime();
+                    Log.w("SylphyMedia", "fgs_reaffirm_denied type="
+                            + e.getClass().getSimpleName());
+                    return;
+                }
+            }
             if (provisional) {
                 foregroundResume.markProvisional();
                 handler.removeCallbacks(provisionalForegroundTimeout);

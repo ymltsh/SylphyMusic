@@ -20,6 +20,7 @@ class DesktopLyricsWindow {
                                      LPARAM lparam);
   bool EnsureWindow();
   bool Render();
+  void ShowControls(bool redraw = true);
   void Hide();
   void Dismiss();
   void SavePosition();
@@ -32,6 +33,11 @@ class DesktopLyricsWindow {
   std::wstring text_;
   DWORD color_ = 0xffe9f0ef;
   double font_size_ = 20;
+  float controls_opacity_ = 1.0f;
+  ULONGLONG fade_started_ = 0;
+  bool tracking_mouse_ = false;
+  bool has_mouse_point_ = false;
+  POINT last_mouse_point_{};
   bool dragging_ = false;
   POINT drag_start_{};
   RECT drag_frame_{};

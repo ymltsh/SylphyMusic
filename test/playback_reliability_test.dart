@@ -124,6 +124,53 @@ void main() {
     );
   });
 
+  test('cached file reopens only after long pause', () {
+    final now = DateTime.utc(2026, 11, 8, 14);
+    bool reopen(bool cached, Duration? pause) => shouldReopenPausedCache(
+      usingCompleteCache: cached,
+      pausedAt: pause == null ? null : now.subtract(pause),
+      now: now,
+    );
+    expect(reopen(false, const Duration(hours: 1)), isFalse);
+    expect(reopen(true, null), isFalse);
+    expect(reopen(true, const Duration(minutes: 14)), isFalse);
+    expect(reopen(true, const Duration(minutes: 15)), isTrue);
+    expect(reopen(true, const Duration(hours: 3)), isTrue);
+    expect(
+      shouldReopenPausedCache(
+        usingCompleteCache: true,
+        pausedAt: now.add(const Duration(seconds: 1)),
+        now: now,
+      ),
+      isTrue,
+    );
+  });
+
+  test('unconfirmed resume never overrides a focus loss or newer command', () {
+    bool attempt({
+      bool current = true,
+      bool request = true,
+      bool paused = false,
+      bool focusLost = false,
+      bool progress = false,
+      bool busy = false,
+    }) => mayRecoverUnconfirmedResume(
+      stillCurrent: current,
+      playRequested: request,
+      userPaused: paused,
+      focusLost: focusLost,
+      progressConfirmed: progress,
+      recoveryRunning: busy,
+    );
+    expect(attempt(), isTrue);
+    expect(attempt(current: false), isFalse);
+    expect(attempt(request: false), isFalse);
+    expect(attempt(paused: true), isFalse);
+    expect(attempt(focusLost: true), isFalse);
+    expect(attempt(progress: true), isFalse);
+    expect(attempt(busy: true), isFalse);
+  });
+
   test('local 403 is recoverable but upstream 403 is terminal', () {
     expect(
       classifyPlaybackFailure('HTTP 403', 'local_ticket_expired'),

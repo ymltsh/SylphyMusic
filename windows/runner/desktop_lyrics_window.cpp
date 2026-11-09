@@ -8,6 +8,11 @@
 #include <cstdint>
 
 namespace {
+constexpr UINT_PTR kIdleTimer = 1;
+constexpr UINT_PTR kFadeTimer = 2;
+constexpr UINT kControlsIdleMs = 2500;
+constexpr ULONGLONG kControlsFadeMs = 350;
+
 constexpr wchar_t kWindowClass[] = L"SylphyMusicDesktopLyrics";
 constexpr wchar_t kSettingsKey[] = L"Software\\SylphyMusic\\DesktopLyrics";
 
@@ -78,9 +83,14 @@ DesktopLyricsWindow::DesktopLyricsWindow(
         text_.resize(4096);
         if (text_.back() >= 0xd800 && text_.back() <= 0xdbff) text_.pop_back();
       }
+      const bool reveal_controls = !window_ || !IsWindowVisible(window_) ||
+                                   color_ != static_cast<DWORD>(*argb) ||
+                                   font_size_ != *font;
       color_ = static_cast<DWORD>(*argb);
       font_size_ = *font;
-      if (EnsureWindow() && Render()) {
+      const bool ready = EnsureWindow();
+      if (ready && reveal_controls) ShowControls(false);
+      if (ready && Render()) {
         ShowWindow(window_, SW_SHOWNOACTIVATE);
         result->Success();
       } else {
@@ -96,6 +106,8 @@ DesktopLyricsWindow::DesktopLyricsWindow(
 DesktopLyricsWindow::~DesktopLyricsWindow() {
   channel_->SetMethodCallHandler(nullptr);
   if (window_) {
+    KillTimer(window_, kIdleTimer);
+    KillTimer(window_, kFadeTimer);
     SavePosition();
     DestroyWindow(window_);
   }
@@ -188,7 +200,8 @@ bool DesktopLyricsWindow::Render() {
     const bool light_text = foreground.GetR() * 299 + foreground.GetG() * 587 +
                                 foreground.GetB() * 114 >= 128000;
     const BYTE background = light_text ? 18 : 245;
-    Gdiplus::SolidBrush panel(Gdiplus::Color(190, background, background, background));
+    Gdiplus::SolidBrush panel(Gdiplus::Color(static_cast<BYTE>(190 * controls_opacity_),
+                                            background, background, background));
     const float w = static_cast<float>(width);
     const float h = static_cast<float>(height);
     const float radius = std::min(16 * scale, std::min(w, h) / 2);
@@ -215,7 +228,9 @@ bool DesktopLyricsWindow::Render() {
                               std::max(1.0f, h - 16 * scale));
     const auto status = graphics.DrawString(text_.c_str(), -1, &font, area,
                                              &format, &ink);
-    Gdiplus::Pen close_pen(Gdiplus::Color(230, light_text ? 235 : 30,
+    Gdiplus::Pen close_pen(Gdiplus::Color(
+                                         static_cast<BYTE>(230 * controls_opacity_),
+                                         light_text ? 235 : 30,
                                          light_text ? 235 : 30,
                                          light_text ? 235 : 30), 2 * scale);
     const float x = w - 26 * scale;
@@ -241,6 +256,16 @@ bool DesktopLyricsWindow::Render() {
   return painted;
 }
 
+void DesktopLyricsWindow::ShowControls(bool redraw) {
+  if (!window_) return;
+  KillTimer(window_, kFadeTimer);
+  fade_started_ = 0;
+  const bool changed = controls_opacity_ < 1.0f;
+  controls_opacity_ = 1.0f;
+  SetTimer(window_, kIdleTimer, kControlsIdleMs, nullptr);
+  if (changed && redraw) Render();
+}
+
 void DesktopLyricsWindow::SavePosition() {
   RECT frame{};
   if (window_ && GetWindowRect(window_, &frame)) {
@@ -251,8 +276,16 @@ void DesktopLyricsWindow::SavePosition() {
 
 void DesktopLyricsWindow::Hide() {
   if (!window_) return;
-  if (GetCapture() == window_) ReleaseCapture();
+  KillTimer(window_, kIdleTimer);
+  KillTimer(window_, kFadeTimer);
+  fade_started_ = 0;
+  controls_opacity_ = 1.0f;
+  tracking_mouse_ = false;
+  has_mouse_point_ = false;
+  TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT), TME_CANCEL | TME_LEAVE, window_, 0};
+  TrackMouseEvent(&tracking);
   dragging_ = false;
+  if (GetCapture() == window_) ReleaseCapture();
   SavePosition();
   ShowWindow(window_, SW_HIDE);
 }
@@ -265,7 +298,7 @@ void DesktopLyricsWindow::Dismiss() {
 bool DesktopLyricsWindow::InCloseButton(int x) const {
   RECT client{};
   GetClientRect(window_, &client);
-  return x >= client.right - static_cast<int>(48 * Scale(window_));
+  return controls_opacity_ > 0.0f && x >= client.right - static_cast<int>(48 * Scale(window_));
 }
 
 LRESULT CALLBACK DesktopLyricsWindow::WindowProc(HWND window, UINT message,
@@ -286,13 +319,28 @@ LRESULT CALLBACK DesktopLyricsWindow::WindowProc(HWND window, UINT message,
       if (self->InCloseButton(GET_X_LPARAM(lparam))) {
         self->Dismiss();
       } else {
+        self->ShowControls();
         self->dragging_ = true;
         GetCursorPos(&self->drag_start_);
         GetWindowRect(window, &self->drag_frame_);
         SetCapture(window);
       }
       return 0;
-    case WM_MOUSEMOVE:
+    case WM_MOUSEMOVE: {
+      POINT mouse{};
+      GetCursorPos(&mouse);
+      // Repaints can produce mouse messages without actual pointer movement.
+      // They must not repeatedly restart the idle countdown during a fade.
+      if (!self->has_mouse_point_ || mouse.x != self->last_mouse_point_.x ||
+          mouse.y != self->last_mouse_point_.y) {
+        self->ShowControls();
+      }
+      self->last_mouse_point_ = mouse;
+      self->has_mouse_point_ = true;
+      if (!self->tracking_mouse_) {
+        TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT), TME_LEAVE, window, 0};
+        self->tracking_mouse_ = TrackMouseEvent(&tracking) != FALSE;
+      }
       if (self->dragging_ && GetCapture() == window) {
         POINT point{};
         GetCursorPos(&point);
@@ -302,15 +350,45 @@ LRESULT CALLBACK DesktopLyricsWindow::WindowProc(HWND window, UINT message,
                       0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
       }
       return 0;
+    }
+    case WM_MOUSELEAVE:
+      self->tracking_mouse_ = false;
+      return 0;
+    case WM_TIMER:
+      if (wparam == kIdleTimer) {
+        KillTimer(window, kIdleTimer);
+        if (self->dragging_) {
+          self->ShowControls();
+        } else if (IsWindowVisible(window)) {
+          self->fade_started_ = GetTickCount64();
+          SetTimer(window, kFadeTimer, 16, nullptr);
+        }
+        return 0;
+      }
+      if (wparam == kFadeTimer) {
+        if (!self->fade_started_) return 0;
+        const auto elapsed = GetTickCount64() - self->fade_started_;
+        self->controls_opacity_ = 1.0f -
+            std::min(1.0f, static_cast<float>(elapsed) / kControlsFadeMs);
+        if (elapsed >= kControlsFadeMs) {
+          KillTimer(window, kFadeTimer);
+          self->fade_started_ = 0;
+        }
+        self->Render();
+        return 0;
+      }
+      break;
     case WM_LBUTTONUP:
       if (self->dragging_) {
         self->dragging_ = false;
+        self->ShowControls();
         ReleaseCapture();
         self->Render();
         self->SavePosition();
       }
       return 0;
     case WM_CAPTURECHANGED:
+      if (self->dragging_) self->ShowControls();
       self->dragging_ = false;
       return 0;
     case WM_SETCURSOR: {

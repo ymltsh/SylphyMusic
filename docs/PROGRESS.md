@@ -1,5 +1,43 @@
 # 实施与验证记录
 
+## 2026-11-09 发布 1.0.36+49 / 1.0.36-openlist.19+49
+
+按用户“推送版本更新”要求发布两通道，包含后台恢复 V3：完整缓存长暂停后重开、Android 本地 / 缓存实际进度检查及同曲一次主动重开、音频焦点与新操作取消保护、原生前台状态重申和恢复诊断。发布标题、正文与清单说明面向用户。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+普通版 release.py 与特别版发布入口均输出 Release succeeded，退出码 0；普通版六个附件、特别版三个附件的大小 / SHA-256、Release 状态 / 标题 / 正文，以及四份清单原始 / 加速入口全部匹配。特别版状态 build/releases/1.0.36-openlist.19-49/publish-state.json 为 complete。只提交推送清单：main/version.json 为 6915104，main/version-openlist.json 为 ca54ad3，特性分支 version.json / version-openlist.json 为 f8b13ce。源码、版本配置与其他已有修改保留本地。
+
+普通版产物 build/releases/1.0.36-49/，日志 build/test_logs/release-1.0.36.log；特别版产物 build/releases/1.0.36-openlist.19-49/，日志 build/test_logs/openlist-release-49-*.log。未运行 analyze、测试、启动或设备验收；发布成功不代表设备后台恢复效果已通过功能验证。
+
+## 2026-11-09 应用 Android 后台恢复 V3 补丁
+
+按用户要求，将 SylphyMusic-Android-Background-Resume-V3.patch 直接应用到 main 与 feature/android-openlist-lite，保留其他已有修改，Dart 文件完成格式化。补丁涉及的已有文件备份在各自 .private/android-background-resume-v3-before/；同步补丁附带测试与说明文档、架构正文及文档索引。
+
+完整缓存曲目长暂停后重新打开并保留保存位置；Android 本地 / 完整缓存的显式恢复播放增加 12 秒实际进度检查，同一播放意图最多重开同一首歌一次，再次无进度则暂停提示手动重试，不自动跳曲。进度、暂停、跳转、新加载与关闭会取消检查，并重新核对曲目、加载 / 导航代次、播放意图和音频焦点；代理流继续使用原 45 秒看门狗，本地 / 缓存恢复不再探测 HTTP 代理。原生媒体播放手势重新申明前台状态，被系统拒绝时清理过期标记并释放唤醒锁，增加不含 URL 或凭据的诊断。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/android-background-resume-v3-build.log。未运行补丁文档中的测试、ADB 操作，未运行 analyze、启动或设备验收；本轮未修改版本号或更新清单，未提交、推送或发布，实际后台恢复效果由用户在设备上确认。
+
+## 2026-11-07 发布 1.0.35+48 / 1.0.35-openlist.18+48
+
+按用户“发布版本更新”要求发布两通道，包含 Android 后台恢复 V2 与恢复诊断，普通版同时包含 Windows 桌面歌词操作区域静置自动淡出。发布标题、正文与清单说明面向用户，特别版未将 Windows 能力描述为 Android 更新。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。
+
+普通版 release.py 与特别版发布入口均输出 Release succeeded，退出码 0；普通版六个附件、特别版三个附件的大小 / SHA-256、Release 状态 / 标题 / 正文，以及四份清单原始 / 加速入口全部匹配。特别版状态 build/releases/1.0.35-openlist.18-48/publish-state.json 为 complete。只提交推送清单：main/version.json 为 98a8ee1，main/version-openlist.json 为 e7684ea，特性分支 version.json / version-openlist.json 为 c21d2dc。源码、版本配置与其他已有修改保留本地。
+
+普通版产物 build/releases/1.0.35-48/，日志 build/test_logs/release-1.0.35.log；特别版产物 build/releases/1.0.35-openlist.18-48/，日志 build/test_logs/openlist-release-48-*.log。未运行 analyze、测试、启动或设备验收；发布成功不代表后台恢复与 Windows 歌词淡出已通过功能验证。
+
+## 2026-11-07 Windows 桌面歌词操作区自动沉浸
+
+按用户要求，Windows 桌面歌词背景面板与右侧关闭按钮在显示或操作后静置约 2.5 秒，再用 350 毫秒淡出至全透明，仅保留歌词；鼠标移动到歌词上、拖动、调整颜色或字号时恢复操作区。歌词内容更新不重置计时，静止鼠标产生的重绘消息也不延长倒计时；拖动期间保持操作区，松开后重新计时。隐藏与销毁停止计时器，完全淡出后不保留动画刷新计时器，关闭按钮隐藏时不响应隐藏按钮点击。两工作区同步原生实现与说明，修改前文件保存在各自 .private/windows-lyrics-auto-immerse-before/。
+
+普通版 Windows Release 编译和内部打包成功，产物 build/internal-review/SylphyMusic-windows-release-internal.zip；日志 build/test_logs/windows-lyrics-auto-immerse-build.log 和 windows-lyrics-auto-immerse-package.log。仅改 Windows 原生代码，Android 包复用现有产物。未运行 analyze、测试、启动或设备验收，未修改版本号与清单，未提交、推送或发布；实际淡出和鼠标交互效果由用户确认。
+
+## 2026-11-07 应用 Android 后台恢复 V2 补丁
+
+按用户要求，将 SylphyMusic-Android-Background-Resume-V2.patch 合并到 main 与 feature/android-openlist-lite。原生 AudioService、ForegroundResumeState、附带 JVM / Dart 测试与说明文档直接应用；播放层与现有 V1 重叠处适配合并，复用暂停时间，保留票据临期刷新、原生命令入队超时保护、淡入期间新暂停保护和 OpenList 播放租约。修改前补丁涉及的已有文件保存在各自 .private/android-background-resume-v2-before/，其他已有修改保留。
+
+媒体播放原生回调在等待 Dart / 数据库前尝试临时前台服务提升，20 秒内未确认播放则撤回。区分服务已启动与前台提升状态，已启动实例恢复时不重复启动；系统限制异常仅记录类型并保留后续重试机会，普通状态更新按 3 秒冷却。新增代理打开标记、播放请求处理阶段及真实进度恢复诊断；文档同步说明 V1 / V2 共存方式。未按补丁说明执行 JVM、Flutter 或 ADB 验证建议。
+
+普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/android-background-resume-v2-build.log。未运行 analyze、测试、启动或设备验收，未修改版本号与更新清单，未提交、推送或发布；编译成功不代表受限设备的后台恢复已通过功能验证。
+
 ## 2026-11-07 发布 1.0.34+47 / 1.0.34-openlist.17+47
 
 按用户“推送更新”要求发布两通道。普通版新增 Windows 桌面歌词，提供播放页更多及设置入口、置顶拖动浮窗、位置记忆、关闭、颜色字号和 DPI 适配；OpenList 特别版继续提供 Android 桌面歌词，发布说明未将 Windows 能力描述为 Android 新增能力。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 发布成功并保持 Latest；OpenList Android arm64 独立预发布，附对应应用、OpenList 后端 / 前端源码与许可证。四份 APK 正式签名一致，OpenList JNI 未变。

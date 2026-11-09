@@ -83,6 +83,9 @@ class PlaybackCoordinator extends ChangeNotifier {
   DateTime? _proxyTicketIssuedAt;
   DateTime? _pausedAt;
   bool _openedWithProxy = false;
+  bool _openedFromCompleteCache = false;
+  Timer? _resumeProgressTimer;
+  int? _resumeReopenTriedIntent;
   int? _awaitingProgressIntent;
   DateTime? _lastPlayCommandAt;
   DateTime? _steadyProgressSince;
@@ -187,7 +190,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       _loadGeneration == generation &&
       _playIntentGeneration == intentGeneration &&
       _playRequested &&
-      !_userPaused;
+      !_userPaused &&
+      !_focusWasLost;
 
   Future<void> _recoverStall(
     TrackRef? stuckRef,
@@ -196,27 +200,142 @@ class PlaybackCoordinator extends ChangeNotifier {
   ) async {
     try {
       if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
-      // A responsive local listener does not imply the Emby upstream is
-      // healthy. Never restart the proxy on every buffering event.
-      diagnostics?.record('playback', 'local_proxy_probe_started');
-      final healthy = await proxy.ping();
-      diagnostics?.record(
-        'playback',
-        healthy ? 'local_proxy_healthy' : 'local_proxy_unresponsive',
-      );
-      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
-      if (!healthy) {
-        try {
-          await proxy.restart();
-        } catch (_) {
-          // _failed still applies the bounded retry/stop policy below.
+      // A complete cache file does not use the loopback HTTP proxy. Probing
+      // or restarting that proxy cannot heal its stalled AudioTrack.
+      if (_openedWithProxy) {
+        diagnostics?.record('playback', 'local_proxy_probe_started');
+        final healthy = await proxy.ping();
+        diagnostics?.record(
+          'playback',
+          healthy ? 'local_proxy_healthy' : 'local_proxy_unresponsive',
+        );
+        if (!_sameRecovery(stuckRef, generation, intentGeneration)) {
+          diagnostics?.record('playback', 'stall_recovery_cancelled');
+          return;
         }
+        if (!healthy) {
+          try {
+            await proxy.restart();
+          } catch (_) {
+            // _failed still applies its existing bounded retry/stop policy.
+          }
+        }
+      } else {
+        diagnostics?.record('playback', 'stall_proxy_not_used');
       }
-      if (!_sameRecovery(stuckRef, generation, intentGeneration)) return;
+      if (!_sameRecovery(stuckRef, generation, intentGeneration)) {
+        diagnostics?.record('playback', 'stall_recovery_cancelled');
+        return;
+      }
       await _failed('播放进度超过 45 秒没有变化');
     } catch (_) {
       // The recovery attempt is best effort; never leave the guard latched.
       diagnostics?.record('playback', 'stall_recovery_failed');
+    } finally {
+      _handlingFailure = false;
+      _stalledRecoveryRunning = false;
+      _progressWatch.reset();
+    }
+  }
+
+  void _cancelResumeProgressTimer() {
+    _resumeProgressTimer?.cancel();
+    _resumeProgressTimer = null;
+  }
+
+  /// Verify *actual* media progress, not only native.play() completion. This
+  /// timer may be delayed by Android freeze; stale callbacks always recheck
+  /// the focus, track and intent before touching the player.
+  void _verifyResumeProgress({
+    required TrackRef? ref,
+    required int generation,
+    required int intent,
+    required int navigation,
+  }) {
+    _cancelResumeProgressTimer();
+    // Remote streaming may legitimately take longer to buffer. Leave proxy
+    // stalls to the existing 45-second watchdog.
+    if (!Platform.isAndroid ||
+        _openedWithProxy ||
+        _awaitingProgressIntent != intent)
+      return;
+    _resumeProgressTimer = Timer(const Duration(seconds: 12), () {
+      _resumeProgressTimer = null;
+      unawaited(_reopenUnconfirmedResume(ref, generation, intent, navigation));
+    });
+  }
+
+  Future<void> _reopenUnconfirmedResume(
+    TrackRef? ref,
+    int generation,
+    int intent,
+    int navigation,
+  ) async {
+    bool allowed() => mayRecoverUnconfirmedResume(
+      stillCurrent:
+          _sameRecovery(ref, generation, intent) &&
+          _navigationEpoch == navigation &&
+          !_opening &&
+          !_finishingTrack &&
+          !_nativeEngineBroken,
+      playRequested: _playRequested,
+      userPaused: _userPaused,
+      focusLost: _focusWasLost,
+      progressConfirmed: _awaitingProgressIntent != intent,
+      recoveryRunning: _handlingFailure || _stalledRecoveryRunning,
+    );
+    if (!allowed()) {
+      diagnostics?.record('playback', 'resume_recheck_cancelled');
+      return;
+    }
+    _stalledRecoveryRunning = true;
+    _handlingFailure = true;
+    diagnostics?.record(
+      'playback',
+      'resume_progress_timeout',
+      details: {'stage': _openedFromCompleteCache ? 'cached' : 'local'},
+    );
+    try {
+      // A fresh open has also failed to make progress: stop explicitly.
+      // Never fall back to _failed(), which may retry and skip other tracks.
+      if (_resumeReopenTriedIntent == intent) {
+        diagnostics?.record('playback', 'resume_progress_failed');
+        error = '后台恢复播放失败，请手动重试';
+        await pause();
+        notifyListeners();
+        return;
+      }
+      // Persist the exact position before _loadCurrent uses snapshot.positionMs.
+      await save();
+      if (!_sameRecovery(ref, generation, intent) ||
+          navigation != _navigationEpoch ||
+          _awaitingProgressIntent != intent) {
+        diagnostics?.record('playback', 'resume_recheck_cancelled');
+        return;
+      }
+      _cancelResumeProgressTimer();
+      _resumeReopenTriedIntent =
+          intent; // At most one proactive reload per play.
+      diagnostics?.record('playback', 'resume_same_track_reopen');
+      // manual:true prevents an open failure from automatically skipping the
+      // song; manual retry remains available after a clear error.
+      await _loadCurrent(autoplay: true, manual: true);
+      if (_sameRecovery(ref, _loadGeneration, intent) &&
+          _awaitingProgressIntent == intent) {
+        _verifyResumeProgress(
+          ref: ref,
+          generation: _loadGeneration,
+          intent: intent,
+          navigation: navigation,
+        );
+      }
+    } catch (_) {
+      diagnostics?.record('playback', 'resume_same_track_failed');
+      if (_sameRecovery(ref, _loadGeneration, intent)) {
+        error = '后台恢复播放失败，请手动重试';
+        await pause();
+        notifyListeners();
+      }
     } finally {
       _handlingFailure = false;
       _stalledRecoveryRunning = false;
@@ -541,6 +660,7 @@ class PlaybackCoordinator extends ChangeNotifier {
               nextMs - previousProgressMs <= 4000 &&
               _awaitingProgressIntent == _playIntentGeneration) {
             _awaitingProgressIntent = null;
+            _cancelResumeProgressTimer();
             final startedAt = _lastPlayCommandAt;
             diagnostics?.record(
               'playback',
@@ -1111,11 +1231,13 @@ class PlaybackCoordinator extends ChangeNotifier {
         'manual': manual,
       },
     );
+    _cancelResumeProgressTimer();
     _opening = true;
     _playRequested = autoplay;
     if (!autoplay) _pausedAt = DateTime.now();
     _proxyTicketIssuedAt = null;
     _openedWithProxy = false;
+    _openedFromCompleteCache = false;
     _androidAudioOutputProbed = false;
     _seekPending = false;
     final generation = ++_loadGeneration;
@@ -1187,6 +1309,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         final cached = await cache.find(ref, touch: true);
         if (generation != _loadGeneration) return;
         _openedWithProxy = cached == null;
+        _openedFromCompleteCache = cached != null;
         if (cached != null) {
           uri = cached.file.uri;
         } else {
@@ -1231,6 +1354,20 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       _publish();
       await save();
+      // A successful native open does not prove that cached audio progresses.
+      // Only schedule this for a pending explicit resume request.
+      if (shouldPlay &&
+          _playRequested &&
+          generation == _loadGeneration &&
+          _openedFromCompleteCache &&
+          _awaitingProgressIntent == _playIntentGeneration) {
+        _verifyResumeProgress(
+          ref: ref,
+          generation: generation,
+          intent: _playIntentGeneration,
+          navigation: _navigationEpoch,
+        );
+      }
       _scheduleAhead();
     } catch (e) {
       if (generation != _loadGeneration) return;
@@ -1534,13 +1671,22 @@ class PlaybackCoordinator extends ChangeNotifier {
       now: DateTime.now(),
       ticketLifetime: MediaProxy.ticketValidity,
     );
+    final refreshCache = shouldReopenPausedCache(
+      usingCompleteCache: _openedFromCompleteCache,
+      pausedAt: _pausedAt,
+      now: DateTime.now(),
+    );
     if (player.state.playlist.medias.isEmpty ||
         _reloadSources.contains(source.id) ||
         error != null ||
         refreshRemote ||
-        refreshPausedProxy) {
+        refreshPausedProxy ||
+        refreshCache) {
       if (refreshRemote || refreshPausedProxy) {
         diagnostics?.record('playback', 'resume_source_refresh');
+      }
+      if (refreshCache) {
+        diagnostics?.record('playback', 'resume_cached_reopen');
       }
       // A fresh mpv Media URL renews the short-lived proxy ticket and avoids
       // resuming an abandoned background HTTP connection.
@@ -1589,6 +1735,12 @@ class PlaybackCoordinator extends ChangeNotifier {
           _playRequested &&
           intentGeneration == _playIntentGeneration) {
         diagnostics?.record('playback', 'native_play_completed');
+        _verifyResumeProgress(
+          ref: requestedRef,
+          generation: _loadGeneration,
+          intent: intentGeneration,
+          navigation: navigationEpoch,
+        );
         if (fadeIn && gainGeneration == _gainGeneration) {
           await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
         }
@@ -1613,6 +1765,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     _playRequested = false;
     _pausedAt = DateTime.now();
     _awaitingProgressIntent = null;
+    _cancelResumeProgressTimer();
     _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;
@@ -1852,6 +2005,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> seek(Duration target) async {
+    _cancelResumeProgressTimer();
+    _awaitingProgressIntent = null;
     ++_playIntentGeneration;
     final generation = _loadGeneration;
     final navigationEpoch = _navigationEpoch;
@@ -2153,6 +2308,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   void dispose() {
     ++_gainGeneration;
     _cancelFocusResume();
+    _cancelResumeProgressTimer();
     _cancelAhead();
     _stallTimer?.cancel();
     _stallTimer = null;
@@ -2170,6 +2326,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> shutdown() async {
     ++_gainGeneration;
     _cancelFocusResume();
+    _cancelResumeProgressTimer();
     _stallTimer?.cancel();
     _stallTimer = null;
     _notificationClockTimer?.cancel();

@@ -68,3 +68,34 @@ bool shouldReopenPausedProxy({
   final age = now.difference(pausedAt);
   return age.isNegative || age >= maxPause;
 }
+
+/// A complete cache file still has an mpv decoder/AudioTrack that can become
+/// unusable after long Android process suspension. Reopen the file, not the
+/// network source, while preserving the queue's stored position.
+bool shouldReopenPausedCache({
+  required bool usingCompleteCache,
+  required DateTime? pausedAt,
+  required DateTime now,
+  Duration maxPause = const Duration(minutes: 15),
+}) {
+  if (!usingCompleteCache || pausedAt == null) return false;
+  final elapsed = now.difference(pausedAt);
+  return elapsed.isNegative || elapsed >= maxPause;
+}
+
+/// A stale native play completion is not proof of audible progress. A retry
+/// must remain tied to the same user intent, song and granted audio focus.
+bool mayRecoverUnconfirmedResume({
+  required bool stillCurrent,
+  required bool playRequested,
+  required bool userPaused,
+  required bool focusLost,
+  required bool progressConfirmed,
+  required bool recoveryRunning,
+}) =>
+    stillCurrent &&
+    playRequested &&
+    !userPaused &&
+    !focusLost &&
+    !progressConfirmed &&
+    !recoveryRunning;
