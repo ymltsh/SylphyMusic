@@ -865,7 +865,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     await player.setRate(speed);
     await _applyPlayerVolume();
     await _configureAndroidAudioOutput();
-    await _setMpvOption('gapless-audio', 'weak');
+    await _configureGaplessAudio();
     await _setMpvOption('replaygain', replayGain);
     await _setMpvOption('audio-pitch-correction', 'yes');
     await _setMpvOption('sub-auto', 'no');
@@ -1064,7 +1064,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     await player.setRate(speed);
     await _applyPlayerVolume();
     await _configureAndroidAudioOutput();
-    await _setMpvOption('gapless-audio', 'weak');
+    await _configureGaplessAudio();
     final savedGain = await db.setting('replaygain');
     replayGain = const ['no', 'track', 'album'].contains(savedGain)
         ? savedGain!
@@ -1120,6 +1120,34 @@ class PlaybackCoordinator extends ChangeNotifier {
           // A disconnected headset is not a transient interruption to resume.
           unawaited(pause(system: true));
         }),
+      );
+    }
+  }
+
+  /// A new Android source must not inherit an output device left unusable by
+  /// the OEM. The option is set before opening any media on both engine paths.
+  /// Unlike an accepted setter Future, the readback reports the actual option.
+  Future<void> _configureGaplessAudio() async {
+    if (!Platform.isAndroid) {
+      await _setMpvOption('gapless-audio', 'weak');
+      return;
+    }
+    final native = player.platform;
+    if (native is! NativePlayer) return;
+    try {
+      await native.setProperty('options/gapless-audio', 'no');
+      final selected = await native.getProperty('options/gapless-audio');
+      diagnostics?.record(
+        'playback',
+        selected == 'no'
+            ? 'android_gapless_disabled_confirmed'
+            : 'android_gapless_setting_unconfirmed',
+      );
+    } catch (e) {
+      diagnostics?.record(
+        'playback',
+        'android_gapless_setting_failed',
+        details: {'type': e.runtimeType.toString()},
       );
     }
   }
@@ -1485,12 +1513,13 @@ class PlaybackCoordinator extends ChangeNotifier {
       notifyListeners();
       _publish();
       await save();
-      // A successful native open does not prove that cached audio progresses.
-      // Only schedule this for a pending explicit resume request.
+      // Reopening a local or fully cached file does not prove that its Android
+      // audio output has become usable. Verify progress after explicit resume.
       if (shouldPlay &&
+          Platform.isAndroid &&
           _playRequested &&
           generation == _loadGeneration &&
-          _openedFromCompleteCache &&
+          !_openedWithProxy &&
           _awaitingProgressIntent == _playIntentGeneration) {
         _verifyResumeProgress(
           ref: ref,
@@ -1837,17 +1866,27 @@ class PlaybackCoordinator extends ChangeNotifier {
       pausedAt: _pausedAt,
       now: DateTime.now(),
     );
+    final refreshAndroidLocal = shouldReopenPausedAndroidLocal(
+      isAndroid: Platform.isAndroid,
+      isLocalSource: source.kind == SourceKind.local,
+      pausedAt: _pausedAt,
+      now: DateTime.now(),
+    );
     if (player.state.playlist.medias.isEmpty ||
         _reloadSources.contains(source.id) ||
         error != null ||
         refreshRemote ||
         refreshPausedProxy ||
-        refreshCache) {
+        refreshCache ||
+        refreshAndroidLocal) {
       if (refreshRemote || refreshPausedProxy) {
         diagnostics?.record('playback', 'resume_source_refresh');
       }
       if (refreshCache) {
         diagnostics?.record('playback', 'resume_cached_reopen');
+      }
+      if (refreshAndroidLocal) {
+        diagnostics?.record('playback', 'resume_local_reopen');
       }
       // A fresh mpv Media URL renews the short-lived proxy ticket and avoids
       // resuming an abandoned background HTTP connection.

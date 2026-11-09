@@ -1,5 +1,15 @@
 # 实施与验证记录
 
+## 2026-11-10 应用 Android 14 恢复 AO / FGS v4 补丁
+
+按用户“应用”要求，将 SylphyMusic-Android14-Resume-AO-FGS-v4.patch 直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留前几轮播放生命周期整合、媒体会话投影、封面共享、焦点策略与 OpenList 播放租约及其他已有修改。涉及的已有文件备份在各自 .private/android14-resume-ao-fgs-v4-before/。
+
+Android 初始化与原生播放器重建设置并回读 options/gapless-audio=no，其他平台保留 weak；Android 本地来源暂停达到 15 分钟或时钟回拨时显式恢复同曲重开，重开后的实际进度检查从完整缓存扩展至全部非代理媒体。前台服务请求后 350 毫秒初查若为非前台，延迟 1 秒再查一次，连续两次负面结果才撤销逻辑保留并释放唤醒锁；未知结果保持未知，旧代次检查失效，不持续轮询。
+
+Dart 文件已格式化，架构及整合说明同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/android14-resume-ao-fgs-v4-build.log。getRunningServices 弃用警告未阻断构建。
+
+未新增或运行测试，未执行 analyze、ADB、启动或设备验证；未修改版本号或更新清单，未提交、推送或发布。音频输出设置生效、长暂停恢复与前台复核效果仍由用户在设备确认。
+
 ## 2026-11-10 应用播放生命周期整合补丁
 
 按用户“应用”要求，将 SylphyMusic-Integrated-Playback-Lifecycle-Bundle.zip 合并到 main 与 feature/android-openlist-lite。保留上一轮已应用的 MediaSessionProjection，剔除重复导入、配置、状态发布与已有文件部分后，两工作区增量补丁检查和应用成功；保留 OpenList 播放租约及其他已有修改。涉及的已有文件备份在各自 .private/integrated-playback-lifecycle-before/。

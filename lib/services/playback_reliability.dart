@@ -83,6 +83,20 @@ bool shouldReopenPausedCache({
   return elapsed.isNegative || elapsed >= maxPause;
 }
 
+/// A local-library AudioTrack can be just as stale as a complete-cache track.
+/// Scope this proactive reopen to Android; other platforms retain fast resume.
+bool shouldReopenPausedAndroidLocal({
+  required bool isAndroid,
+  required bool isLocalSource,
+  required DateTime? pausedAt,
+  required DateTime now,
+  Duration maxPause = const Duration(minutes: 15),
+}) {
+  if (!isAndroid || !isLocalSource || pausedAt == null) return false;
+  final age = now.difference(pausedAt);
+  return age.isNegative || age >= maxPause;
+}
+
 /// A stale native play completion is not proof of audible progress. A retry
 /// must remain tied to the same user intent, song and granted audio focus.
 bool mayRecoverUnconfirmedResume({

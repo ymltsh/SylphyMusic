@@ -812,22 +812,29 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     private void observeForegroundRequest(String reason) {
         final long epoch = ++foregroundObservationEpoch;
-        handler.postDelayed(() -> {
-            if (epoch != foregroundObservationEpoch || !foregroundResume.isForeground()) return;
-            Boolean observed = observedOwnServiceForeground();
-            if (observed == null) {
-                Log.w("SylphyMedia", "fgs_os_status_unknown reason=" + reason);
-            } else if (observed) {
-                foregroundResume.markOsConfirmed();
-                Log.i("SylphyMedia", "fgs_os_confirmed reason=" + reason);
-            } else {
-                // Avoid a false foreground lease after a silent OS denial.
-                Log.w("SylphyMedia", "fgs_os_not_foreground reason=" + reason);
-                foregroundResume.markDemoted();
-                releaseWakeLock();
-                lastForegroundDenialMs = SystemClock.elapsedRealtime();
-            }
-        }, 350);
+        handler.postDelayed(() -> verifyForegroundRequest(epoch, reason, false), 350);
+    }
+
+    // HyperOS may report a not-yet-foreground service immediately after a
+    // successful startForeground call. One early negative result is not proof
+    // of denial: sample once more, but never poll or keep the FGS indefinitely.
+    private void verifyForegroundRequest(long epoch, String reason, boolean repeated) {
+        if (epoch != foregroundObservationEpoch || !foregroundResume.isForeground()) return;
+        Boolean observed = observedOwnServiceForeground();
+        if (observed == null) {
+            Log.w("SylphyMedia", "fgs_os_status_unknown reason=" + reason);
+        } else if (observed) {
+            foregroundResume.markOsConfirmed();
+            Log.i("SylphyMedia", "fgs_os_confirmed reason=" + reason);
+        } else if (!repeated) {
+            Log.w("SylphyMedia", "fgs_os_confirmation_pending reason=" + reason);
+            handler.postDelayed(() -> verifyForegroundRequest(epoch, reason, true), 1000);
+        } else {
+            Log.w("SylphyMedia", "fgs_os_not_foreground reason=" + reason);
+            foregroundResume.markDemoted();
+            releaseWakeLock();
+            lastForegroundDenialMs = SystemClock.elapsedRealtime();
+        }
     }
 
     private void enterPlayingState(boolean provisional, boolean userInitiated) {

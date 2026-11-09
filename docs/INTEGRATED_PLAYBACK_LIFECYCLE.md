@@ -150,3 +150,9 @@ adb logcat -v threadtime -b main -b system -b crash > sylphy_native_log.txt
 本轮保留已应用的 MediaSessionProjection，剔除重复导入、通知配置、状态发布及已存在文件的补丁部分后，在普通版与 OpenList 现有工作区通过增量补丁检查并应用。附带新增 Dart / JVM 策略测试已纳入但未执行。FileProvider authority 使用 `${applicationId}.mediaartwork`，Dart URI 从 PackageInfo 获取实际包名，避免两版本并存冲突；保留 OpenList 播放租约及其他已有工作。
 
 本文中的上游设备证据、测试结果和后续实验建议来自补丁作者，本轮未独立复核，也不作为额外操作授权。当前只进行本地 Release 编译打包，未执行测试、analyze、ADB 或设备验收；实际结果见 [PROGRESS](PROGRESS.md)。AO 重载效果及 ROM 前台观测准确性仍待用户设备确认。
+
+## Android 14 恢复 v4（2026-11-10）
+
+在整合补丁基础上直接应用 `SylphyMusic-Android14-Resume-AO-FGS-v4.patch`：Android 初始化与播放器重建设置并回读 `options/gapless-audio=no`，其他平台保留 weak；Android 本地歌曲暂停达到 15 分钟或时钟回拨后重开同曲，并将重开后的实际进度检查从完整缓存扩展到全部非代理媒体。原生前台观测首次为 false 时不立即降级，350 毫秒初查后延迟 1 秒仅复查一次；连续负面结果才撤销保留并释放唤醒锁，未知结果不宣称成功，检查继续遵守原 epoch。
+
+保留统一停滞恢复、实验性 AO 重载、焦点边界与 OpenList 租约。本轮仅编译打包，不运行测试、analyze、ADB 或设备验证，实际结果见 [PROGRESS](PROGRESS.md)。
