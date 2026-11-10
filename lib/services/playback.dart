@@ -1371,7 +1371,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     await _loadCurrent(autoplay: autoplay, manual: true);
   }
 
-  Future<void> _loadCurrent({bool autoplay = true, bool manual = false}) async {
+  Future<void> _loadCurrent({
+    bool autoplay = true,
+    bool manual = false,
+    int? resumePositionMs,
+  }) async {
     if (_nativeEngineBroken) {
       error = '播放器无法安全恢复，请重新启动应用';
       _playRequested = false;
@@ -1406,7 +1410,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     _watchdogPositionMs = -1;
     _openStallLogged = false;
     _progressWatch.reset();
-    final resumeMs = snapshot.positionMs;
+    final resumeMs = resumePositionMs ?? snapshot.positionMs;
     error = null;
     try {
       if (_leased != null) {
@@ -1850,36 +1854,68 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     _focusRecovery.focusGranted();
+    // A complete cache may have finished downloading after this song was
+    // opened through the proxy. Prefer the verified local file at the next
+    // explicit Play; never interrupt an already advancing playback to switch.
+    var switchToCompleteCache = false;
+    if (!_playRequested &&
+        _openedWithProxy &&
+        source.kind != SourceKind.local &&
+        requestedRef != null) {
+      try {
+        switchToCompleteCache = await cache.find(requestedRef) != null;
+      } catch (e) {
+        // Cache lookup is best effort. A transient filesystem error must not
+        // make the notification Play command fail when the proxy still works.
+        diagnostics?.record(
+          'playback',
+          'resume_cache_lookup_failed',
+          details: {'type': e.runtimeType.toString()},
+        );
+      }
+      // The I/O above can overlap a pause, skip or a focus interruption.
+      if (intentGeneration != _playIntentGeneration ||
+          navigationEpoch != _navigationEpoch ||
+          currentRef != requestedRef ||
+          focusEpoch != _focusResumeEpoch ||
+          (automaticFocusResume && _focusWasLost)) {
+        return;
+      }
+    }
+    final now = DateTime.now();
     final refreshPausedProxy = shouldReopenPausedProxy(
       usingProxy: _openedWithProxy,
       pausedAt: _pausedAt,
-      now: DateTime.now(),
+      now: now,
     );
     final refreshRemote = shouldRefreshRemotePlaybackSource(
       ticketIssuedAt: _proxyTicketIssuedAt,
       pausedAt: _pausedAt,
-      now: DateTime.now(),
+      now: now,
       ticketLifetime: MediaProxy.ticketValidity,
     );
     final refreshCache = shouldReopenPausedCache(
       usingCompleteCache: _openedFromCompleteCache,
       pausedAt: _pausedAt,
-      now: DateTime.now(),
+      now: now,
     );
     final refreshAndroidLocal = shouldReopenPausedAndroidLocal(
       isAndroid: Platform.isAndroid,
       isLocalSource: source.kind == SourceKind.local,
       pausedAt: _pausedAt,
-      now: DateTime.now(),
+      now: now,
     );
     if (player.state.playlist.medias.isEmpty ||
         _reloadSources.contains(source.id) ||
         error != null ||
+        switchToCompleteCache ||
         refreshRemote ||
         refreshPausedProxy ||
         refreshCache ||
         refreshAndroidLocal) {
-      if (refreshRemote || refreshPausedProxy) {
+      if (switchToCompleteCache) {
+        diagnostics?.record('playback', 'resume_switch_to_complete_cache');
+      } else if (refreshRemote || refreshPausedProxy) {
         diagnostics?.record('playback', 'resume_source_refresh');
       }
       if (refreshCache) {
@@ -1888,9 +1924,17 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (refreshAndroidLocal) {
         diagnostics?.record('playback', 'resume_local_reopen');
       }
-      // A fresh mpv Media URL renews the short-lived proxy ticket and avoids
-      // resuming an abandoned background HTTP connection.
-      await _loadCurrent(autoplay: true, manual: true);
+      // A fresh open selects a verified cache file when present, or refreshes
+      // the remote ticket only when no complete cache is available.
+      await _loadCurrent(
+        autoplay: true,
+        manual: true,
+        // A fast Pause -> Play may race the asynchronous pause save.
+        // Preserve the live position when promoting the proxy to a file.
+        resumePositionMs: switchToCompleteCache
+            ? position.inMilliseconds
+            : null,
+      );
       return;
     }
     final wasRequested = _playRequested;

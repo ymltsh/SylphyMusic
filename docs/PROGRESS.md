@@ -1,5 +1,49 @@
 # 实施与验证记录
 
+## 2026-11-10 应用歌词行内翻译解析补丁
+
+按用户“应用补丁”要求，将 sylphymusic-inline-translation.patch 直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过，保留其他已有修改。涉及的已有歌词解析、两个测试文件和进度记录备份在各自 .private/inline-translation-before/。
+
+LRC 解析识别 U+2009 / U+200A / U+202F 窄空格分隔：仅当分隔符附近的前后字母分别属于拉丁与中日韩字符范围时，将原文与已有译文拆成换行文本，沿用现有歌词译文字体样式，时间戳保持不变。普通空格、同文字范围的窄空格与示例混合语言作曲信息保留原状。不增加在线翻译请求。
+
+附带解析与 Widget 测试已纳入并完成 Dart 格式化，未运行。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/inline-translation-build.log。
+
+未运行 analyze、测试、ADB、启动或设备验证；未修改版本号或更新清单，未提交、推送或发布。实际歌词显示效果交由用户确认。
+
+## 2026-11-10 发布 1.0.38+51 / 1.0.38-openlist.21+51
+
+按用户“推送版本更新”要求发布两通道，包含缓存优先恢复：此前通过代理播放的远程歌曲在暂停期间完成完整缓存后，再次播放优先切换到缓存文件并保留当前位置；已在播放的会话不主动切换，暂停、导航与焦点变化使过期查询失效。发布标题、正文和清单说明均面向用户。
+
+普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 及摘要六个附件发布成功并保持 Latest；OpenList Android arm64 独立预发布，附当前应用、OpenList 后端 / 前端源码与许可证及摘要三个附件。四份 APK 正式签名通过且证书一致，OpenList JNI 与上一版本一致。普通版 release.py 和特别版发布入口均输出 Release succeeded，退出码 0；Release 状态、标题、正文、全部附件大小 / SHA-256 及四份清单的原始 / 加速入口均匹配，特别版发布状态为 complete。
+
+仅提交推送本轮更新清单：main/version.json 为 e55518b，main/version-openlist.json 为 c329faa；feature/android-openlist-lite/version.json 与 version-openlist.json 为 08887f6。源码、版本配置与其他已有修改保留本地，本轮未另行提交推送。
+
+普通版产物 build/releases/1.0.38-51/，日志 build/test_logs/release-1.0.38.log；特别版产物 build/releases/1.0.38-openlist.21-51/，日志 build/test_logs/openlist-release-51-prepare.log 与 openlist-release-51-publish.log。未运行 analyze、测试、启动、ADB 或设备验收；发布成功不代表缓存切换和进度保持效果已通过设备验证。
+
+发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.38%2B51 及 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.38-openlist.21%2B51 。
+
+## 2026-11-10 应用缓存优先恢复补丁
+
+按用户“应用补丁”要求，将 SylphyMusic-Cache-First-Resume(1).patch 直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留现有播放生命周期、焦点、AO / FGS v4、媒体会话及 OpenList 播放租约和其他已有修改。涉及的已有播放代码、架构和进度记录备份在各自 .private/cache-first-resume-before/。
+
+暂停后的播放请求发现此前通过代理打开的远程歌曲已有完整缓存时，重新打开优先选择缓存文件；_loadCurrent 新增可选 resumePositionMs，在代理转缓存时传入实时位置，避免快速暂停 / 播放与异步保存竞争造成回退。正在请求播放的会话不主动切换。缓存查询失败继续既有恢复流程，查询后重新核对播放意图、导航、曲目与焦点代次；实际加载仍在缓存租约内重新查找完整文件，残片不视为可用缓存。
+
+Dart 文件完成格式化，架构说明同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/cache-first-resume-build.log。
+
+未新增或运行测试，未执行 analyze、ADB、启动或设备验证；未修改版本号或更新清单，未提交、推送或发布。缓存切换与位置保持效果仍由用户在设备确认。
+
+## 2026-11-10 发布 1.0.37+50 / 1.0.37-openlist.20+50
+
+按用户“推送版本更新”要求发布两通道，包含播放焦点重构、媒体会话状态投影、统一同曲恢复及 Android 14 AO / FGS v4：长暂停本地 / 缓存重开、实验性输出重载与实际进度复核、临时焦点保持、通知暂停 / 缓冲 / 失败状态、封面 URI 共享及前台观测延迟复核。发布标题、正文与清单说明面向用户，不宣称设备恢复效果已验证。
+
+普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 及摘要六个附件发布成功并保持 Latest；OpenList Android arm64 独立预发布，附当前应用、OpenList 后端 / 前端源码与许可证及摘要三个附件。四份 APK 正式签名校验通过且证书一致，OpenList JNI 与上一版本一致。普通版 release.py 与特别版发布入口均输出 Release succeeded，退出码 0；Release 状态、标题、正文与全部附件大小 / SHA-256 匹配，正式及 OpenList 清单的原始 / 加速入口匹配，特别版发布状态为 complete。
+
+仅提交推送本轮更新清单：main/version.json 为 fcccf71，main/version-openlist.json 为 6550d3e；feature/android-openlist-lite/version.json 与 version-openlist.json 为 f9f4fe7。本轮源码、版本配置与其他已有修改保留本地，不另行提交推送。
+
+普通版产物 build/releases/1.0.37-50/，日志 build/test_logs/release-1.0.37.log；特别版产物 build/releases/1.0.37-openlist.20-50/，日志 build/test_logs/openlist-release-50-prepare.log 与 openlist-release-50-publish.log。未运行 analyze、测试、启动、ADB 或设备验收；编译与发布成功不代表设备后台恢复效果通过功能验证。
+
+发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.37%2B50 及 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.37-openlist.20%2B50 。
+
 ## 2026-11-10 应用 Android 14 恢复 AO / FGS v4 补丁
 
 按用户“应用”要求，将 SylphyMusic-Android14-Resume-AO-FGS-v4.patch 直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留前几轮播放生命周期整合、媒体会话投影、封面共享、焦点策略与 OpenList 播放租约及其他已有修改。涉及的已有文件备份在各自 .private/android14-resume-ao-fgs-v4-before/。

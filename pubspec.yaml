@@ -1,7 +1,7 @@
 name: sylphy_music
 description: 风灵音乐 / Sylphy Music - multi-source music player
 publish_to: none
-version: 1.0.36+49
+version: 1.0.38+51
 environment:
   sdk: '>=3.13.0 <4.0.0'
 dependencies:

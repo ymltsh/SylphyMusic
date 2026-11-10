@@ -31,6 +31,25 @@ void main() {
     ),
   );
 
+  testWidgets('inline bilingual LRC renders a smaller translated line', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      view(
+        '[01:32.08]Original\u2009译文',
+        const Duration(minutes: 1, seconds: 32, milliseconds: 80),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final lyric = find.text('Original\n译文');
+    expect(lyric, findsOneWidget);
+    final spans = (tester.widget<Text>(lyric).textSpan! as TextSpan).children!;
+    expect(spans.first.toPlainText(), 'Original');
+    expect(spans.last.toPlainText(), '\n译文');
+    expect(spans.last.style!.fontSize, lessThan(22));
+    expect(spans.last.style!.fontWeight, FontWeight.w400);
+  });
+
   testWidgets(
     'variable height lyrics retain reading focus after seek, resize and large text',
     (tester) async {
