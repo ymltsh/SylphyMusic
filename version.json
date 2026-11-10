@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.37",
-    "build": 50,
-    "name": "风灵音乐 v1.0.37",
+    "version": "1.0.38",
+    "build": 51,
+    "name": "风灵音乐 v1.0.38",
     "date": "2026-11-10",
-    "notes": "风灵音乐 1.0.37\n\n- 调整 Android 本地与缓存歌曲长时间暂停后的恢复方式，从保存的位置重新准备播放。\n- 改进播放停滞时的同曲恢复，恢复失败时提示手动重试，避免因输出异常自动跳到其他歌曲。\n- 改进其他应用临时占用音频后的恢复，以及手动暂停和耳机播放控制的衔接。\n- 优化媒体通知的暂停、缓冲和失败状态显示，进度停滞时不再继续显示播放进度。\n- 改进 Android 通知封面共享和后台播放服务状态处理。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+    "notes": "风灵音乐 1.0.38\n\n- 远程歌曲在暂停期间完成缓存后，再次播放时优先使用完整缓存，减少对网络连接的依赖。\n- 切换到缓存播放时保留当前播放位置，改进快速暂停后继续播放的进度衔接。\n- 播放中完成缓存不会中断当前歌曲；暂停、切歌或音频被其他应用打断时，取消过期的切换请求。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.38%2B51/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.38%2B51/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.38%2B51/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.38%2B51/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.38%2B51/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.37+50"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.38+51"
   },
   "history": [
+    {
+      "version": "1.0.37",
+      "build": 50,
+      "name": "风灵音乐 v1.0.37",
+      "date": "2026-11-10",
+      "notes": "风灵音乐 1.0.37\n\n- 调整 Android 本地与缓存歌曲长时间暂停后的恢复方式，从保存的位置重新准备播放。\n- 改进播放停滞时的同曲恢复，恢复失败时提示手动重试，避免因输出异常自动跳到其他歌曲。\n- 改进其他应用临时占用音频后的恢复，以及手动暂停和耳机播放控制的衔接。\n- 优化媒体通知的暂停、缓冲和失败状态显示，进度停滞时不再继续显示播放进度。\n- 改进 Android 通知封面共享和后台播放服务状态处理。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.37%2B50/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.37+50"
+    },
     {
       "version": "1.0.36",
       "build": 49,
