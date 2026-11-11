@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.41-openlist.24",
-    "build": 54,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.41-openlist.24 (arm64-v8a)",
+    "version": "1.0.42-openlist.25",
+    "build": 55,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25 (arm64-v8a)",
     "date": "2026-11-12",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.41-openlist.24\n\n- 每日精选新增音乐笔友式来信，支持多段全文、真实封面叠卡与逐曲推荐理由；无法使用 LLM 时提供本地精选短笺。\n- 新增“每日推荐文案”信箱，保存每轮来信，可分页阅读和单独清空；清理推荐统计时保留信件。\n- 今日音乐信和历史信件支持导出 PNG 图片、分享图片，底部带日期、风灵音乐署名和 Logo，默认保存到 Pictures/SylphyMusic。\n- 自定义 Prompt 支持分别调整 System 推荐角色与策略、User 个人偏好，并可恢复默认。\n- LLM 连接测试弹窗显示响应内容、HTTP 状态和具体错误，推荐诊断记录请求及回退情况，方便排查接口问题。\n- 最近播放说明更新为最多保留 1000 首歌曲。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25\n\n- “最近播放、我的收藏、全部音乐、本地下载”四个快捷入口从首页合并到“我的”页面，常用功能集中查看。\n- 音乐来信支持由 LLM 为每轮推荐拟定标题，标题与信件一并保存；未提供标题时使用默认标题。\n- 调整来信页面排版，日期和歌曲数量纳入卡片，导出与分享操作移到完整信件和推荐理由之后。\n- 新增图片导出设置，可选择真实封面叠卡、推荐理由、浅深主题以及 1080 / 1440 像素宽度；图片布局与应用卡片保持一致。\n- 信件存档保存标题和封面引用，旧信件继续可读；图片仍默认保存到 Pictures/SylphyMusic，底部保留日期、项目名与 Logo。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.41-openlist.24%2B54/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.42-openlist.25%2B55/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.41-openlist.24%2B54"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.42-openlist.25%2B55"
   },
   "history": [
+    {
+      "version": "1.0.41-openlist.24",
+      "build": 54,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.41-openlist.24 (arm64-v8a)",
+      "date": "2026-11-12",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.41-openlist.24\n\n- 每日精选新增音乐笔友式来信，支持多段全文、真实封面叠卡与逐曲推荐理由；无法使用 LLM 时提供本地精选短笺。\n- 新增“每日推荐文案”信箱，保存每轮来信，可分页阅读和单独清空；清理推荐统计时保留信件。\n- 今日音乐信和历史信件支持导出 PNG 图片、分享图片，底部带日期、风灵音乐署名和 Logo，默认保存到 Pictures/SylphyMusic。\n- 自定义 Prompt 支持分别调整 System 推荐角色与策略、User 个人偏好，并可恢复默认。\n- LLM 连接测试弹窗显示响应内容、HTTP 状态和具体错误，推荐诊断记录请求及回退情况，方便排查接口问题。\n- 最近播放说明更新为最多保留 1000 首歌曲。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.41-openlist.24%2B54/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.41-openlist.24%2B54"
+    },
     {
       "version": "1.0.40-openlist.23",
       "build": 53,
