@@ -11,8 +11,8 @@ import 'dart:typed_data';
 class DiagnosticLogs {
   DiagnosticLogs(
     this.directory, {
-    this.maxFileBytes = 512 * 1024,
-    this.retainedFiles = 3,
+    this.maxFileBytes = 1024 * 1024,
+    this.retainedFiles = 4,
   }) : assert(maxFileBytes > 128),
        assert(retainedFiles >= 1);
 
@@ -22,24 +22,57 @@ class DiagnosticLogs {
   bool enabled = false;
   bool _closed = false;
   Future<void> _pending = Future<void>.value();
+  // Monotonic Dart sequence and elapsed time survive wall-clock adjustments.
+  final Stopwatch _elapsed = Stopwatch()..start();
+  int _sequence = 0;
 
   static final RegExp _safeToken = RegExp(r'^[A-Za-z][A-Za-z0-9_]{0,47}$');
   static const Set<String> _detailKeys = {
+    'audio_mode',
     'autoplay',
     'attempt',
     'buffering',
+    'cache_hit',
+    'delay_ms',
+    'device_idle',
+    'elapsed_ms',
+    'fgs_confirmed',
+    'fgs_requested',
+    'focus_blocked',
+    'focus_epoch',
     'gap_ms',
+    'granted',
     'http_status',
     'index',
+    'intent',
+    'interactive',
+    'load',
     'manual',
+    'music_active',
+    'native_pid',
+    'native_seq',
+    'native_uptime_ms',
+    'nav',
+    'os_fgs',
+    'pause_age_ms',
     'playing',
+    'position_ms',
+    'progress_gap_ms',
     'queue_size',
     'rank',
+    'resume_ms',
+    'service_alive',
+    'session_moving',
+    'session_position_ms',
+    'session_state',
+    'source',
     'source_kind',
     'stage',
     'state',
     'system',
+    'trigger',
     'type',
+    'wake_lock',
   };
 
   File _file(int index) => File(
@@ -67,14 +100,15 @@ class DiagnosticLogs {
       final value = item.value;
       if (value is bool) {
         safeDetails[item.key] = value;
-      } else if (value is int && value >= 0 && value <= 1000000000) {
+      } else if (value is int && value >= 0 && value <= 9007199254740991) {
+        // Millisecond clocks can exceed 1e9 on long-lived Android devices.
         safeDetails[item.key] = value;
       } else if (value is String && _safeToken.hasMatch(value)) {
         safeDetails[item.key] = value;
       }
     }
     final line =
-        '${jsonEncode({'utc': DateTime.now().toUtc().toIso8601String(), 'scope': scope, 'event': event, ...safeDetails})}\n';
+        '${jsonEncode({'utc': DateTime.now().toUtc().toIso8601String(), 'seq': ++_sequence, 'uptime_ms': _elapsed.elapsedMilliseconds, 'scope': scope, 'event': event, ...safeDetails})}\n';
     // The queue preserves event order and never delays playback callbacks.
     unawaited(
       _serialize(() => _append(line)).catchError((Object _) {
@@ -134,6 +168,7 @@ class DiagnosticLogs {
     final output = StringBuffer(
       'SylphyMusic diagnostics (UTC, opt-in)\n'
       'Contains only allowlisted event names and fields. '
+      'Android snapshots describe the media service, not AudioTrack PCM counters. '
       'Does not include Android logcat or native crash dumps.\n\n',
     );
     for (var i = retainedFiles - 1; i >= 0; i--) {

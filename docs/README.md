@@ -29,6 +29,8 @@
 | [COVER_FLOW](COVER_FLOW.md) | 专辑 / 歌单封面流、分批数据接入与会话内视图切换 |
 | [PLAYER_LAYOUT_EDITOR](PLAYER_LAYOUT_EDITOR.md) | 播放页全画布组件、9 / 16 宫格编辑、统一封面与歌词页、模板与迁移 |
 | [DIAGNOSTIC_LOGGING](DIAGNOSTIC_LOGGING.md) | 用户主动启用的诊断日志、导出 / 分享与隐私边界 |
+| [单曲循环 EOF 错误竞争](REPEAT_ONE_EOF_ERROR_RACE.md) | 曲尾错误短暂延迟、完成事件协调与旧重连任务失效 |
+| [播放稳定性诊断 V2](PLAYBACK_STABILITY_DIAGNOSTICS_V2.md) | 通知 Play → FGS / 焦点 → mpv → AO 重载的关联日志及 ADB 双快照采集 |
 | [后台持续播放学习清单](BACKGROUND_PLAYBACK_LEARNING.md) | 棉花音乐 APK 的代理探活 / 恢复证据、我们自身的风险与改进优先级；仅分析待办 |
 | [分块缓存参考分析](FRAGMENT_CACHE_REFERENCE.md) | 片段 / 空洞、范围写锁、滚动提交、LRU 与完整文件迁移，以及现有缓存的升级建议 |
 | [LAUNCHER_ICONS](LAUNCHER_ICONS.md) | Android 备用桌面图标、activity-alias 切换与资源生成 |

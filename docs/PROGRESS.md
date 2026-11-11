@@ -1,5 +1,27 @@
 # 实施与验证记录
 
+## 2026-11-11 应用单曲循环 EOF 错误竞争补丁
+
+按用户“应用补丁”要求，将 SylphyMusic-Repeat-One-EOF-Error-Race-Fix.zip 内补丁直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留播放稳定性诊断 V2、缓存优先恢复、歌词行内翻译、OpenList 播放租约及其他已有修改。涉及的已有播放代码、架构、索引及进度文件备份在各自 .private/repeat-one-eof-error-race-before/。
+
+播放请求有效且进度距已知曲尾约 2.5 秒内收到播放器错误时，暂缓 750 毫秒；同一加载代次收到有效完成事件则取消待处理错误并交给正常曲终流程，未收到完成且各代次仍有效则进入原有错误处理。暂停、跳转、新加载、关闭取消待处理回调；失败恢复在数据库查询与重试延迟后核对循环代次，避免旧重连任务在循环开始后重开曲尾。增加 end_error_deferred / ignored / superseded 诊断事件，不修改缓存、代理、Android 前台、AO 或通知策略。
+
+Dart 文件已格式化，附带说明已纳入 docs/REPEAT_ONE_EOF_ERROR_RACE.md，架构与索引同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/repeat-one-eof-error-race-build.log。
+
+未新增或运行测试，未执行 analyze、ADB、启动或设备验收，未独立复核附件引用的诊断日志；未修改版本号或更新清单，未提交、推送或发布。单曲循环曲尾实际效果交由用户确认。
+
+## 2026-11-11 应用播放稳定性诊断 V2 补丁
+
+按用户“应用补丁”要求，将 SylphyMusic-Playback-Stability-Diagnostics-V2.zip 内补丁直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留缓存优先恢复、歌词行内翻译、播放生命周期与 OpenList 租约等已有改动。涉及的已有文件和编译适配文件备份在各自 .private/playback-stability-diagnostics-v2-before/。
+
+DiagnosticLogs 新增实例内递增序号与单调运行时间，白名单扩展播放意图 / 加载 / 导航 / 焦点代次、来源类别、实际恢复延迟及原生服务状态；轮转上限调整为 4×1 MiB。Android 快照通道注册到长期 FlutterEngine，并在原生服务冷启动时提供回退，按用户诊断开关异步尽力记录 FGS、WakeLock、电源、系统音乐活动与媒体会话锚点；Dart 最多等待 2 秒，失败只记类型，不改变恢复策略或阈值。原生 logcat 增加传输序号和状态变化日志，不包含媒体元数据。附带说明、索引与手动 ADB 双快照工具已纳入，原始采集默认放 .private/，本轮未执行。
+
+首次 Android 编译因应用直接调用 AudioService 快照方法、无法解析 MediaBrowserServiceCompat 父类失败；两工作区 app 模块补充 androidx.media:media:1.7.0 显式依赖，与现有插件版本一致后重新编译成功。初次失败摘要记录于普通版 build/test_logs/playback-stability-diagnostics-v2-initial-failure-summary.log。Dart 文件已格式化，架构和本地应用说明同步更新。
+
+普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/playback-stability-diagnostics-v2-build.log。getRunningServices 弃用警告未阻断构建。
+
+未新增或运行测试，未运行 analyze、ADB、应用启动或设备验证；未修改版本号或更新清单，未提交、推送或发布。服务快照与媒体进度不等于 AudioTrack PCM 输出或实际发声证据，诊断效果由用户在设备确认。
+
 ## 2026-11-10 应用歌词行内翻译解析补丁
 
 按用户“应用补丁”要求，将 sylphymusic-inline-translation.patch 直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过，保留其他已有修改。涉及的已有歌词解析、两个测试文件和进度记录备份在各自 .private/inline-translation-before/。

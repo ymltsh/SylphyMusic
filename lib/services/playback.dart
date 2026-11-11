@@ -7,6 +7,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -39,6 +40,9 @@ MediaItem mediaItemForTrack(Track track, {Uri? artUri}) => MediaItem(
 
 class PlaybackCoordinator extends ChangeNotifier {
   PlaybackCoordinator(this.db, this.proxy, this.cache, {this.diagnostics});
+  static const _nativeDiagnosticChannel = MethodChannel(
+    'music.sylphy/playback_diagnostics',
+  );
   final AppDb db;
   final MediaProxy proxy;
   final CacheManager cache;
@@ -92,6 +96,10 @@ class PlaybackCoordinator extends ChangeNotifier {
   bool _openedWithProxy = false;
   bool _openedFromCompleteCache = false;
   Timer? _resumeProgressTimer;
+  // A near-EOF media_kit error can precede completed by a few hundred ms.
+  // Hold it briefly to avoid racing the real single-track repeat transition.
+  Timer? _pendingEndErrorTimer;
+  int? _pendingEndErrorLoad;
   int? _resumeReopenTriedIntent;
   TrackRef? _resumeReopenTriedRef;
   int? _audioOutputReloadTriedIntent;
@@ -140,6 +148,45 @@ class PlaybackCoordinator extends ChangeNotifier {
     buffering: buffering,
   );
 
+  /// Non-blocking, opt-in snapshot of the *native media service* in the same
+  /// Flutter engine that remains alive in the background. This intentionally
+  /// does not claim AudioTrack PCM write/head counters (owned by libmpv).
+  void _snapshotNative(String stage) {
+    final log = diagnostics;
+    if (!Platform.isAndroid || log == null || !log.enabled) return;
+    final intent = _playIntentGeneration;
+    final load = _loadGeneration;
+    final nav = _navigationEpoch;
+    final focusEpoch = _focusResumeEpoch;
+    unawaited(
+      _nativeDiagnosticChannel
+          .invokeMapMethod<String, dynamic>('snapshot')
+          .timeout(const Duration(seconds: 2))
+          .then<void>((data) {
+            if (data == null) return;
+            log.record(
+              'android',
+              'snapshot',
+              details: {
+                'stage': stage,
+                'intent': intent,
+                'load': load,
+                'nav': nav,
+                'focus_epoch': focusEpoch,
+                ...data,
+              },
+            );
+          })
+          .catchError((Object error) {
+            log.record(
+              'android',
+              'snapshot_failed',
+              details: {'stage': stage, 'type': error.runtimeType.toString()},
+            );
+          }),
+    );
+  }
+
   void _checkForStall() {
     if (!_playRequested ||
         _userPaused ||
@@ -187,8 +234,15 @@ class PlaybackCoordinator extends ChangeNotifier {
     diagnostics?.record(
       'playback',
       'progress_stalled',
-      details: {'index': snapshot.index},
+      details: {
+        'index': snapshot.index,
+        'intent': intentGeneration,
+        'load': generation,
+        'position_ms': position.inMilliseconds,
+        'progress_gap_ms': _progressWatch.elapsedMilliseconds,
+      },
     );
+    _snapshotNative('watchdog_stall');
     // One recovery owner for both the 12s resume check and 45s watchdog.
     // It owns the guards; the watchdog never takes the lock first.
     _awaitingProgressIntent = intentGeneration;
@@ -237,17 +291,35 @@ class PlaybackCoordinator extends ChangeNotifier {
         (_openedWithProxy && !afterRecovery) ||
         _awaitingProgressIntent != intent)
       return;
-    _resumeProgressTimer = Timer(
-      _openedWithProxy
-          ? const Duration(seconds: 30)
-          : const Duration(seconds: 12),
-      () {
-        _resumeProgressTimer = null;
-        unawaited(
-          _reopenUnconfirmedResume(ref, generation, intent, navigation),
-        );
+    final timeout = _openedWithProxy
+        ? const Duration(seconds: 30)
+        : const Duration(seconds: 12);
+    diagnostics?.record(
+      'playback',
+      'resume_probe_armed',
+      details: {
+        'intent': intent,
+        'load': generation,
+        'resume_ms': timeout.inMilliseconds,
       },
     );
+    _resumeProgressTimer = Timer(timeout, () {
+      _resumeProgressTimer = null;
+      diagnostics?.record(
+        'playback',
+        'resume_probe_fired',
+        details: {
+          'intent': intent,
+          'load': generation,
+          'elapsed_ms': _lastPlayCommandAt == null
+              ? 0
+              : DateTime.now().difference(_lastPlayCommandAt!).inMilliseconds,
+          'progress_gap_ms': _progressWatch.elapsedMilliseconds,
+        },
+      );
+      _snapshotNative('resume_timeout');
+      unawaited(_reopenUnconfirmedResume(ref, generation, intent, navigation));
+    });
   }
 
   /// The *only* stalled-output recovery executor. Both watchdog and resume
@@ -280,6 +352,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     _stalledRecoveryRunning = true;
     _handlingFailure = true;
     _cancelResumeProgressTimer();
+    _snapshotNative('recovery_started');
     diagnostics?.record(
       'playback',
       'output_recovery_started',
@@ -317,6 +390,16 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (action == AudioRecoveryAction.reloadAudioOutput) {
         _audioOutputReloadTriedIntent = intent;
         _audioOutputReloadTriedRef = ref;
+        diagnostics?.record(
+          'playback',
+          'audio_output_reload_started',
+          details: {
+            'intent': intent,
+            'load': generation,
+            'position_ms': position.inMilliseconds,
+          },
+        );
+        _snapshotNative('ao_reload_before');
         bool accepted = false;
         try {
           accepted = await _runNativeCommand(
@@ -339,7 +422,12 @@ class PlaybackCoordinator extends ChangeNotifier {
           );
         }
         if (accepted && stillCurrent()) {
-          diagnostics?.record('playback', 'audio_output_reload_requested');
+          diagnostics?.record(
+            'playback',
+            'audio_output_reload_requested',
+            details: {'intent': intent, 'load': generation},
+          );
+          _snapshotNative('ao_reload_after');
           // Completion of ao-reload is not proof of PCM output. Only an
           // advancing media position can cancel the next verification.
           _verifyResumeProgress(
@@ -381,7 +469,12 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (!stillCurrent() || _awaitingProgressIntent != intent) return;
       _resumeReopenTriedIntent = intent;
       _resumeReopenTriedRef = ref;
-      diagnostics?.record('playback', 'resume_same_track_reopen');
+      diagnostics?.record(
+        'playback',
+        'resume_same_track_reopen',
+        details: {'intent': intent, 'load': generation},
+      );
+      _snapshotNative('same_track_reopen');
       await _loadCurrent(autoplay: true, manual: true);
       if (_sameRecovery(ref, _loadGeneration, intent) &&
           navigation == _navigationEpoch &&
@@ -558,8 +651,12 @@ class PlaybackCoordinator extends ChangeNotifier {
       details: {
         'state': event.begin ? 'begin' : 'end',
         'type': event.type.name,
+        'intent': _playIntentGeneration,
+        'focus_epoch': _focusResumeEpoch,
+        'playing': _playRequested,
       },
     );
+    _snapshotNative(event.begin ? 'focus_loss' : 'focus_gain');
     if (event.begin) {
       if (event.type == AudioInterruptionType.duck) {
         // Duck is a volume decision, not a newer pause/play request. Do not
@@ -696,7 +793,12 @@ class PlaybackCoordinator extends ChangeNotifier {
         diagnostics?.record(
           'playback',
           'playing_changed',
-          details: {'playing': v},
+          details: {
+            'playing': v,
+            'intent': _playIntentGeneration,
+            'load': _loadGeneration,
+            'buffering': buffering,
+          },
         );
         cache.updatePlaybackPriority(active: v, buffering: buffering);
         notifyListeners();
@@ -762,8 +864,15 @@ class PlaybackCoordinator extends ChangeNotifier {
                 'delay_ms': startedAt == null
                     ? -1
                     : DateTime.now().difference(startedAt).inMilliseconds,
+                'intent': _playIntentGeneration,
+                'load': _loadGeneration,
+                'position_ms': nextMs,
+                'source': _openedWithProxy
+                    ? 'proxy'
+                    : (_openedFromCompleteCache ? 'cache' : 'local'),
               },
             );
+            _snapshotNative('progress_resumed');
           }
           if (_playRequested &&
               playing &&
@@ -815,6 +924,11 @@ class PlaybackCoordinator extends ChangeNotifier {
             _navigationInFlight == 0 &&
             !_finishingTrack &&
             !_stalledRecoveryRunning) {
+          if (_pendingEndErrorLoad == _loadGeneration &&
+              _pendingEndErrorTimer != null) {
+            _cancelPendingEndError();
+            diagnostics?.record('playback', 'end_error_ignored');
+          }
           diagnostics?.record(
             'playback',
             'track_completed',
@@ -839,15 +953,70 @@ class PlaybackCoordinator extends ChangeNotifier {
     );
     _registerPlayerSubscription(
       player.stream.error.listen((e) {
-        diagnostics?.record('playback', 'player_error');
-        error = e;
-        notifyListeners();
-        if (!_opening && !_handlingFailure) {
-          _handlingFailure = true;
-          unawaited(_failed(e).whenComplete(() => _handlingFailure = false));
+        // On this Android/libmpv build, the error stream can emit shortly
+        // before a genuine EOF completion. Do not publish a false loading
+        // error or start a reconnect while repeat-one is seeking to zero.
+        final positionMs = position.inMilliseconds;
+        final durationMs = duration.inMilliseconds;
+        final nearEnd =
+            !_opening &&
+            _playRequested &&
+            durationMs > 0 &&
+            positionMs >= durationMs - 2500;
+        if (nearEnd) {
+          final load = _loadGeneration;
+          final nav = _navigationEpoch;
+          final intent = _playIntentGeneration;
+          final transition = _transitionEpoch;
+          _cancelPendingEndError();
+          _pendingEndErrorLoad = load;
+          diagnostics?.record(
+            'playback',
+            'end_error_deferred',
+            details: {'load': load, 'position_ms': positionMs},
+          );
+          _pendingEndErrorTimer = Timer(const Duration(milliseconds: 750), () {
+            _pendingEndErrorTimer = null;
+            _pendingEndErrorLoad = null;
+            if (load != _loadGeneration ||
+                nav != _navigationEpoch ||
+                intent != _playIntentGeneration ||
+                transition != _transitionEpoch ||
+                _opening ||
+                _finishingTrack) {
+              diagnostics?.record('playback', 'end_error_superseded');
+              return;
+            }
+            _reportPlayerError(e);
+          });
+          return;
         }
+        _reportPlayerError(e);
       }),
     );
+  }
+
+  void _cancelPendingEndError() {
+    _pendingEndErrorTimer?.cancel();
+    _pendingEndErrorTimer = null;
+    _pendingEndErrorLoad = null;
+  }
+
+  void _reportPlayerError(String reason) {
+    diagnostics?.record(
+      'playback',
+      'player_error',
+      details: {
+        'load': _loadGeneration,
+        'position_ms': position.inMilliseconds,
+      },
+    );
+    error = reason;
+    notifyListeners();
+    if (!_opening && !_handlingFailure) {
+      _handlingFailure = true;
+      unawaited(_failed(reason).whenComplete(() => _handlingFailure = false));
+    }
   }
 
   // Called under _nativeCommands. Future.timeout cannot cancel native open.
@@ -1384,6 +1553,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       _publish();
       return;
     }
+    _cancelPendingEndError();
     diagnostics?.record(
       'playback',
       'load_started',
@@ -1392,6 +1562,8 @@ class PlaybackCoordinator extends ChangeNotifier {
         'queue_size': snapshot.tracks.length,
         'autoplay': autoplay,
         'manual': manual,
+        'intent': _playIntentGeneration,
+        'nav': _navigationEpoch,
       },
     );
     _cancelResumeProgressTimer();
@@ -1411,6 +1583,16 @@ class PlaybackCoordinator extends ChangeNotifier {
     _openStallLogged = false;
     _progressWatch.reset();
     final resumeMs = resumePositionMs ?? snapshot.positionMs;
+    diagnostics?.record(
+      'playback',
+      'load_context',
+      details: {
+        'intent': _playIntentGeneration,
+        'load': generation,
+        'nav': _navigationEpoch,
+        'resume_ms': resumeMs,
+      },
+    );
     error = null;
     try {
       if (_leased != null) {
@@ -1448,6 +1630,11 @@ class PlaybackCoordinator extends ChangeNotifier {
       _publish();
       if (autoplay && _playRequested && _session != null) {
         final focusGranted = await _session!.setActive(true);
+        diagnostics?.record(
+          'audio_focus',
+          'load_focus_result',
+          details: {'load': generation, 'granted': focusGranted},
+        );
         if (generation != _loadGeneration) return;
         if (!focusGranted) {
           // Focus denial is not a broken media source. Do not skip tracks.
@@ -1468,6 +1655,11 @@ class PlaybackCoordinator extends ChangeNotifier {
         final f = File(current!.remote['path']?.toString() ?? ref.id);
         if (!await f.exists()) throw StateError('本地原始音频文件不存在');
         uri = f.uri;
+        diagnostics?.record(
+          'playback',
+          'source_selected',
+          details: {'source': 'local', 'load': generation},
+        );
       } else {
         final cached = await cache.find(ref, touch: true);
         if (generation != _loadGeneration) return;
@@ -1482,6 +1674,16 @@ class PlaybackCoordinator extends ChangeNotifier {
         diagnostics?.record(
           'playback',
           cached == null ? 'remote_ticket_open' : 'cached_file_open',
+          details: {'load': generation, 'intent': _playIntentGeneration},
+        );
+        diagnostics?.record(
+          'playback',
+          'source_selected',
+          details: {
+            'source': cached == null ? 'proxy' : 'cache',
+            'cache_hit': cached != null,
+            'load': generation,
+          },
         );
       }
       // Fade out any previous output before replacing its media source.
@@ -1493,7 +1695,16 @@ class PlaybackCoordinator extends ChangeNotifier {
         await _setPlaybackGain(0, gainGeneration);
       }
       if (generation != _loadGeneration) return;
-      diagnostics?.record('playback', 'native_open_started');
+      diagnostics?.record(
+        'playback',
+        'native_open_started',
+        details: {
+          'load': generation,
+          'intent': _playIntentGeneration,
+          'resume_ms': resumeMs,
+        },
+      );
+      _snapshotNative('native_open_before');
       await _openNative(
         Media(uri.toString()),
         play: shouldPlay,
@@ -1501,7 +1712,12 @@ class PlaybackCoordinator extends ChangeNotifier {
         resumeMs: resumeMs,
       );
       if (generation != _loadGeneration) return;
-      diagnostics?.record('playback', 'player_opened');
+      diagnostics?.record(
+        'playback',
+        'player_opened',
+        details: {'load': generation, 'intent': _playIntentGeneration},
+      );
+      _snapshotNative('native_open_after');
       _watchdogPositionMs = position.inMilliseconds;
       _progressWatch.reset();
       // _openNative already applies the resume seek and any intervening pause
@@ -1799,7 +2015,23 @@ class PlaybackCoordinator extends ChangeNotifier {
     final navigationEpoch = _navigationEpoch;
     _awaitingProgressIntent = intentGeneration;
     _lastPlayCommandAt = DateTime.now();
-    diagnostics?.record('playback', 'play_requested');
+    diagnostics?.record(
+      'playback',
+      'play_requested',
+      details: {
+        'intent': intentGeneration,
+        'load': _loadGeneration,
+        'nav': navigationEpoch,
+        'focus_epoch': focusEpoch,
+        'position_ms': position.inMilliseconds,
+        'source': _openedWithProxy
+            ? 'proxy'
+            : (_openedFromCompleteCache ? 'cache' : 'local'),
+        'focus_blocked': _focusWasLost,
+        'playing': _playRequested,
+      },
+    );
+    _snapshotNative('play_requested');
     _userPaused = false;
     if (current == null) {
       diagnostics?.record('playback', 'play_prepare_current_started');
@@ -1828,6 +2060,11 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     // All play paths (reuse, cached-file reopen, HTTP ticket refresh) obtain
     // focus BEFORE native open, instead of bypassing focus in the reload arm.
+    diagnostics?.record(
+      'audio_focus',
+      'focus_request',
+      details: {'intent': intentGeneration, 'focus_epoch': focusEpoch},
+    );
     var focusGranted = _session == null;
     try {
       if (_session != null) focusGranted = await _session!.setActive(true);
@@ -1838,6 +2075,15 @@ class PlaybackCoordinator extends ChangeNotifier {
         details: {'type': e.runtimeType.toString()},
       );
     }
+    diagnostics?.record(
+      'audio_focus',
+      'focus_result',
+      details: {
+        'intent': intentGeneration,
+        'focus_epoch': focusEpoch,
+        'granted': focusGranted,
+      },
+    );
     if (intentGeneration != _playIntentGeneration ||
         navigationEpoch != _navigationEpoch ||
         currentRef != requestedRef ||
@@ -1864,6 +2110,14 @@ class PlaybackCoordinator extends ChangeNotifier {
         requestedRef != null) {
       try {
         switchToCompleteCache = await cache.find(requestedRef) != null;
+        diagnostics?.record(
+          'playback',
+          'resume_cache_checked',
+          details: {
+            'intent': intentGeneration,
+            'cache_hit': switchToCompleteCache,
+          },
+        );
       } catch (e) {
         // Cache lookup is best effort. A transient filesystem error must not
         // make the notification Play command fail when the proxy still works.
@@ -1960,7 +2214,12 @@ class PlaybackCoordinator extends ChangeNotifier {
           intentGeneration != _playIntentGeneration ||
           _focusWasLost)
         return;
-      diagnostics?.record('playback', 'native_play_started');
+      diagnostics?.record(
+        'playback',
+        'native_play_started',
+        details: {'intent': intentGeneration, 'load': _loadGeneration},
+      );
+      _snapshotNative('native_play_before');
       final started = await _runNativeCommand(
         (native) async {
           await native.play();
@@ -1976,7 +2235,12 @@ class PlaybackCoordinator extends ChangeNotifier {
       if (started &&
           _playRequested &&
           intentGeneration == _playIntentGeneration) {
-        diagnostics?.record('playback', 'native_play_completed');
+        diagnostics?.record(
+          'playback',
+          'native_play_completed',
+          details: {'intent': intentGeneration, 'load': _loadGeneration},
+        );
+        _snapshotNative('native_play_after');
         _verifyResumeProgress(
           ref: requestedRef,
           generation: _loadGeneration,
@@ -1999,11 +2263,18 @@ class PlaybackCoordinator extends ChangeNotifier {
       _userPaused = true;
     }
     ++_playIntentGeneration;
+    _cancelPendingEndError();
     diagnostics?.record(
       'playback',
       'pause_requested',
-      details: {'system': system},
+      details: {
+        'system': system,
+        'intent': _playIntentGeneration,
+        'load': _loadGeneration,
+        'position_ms': position.inMilliseconds,
+      },
     );
+    _snapshotNative('pause_requested');
     _playRequested = false;
     _pausedAt = DateTime.now();
     _awaitingProgressIntent = null;
@@ -2168,6 +2439,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> _failed(String reason, {bool manual = false}) async {
+    final transitionAtFailure = _transitionEpoch;
     diagnostics?.record(
       'playback',
       'recovery_started',
@@ -2200,6 +2472,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     final source = ref == null ? null : await db.source(ref.sourceId);
     if (_loadGeneration != recoveryGeneration ||
+        _transitionEpoch != transitionAtFailure ||
         currentRef != ref ||
         !_playRequested ||
         _userPaused) {
@@ -2225,6 +2498,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       await Future<void>.delayed(Duration(milliseconds: 400 * _reconnects));
       if (currentRef == ref &&
           _loadGeneration == recoveryGeneration &&
+          _transitionEpoch == transitionAtFailure &&
           !_userPaused &&
           _playRequested) {
         await _loadCurrent(autoplay: true, manual: false);
@@ -2246,6 +2520,7 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> seek(Duration target) async {
     _cancelResumeProgressTimer();
+    _cancelPendingEndError();
     _awaitingProgressIntent = null;
     ++_playIntentGeneration;
     final generation = _loadGeneration;
@@ -2564,6 +2839,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_gainGeneration;
     _cancelFocusResume();
     _cancelResumeProgressTimer();
+    _cancelPendingEndError();
     _cancelAhead();
     _stallTimer?.cancel();
     _stallTimer = null;
@@ -2582,6 +2858,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_gainGeneration;
     _cancelFocusResume();
     _cancelResumeProgressTimer();
+    _cancelPendingEndError();
     _stallTimer?.cancel();
     _stallTimer = null;
     _notificationClockTimer?.cancel();

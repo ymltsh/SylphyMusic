@@ -55,6 +55,11 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
     }
 }
 
+dependencies {
+    // AudioService snapshot calls expose its MediaBrowserServiceCompat parent.
+    implementation("androidx.media:media:1.7.0")
+}
+
 flutter {
     source = "../.."
 }

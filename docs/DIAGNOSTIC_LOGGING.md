@@ -6,7 +6,9 @@
 
 后台播放 P0 补丁增加本地代理探测 / 重启事件与 `dart_timer_delayed`，白名单字段 `gap_ms` 记录 Dart 看门狗相邻回调间隔。代理健康只表示回环 HTTP 监听器响应，不代表远程音源正常。Android 原生端另以 `SylphyLifecycle` 标签向系统 logcat 记录 Application 创建、Activity 可见 / 隐藏和进程 PID，不含来源、账号或曲目信息；这些原生日志独立于应用诊断开关，不包含在应用导出的诊断文件中。
 
-磁盘使用：保存在应用私有目录 `sylphy_music/diagnostics/`，最多 3 × 512 KiB 的 JSON Lines 日志，满额轮转，追加由异步写队列处理；导出等待队列写入完成。日志记录失败不会中断音乐播放。关闭仅停止写入；清除操作删除保留的轮转文件。卸载应用会清除应用私有文件。
+播放稳定性诊断 V2 增加 Dart 单调时间与序列号、播放意图 / 加载代次、缓存优先来源决策、音频焦点结果、恢复检查实际延迟、AO 重载前后 Android 服务快照。Android 快照不包含 AudioTrack PCM 写入帧数与播放头，不能单凭 MediaSession 进度判断发声。详见 [播放稳定性诊断 V2](PLAYBACK_STABILITY_DIAGNOSTICS_V2.md)。
+
+磁盘使用：保存在应用私有目录 `sylphy_music/diagnostics/`，最多 4 × 1024 KiB 的 JSON Lines 日志，满额轮转，追加由异步写队列处理；导出等待队列写入完成。日志记录失败不会中断音乐播放。关闭仅停止写入；清除操作删除保留的轮转文件。卸载应用会清除应用私有文件。
 
 导出：平台文件保存对话框 `.txt`；Android/Windows 可在系统分享界面作为文本附件分享。Linux 因 share_plus 不支持共享文件，使用“导出诊断日志”保存后通过文件管理器分享。分享前建议检查文件，文件交由用户选择的第三方应用后不再受本应用控制。
 

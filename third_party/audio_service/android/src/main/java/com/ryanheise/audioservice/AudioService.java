@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.MethodChannel;
 
 public class AudioService extends MediaBrowserServiceCompat {
     public static final String CONTENT_STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
@@ -291,6 +292,9 @@ public class AudioService extends MediaBrowserServiceCompat {
     private int repeatMode;
     private int shuffleMode;
     private boolean notificationCreated;
+    // Monotonic native media transport sequence, correlated with Dart intent
+    // via the app's opt-in playback_diagnostics MethodChannel.
+    private int nativeTransportSequence = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ForegroundResumeState foregroundResume = new ForegroundResumeState();
     private long lastForegroundDenialMs = -1;
@@ -310,6 +314,45 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     public boolean isPlaying() {
         return playing;
+    }
+
+    /**
+     * Native-service snapshot, not PCM evidence. Called by the long-lived
+     * Flutter engine's diagnostic channel, not by the Activity lifecycle.
+     * Never include media IDs, source URLs, notification contents or tokens.
+     */
+    public static Map<String, Object> diagnosticSnapshot(Context context) {
+        Map<String, Object> data = new HashMap<>();
+        final AudioService service = instance;
+        data.put("service_alive", service != null);
+        data.put("native_pid", android.os.Process.myPid());
+        data.put("native_uptime_ms", SystemClock.elapsedRealtime());
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (power != null) {
+            data.put("interactive", power.isInteractive());
+            if (Build.VERSION.SDK_INT >= 23) data.put("device_idle", power.isDeviceIdleMode());
+        }
+        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (audio != null) {
+            // This is system-wide audio activity, NOT proof this app outputs PCM.
+            data.put("music_active", audio.isMusicActive());
+            data.put("audio_mode", audio.getMode());
+        }
+        if (service != null) {
+            data.put("native_seq", service.nativeTransportSequence);
+            data.put("fgs_requested", service.foregroundResume.isForeground());
+            data.put("fgs_confirmed", service.foregroundResume.isOsConfirmed());
+            Boolean foreground = service.observedOwnServiceForeground();
+            data.put("os_fgs", foreground == null ? "unknown" : (foreground ? "yes" : "no"));
+            data.put("wake_lock", service.wakeLock != null && service.wakeLock.isHeld());
+            data.put("playing", service.playing);
+            data.put("session_state", service.processingState.name().toLowerCase(java.util.Locale.ROOT));
+            data.put("session_moving", service.sessionSpeed > 0f);
+            data.put("session_position_ms", Math.max(0L, Math.min(1000000000L, service.sessionPosition)));
+        } else {
+            data.put("os_fgs", "unknown");
+        }
+        return data;
     }
 
     public int getRepeatMode() {
@@ -362,6 +405,19 @@ public class AudioService extends MediaBrowserServiceCompat {
         };
 
         flutterEngine = AudioServicePlugin.getFlutterEngine(this);
+        // A media-service cold start may run without an Activity. Own the same
+        // diagnostic channel here as a fallback for a headless engine.
+        final Context diagnosticContext = getApplicationContext();
+        MethodChannel nativeDiagnosticChannel = new MethodChannel(
+                flutterEngine.getDartExecutor().getBinaryMessenger(),
+                "music.sylphy/playback_diagnostics");
+        nativeDiagnosticChannel.setMethodCallHandler((call, result) -> {
+            if ("snapshot".equals(call.method)) {
+                result.success(diagnosticSnapshot(diagnosticContext));
+            } else {
+                result.notImplemented();
+            }
+        });
         System.out.println("flutterEngine warmed up");
     }
 
@@ -560,8 +616,16 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
         this.compactActionIndices = compactActionIndices;
         AudioProcessingState oldProcessingState = this.processingState;
+        boolean oldPlaying = this.playing;
+        boolean oldMoving = this.sessionSpeed > 0f;
         this.processingState = processingState;
         this.playing = playing;
+        if (oldPlaying != playing || oldProcessingState != processingState || oldMoving != (speed > 0f)) {
+            Log.i("SylphyMedia", "media_state playing=" + playing
+                    + " processing=" + processingState.name()
+                    + " speed_positive=" + (speed > 0f)
+                    + " native_seq=" + nativeTransportSequence);
+        }
         this.repeatMode = repeatMode;
         this.shuffleMode = shuffleMode;
 
@@ -1110,7 +1174,10 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPlay() {
-            Log.i("SylphyMedia", "session=play listener=" + (listener != null));
+            nativeTransportSequence++;
+            Log.i("SylphyMedia", "session=play seq=" + nativeTransportSequence
+                    + " uptime_ms=" + SystemClock.elapsedRealtime()
+                    + " listener=" + (listener != null));
             if (listener == null) return;
             prepareForegroundForMediaPlay();
             listener.onPlay();
@@ -1207,7 +1274,10 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPause() {
-            Log.i("SylphyMedia", "session=pause listener=" + (listener != null));
+            nativeTransportSequence++;
+            Log.i("SylphyMedia", "session=pause seq=" + nativeTransportSequence
+                    + " uptime_ms=" + SystemClock.elapsedRealtime()
+                    + " listener=" + (listener != null));
             cancelProvisionalForeground();
             if (listener == null) return;
             listener.onPause();

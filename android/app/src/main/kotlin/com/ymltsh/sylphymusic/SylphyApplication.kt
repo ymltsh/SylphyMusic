@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.ryanheise.audioservice.AudioService
 import com.ryanheise.audioservice.AudioServicePlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
@@ -29,6 +30,21 @@ class SylphyApplication : Application() {
         if (installedEngine === engine) return engine
         overlay.hide()
         SystemNotifications.register(this, engine)
+        // Register on the engine owned by audio_service, not MainActivity:
+        // notification/headset playback still needs the channel in background.
+        MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/playback_diagnostics")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "snapshot") {
+                    result.notImplemented()
+                } else {
+                    try {
+                        result.success(AudioService.diagnosticSnapshot(this))
+                    } catch (error: Exception) {
+                        Log.w("SylphyDiagnostics", "native_snapshot_failed type=${error.javaClass.simpleName}")
+                        result.error("snapshot_unavailable", "Native status unavailable", null)
+                    }
+                }
+            }
         installedEngine = engine
         dartStarts = 0
         Log.i("SylphyLifecycle", "engine_attached engine=${System.identityHashCode(engine)} pid=${android.os.Process.myPid()}")
