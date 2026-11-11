@@ -14,6 +14,8 @@ class ApiSettings extends ChangeNotifier {
   static const defaultQuoteUrl = 'https://v1.hitokoto.cn/?encode=json';
   static const defaultGitHubMirror = 'https://hub.wgen.top/';
   static const defaultLrcApiUrl = 'https://api.lrc.cx/lyrics';
+  static const defaultLlmUrl = 'https://api.openai.com/v1/chat/completions';
+  static const defaultLlmModel = 'gpt-4o-mini';
   static const fallbackQuote = '音乐随心，聆听自在。';
   final AppDb db;
   final http.Client Function() _clientFactory;
@@ -22,6 +24,11 @@ class ApiSettings extends ChangeNotifier {
   String githubMirror = defaultGitHubMirror;
   bool lrcApiEnabled = false;
   String lrcApiUrl = defaultLrcApiUrl;
+  bool llmEnabled = false;
+  String llmUrl = defaultLlmUrl;
+  String llmModel = defaultLlmModel;
+  String llmMode = 'assist'; // assist or lead
+  int llmRevision = 0;
   String quote = fallbackQuote;
   String _quoteDay = '';
   int _requestId = 0;
@@ -76,6 +83,84 @@ class ApiSettings extends ChangeNotifier {
     return uri.replace(path: endpoint).toString();
   }
 
+  static bool isLoopbackHost(String host) {
+    final h = host.toLowerCase();
+    return h == 'localhost' || h == '127.0.0.1' || h == '::1' || h == '[::1]';
+  }
+
+  static String validateLlmUrl(String value) {
+    final candidate = value.trim().isEmpty ? defaultLlmUrl : value.trim();
+    final uri = Uri.tryParse(candidate);
+    if (uri == null ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        (uri.scheme != 'https' &&
+            !(uri.scheme == 'http' && isLoopbackHost(uri.host)))) {
+      throw const FormatException(
+        'LLM 接口需要 HTTPS 地址（本机回环可使用 HTTP），不允许嵌入凭据或查询参数',
+      );
+    }
+    final path = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    if (path.isEmpty || path == '/') {
+      throw const FormatException('请填写完整的 /v1/chat/completions 等兼容接口路径');
+    }
+    return uri.toString();
+  }
+
+  static String validateLlmModel(String value) {
+    final model = value.trim();
+    if (model.isEmpty ||
+        model.length > 100 ||
+        model.contains(RegExp(r'[\x00-\x1f]'))) {
+      throw const FormatException('请输入有效的 LLM 模型名称');
+    }
+    return model;
+  }
+
+  Future<void> _updateLlmRevision() async {
+    llmRevision++;
+    await db.setSetting('api_llm_revision', llmRevision.toString());
+    notifyListeners();
+  }
+
+  Future<void> setLlmEnabled(bool value) async {
+    if (llmEnabled == value) return;
+    await db.setSetting('api_llm_enabled', value.toString());
+    llmEnabled = value;
+    await _updateLlmRevision();
+  }
+
+  Future<void> setLlmUrl(String value) async {
+    final next = validateLlmUrl(value);
+    if (llmUrl == next) return;
+    await db.setSetting('api_llm_url', next);
+    llmUrl = next;
+    await _updateLlmRevision();
+  }
+
+  Future<void> setLlmModel(String value) async {
+    final next = validateLlmModel(value);
+    if (llmModel == next) return;
+    await db.setSetting('api_llm_model', next);
+    llmModel = next;
+    await _updateLlmRevision();
+  }
+
+  Future<void> setLlmMode(String value) async {
+    if (value != 'assist' && value != 'lead') {
+      throw const FormatException('未知的 LLM 推荐模式');
+    }
+    if (llmMode == value) return;
+    await db.setSetting('api_llm_mode', value);
+    llmMode = value;
+    await _updateLlmRevision();
+  }
+
+  /// Called after a secret change; the secret itself is kept only in AuthVault.
+  Future<void> llmCredentialChanged() => _updateLlmRevision();
+
   static String parseQuote(String response) {
     final value = jsonDecode(response);
     if (value is String && value.trim().isNotEmpty) return value.trim();
@@ -113,6 +198,22 @@ class ApiSettings extends ChangeNotifier {
       lrcApiUrl = defaultLrcApiUrl;
     }
     lrcApiEnabled = await db.setting('api_lrc_enabled') == 'true';
+    try {
+      llmUrl = validateLlmUrl(await db.setting('api_llm_url') ?? '');
+    } on FormatException {
+      llmUrl = defaultLlmUrl;
+    }
+    try {
+      llmModel = validateLlmModel(
+        await db.setting('api_llm_model') ?? defaultLlmModel,
+      );
+    } on FormatException {
+      llmModel = defaultLlmModel;
+    }
+    final storedMode = await db.setting('api_llm_mode');
+    llmMode = storedMode == 'lead' ? 'lead' : 'assist';
+    llmEnabled = await db.setting('api_llm_enabled') == 'true';
+    llmRevision = int.tryParse(await db.setting('api_llm_revision') ?? '') ?? 0;
     _quoteDay = await db.setting('api_quote_day') ?? '';
     final cached = await db.setting('api_quote_text');
     quote = cached != null && cached.trim().isNotEmpty ? cached : fallbackQuote;

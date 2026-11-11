@@ -216,3 +216,14 @@ WebDAV 扫描范围保存于来源配置：SQLite v8 为 sources 增加 webdav_b
 缓存任务按 jobId 持有当前曲目的 TransferToken，先登记令牌再核对数据库状态；取消或暂停会取消令牌，避免状态检查与 fetchWhole 之间的竞态启动新请求。移除任务先取消仍活跃的工作，再事务删除任务条目及任务记录；已完成且校验通过的整曲缓存保留。下载结束后的状态更新附带原状态条件，任务记录已移除时不重新创建；失败任务同时提供重试和移除入口。
 
 统一缓存额度由 CacheManager 与 MediaAssetStore 共享的 UnifiedCacheQuota 管理，音频、封面和歌词按物理文件计费并跨类型 LRU 淘汰；手动歌词计入用量但不自动删除。SQLite v9 新增歌曲资源关联表 cache_asset_links，保留 v8 WebDAV 范围迁移。资源读取、写入、清理和配额淘汰共用互斥锁，准入保留将复用的共享文件；清理读取中的资源延迟到租约释放后删除。缓存任务下载可选封面 / 歌词期间保护刚完成的音频，每一步核对取消状态；可选资源失败不使完整音频任务失败。
+
+## LLM 增强推荐（v11）
+
+默认关闭的 `LlmRecommendationClient` 由 `RecommendationService` 持有，
+在每日精选和专辑精选的有界 SQL 候选集合之上进行可选选择、重排与推荐文案生成。
+LLM 响应中的整数候选 ID 经本地校验；不更改 TrackRef，不发送音源凭据与音频。
+OpenAI Chat Completions 兼容地址、模型、参与模式及启用开关保存在 ApiSettings，
+密钥只保存在 AuthVault；失败回退本地推荐。
+SQLite v11 为推荐快照增加 introduction 和 llm_tag 字段，以保证同一天的文案与
+配置版本可复现，播放器会话不受推荐刷新影响。
+使用、限制与验收见 [LLM 推荐增强](LLM_RECOMMENDATION.md)。

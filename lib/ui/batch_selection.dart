@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
+import 'playlist_picker_sheet.dart';
 
 /// Selection is expressed as explicit IDs or "all in this query except IDs".
 /// It never requires loading every SQLite row merely to show checked state.
@@ -196,23 +197,14 @@ Future<bool> showBatchTrackActions(
                         ))),
           );
           if (!context.mounted) return false;
-          final chosen = await showDialog<PlaylistModel>(
-            context: context,
-            builder: (dialog) => SimpleDialog(
-              title: const Text('添加到歌单'),
-              children: [
-                for (final p in candidates)
-                  SimpleDialogOption(
-                    onPressed: () => Navigator.pop(dialog, p),
-                    child: Text(p.name),
-                  ),
-              ],
-            ),
+          final chosen = await showPlaylistPickerSheet(
+            context,
+            candidates: candidates.toList(),
+            sources: app.sources,
+            trackCount: refs.length,
           );
           if (chosen == null) return false;
-          final keys = await app.db.playlistKeys(chosen.id);
-          keys.addAll(refs.map((ref) => ref.key));
-          await app.setPlaylistKeys(chosen, keys);
+          await appendToPlaylistChoice(app, chosen, refs);
         case 'cache':
           final online = [
             for (final ref in refs)

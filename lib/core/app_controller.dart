@@ -39,6 +39,7 @@ import 'listening_history.dart';
 import '../data/recommendation_repository.dart';
 import '../services/listening_analytics.dart';
 import '../services/recommendation_service.dart';
+import '../services/llm_recommendations.dart';
 import 'player_layout_store.dart';
 
 class SylphyApp extends ChangeNotifier {
@@ -89,6 +90,8 @@ class SylphyApp extends ChangeNotifier {
   late final recommendations = RecommendationService(
     db,
     recommendationRepository,
+    diagnostics: diagnostics,
+    llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
   );
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};

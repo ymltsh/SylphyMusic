@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
+import 'playlist_picker_sheet.dart';
 
 Future<void> performTrackAction(
   BuildContext context,
@@ -32,25 +33,18 @@ Future<void> performTrackAction(
                       (s) => s.id == p.sourceId && s.kind.cloudPlaylistWritable,
                     ))),
       );
-      final chosen = await showDialog<PlaylistModel>(
-        context: context,
-        builder: (context) => SimpleDialog(
-          title: const Text('添加到歌单'),
-          children: candidates
-              .map(
-                (p) => SimpleDialogOption(
-                  onPressed: () => Navigator.pop(context, p),
-                  child: Text(
-                    '${p.name}${p.kind == PlaylistKind.cloud ? ' · 云端' : ''}',
-                  ),
-                ),
-              )
-              .toList(),
-        ),
+      final chosen = await showPlaylistPickerSheet(
+        context,
+        candidates: candidates.toList(),
+        sources: app.sources,
+        trackCount: 1,
+        trackTitle: track.title,
       );
       if (chosen == null) return;
-      final keys = await app.db.playlistKeys(chosen.id);
-      keys.add(track.ref.key);
-      await app.setPlaylistKeys(chosen, keys);
+      await appendToPlaylistChoice(app, chosen, [track.ref]);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('已添加到歌单')));
+      }
   }
 }

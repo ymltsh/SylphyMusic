@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/app_controller.dart';
+import '../services/llm_recommendations.dart';
 import '../core/appearance.dart';
 import '../core/player_layout.dart';
 import 'cache_storage.dart';
@@ -50,6 +51,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   SylphyApp get app => widget.app;
+  bool _llmTestRunning = false;
   Future<void> _act(Future<void> Function() action) async {
     try {
       await action();
@@ -141,6 +143,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? _lyricCards()
                           : section == _Section.player
                           ? _playerAppearanceCards()
+                          : section == _Section.api
+                          ? _apiCards()
                           : [
                               Card(
                                 margin: EdgeInsets.zero,
@@ -268,6 +272,200 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     ],
   );
+
+  Future<void> _testLlmConnection() async {
+    if (_llmTestRunning) return;
+    setState(() => _llmTestRunning = true);
+    final future = app.recommendations.checkLlmConnection();
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => FutureBuilder<LlmConnectionTestResult>(
+          future: future,
+          builder: (context, snapshot) {
+            final result = snapshot.data;
+            final waiting = snapshot.connectionState != ConnectionState.done;
+            Widget detail(String title, String value) => Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  SelectableText(value),
+                ],
+              ),
+            );
+            return AlertDialog(
+              title: Text(waiting ? '正在测试 LLM 连接' : 'LLM 连接测试结果'),
+              content: SizedBox(
+                width: 600,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (waiting) ...[
+                        const LinearProgressIndicator(),
+                        const SizedBox(height: 16),
+                        const Text('正在发送合成歌曲元数据并验证模型输出，请稍候…'),
+                      ] else if (result != null) ...[
+                        Text(result.success ? '连接成功，已验证推荐 JSON 输出。' : '测试失败'),
+                        const SizedBox(height: 8),
+                        Text('HTTP 状态：${result.statusCode ?? "未收到响应"}'),
+                        Text(
+                          '耗时：${(result.elapsed.inMilliseconds / 1000).toStringAsFixed(2)} 秒',
+                        ),
+                        if (result.error.isNotEmpty)
+                          detail('具体错误', result.error),
+                        if (result.modelContent.isNotEmpty)
+                          detail('模型响应内容', result.modelContent),
+                        detail(
+                          '服务响应正文',
+                          result.responseBody.isEmpty
+                              ? '未收到响应正文'
+                              : result.responseBody,
+                        ),
+                      ] else
+                        const Text('测试未能完成，请重试。'),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('关闭'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } finally {
+      // Closing the dialog does not start another request while this one runs.
+      await future;
+      if (mounted) setState(() => _llmTestRunning = false);
+    }
+  }
+
+  List<Widget> _apiCards() => [
+    _group('每日一言', [
+      ListTile(
+        key: const ValueKey('api-quote'),
+        leading: const Icon(Icons.format_quote_rounded),
+        title: const Text('每日一言 API'),
+        subtitle: Text(app.apiSettings.quoteUrl),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: () => _editApiUrl(quote: true),
+      ),
+    ]),
+    _group('GitHub 加速', [
+      ListTile(
+        key: const ValueKey('api-github-mirror'),
+        leading: const Icon(Icons.cloud_download_outlined),
+        title: const Text('GitHub 加速 API'),
+        subtitle: Text(app.apiSettings.githubMirror),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: () => _editApiUrl(quote: false),
+      ),
+    ]),
+    _group('在线歌词', [
+      SwitchListTile(
+        key: const ValueKey('api-lrc-enabled'),
+        secondary: const Icon(Icons.lyrics_outlined),
+        title: const Text('补充在线歌词'),
+        subtitle: const Text('自动补充缺失的歌词'),
+        value: app.apiSettings.lrcApiEnabled,
+        onChanged: (value) => _act(() async {
+          if (value &&
+              !await _confirm('开启后，将歌曲名称、艺术家和专辑发送到歌词服务，以查找缺失的歌词。是否开启？')) {
+            return;
+          }
+          await app.apiSettings.setLrcApiEnabled(value);
+        }),
+      ),
+      ListTile(
+        key: const ValueKey('api-lrc-url'),
+        leading: const Icon(Icons.link_outlined),
+        title: const Text('歌词服务地址'),
+        subtitle: Text(app.apiSettings.lrcApiUrl),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLrcApiUrl,
+      ),
+      ListTile(
+        key: const ValueKey('api-lrc-auth'),
+        leading: const Icon(Icons.key_outlined),
+        title: const Text('歌词服务密钥'),
+        subtitle: const Text('可选'),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLrcApiToken,
+      ),
+    ]),
+    _group('LLM 推荐', [
+      SwitchListTile(
+        key: const ValueKey('api-llm-enabled'),
+        secondary: const Icon(Icons.auto_awesome_outlined),
+        title: const Text('LLM 增强推荐'),
+        subtitle: const Text('可选：AI 参与每日精选和专辑排序，并生成推荐词'),
+        value: app.apiSettings.llmEnabled,
+        onChanged: (value) => _act(() async {
+          if (value &&
+              !await _confirm(
+                '开启后，候选歌曲名称、歌手、专辑及有限的本机听歌统计会发送给你配置的 LLM 服务。不会发送音乐源地址、账号或音频文件；第三方接口可能收费。是否开启？',
+              ))
+            return;
+          await app.apiSettings.setLlmEnabled(value);
+        }),
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-url'),
+        leading: const Icon(Icons.link_outlined),
+        title: const Text('LLM 接口地址'),
+        subtitle: Text(app.apiSettings.llmUrl),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLlmUrl,
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-model'),
+        leading: const Icon(Icons.psychology_outlined),
+        title: const Text('LLM 模型'),
+        subtitle: Text(app.apiSettings.llmModel),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLlmModel,
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-token'),
+        leading: const Icon(Icons.key_outlined),
+        title: const Text('LLM API Key'),
+        subtitle: const Text('保存在系统安全存储；留空清除'),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLlmToken,
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-test'),
+        leading: const Icon(Icons.network_check_outlined),
+        title: Text(_llmTestRunning ? '正在测试 LLM 连接…' : '测试 LLM 连接'),
+        subtitle: const Text('仅使用合成歌曲元数据；可能产生少量 API 用量'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: app.apiSettings.llmEnabled && !_llmTestRunning
+            ? _testLlmConnection
+            : null,
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-mode'),
+        leading: const Icon(Icons.tune_outlined),
+        title: const Text('LLM 推荐参与方式'),
+        subtitle: Text(
+          app.apiSettings.llmMode == 'lead'
+              ? '主导：在扩展候选中选歌、重排和撰写推荐词'
+              : '辅助：保留本地候选，LLM 重排并撰写推荐词',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _editLlmMode,
+      ),
+    ]),
+  ];
 
   List<Widget> _lyricCards() => [
     _group('歌词页面', [
@@ -699,56 +897,7 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _downloads,
       ),
     ],
-    _Section.api => [
-      ListTile(
-        key: const ValueKey('api-quote'),
-        leading: const Icon(Icons.format_quote_rounded),
-        title: const Text('每日一言 API'),
-        subtitle: Text(app.apiSettings.quoteUrl),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: () => _editApiUrl(quote: true),
-      ),
-      const Divider(height: 1),
-      ListTile(
-        key: const ValueKey('api-github-mirror'),
-        leading: const Icon(Icons.cloud_download_outlined),
-        title: const Text('GitHub 加速 API'),
-        subtitle: Text(app.apiSettings.githubMirror),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: () => _editApiUrl(quote: false),
-      ),
-      const Divider(height: 1),
-      SwitchListTile(
-        key: const ValueKey('api-lrc-enabled'),
-        secondary: const Icon(Icons.lyrics_outlined),
-        title: const Text('补充在线歌词'),
-        subtitle: const Text('自动补充缺失的歌词'),
-        value: app.apiSettings.lrcApiEnabled,
-        onChanged: (value) => _act(() async {
-          if (value &&
-              !await _confirm('开启后，将歌曲名称、艺术家和专辑发送到歌词服务，以查找缺失的歌词。是否开启？')) {
-            return;
-          }
-          await app.apiSettings.setLrcApiEnabled(value);
-        }),
-      ),
-      ListTile(
-        key: const ValueKey('api-lrc-url'),
-        leading: const Icon(Icons.link_outlined),
-        title: const Text('歌词服务地址'),
-        subtitle: Text(app.apiSettings.lrcApiUrl),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: _editLrcApiUrl,
-      ),
-      ListTile(
-        key: const ValueKey('api-lrc-auth'),
-        leading: const Icon(Icons.key_outlined),
-        title: const Text('歌词服务密钥'),
-        subtitle: const Text('可选'),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: _editLrcApiToken,
-      ),
-    ],
+    _Section.api => _apiCards(),
     _Section.diagnostics => [
       SwitchListTile(
         key: const ValueKey('diagnostics-toggle'),
@@ -841,6 +990,79 @@ class _SettingsPageState extends State<SettingsPage> {
         await app.vault.write('lrcapi', 'token', value.trim());
       }
     });
+  }
+
+  Future<void> _editLlmUrl() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _ApiValueDialog(
+        title: 'LLM Chat Completions 地址',
+        label: 'HTTP(S) URL',
+        helper: '例如 https://api.openai.com/v1/chat/completions；本机回环允许 HTTP',
+        initial: app.apiSettings.llmUrl,
+      ),
+    );
+    if (value != null && mounted) {
+      await _act(() => app.apiSettings.setLlmUrl(value));
+    }
+  }
+
+  Future<void> _editLlmModel() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _ApiValueDialog(
+        title: 'LLM 模型名称',
+        label: '模型 ID',
+        helper: '填服务提供商支持的模型名称',
+        initial: app.apiSettings.llmModel,
+      ),
+    );
+    if (value != null && mounted) {
+      await _act(() => app.apiSettings.setLlmModel(value));
+    }
+  }
+
+  Future<void> _editLlmToken() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => const _ApiValueDialog(
+        title: 'LLM API Key',
+        label: '密钥（可选，本地模型可留空）',
+        helper: '保存空值会清除旧密钥，界面不回显已保存的密钥',
+        secret: true,
+      ),
+    );
+    if (value == null || !mounted) return;
+    await _act(() async {
+      if (value.trim().isEmpty) {
+        await app.vault.delete('llm');
+      } else {
+        await app.vault.write('llm', 'token', value.trim());
+      }
+      await app.apiSettings.llmCredentialChanged();
+    });
+  }
+
+  Future<void> _editLlmMode() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('LLM 推荐参与方式'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'assist'),
+            child: const Text('辅助推荐 · 重排现有精选并撰写推荐词'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'lead'),
+            child: const Text('主导推荐 · 从扩展候选中选择并撰写推荐词'),
+          ),
+        ],
+      ),
+    );
+    if (value != null && mounted) {
+      await _act(() => app.apiSettings.setLlmMode(value));
+    }
   }
 
   Future<void> _chooseThemeColor() async {

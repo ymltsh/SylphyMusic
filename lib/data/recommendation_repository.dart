@@ -293,13 +293,19 @@ class RecommendationRepository {
         .toSet();
   }
 
-  Future<({int id, int generation, int itemCount})?> latestSnapshot(
-    String kind,
-    String day,
-  ) async {
+  Future<
+    ({
+      int id,
+      int generation,
+      int itemCount,
+      String introduction,
+      String llmTag,
+    })?
+  >
+  latestSnapshot(String kind, String day) async {
     final rows = await database.db.query(
       'recommendation_snapshots',
-      columns: ['id', 'generation', 'item_count'],
+      columns: ['id', 'generation', 'item_count', 'introduction', 'llm_tag'],
       where: 'kind=? AND local_day=?',
       whereArgs: [kind, day],
       orderBy: 'generation DESC',
@@ -310,6 +316,8 @@ class RecommendationRepository {
       id: rows.first['id'] as int,
       generation: rows.first['generation'] as int,
       itemCount: rows.first['item_count'] as int,
+      introduction: rows.first['introduction'] as String? ?? '',
+      llmTag: rows.first['llm_tag'] as String? ?? 'local',
     );
   }
 
@@ -374,8 +382,12 @@ class RecommendationRepository {
     String day,
     int generation,
     int seed,
-    List<RecommendedTrack> items,
-  ) => _saveSnapshot(
+    List<RecommendedTrack> items, {
+    String introduction = '',
+    String llmTag = 'local',
+  }) => _saveSnapshot(
+    introduction: introduction,
+    llmTag: llmTag,
     kind: 'daily',
     day: day,
     generation: generation,
@@ -396,8 +408,10 @@ class RecommendationRepository {
     String day,
     int generation,
     int seed,
-    List<RecommendedAlbum> items,
-  ) => _saveSnapshot(
+    List<RecommendedAlbum> items, {
+    String llmTag = 'local',
+  }) => _saveSnapshot(
+    llmTag: llmTag,
     kind: 'albums',
     day: day,
     generation: generation,
@@ -417,6 +431,8 @@ class RecommendationRepository {
   );
 
   Future<int> _saveSnapshot({
+    String introduction = '',
+    String llmTag = 'local',
     required String kind,
     required String day,
     required int generation,
@@ -425,6 +441,8 @@ class RecommendationRepository {
   }) => database.db.transaction((tx) async {
     final id = await tx.insert('recommendation_snapshots', {
       'kind': kind,
+      'introduction': introduction,
+      'llm_tag': llmTag,
       'local_day': day,
       'generation': generation,
       'algorithm_version': 1,

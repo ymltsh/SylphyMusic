@@ -1,5 +1,57 @@
 # 实施与验证记录
 
+## 2026-11-12 推荐与 LLM 响应诊断日志
+
+按用户要求，将普通版与 OpenList 的推荐服务及 LLM 客户端接入现有 DiagnosticLogs，沿用默认关闭的开关、字段白名单、异步轮转及导出入口。新增推荐生成 / 缓存命中 / 空候选 / 本地选择 / LLM 应用 / 本地回退 / 完成 / 失败事件；LLM 记录请求序号与类型、模式、候选数、HTTP 状态、耗时、响应字节数、模型输出字符数、有效结果与推荐词数、非法 / 重复候选 ID 数、白名单结束原因及可用 Token 用量。失败记录固定阶段和原因码，可区分 HTTP 错误、超时、网络错误、结构 / JSON / 候选 ID 异常与配置变更。
+
+只保存结构化摘要，服务地址、模型名、密钥、曲库元数据、原始响应、模型正文、异常文字和堆栈均不进入导出日志；详细响应仍在测试弹窗查看。保留原推荐回退及播放行为，诊断和 LLM 文档同步更新。修改前备份在各工作区 .private/recommendation-logging-before/。
+
+Dart 已格式化，普通版 Android 三 ABI / Windows Release 与内部打包成功（build/internal-review/）；OpenList Android arm64 Release 编译成功（build/app/outputs/flutter-apk/app-arm64-v8a-release.apk）。各工作区构建日志 build/test_logs/recommendation-logging-build.log。未执行测试、analyze、设备检查或真实 LLM 请求，日志与功能由用户验收；未修改版本号、提交、推送或发布。
+
+## 2026-11-11 LLM 测试详情弹窗与历史说明修正
+
+普通版和 OpenList 的 LLM 连接测试改为立即打开结果弹窗，展示等待状态、成功 / 失败、HTTP 状态、耗时、具体异常阶段及信息、模型内容和服务响应正文（可选择复制）。读取非 200 正文帮助定位鉴权 / 限流 / 服务错误，区分响应结构、JSON 和候选 ID 错误。响应仍限制 128 KiB，已配置密钥及常见凭据字段脱敏；详情仅保留内存，不写入日志或快照。关闭弹窗后请求完成前仍禁止重复点击。自动推荐失败仍保留本地回退。
+
+排查用户反馈的“最近 50 首”：保存、初始化和列表读取已经支持 1000 首，残留的是侧栏说明。现文案改为“最多保留最近听过的 1000 首歌曲”，并统一通过 ListeningHistory.maxEntries 控制保存、读取与说明。旧版丢弃的历史无法补回，后续不同歌曲继续累积至上限。
+
+两工作区修改前文件保存在 .private/llm-test-dialog-before/。Dart 已格式化，普通版 Android 三 ABI / Windows Release 与内部打包成功（build/internal-review/）；OpenList Android arm64 Release 编译成功（build/app/outputs/flutter-apk/app-arm64-v8a-release.apk）。最终日志均为 build/test_logs/llm-dialog-history-build.log。未运行测试、analyze、应用启动或真实 LLM 请求；功能与设备效果由用户验收。本轮未修改版本号、提交、推送或发布。
+
+## 2026-11-11 发布 1.0.40 与 OpenList .23
+
+按用户“推送版本更新”授权，发布普通版 1.0.40+53（Android 三 ABI、Windows 安装版 / 便携版、摘要）与 OpenList 1.0.40-openlist.23+53（Android arm64、对应源码、摘要）。更新说明覆盖每日精选 / 专辑推荐、推荐设置、可选 LLM 增强、API 设置功能卡片和添加到歌单面板。两个版本重新构建并核对正式 Android 签名，OpenList JNI 与上一版一致。
+
+两个 Release 的状态、标题、正文、全部附件大小与 SHA-256 均通过发布流程核对；main/version.json、两分支 version-openlist.json 及 feature/android-openlist-lite/version.json 的原始与加速入口均核对通过。普通版保持 Latest，OpenList 作为独立特别版。仅提交并推送清单：main a609ed6、7ad8aaa；feature 6960135。源码、版本号及本地进度改动保留在工作区，未额外提交。
+
+产物：普通版 build/releases/1.0.40-53/；OpenList build/releases/1.0.40-openlist.23-53/。日志：普通版 build/test_logs/release-1.0.40-build.log；OpenList build/test_logs/release-openlist-53-build.log 和 release-openlist-53-publish.log。未运行 analyze、功能测试或设备验收。
+
+## 2026-11-11 应用添加到歌单面板 V1
+
+审阅 SylphyMusic-playlist-picker-V1-patch.zip 的安装脚本和源码后，普通版与 OpenList 均通过四处锚点兼容检查并应用；修改前备份保存于各工作区 .private/playlist-picker-v1-before/。新增共享 playlist_picker_sheet.dart，单曲和批量添加使用约 84% 高度的圆角底部面板，宽屏内容限宽 640dp，展示歌曲上下文、来源与同步状态；支持面板内新建本地歌单并添加、我的本地收藏快捷入口以及懒加载歌单列表。保留候选云歌单来源与只读限制、普通歌单重复项和原有同步路径，本地收藏新增项去重。Dart 已格式化，保留既有推荐及 API 设置卡片改动。
+
+普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/playlist-picker-v1-build.log。未运行测试、analyze、应用启动或真实云歌单写入验证，页面与交互由用户验收；未修改版本号，未提交、推送或发布。
+
+## 2026-11-11 API 设置按功能划分卡片
+
+普通版与 OpenList 的 API 设置拆为“每日一言”“GitHub 加速”“在线歌词”“LLM 推荐”四个功能卡片，复用设置页分组标题、圆角卡片与组内分隔线。保留原有配置字段、开关、编辑、连接测试和确认逻辑。Dart 已格式化。
+
+普通版 Android 三 ABI / Windows Release 编译及内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/api-settings-cards-build.log。未运行测试、analyze 或设备验收，页面效果由用户确认；未修改版本号、提交、推送或发布。
+
+## 2026-11-11 应用 LLM 推荐增强 V1
+
+按用户“应用”要求，审阅 SylphyMusic-LLM-recommendation-v1-patch.zip 安装脚本、客户端与迁移后，普通版和 OpenList 均通过 12 项预检查并直接应用。保留外观与个性化中的推荐设置入口、当前推荐系统、播放恢复及 OpenList 租约。已有文件备份在各自 .private/llm-recommendation-v1-before/。
+
+新增默认关闭的 LlmRecommendationClient，在设置 → API 设置配置兼容 Chat Completions 端点、模型、辅助 / 主导模式和安全存储密钥，开启前提示候选元数据发送与可能的 API 费用。请求仅提供有界音乐元数据与有限统计，响应只按合法整数索引重排 / 选择，推荐词及导语以普通文本展示，不修改 TrackRef、音频、来源或已建立队列。限定 HTTPS / 本机 HTTP，拒绝嵌入凭据与重定向；密钥保存在 AuthVault，不写入数据库或推荐快照。失败保留本地推荐，配置版本参与每日快照缓存。
+
+SQLite v10→v11 为快照新增 introduction 与 llm_tag，旧版本通过前向迁移保留数据。首页 / 每日精选显示导语与单条推荐词，推荐专辑详情可显示完整推荐理由。退出补充关闭在途 HTTP 客户端，由 RecommendationService.shutdown 等待任务结束后再关闭数据库。Dart 已格式化，架构、索引和 LLM 说明同步更新。
+
+普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/llm-recommendation-v1-build.log。
+
+未配置密钥、开启 LLM 或发起任何 LLM 接口请求；未新增或运行测试，未执行 analyze、应用启动、实际数据库迁移或设备验收；未修改版本号或更新清单，未提交、推送或发布。模型兼容性、实际迁移、推荐和页面效果仍由用户确认。
+
+## 2026-11-11 推荐设置移入个性化分组
+
+按用户要求，将普通版与 OpenList 的“推荐设置”入口从“音乐与存储”移至“外观与个性化”分组首项，设置功能保留。推荐文档同步新路径，Dart 已格式化。普通版 Android 三 ABI / Windows Release 与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/recommendation-settings-group-build.log。未运行测试、analyze 或设备验证，未修改版本号，未提交、推送或发布。
+
 ## 2026-11-11 设置页增加推荐设置入口
 
 按用户要求，普通版与 OpenList 的“设置 → 音乐与存储”新增“推荐设置”入口，进入独立 RecommendationSettingsPage。提供带当前状态的个性化推荐、在线热度开关和清除推荐统计；读取在线热度失败可重试，操作期间禁用重复操作并显示进度。清除前确认操作后果，更改后重新生成每日精选与专辑推荐并 reload 刷新首页。每日精选原有菜单快捷操作保留，复用既有服务与数据库设置，不改变数据库结构。

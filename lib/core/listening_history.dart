@@ -8,6 +8,7 @@ import 'models.dart';
 
 /// Bounded personal history; stores identities only and follows actual playback.
 class ListeningHistory extends ChangeNotifier {
+  static const maxEntries = 1000;
   ListeningHistory(this.db, this.playback);
   final AppDb db;
   final PlaybackCoordinator playback;
@@ -19,7 +20,7 @@ class ListeningHistory extends ChangeNotifier {
     try {
       refs = (jsonDecode(await db.setting('listening_history') ?? '[]') as List)
           .whereType<String>()
-          .take(1000)
+          .take(maxEntries)
           .map(TrackRef.parse)
           .toList();
     } catch (_) {
@@ -38,7 +39,7 @@ class ListeningHistory extends ChangeNotifier {
       return;
     }
     _last = ref.key;
-    refs = [ref, ...refs.where((r) => r != ref)].take(1000).toList();
+    refs = [ref, ...refs.where((r) => r != ref)].take(maxEntries).toList();
     final value = jsonEncode(refs.map((r) => r.key).toList());
     _pending = _pending
         .then((_) => db.setSetting('listening_history', value))

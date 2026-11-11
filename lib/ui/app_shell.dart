@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/listening_history.dart';
 import '../core/models.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
@@ -535,7 +536,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       ListTile(
         leading: const Icon(Icons.queue_music),
         title: const Text('最近播放'),
-        subtitle: const Text('最近听过的 50 首歌曲'),
+        subtitle: const Text('最多保留最近听过的 ${ListeningHistory.maxEntries} 首歌曲'),
         onTap: () => _open('最近播放', () => ListeningHistoryPage(app: app)),
       ),
       ListTile(

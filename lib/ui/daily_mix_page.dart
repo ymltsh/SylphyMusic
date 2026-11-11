@@ -18,6 +18,27 @@ class DailyMixPage extends StatefulWidget {
 class _DailyMixPageState extends State<DailyMixPage> {
   late Future<DailyMix> _mix = widget.app.recommendations.daily();
   bool _working = false;
+  int _llmRevision = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _llmRevision = widget.app.apiSettings.llmRevision;
+    widget.app.apiSettings.addListener(_settingsChanged);
+  }
+
+  void _settingsChanged() {
+    final updated = widget.app.apiSettings.llmRevision;
+    if (!mounted || _llmRevision == updated) return;
+    _llmRevision = updated;
+    setState(() => _mix = widget.app.recommendations.daily());
+  }
+
+  @override
+  void dispose() {
+    widget.app.apiSettings.removeListener(_settingsChanged);
+    super.dispose();
+  }
 
   Future<void> _play(DailyMix mix, {int start = 0}) async {
     if (mix.items.isEmpty) return;
@@ -151,6 +172,23 @@ class _DailyMixPageState extends State<DailyMixPage> {
                 ],
               ),
             ),
+            if (mix.introduction.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.auto_awesome_outlined, size: 19),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        mix.introduction,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: ListView.builder(
                 itemCount: mix.items.length,

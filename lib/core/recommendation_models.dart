@@ -4,10 +4,16 @@ import 'models.dart';
 
 /// A complete, dated, locally reproducible set of recommendations.
 class DailyMix {
-  const DailyMix(this.day, this.generation, this.items);
+  const DailyMix(
+    this.day,
+    this.generation,
+    this.items, {
+    this.introduction = '',
+  });
   final String day;
   final int generation;
   final List<RecommendedTrack> items;
+  final String introduction;
   List<TrackRef> get refs => items.map((item) => item.track.ref).toList();
 }
 

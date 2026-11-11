@@ -23,3 +23,13 @@ flutter build apk --release
 ```
 
 用户可在 Android 真实设备观察长时间锁屏、自动切歌、弱网、手动暂停、媒体通知状态，以及分享应用对附件的接收行为。此功能不申请额外媒体/文件权限。
+
+## 推荐与 LLM 响应诊断
+
+沿用设置 → 诊断与反馈 → 记录诊断日志开关和导出入口。开启后，重新生成每日精选 / 专辑推荐或执行 LLM 连接测试即可采集；命中已有快照时记录 snapshot_reused，不会为了记录日志强制请求 LLM。
+
+- recommendation：generation_started、snapshot_reused、generation_empty、local_selected、llm_applied、local_fallback、generation_completed、generation_failed；type 区分 daily / albums，记录结果数和固定原因码。
+- llm：request_started、response_received、request_succeeded / request_failed；request_id 关联同次请求，type 区分 daily / albums / connection_test。记录参与方式、候选数、请求数、HTTP 状态、耗时、实际接收字节数、模型内容字符数、有效结果 / 推荐词数、无效 / 重复 ID 数，以及可用的 Token 用量和结束原因。
+- stage：prepare / connect / read_response / response_json / model_json。失败 reason 区分 disabled、configuration_changed、insecure_endpoint、response_too_large、http_error、timeout、network_error、invalid_json、invalid_envelope、missing_choices、missing_message、missing_content、content_too_large、missing_order、no_valid_ids、request_error 等；结合 http_status 可区分鉴权、限流或服务异常。
+
+导出仍只包含白名单字段、整数和固定枚举，不写入服务地址、模型名、密钥、曲目 / 专辑元数据、模型推荐正文、原始服务响应、异常文字或堆栈。详细响应及错误文字仍仅在测试弹窗中查看。日志失败不影响推荐和播放；关闭开关后不新增记录。

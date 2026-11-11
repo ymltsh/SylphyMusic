@@ -30,6 +30,7 @@ class AppDb {
       local_day TEXT NOT NULL,generation INTEGER NOT NULL,
       algorithm_version INTEGER NOT NULL,seed INTEGER NOT NULL,
       item_count INTEGER NOT NULL DEFAULT 0,created_at_ms INTEGER NOT NULL,
+      introduction TEXT NOT NULL DEFAULT '',llm_tag TEXT NOT NULL DEFAULT 'local',
       UNIQUE(kind,local_day,generation))''',
     '''CREATE TABLE recommendation_items(
       snapshot_id INTEGER NOT NULL,position INTEGER NOT NULL,
@@ -117,7 +118,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 10,
+      version: 11,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -187,6 +188,13 @@ class AppDb {
           for (final sql in _recommendationSchema) {
             await database.execute(sql);
           }
+        } else if (oldVersion < 11) {
+          await database.execute(
+            "ALTER TABLE recommendation_snapshots ADD COLUMN introduction TEXT NOT NULL DEFAULT ''",
+          );
+          await database.execute(
+            "ALTER TABLE recommendation_snapshots ADD COLUMN llm_tag TEXT NOT NULL DEFAULT 'local'",
+          );
         }
       },
       onCreate: (d, v) async {

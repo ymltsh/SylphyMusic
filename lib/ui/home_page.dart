@@ -38,6 +38,17 @@ class _HomePageState extends State<HomePage> {
   final Map<String, String> _albumReasons = {};
   late int revision;
   int _albumRefreshEpoch = 0;
+  int _lastLlmRevision = -1;
+
+  void _llmSettingsChanged() {
+    final updated = widget.app.apiSettings.llmRevision;
+    if (!mounted || updated == _lastLlmRevision) return;
+    _lastLlmRevision = updated;
+    setState(() {
+      dailyMix = widget.app.recommendations.daily();
+      albums = _albums();
+    });
+  }
 
   @override
   void initState() {
@@ -46,6 +57,8 @@ class _HomePageState extends State<HomePage> {
     albums = _albums();
     dailyMix = widget.app.recommendations.daily();
     widget.app.catalogListenable.addListener(_catalogChanged);
+    _lastLlmRevision = widget.app.apiSettings.llmRevision;
+    widget.app.apiSettings.addListener(_llmSettingsChanged);
   }
 
   Future<CatalogPage> _albums() async {
@@ -104,7 +117,10 @@ class _HomePageState extends State<HomePage> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.app, widget.app)) {
       oldWidget.app.catalogListenable.removeListener(_catalogChanged);
+      oldWidget.app.apiSettings.removeListener(_llmSettingsChanged);
       widget.app.catalogListenable.addListener(_catalogChanged);
+      widget.app.apiSettings.addListener(_llmSettingsChanged);
+      _lastLlmRevision = widget.app.apiSettings.llmRevision;
     }
     if (!identical(oldWidget.app, widget.app) ||
         revision != widget.app.catalogRevision) {
@@ -118,6 +134,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     widget.app.catalogListenable.removeListener(_catalogChanged);
+    widget.app.apiSettings.removeListener(_llmSettingsChanged);
     super.dispose();
   }
 
@@ -188,14 +205,36 @@ class _HomePageState extends State<HomePage> {
         MaterialPageRoute(
           builder: (_) => Scaffold(
             appBar: AppBar(title: Text(album)),
-            body: LibraryBrowser(
-              app: app,
-              query: CatalogQuery(
-                view: 1,
-                sourceId: track.ref.sourceId,
-                sort: 'track_number',
-              ).songsIn('album', row.key),
-              onAction: widget.onAction,
+            body: Column(
+              children: [
+                if (_albumReasons['${track.ref.sourceId}|${row.key}'] != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.music_note_outlined, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _albumReasons['${track.ref.sourceId}|${row.key}']!,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: LibraryBrowser(
+                    app: app,
+                    query: CatalogQuery(
+                      view: 1,
+                      sourceId: track.ref.sourceId,
+                      sort: 'track_number',
+                    ).songsIn('album', row.key),
+                    onAction: widget.onAction,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -384,7 +423,9 @@ class _HomePageState extends State<HomePage> {
                 leading: CoverArt(app: app, track: first, size: 64),
                 title: const Text('今天，听点喜欢的'),
                 subtitle: Text(
-                  '${mix.items.length} 首 · 熟悉的旋律与新的发现',
+                  mix.introduction.isEmpty
+                      ? '${mix.items.length} 首 · 熟悉的旋律与新的发现'
+                      : '${mix.items.length} 首 · ${mix.introduction}',
                   maxLines: 2,
                 ),
                 onTap: () => Navigator.push(
