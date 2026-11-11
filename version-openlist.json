@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.39-openlist.22",
-    "build": 52,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.39-openlist.22 (arm64-v8a)",
+    "version": "1.0.40-openlist.23",
+    "build": 53,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.40-openlist.23 (arm64-v8a)",
     "date": "2026-11-11",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.39-openlist.22\n\n- 改进 Android 本地与完整缓存歌曲暂停后的恢复，在持续无进度时更早尝试恢复当前音频输出，并保留失败后的重试提示。\n- 改进单曲循环的曲尾衔接，避免旧错误重连干扰循环，以及回到歌曲开头后被误判为播放停滞。\n- 支持将部分以窄空格连接的双语歌词显示为原文、译文两行，保持原时间轴。\n- 完善可选播放诊断，便于排查后台暂停、音频焦点和播放进度异常。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.40-openlist.23\n\n- 新增每日精选和专辑推荐，可结合本机收听习惯选择歌曲，并在“设置 → 外观与个性化 → 推荐设置”管理偏好。\n- 新增可选的 LLM 增强推荐，支持配置服务、模型与参与方式，提供推荐词和连接测试；默认关闭，开启前会提示数据发送范围与可能的接口费用。\n- API 设置按每日一言、GitHub 加速、在线歌词和 LLM 推荐分为独立卡片，查找配置更清晰。\n- 重新设计“添加到歌单”面板，单曲与批量操作共用，支持直接新建本地歌单、快捷加入我的收藏，并展示歌单来源与同步状态。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.39-openlist.22%2B52/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.40-openlist.23%2B53/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.39-openlist.22%2B52"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.40-openlist.23%2B53"
   },
   "history": [
+    {
+      "version": "1.0.39-openlist.22",
+      "build": 52,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.39-openlist.22 (arm64-v8a)",
+      "date": "2026-11-11",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.39-openlist.22\n\n- 改进 Android 本地与完整缓存歌曲暂停后的恢复，在持续无进度时更早尝试恢复当前音频输出，并保留失败后的重试提示。\n- 改进单曲循环的曲尾衔接，避免旧错误重连干扰循环，以及回到歌曲开头后被误判为播放停滞。\n- 支持将部分以窄空格连接的双语歌词显示为原文、译文两行，保持原时间轴。\n- 完善可选播放诊断，便于排查后台暂停、音频焦点和播放进度异常。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.39-openlist.22%2B52/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.39-openlist.22%2B52"
+    },
     {
       "version": "1.0.38-openlist.21",
       "build": 51,
