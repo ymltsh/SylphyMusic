@@ -1,5 +1,15 @@
 # 实施与验证记录
 
+## 2026-11-11 按文档应用单曲循环 / 后台稳定性 V3
+
+按用户“按照文档应用补丁”要求处理 SylphyMusic-RepeatOne-Background-Stability-V3-Bundle.zip。main 与 feature/android-openlist-lite 已具备 V2 诊断和 EOF 竞争修复，因此遵循 README 只应用 03，未重复应用 01 / 02。恢复超时日志一处因现有 Dart 格式化上下文无法直接匹配，按补丁字段适配，其余代码直接应用；保留 OpenList 播放租约、缓存优先、歌词与其他已有修改。已有文件备份在各自 .private/repeatone-background-stability-v3-before/。
+
+内部单曲循环 seek(0) 前重置旧曲尾看门狗基准，取消过期恢复检查；首个新位置到来前最多 5 秒过滤大于 4 秒的旧曲尾样本，记录新循环位置和原生命令成功 / 过期 / 失败状态。循环命令核对加载、播放意图与循环代次。Android 且开启诊断时增加 2 秒 / 3 秒纯采样，记录位置、位移、事件数、缓冲、焦点及来源，未确认时异步采集原生状态；不执行恢复，不缩短既有 12 秒检查阈值。暂停、跳转、加载、完成与关闭清理相应早期采样任务。原有 EOF 错误延迟继续保留。
+
+Dart 文件已格式化，包内应用说明与分析纳入 docs/REPEATONE_BACKGROUND_STABILITY_V3.md 和对应 ANALYSIS 文档，架构与索引同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/repeatone-background-stability-v3-build.log。
+
+未新增或运行测试，未执行 analyze、ADB、启动或设备矩阵验证，未独立复核附件引用的日志；未修改版本号或更新清单，未提交、推送或发布。单曲循环与后台恢复效果仍由用户在设备确认，诊断进度不等于 PCM 发声证据。
+
 ## 2026-11-11 应用单曲循环 EOF 错误竞争补丁
 
 按用户“应用补丁”要求，将 SylphyMusic-Repeat-One-EOF-Error-Race-Fix.zip 内补丁直接应用到 main 与 feature/android-openlist-lite，两工作区 git apply --check 均通过。保留播放稳定性诊断 V2、缓存优先恢复、歌词行内翻译、OpenList 播放租约及其他已有修改。涉及的已有播放代码、架构、索引及进度文件备份在各自 .private/repeat-one-eof-error-race-before/。

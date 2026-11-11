@@ -111,6 +111,13 @@ class PlaybackCoordinator extends ChangeNotifier {
   AudioSession? _session;
   // Sample the actual mpv AO once per track, after audio advances.
   bool _androidAudioOutputProbed = false;
+  // Repeat-one native seek does not go through the public seek() path. Ignore
+  // the previous decoder's last samples until the new <=4s position arrives.
+  bool _loopPositionResetPending = false;
+  bool _loopStaleSampleLogged = false;
+  final Stopwatch _loopResetWatch = Stopwatch();
+  int _positionEventSequence = 0;
+  final List<Timer> _earlyResumeProbeTimers = [];
   TrackRef? _leased;
   final Set<String> _reloadSources = {};
   Future<String?> Function(Track)? _lyricsLoader;
@@ -185,6 +192,69 @@ class PlaybackCoordinator extends ChangeNotifier {
             );
           }),
     );
+  }
+
+  void _cancelEarlyResumeProbes() {
+    for (final timer in _earlyResumeProbeTimers) {
+      timer.cancel();
+    }
+    _earlyResumeProbeTimers.clear();
+  }
+
+  /// Log the 2s/3s timeline *without* trying any recovery. A normal play is
+  /// deliberately sampled too, so a future report has a healthy baseline.
+  void _armEarlyResumeProbes({
+    required TrackRef? ref,
+    required int generation,
+    required int intent,
+    required int navigation,
+  }) {
+    _cancelEarlyResumeProbes();
+    if (!Platform.isAndroid || diagnostics?.enabled != true) return;
+    final baseline = position.inMilliseconds;
+    final initialEvents = _positionEventSequence;
+    final started = Stopwatch()..start();
+    for (final seconds in const [2, 3]) {
+      final stage = seconds == 2 ? 'early_2s' : 'early_3s';
+      _earlyResumeProbeTimers.add(
+        Timer(Duration(seconds: seconds), () {
+          if (generation != _loadGeneration ||
+              intent != _playIntentGeneration ||
+              navigation != _navigationEpoch ||
+              currentRef != ref ||
+              !_playRequested ||
+              _userPaused ||
+              _focusWasLost) {
+            return;
+          }
+          final currentMs = position.inMilliseconds;
+          final confirmed = _awaitingProgressIntent != intent;
+          diagnostics?.record(
+            'playback',
+            'early_resume_probe',
+            details: {
+              'stage': stage,
+              'intent': intent,
+              'load': generation,
+              'elapsed_ms': started.elapsedMilliseconds,
+              'baseline_ms': baseline,
+              'position_ms': currentMs,
+              'delta_ms': max(0, currentMs - baseline),
+              'position_events': _positionEventSequence - initialEvents,
+              'watchdog_position_ms': max(0, _watchdogPositionMs),
+              'progress_gap_ms': _progressWatch.elapsedMilliseconds,
+              'native_playing': playing,
+              'buffering': buffering,
+              'mpv_confirmed': confirmed,
+              'source': _openedWithProxy
+                  ? 'proxy'
+                  : (_openedFromCompleteCache ? 'cache' : 'local'),
+            },
+          );
+          if (!confirmed) _snapshotNative(stage);
+        }),
+      );
+    }
   }
 
   void _checkForStall() {
@@ -291,6 +361,14 @@ class PlaybackCoordinator extends ChangeNotifier {
         (_openedWithProxy && !afterRecovery) ||
         _awaitingProgressIntent != intent)
       return;
+    if (!afterRecovery) {
+      _armEarlyResumeProbes(
+        ref: ref,
+        generation: generation,
+        intent: intent,
+        navigation: navigation,
+      );
+    }
     final timeout = _openedWithProxy
         ? const Duration(seconds: 30)
         : const Duration(seconds: 12);
@@ -315,6 +393,12 @@ class PlaybackCoordinator extends ChangeNotifier {
               ? 0
               : DateTime.now().difference(_lastPlayCommandAt!).inMilliseconds,
           'progress_gap_ms': _progressWatch.elapsedMilliseconds,
+          'position_ms': position.inMilliseconds,
+          'watchdog_position_ms': max(0, _watchdogPositionMs),
+          'position_events': _positionEventSequence,
+          'native_playing': playing,
+          'buffering': buffering,
+          'mpv_confirmed': _awaitingProgressIntent != intent,
         },
       );
       _snapshotNative('resume_timeout');
@@ -823,6 +907,41 @@ class PlaybackCoordinator extends ChangeNotifier {
     _registerPlayerSubscription(
       player.stream.position.listen((v) {
         final nextMs = v.inMilliseconds;
+        ++_positionEventSequence;
+        if (_loopPositionResetPending) {
+          // media_kit may deliver one last EOF-position sample after seek(0).
+          // That sample must not establish a fake high watchdog baseline.
+          if (nextMs > 4000 &&
+              _loopResetWatch.elapsed < const Duration(seconds: 5)) {
+            if (!_loopStaleSampleLogged) {
+              _loopStaleSampleLogged = true;
+              diagnostics?.record(
+                'playback',
+                'loop_old_position_ignored',
+                details: {
+                  'position_ms': nextMs,
+                  'duration_ms': max(0, duration.inMilliseconds),
+                  'loop_epoch': _transitionEpoch,
+                },
+              );
+            }
+            return;
+          }
+          _loopPositionResetPending = false;
+          _loopResetWatch.stop();
+          _watchdogPositionMs = nextMs;
+          _progressWatch.reset();
+          diagnostics?.record(
+            'playback',
+            'loop_first_position',
+            details: {
+              'position_ms': nextMs,
+              'loop_epoch': _transitionEpoch,
+              'load': _loadGeneration,
+              'stage': nextMs > 4000 ? 'fallback' : 'fresh',
+            },
+          );
+        }
         if (Platform.isAndroid &&
             playing &&
             !_androidAudioOutputProbed &&
@@ -932,8 +1051,16 @@ class PlaybackCoordinator extends ChangeNotifier {
           diagnostics?.record(
             'playback',
             'track_completed',
-            details: {'index': snapshot.index},
+            details: {
+              'index': snapshot.index,
+              'position_ms': max(0, position.inMilliseconds),
+              'duration_ms': max(0, duration.inMilliseconds),
+              'watchdog_position_ms': max(0, _watchdogPositionMs),
+              'load': _loadGeneration,
+              'loop_epoch': _transitionEpoch,
+            },
           );
+          _cancelEarlyResumeProbes();
           _finishingTrack = true;
           final transitionEpoch = ++_transitionEpoch;
           _transitionStartIndex = snapshot.index;
@@ -1567,6 +1694,8 @@ class PlaybackCoordinator extends ChangeNotifier {
       },
     );
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
+    _loopPositionResetPending = false;
     _opening = true;
     _playRequested = autoplay;
     if (!autoplay) _pausedAt = DateTime.now();
@@ -2279,6 +2408,8 @@ class PlaybackCoordinator extends ChangeNotifier {
     _pausedAt = DateTime.now();
     _awaitingProgressIntent = null;
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
+    _loopPositionResetPending = false;
     _notificationTimeline.reset();
     _steadyProgressSince = null;
     _lastSteadyProgress = null;
@@ -2423,12 +2554,97 @@ class PlaybackCoordinator extends ChangeNotifier {
     if (!_playRequested) return;
     if (snapshot.repeat == RepeatKind.one) {
       final epoch = _transitionEpoch;
-      await _runNativeCommand((native) async {
-        await native.seek(Duration.zero);
-        if (epoch == _transitionEpoch && _playRequested) {
-          await native.play();
+      final generation = _loadGeneration;
+      final intent = _playIntentGeneration;
+      // Internal repeat-one uses a native seek rather than seek(). Reset the
+      // previous track's high EOF baseline before decoding the new loop.
+      _cancelResumeProgressTimer();
+      _cancelEarlyResumeProbes();
+      _awaitingProgressIntent = null;
+      _loopPositionResetPending = true;
+      _loopStaleSampleLogged = false;
+      _loopResetWatch
+        ..reset()
+        ..start();
+      _watchdogPositionMs = -1;
+      _progressWatch.reset();
+      diagnostics?.record(
+        'playback',
+        'loop_seek_started',
+        details: {
+          'intent': intent,
+          'load': generation,
+          'loop_epoch': epoch,
+          'position_ms': max(0, position.inMilliseconds),
+          'duration_ms': max(0, duration.inMilliseconds),
+        },
+      );
+      bool accepted;
+      try {
+        accepted = await _runNativeCommand(
+          (native) async {
+            await native.seek(Duration.zero);
+            if (epoch == _transitionEpoch &&
+                generation == _loadGeneration &&
+                intent == _playIntentGeneration &&
+                _playRequested) {
+              await native.play();
+            }
+          },
+          allowed: () =>
+              epoch == _transitionEpoch &&
+              generation == _loadGeneration &&
+              intent == _playIntentGeneration &&
+              _playRequested,
+        );
+      } catch (e) {
+        _loopPositionResetPending = false;
+        _loopResetWatch.stop();
+        diagnostics?.record(
+          'playback',
+          'loop_seek_failed',
+          details: {
+            'load': generation,
+            'loop_epoch': epoch,
+            'type': e.runtimeType.toString(),
+          },
+        );
+        if (epoch == _transitionEpoch &&
+            generation == _loadGeneration &&
+            intent == _playIntentGeneration &&
+            _playRequested) {
+          _reportPlayerError('单曲循环重启失败');
         }
-      }, allowed: () => epoch == _transitionEpoch && _playRequested);
+        return;
+      }
+      if (accepted &&
+          epoch == _transitionEpoch &&
+          generation == _loadGeneration &&
+          intent == _playIntentGeneration &&
+          _playRequested) {
+        // A first low position sample may already have arrived during seek.
+        if (_loopPositionResetPending) position = Duration.zero;
+        _notificationTimeline.reset();
+        _publish();
+        diagnostics?.record(
+          'playback',
+          'loop_seek_completed',
+          details: {
+            'intent': intent,
+            'load': generation,
+            'loop_epoch': epoch,
+            'position_ms': max(0, position.inMilliseconds),
+          },
+        );
+      } else {
+        _loopPositionResetPending = false;
+        _loopResetWatch.stop();
+        diagnostics?.record(
+          'playback',
+          'loop_seek_superseded',
+          details: {'intent': intent, 'load': generation, 'loop_epoch': epoch},
+        );
+      }
       return;
     }
     if (_nextIndex() == null) {
@@ -2520,6 +2736,8 @@ class PlaybackCoordinator extends ChangeNotifier {
 
   Future<void> seek(Duration target) async {
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
+    _loopPositionResetPending = false;
     _cancelPendingEndError();
     _awaitingProgressIntent = null;
     ++_playIntentGeneration;
@@ -2839,6 +3057,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_gainGeneration;
     _cancelFocusResume();
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
     _cancelPendingEndError();
     _cancelAhead();
     _stallTimer?.cancel();
@@ -2858,6 +3077,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     ++_gainGeneration;
     _cancelFocusResume();
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
     _cancelPendingEndError();
     _stallTimer?.cancel();
     _stallTimer = null;
