@@ -16,6 +16,12 @@ class ApiSettings extends ChangeNotifier {
   static const defaultLrcApiUrl = 'https://api.lrc.cx/lyrics';
   static const defaultLlmUrl = 'https://api.openai.com/v1/chat/completions';
   static const defaultLlmModel = 'gpt-4o-mini';
+  static const defaultLlmSystemPrompt =
+      '你是个人本地音乐库推荐编辑。保留偏好和探索的平衡，不要因知名度忽略低频音乐。'
+      '推荐词请自然、真诚、简短、具体，信息不足时使用客观描述。';
+  static const defaultLlmUserPrompt =
+      '请兼顾熟悉与探索，从我的曲库中挑选今天值得听的歌曲或专辑。'
+      '推荐文案请自然、真诚、简短，避免空泛套话。';
   static const fallbackQuote = '音乐随心，聆听自在。';
   final AppDb db;
   final http.Client Function() _clientFactory;
@@ -28,6 +34,8 @@ class ApiSettings extends ChangeNotifier {
   String llmUrl = defaultLlmUrl;
   String llmModel = defaultLlmModel;
   String llmMode = 'assist'; // assist or lead
+  String llmUserPrompt = defaultLlmUserPrompt;
+  String llmSystemPrompt = defaultLlmSystemPrompt;
   int llmRevision = 0;
   String quote = fallbackQuote;
   String _quoteDay = '';
@@ -158,6 +166,55 @@ class ApiSettings extends ChangeNotifier {
     await _updateLlmRevision();
   }
 
+  /// The entire user-authored preference segment of the Chat Completions
+  /// user message. Security and output constraints are fixed in system.
+  static String validateLlmUserPrompt(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length > 2000 ||
+        RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]').hasMatch(trimmed)) {
+      throw const FormatException('用户提示词不得超过 2000 字，且不能包含控制字符');
+    }
+    return trimmed.isEmpty ? defaultLlmUserPrompt : trimmed;
+  }
+
+  static String validateLlmSystemPrompt(String value) {
+    final trimmed = value.trim();
+    if (trimmed.length > 2000 ||
+        RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]').hasMatch(trimmed)) {
+      throw const FormatException('System 提示词不得超过 2000 字，且不能包含控制字符');
+    }
+    return trimmed.isEmpty ? defaultLlmSystemPrompt : trimmed;
+  }
+
+  Future<void> setLlmUserPrompt(String value) =>
+      setLlmPrompts(system: llmSystemPrompt, user: value);
+
+  Future<void> setLlmPrompts({
+    required String system,
+    required String user,
+  }) async {
+    final nextSystem = validateLlmSystemPrompt(system);
+    final nextUser = validateLlmUserPrompt(user);
+    if (nextSystem == llmSystemPrompt && nextUser == llmUserPrompt) return;
+    final revision = llmRevision + 1;
+    await db.db.transaction((tx) async {
+      for (final entry in {
+        'api_llm_system_prompt': nextSystem,
+        'api_llm_user_prompt': nextUser,
+        'api_llm_revision': revision.toString(),
+      }.entries) {
+        await tx.rawInsert(
+          'INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)',
+          [entry.key, entry.value],
+        );
+      }
+    });
+    llmSystemPrompt = nextSystem;
+    llmUserPrompt = nextUser;
+    llmRevision = revision;
+    notifyListeners();
+  }
+
   /// Called after a secret change; the secret itself is kept only in AuthVault.
   Future<void> llmCredentialChanged() => _updateLlmRevision();
 
@@ -214,6 +271,20 @@ class ApiSettings extends ChangeNotifier {
     llmMode = storedMode == 'lead' ? 'lead' : 'assist';
     llmEnabled = await db.setting('api_llm_enabled') == 'true';
     llmRevision = int.tryParse(await db.setting('api_llm_revision') ?? '') ?? 0;
+    try {
+      llmSystemPrompt = validateLlmSystemPrompt(
+        await db.setting('api_llm_system_prompt') ?? defaultLlmSystemPrompt,
+      );
+    } on FormatException {
+      llmSystemPrompt = defaultLlmSystemPrompt;
+    }
+    try {
+      llmUserPrompt = validateLlmUserPrompt(
+        await db.setting('api_llm_user_prompt') ?? defaultLlmUserPrompt,
+      );
+    } on FormatException {
+      llmUserPrompt = defaultLlmUserPrompt;
+    }
     _quoteDay = await db.setting('api_quote_day') ?? '';
     final cached = await db.setting('api_quote_text');
     quote = cached != null && cached.trim().isNotEmpty ? cached : fallbackQuote;

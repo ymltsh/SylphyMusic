@@ -9,6 +9,7 @@ import '../core/models.dart';
 import '../data/library_catalog.dart';
 import '../core/recommendation_models.dart';
 import 'daily_mix_page.dart';
+import 'recommendation_showcase.dart';
 import 'cover_art.dart';
 import 'library_browser.dart';
 import 'playing_song_tile.dart';
@@ -416,29 +417,15 @@ class _HomePageState extends State<HomePage> {
                 ),
               );
             }
-            final first = mix.items.first.track;
-            return Card.filled(
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(12),
-                leading: CoverArt(app: app, track: first, size: 64),
-                title: const Text('今天，听点喜欢的'),
-                subtitle: Text(
-                  mix.introduction.isEmpty
-                      ? '${mix.items.length} 首 · 熟悉的旋律与新的发现'
-                      : '${mix.items.length} 首 · ${mix.introduction}',
-                  maxLines: 2,
-                ),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
-                ),
-                trailing: IconButton(
-                  tooltip: '播放每日精选',
-                  icon: const Icon(Icons.play_circle_fill_rounded),
-                  onPressed: () => unawaited(
-                    app.playback.setQueue(mix.refs).catchError((Object _) {}),
-                  ),
-                ),
+            return RecommendationShowcase(
+              app: app,
+              mix: mix,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
+              ),
+              onPlay: () => unawaited(
+                app.playback.setQueue(mix.refs).catchError((Object _) {}),
               ),
             );
           },

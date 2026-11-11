@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/app_controller.dart';
 import '../services/llm_recommendations.dart';
+import '../services/api_settings.dart';
 import '../core/appearance.dart';
 import '../core/player_layout.dart';
 import 'cache_storage.dart';
@@ -463,6 +464,18 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: _editLlmMode,
+      ),
+      ListTile(
+        key: const ValueKey('api-llm-user-prompt'),
+        leading: const Icon(Icons.edit_note_rounded),
+        title: const Text('自定义 Prompt'),
+        subtitle: Text(
+          app.apiSettings.llmUserPrompt,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: const Icon(Icons.edit_outlined),
+        onTap: _editLlmPrompts,
       ),
     ]),
   ];
@@ -1065,6 +1078,21 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _editLlmPrompts() async {
+    final value = await showDialog<({String system, String user})>(
+      context: context,
+      builder: (_) => _LlmPromptDialog(
+        system: app.apiSettings.llmSystemPrompt,
+        user: app.apiSettings.llmUserPrompt,
+      ),
+    );
+    if (value == null || !mounted) return;
+    await _act(
+      () =>
+          app.apiSettings.setLlmPrompts(system: value.system, user: value.user),
+    );
+  }
+
   Future<void> _chooseThemeColor() async {
     final chosen = await showDialog<Color>(
       context: context,
@@ -1217,6 +1245,107 @@ class _ApiValueDialogState extends State<_ApiValueDialog> {
         onPressed: () => Navigator.pop(context, controller.text),
         child: const Text('保存'),
       ),
+    ],
+  );
+}
+
+/// Editable recommendation guidance; candidate and output contracts stay fixed.
+class _LlmPromptDialog extends StatefulWidget {
+  const _LlmPromptDialog({required this.system, required this.user});
+  final String system;
+  final String user;
+
+  @override
+  State<_LlmPromptDialog> createState() => _LlmPromptDialogState();
+}
+
+class _LlmPromptDialogState extends State<_LlmPromptDialog> {
+  late final system = TextEditingController(text: widget.system);
+  late final user = TextEditingController(text: widget.user);
+  String? error;
+
+  @override
+  void dispose() {
+    system.dispose();
+    user.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    try {
+      final value = (
+        system: ApiSettings.validateLlmSystemPrompt(system.text),
+        user: ApiSettings.validateLlmUserPrompt(user.text),
+      );
+      Navigator.pop(context, value);
+    } on FormatException catch (exception) {
+      setState(() => error = exception.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('自定义 Prompt'),
+    content: SizedBox(
+      width: 560,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('可调整推荐角色、选曲侧重和文案风格。真实候选范围、禁止编造和 JSON 输出格式由应用固定。'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: system,
+              minLines: 4,
+              maxLines: 7,
+              maxLength: 2000,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'System Prompt（推荐角色与策略）',
+                helperText: '作为 System 指导发送，固定约束仍会追加；留空恢复默认。',
+                helperMaxLines: 2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: user,
+              minLines: 4,
+              maxLines: 7,
+              maxLength: 2000,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'User Prompt（个人偏好）',
+                hintText: '例如：偏好华语独立音乐；文案带一点诗意。',
+                helperText: '随候选数据发送；留空恢复默认。请勿填写密钥。',
+                helperMaxLines: 2,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('保存后会重新生成推荐，可能产生 API 费用。'),
+            if (error != null)
+              Text(
+                error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () {
+          system.text = ApiSettings.defaultLlmSystemPrompt;
+          user.text = ApiSettings.defaultLlmUserPrompt;
+          setState(() => error = null);
+        },
+        child: const Text('恢复默认'),
+      ),
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('取消'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('保存')),
     ],
   );
 }

@@ -15,6 +15,7 @@
 | [PROGRESS](PROGRESS.md) | 最新证据、剩余工作和验收输出 |
 | [TEST_PLAN](TEST_PLAN.md) | 完整真实环境验收清单 |
 | [RELEASE_GATES](RELEASE_GATES.md) | 独立验收待办，不属于发布流程 |
+| [每日精选封面与提示词](RECOMMENDATION_SHOWCASE_PROMPT.md) | 首页 / 详情封面叠卡与自定义 LLM 推荐偏好 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |
 | [播放生命周期整合](INTEGRATED_PLAYBACK_LIFECYCLE.md) | 统一停滞恢复、实验性 AO 重载、前台系统观测与通知封面共享 |
 | [媒体会话状态投影重构](MEDIA_SESSION_PROJECTION_REDESIGN_2026-11-09.md) | 暂停、焦点保持、缓冲、恢复及错误的统一媒体会话映射 |

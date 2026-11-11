@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/recommendation_models.dart';
 import 'playing_song_tile.dart';
+import 'recommendation_showcase.dart';
 
 /// A dated, independent queue snapshot: regeneration never edits a playing queue.
 class DailyMixPage extends StatefulWidget {
@@ -172,34 +173,28 @@ class _DailyMixPageState extends State<DailyMixPage> {
                 ],
               ),
             ),
-            if (mix.introduction.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.auto_awesome_outlined, size: 19),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        mix.introduction,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             Expanded(
               child: ListView.builder(
-                itemCount: mix.items.length,
+                itemCount: mix.items.length + 1,
                 itemBuilder: (context, index) {
-                  final item = mix.items[index];
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                      child: RecommendationShowcase(
+                        app: widget.app,
+                        mix: mix,
+                        detailed: true,
+                      ),
+                    );
+                  }
+                  final trackIndex = index - 1;
+                  final item = mix.items[trackIndex];
                   return PlayingSongTile(
                     app: widget.app,
                     track: item.track,
                     title: item.track.title,
                     subtitle: '${item.track.artist} · ${item.reason}',
-                    onTap: () => unawaited(_play(mix, start: index)),
+                    onTap: () => unawaited(_play(mix, start: trackIndex)),
                     trailing: PopupMenuButton<String>(
                       tooltip: '推荐反馈',
                       onSelected: (value) async {

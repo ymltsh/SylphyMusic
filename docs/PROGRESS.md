@@ -1,5 +1,19 @@
 # 实施与验证记录
 
+## 2026-11-12 自定义 Prompt 扩展 System 与共享目录交付
+
+按用户要求将入口改为“自定义 Prompt”，支持分别编辑 System 推荐角色 / 选曲策略 / 文案风格与 User 个人偏好，每段最多 2000 字，支持留空或按钮恢复默认、输入校验提示。保留旧 User 偏好，新增 api_llm_system_prompt 使用默认内容；两段提示词及配置版本在同一事务保存，一次通知刷新。System 请求追加固定候选 ID、禁止编造和 JSON 输出约束；原解析、诊断脱敏与播放队列行为保留。普通版与 OpenList 同步，文档更新，修改前备份 .private/custom-prompts-before/。
+
+Dart 已格式化，普通版 Android 三 ABI / Windows Release 与内部打包成功；OpenList Android arm64 Release 编译成功。构建日志 build/test_logs/custom-prompts-build.log。已按授权将普通版三个 APK、Windows ZIP、说明 / 原摘要以及独立命名的 OpenList arm64 APK 复制到 \\GENAS\share\sylphy_music_release，逐文件比对长度及 SHA-256，并生成 SHA256SUMS-custom-prompts.txt；复制记录位于普通版 build/test_logs/custom-prompts-share-copy.json。
+
+未运行 analyze、测试、应用启动、设备验收或真实 LLM 请求；未修改版本号、提交、Git 推送或发布。
+
+## 2026-11-12 应用每日精选封面叠卡与用户提示词补丁
+
+审阅 SylphyMusic-recommendation-cards-user-prompt-patch.zip 的说明、安装脚本和组件后，普通版与 OpenList 均通过七处路径的锚点兼容检查并应用。首页每日精选与详情复用 RecommendationShowcase，展示最多四张真实曲目封面、精选导语及详情前三条推荐依据；详情头部纳入滚动列表，保持曲目点击索引。API 设置 → LLM 推荐新增自定义 User Prompt，支持最多 2000 字、恢复默认，保存于既有 settings 表并更新配置版本。固定系统约束、候选 JSON 和解析规则保留，提示词不进入诊断日志。保留既有 LLM 测试弹窗、推荐诊断及最近播放上限修正。
+
+修改前文件由补丁保存于各工作区 .private/recommendation-showcase-before/。Dart 已格式化，补充文档索引与 LLM 说明。普通版 Android 三 ABI / Windows Release 编译与内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/recommendation-showcase-prompt-build.log。未运行测试、analyze、应用启动、设备验收或实际 LLM 请求，视觉与交互由用户确认；未修改版本号、提交、推送或发布。
+
 ## 2026-11-12 推荐与 LLM 响应诊断日志
 
 按用户要求，将普通版与 OpenList 的推荐服务及 LLM 客户端接入现有 DiagnosticLogs，沿用默认关闭的开关、字段白名单、异步轮转及导出入口。新增推荐生成 / 缓存命中 / 空候选 / 本地选择 / LLM 应用 / 本地回退 / 完成 / 失败事件；LLM 记录请求序号与类型、模式、候选数、HTTP 状态、耗时、响应字节数、模型输出字符数、有效结果与推荐词数、非法 / 重复候选 ID 数、白名单结束原因及可用 Token 用量。失败记录固定阶段和原因码，可区分 HTTP 错误、超时、网络错误、结构 / JSON / 候选 ID 异常与配置变更。
