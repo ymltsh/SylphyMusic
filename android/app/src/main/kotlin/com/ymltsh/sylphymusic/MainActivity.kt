@@ -9,6 +9,7 @@ import android.os.Build
 import android.util.Log
 
 class MainActivity : AudioServiceActivity() {
+    private var letterImages: LetterImageStore? = null
     private val notificationRequests = mutableListOf<MethodChannel.Result>()
     // Correlate the observed foreground recovery with the Dart watchdog gap.
     override fun onStart() {
@@ -44,6 +45,9 @@ class MainActivity : AudioServiceActivity() {
                     }
                 }
             }
+        letterImages = LetterImageStore(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/letter_images")
+            .setMethodCallHandler { call, result -> letterImages?.handle(call, result) ?: result.error("unavailable", "图片服务不可用", null) }
         val iconManager = LauncherIconManager(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/launcher_icons")
             .setMethodCallHandler { call, result ->
@@ -70,6 +74,7 @@ class MainActivity : AudioServiceActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 42) completeNotificationRequests()
+        if (requestCode == 43) letterImages?.permissionResult()
     }
 
     private fun completeNotificationRequests() {
@@ -79,6 +84,9 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        letterImages?.detach()
+        letterImages = null
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/letter_images").setMethodCallHandler(null)
         // Activity detach must not leave Dart awaiting a permission result.
         completeNotificationRequests()
         // The engine survives this Activity; do not retain a dead Activity in

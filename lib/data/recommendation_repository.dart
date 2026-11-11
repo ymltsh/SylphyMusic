@@ -384,9 +384,14 @@ class RecommendationRepository {
     int seed,
     List<RecommendedTrack> items, {
     String introduction = '',
+    String letterOrigin = 'local',
     String llmTag = 'local',
   }) => _saveSnapshot(
+    letterDetailsText: items
+        .map((item) => '${item.track.title} · ${item.reason}')
+        .join('\n'),
     introduction: introduction,
+    letterOrigin: letterOrigin,
     llmTag: llmTag,
     kind: 'daily',
     day: day,
@@ -432,6 +437,8 @@ class RecommendationRepository {
 
   Future<int> _saveSnapshot({
     String introduction = '',
+    String letterDetailsText = '',
+    String letterOrigin = 'local',
     String llmTag = 'local',
     required String kind,
     required String day,
@@ -457,6 +464,19 @@ class RecommendationRepository {
         ...items[i],
       });
     }
+    if (kind == 'daily' && introduction.trim().isNotEmpty) {
+      // The letter is a first-class personal record, not a diagnostic log.
+      // Commit together with its recommendation snapshot.
+      await tx.insert('recommendation_letters', {
+        'snapshot_id': id,
+        'local_day': day,
+        'generation': generation,
+        'content': introduction,
+        'details_text': letterDetailsText,
+        'origin': letterOrigin,
+        'created_at_ms': DateTime.now().millisecondsSinceEpoch,
+      });
+    }
     // Snapshot item rows are removed in the same transaction as expired heads.
     final old = await tx.query(
       'recommendation_snapshots',
@@ -480,6 +500,50 @@ class RecommendationRepository {
     }
     return id;
   });
+
+  /// Archives survive statistics/snapshot clearing, so their rounds must also
+  /// participate in allocating the next daily generation.
+  Future<int> nextDailyGeneration(String day, {int previous = -1}) async {
+    final rows = await database.db.rawQuery(
+      'SELECT MAX(generation) AS generation FROM recommendation_letters WHERE local_day=?',
+      [day],
+    );
+    final archived = rows.first['generation'] as int? ?? -1;
+    return max(previous, archived) + 1;
+  }
+
+  /// Paginated archive, retained even when old recommendation snapshots
+  /// are pruned or listening statistics are cleared.
+  Future<List<RecommendationLetter>> letters({
+    int offset = 0,
+    int limit = 30,
+  }) async {
+    if (offset < 0 || limit < 1 || limit > 100) {
+      throw ArgumentError('Invalid letter archive page');
+    }
+    final rows = await database.db.query(
+      'recommendation_letters',
+      orderBy: 'created_at_ms DESC,id DESC',
+      offset: offset,
+      limit: limit,
+    );
+    return [
+      for (final row in rows)
+        RecommendationLetter(
+          id: row['id'] as int,
+          day: row['local_day'] as String,
+          generation: row['generation'] as int,
+          content: row['content'] as String,
+          detailsText: row['details_text'] as String? ?? '',
+          origin: row['origin'] as String,
+          createdAtMs: row['created_at_ms'] as int,
+        ),
+    ];
+  }
+
+  Future<void> clearLetters() async {
+    await database.db.delete('recommendation_letters');
+  }
 
   Future<void> hideTrack(TrackRef ref) async {
     await database.db.insert('recommendation_feedback', {

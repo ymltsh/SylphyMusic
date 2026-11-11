@@ -1,5 +1,23 @@
 # 实施与验证记录
 
+## 2026-11-12 今日音乐信图片分享与 1.0.41 发布
+
+今日音乐信与历史存档新增“导出图片”“分享图片”，通过独立 Canvas / TextPainter 排版完整正文生成 PNG，底部显示信件日期、风灵音乐 · Sylphy Music 和现有 assets/icon.png Logo；不依赖可见滚动区域截图。默认保存到 Pictures/SylphyMusic：Windows 通过 SHGetKnownFolderPath 获取实际图片目录，Android 10+ 通过 MediaStore pending 写入 / 完成，旧 Android 按需申请仅 maxSdk 28 的写存储权限后保存并扫描相册。使用独立时间戳文件名，保存失败清理未完成文件，分享先保留本地图片再交由系统面板选择目标。Dart 已格式化，两版本同步；修改前文件在 .private/letter-image-before/。
+
+按用户授权，普通版 1.0.41+54 完成 Android 三 ABI、Windows 安装程序 / 便携 ZIP 正式构建与发布；OpenList 1.0.41-openlist.24+54 完成 arm64 正式包、对应源码和摘要发布。Android 正式签名核对通过，OpenList JNI 保持上一版。两个 Release 状态 / 标题 / 正文 / 全部附件大小与 SHA-256、普通及 OpenList 的原始与加速清单均核对通过。仅提交推送版本清单：main c754114 / afb7202，feature c2160fe；普通版保持 Latest。
+
+安装包已复制到 \\GENAS\share\sylphy_music_release\1.0.41-54，OpenList 文件位于其 OpenList 子目录，九个文件长度和 SHA-256 均核对一致。产物分别位于 build/releases/1.0.41-54/ 与 build/releases/1.0.41-openlist.24-54/。普通版日志 build/test_logs/release-1.0.41-build.log，OpenList 日志 release-openlist-54-build.log / release-openlist-54-publish.log，复制记录为普通版 build/test_logs/release-54-share-copy.json。未运行 analyze、测试、应用启动或设备验收；实际 PNG 排版、Pictures 保存、旧 Android 权限和系统分享由用户验收。
+
+## 2026-11-12 应用音乐笔友与私人来信存档 V12
+
+审阅 SylphyMusic-penpal-recommendations-v12-patch.zip 的脚本、文档和代码，两个版本均通过九处现有文件与两项新文件检查后应用。新增音乐笔友默认人设、160–320 字目标 / 最多 480 字的分段推荐信、可选缓存每日一言和实际匹配热度信号；关闭或失败时使用真实曲库名称生成本地信件。每日精选和诊断设置新增“每日推荐文案”入口，支持分页阅读、全文与逐曲理由、本地 / LLM 来源以及确认后单独清空。
+
+SQLite v11→v12 前向迁移新增独立 recommendation_letters，旧非空导语归档；新信与推荐快照同事务保存，缓存阅读不新增，统计清理与快照淘汰保留信件。补充根据保留信件分配轮次，避免统计清空后重复轮次导致唯一约束冲突；本地曲名截断防止超长元数据扩张信件，分页与清空互斥、首次加载失败可重试。
+
+本地适配保留用户上一轮明确要求的 System / User 双段“自定义 Prompt”，不采用补丁移除 System 编辑入口的行为。默认更新为音乐笔友；固定真实性、候选 ID、JSON 和字数约束继续由应用追加。诊断日志不包含信件、曲名、用户提示词或原始响应。修改前备份 .private/penpal-recommendations-before/，Dart 已格式化，架构 / LLM / 文档索引同步更新。
+
+普通版 Android 三 ABI / Windows Release 与内部打包成功，OpenList Android arm64 Release 编译成功；日志均为 build/test_logs/penpal-recommendations-v12-build.log。普通版三个 APK、Windows ZIP、说明 / 摘要与独立命名的 OpenList APK 已复制到 \\GENAS\share\sylphy_music_release，长度和 SHA-256 核对通过，生成 SHA256SUMS-penpal-v12.txt；本地复制记录为普通版 build/test_logs/penpal-v12-share-copy.json。未运行测试、analyze、应用启动、真实 LLM 请求或实际数据库升级验证，设备效果交用户验收；未修改版本号、提交、推送或发布。
+
 ## 2026-11-12 自定义 Prompt 扩展 System 与共享目录交付
 
 按用户要求将入口改为“自定义 Prompt”，支持分别编辑 System 推荐角色 / 选曲策略 / 文案风格与 User 个人偏好，每段最多 2000 字，支持留空或按钮恢复默认、输入校验提示。保留旧 User 偏好，新增 api_llm_system_prompt 使用默认内容；两段提示词及配置版本在同一事务保存，一次通知刷新。System 请求追加固定候选 ID、禁止编造和 JSON 输出约束；原解析、诊断脱敏与播放队列行为保留。普通版与 OpenList 同步，文档更新，修改前备份 .private/custom-prompts-before/。

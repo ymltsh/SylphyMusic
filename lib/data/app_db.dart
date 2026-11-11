@@ -10,6 +10,20 @@ import '../core/models.dart';
 import '../services/embedded_tags.dart';
 
 class AppDb {
+  /// Private, durable letters, independent of snapshot pruning and diagnostics.
+  static const _recommendationLettersTable =
+      '''CREATE TABLE recommendation_letters(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER,
+    local_day TEXT NOT NULL,
+    generation INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    details_text TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    UNIQUE(local_day,generation))''';
+  static const _recommendationLettersIndex =
+      'CREATE INDEX idx_recommendation_letters_date ON recommendation_letters(created_at_ms DESC)';
   static const _recommendationSchema = <String>[
     '''CREATE TABLE listening_sessions(
       session_id TEXT PRIMARY KEY,source_id TEXT NOT NULL,track_id TEXT NOT NULL,
@@ -118,7 +132,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 11,
+      version: 12,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -196,6 +210,20 @@ class AppDb {
             "ALTER TABLE recommendation_snapshots ADD COLUMN llm_tag TEXT NOT NULL DEFAULT 'local'",
           );
         }
+        if (oldVersion < 12) {
+          await database.execute(_recommendationLettersTable);
+          await database.execute(_recommendationLettersIndex);
+          // Preserve existing nonempty daily introductions as older letters.
+          await database.execute('''
+            INSERT OR IGNORE INTO recommendation_letters(
+              snapshot_id,local_day,generation,content,origin,created_at_ms)
+            SELECT id,local_day,generation,introduction,
+                   CASE WHEN llm_tag='local' THEN 'local' ELSE 'llm' END,
+                   created_at_ms
+            FROM recommendation_snapshots
+            WHERE kind='daily' AND trim(introduction) <> ''
+          ''');
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -229,6 +257,8 @@ class AppDb {
         for (final sql in _recommendationSchema) {
           await d.execute(sql);
         }
+        await d.execute(_recommendationLettersTable);
+        await d.execute(_recommendationLettersIndex);
       },
     );
     // A killed process never exposes an incomplete remote snapshot. Its staging

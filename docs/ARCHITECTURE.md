@@ -227,3 +227,5 @@ OpenAI Chat Completions 兼容地址、模型、参与模式及启用开关保�
 SQLite v11 为推荐快照增加 introduction 和 llm_tag 字段，以保证同一天的文案与
 配置版本可复现，播放器会话不受推荐刷新影响。
 使用、限制与验收见 [LLM 推荐增强](LLM_RECOMMENDATION.md)。
+
+音乐笔友与私人来信存档：SQLite v12 新增独立 recommendation_letters，每次新生成每日精选时与快照一并保存全文、逐曲理由和本地 / LLM 来源；旧非空导语前向归档。快照轮转和统计清理保留来信，清理来信需独立确认。LLM 导语允许分段、最多 480 字，失败使用本地曲库短笺；保留 System / User 自定义和诊断脱敏。详见 [音乐笔友说明](PENPAL_RECOMMENDATIONS.md)。

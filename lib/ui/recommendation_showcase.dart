@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/recommendation_models.dart';
 import 'cover_art.dart';
+import 'letter_image.dart';
 
 /// A layered display of actual cover art from a daily recommendation snapshot.
 /// No generated artwork and no changes to playback or TrackRef identity.
@@ -125,7 +126,7 @@ class RecommendationShowcase extends StatelessWidget {
         Icon(Icons.auto_awesome_rounded, color: scheme.primary, size: 26),
         const SizedBox(height: 10),
         Text(
-          detailed ? '这一轮，为你推荐' : '今天，听点喜欢的',
+          detailed ? '写给你的今日音乐信' : '今天，有一封音乐来信',
           style:
               (detailed
                       ? theme.textTheme.headlineSmall
@@ -142,13 +143,15 @@ class RecommendationShowcase extends StatelessWidget {
         const SizedBox(height: 10),
         Text(
           intro,
-          maxLines: detailed ? 8 : 3,
-          overflow: TextOverflow.ellipsis,
+          maxLines: detailed ? null : 3,
+          overflow: detailed ? TextOverflow.visible : TextOverflow.ellipsis,
           style: theme.textTheme.bodyMedium,
         ),
         if (detailed) ...[
+          const SizedBox(height: 18),
+          LetterImageActions(day: mix.day, content: intro),
           const SizedBox(height: 14),
-          Text('为什么推荐这些歌', style: theme.textTheme.titleSmall),
+          Text('信里提到的几首歌', style: theme.textTheme.titleSmall),
           const SizedBox(height: 6),
           for (final item in mix.items.take(3))
             Padding(

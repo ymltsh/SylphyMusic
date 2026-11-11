@@ -1,4 +1,5 @@
 #include "desktop_integration.h"
+#include <shlobj.h>
 #include <SystemMediaTransportControlsInterop.h>
 #include "resource.h"
 
@@ -18,6 +19,15 @@ DesktopIntegration::DesktopIntegration(HWND window, flutter::BinaryMessenger* me
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       messenger, "music.sylphy/desktop", &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+    if (call.method_name() == "picturesPath") {
+      PWSTR path = nullptr;
+      const HRESULT hr = SHGetKnownFolderPath(FOLDERID_Pictures, KF_FLAG_CREATE, nullptr, &path);
+      if (FAILED(hr)) { result->Error("pictures_unavailable", "Cannot locate Pictures folder"); return; }
+      const auto value = winrt::to_string(path);
+      CoTaskMemFree(path);
+      result->Success(flutter::EncodableValue(value));
+      return;
+    }
     if (call.method_name() == "capabilities") {
       result->Success(flutter::EncodableValue(flutter::EncodableMap{
         {flutter::EncodableValue("mediaControls"), flutter::EncodableValue(static_cast<bool>(controls_))},

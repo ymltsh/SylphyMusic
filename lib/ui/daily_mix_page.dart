@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/recommendation_models.dart';
+import 'recommendation_letters_page.dart';
 import 'playing_song_tile.dart';
 import 'recommendation_showcase.dart';
 
@@ -110,7 +111,21 @@ class _DailyMixPageState extends State<DailyMixPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('每日精选')),
+    appBar: AppBar(
+      title: const Text('每日精选'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.markunread_mailbox_outlined),
+          tooltip: '每日推荐文案',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RecommendationLettersPage(app: widget.app),
+            ),
+          ),
+        ),
+      ],
+    ),
     body: FutureBuilder<DailyMix>(
       future: _mix,
       builder: (context, snapshot) {

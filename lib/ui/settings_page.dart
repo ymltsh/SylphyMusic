@@ -19,6 +19,7 @@ import 'theme_color_dialog.dart';
 import 'player_layout/layout_editor.dart';
 import 'about_page.dart';
 import 'recommendation_settings_page.dart';
+import 'recommendation_letters_page.dart';
 
 enum _Section {
   playback,
@@ -912,6 +913,19 @@ class _SettingsPageState extends State<SettingsPage> {
     ],
     _Section.api => _apiCards(),
     _Section.diagnostics => [
+      ListTile(
+        key: const ValueKey('recommendation-letters-archive'),
+        leading: const Icon(Icons.markunread_mailbox_outlined),
+        title: const Text('每日推荐文案'),
+        subtitle: const Text('私人存档：查看每轮推荐信件和逐曲理由'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RecommendationLettersPage(app: app),
+          ),
+        ),
+      ),
       SwitchListTile(
         key: const ValueKey('diagnostics-toggle'),
         secondary: const Icon(Icons.bug_report_outlined),

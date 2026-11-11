@@ -72,7 +72,10 @@ class RecommendationService {
         );
       }
     }
-    final generation = (previous?.generation ?? -1) + 1;
+    final generation = await repository.nextDailyGeneration(
+      day,
+      previous: previous?.generation ?? -1,
+    );
     final seed = stableSeed('daily:$day:$generation:v1');
     final personal =
         await db.setting('recommendation_personalization_enabled') != 'false';
@@ -108,7 +111,8 @@ class RecommendationService {
       }
     }
     var finalTracks = hydrated;
-    var introduction = '';
+    var introduction = _localLetter(hydrated);
+    var letterFromLlm = false;
     if (!_closed && llm?.enabled == true && hydrated.isNotEmpty) {
       final options = [...hydrated];
       if (llm!.settings.llmMode == 'lead') {
@@ -141,10 +145,14 @@ class RecommendationService {
             candidate.track.ref.key: candidate.plays,
         },
         favorites: favorites,
+        publicTrends: trends,
       );
       if (selection != null) {
         finalTracks = _mergeDailySelection(hydrated, options, selection);
-        introduction = selection.introduction;
+        if (selection.introduction.trim().isNotEmpty) {
+          introduction = selection.introduction;
+          letterFromLlm = true;
+        }
         _record('llm_applied', 'daily', count: finalTracks.length);
       } else {
         _record(
@@ -174,10 +182,31 @@ class RecommendationService {
       seed,
       finalTracks,
       introduction: introduction,
+      letterOrigin: letterFromLlm ? 'llm' : 'local',
       llmTag: llmTag,
     );
     _record('generation_completed', 'daily', count: finalTracks.length);
     return DailyMix(day, generation, finalTracks, introduction: introduction);
+  }
+
+  /// A deterministic private note, used if no model is configured or available.
+  String _localLetter(List<RecommendedTrack> tracks) {
+    if (tracks.isEmpty) return '';
+    final titles = tracks
+        .take(2)
+        .map(
+          (item) =>
+              '《${String.fromCharCodes(item.track.title.runes.take(60))}》',
+        )
+        .toList();
+    final songs = titles.join('和');
+    return '你好：\n\n'
+        '今天翻看你的曲库时，我留意到了$songs。'
+        '我不知道此刻你最想听哪一种声音，也不想替你的心情下结论。'
+        '只是觉得，熟悉与陌生的名字放在一起，或许会碰出新的趣味。\n\n'
+        '所以我把这几首和另外一些曲子放在一起。'
+        '不必急着听完，想起的时候再点开就好。\n\n'
+        '你的音乐笔友';
   }
 
   Future<List<RecommendedAlbum>> albums({bool regenerate = false}) {

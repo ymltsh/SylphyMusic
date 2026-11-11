@@ -39,6 +39,27 @@ class RecommendedAlbum {
   final double score;
 }
 
+/// One private letter per generated daily recommendation round.
+class RecommendationLetter {
+  const RecommendationLetter({
+    required this.id,
+    required this.day,
+    required this.generation,
+    required this.content,
+    required this.detailsText,
+    required this.origin,
+    required this.createdAtMs,
+  });
+
+  final int id;
+  final String day;
+  final int generation;
+  final String content;
+  final String detailsText;
+  final String origin;
+  final int createdAtMs;
+}
+
 class TrackCandidate {
   const TrackCandidate({
     required this.track,

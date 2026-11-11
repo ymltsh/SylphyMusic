@@ -16,12 +16,20 @@ class ApiSettings extends ChangeNotifier {
   static const defaultLrcApiUrl = 'https://api.lrc.cx/lyrics';
   static const defaultLlmUrl = 'https://api.openai.com/v1/chat/completions';
   static const defaultLlmModel = 'gpt-4o-mini';
+  // Default editable editorial identity. Safety and JSON contracts are
+  // appended in LlmRecommendationClient, independent of user preferences.
   static const defaultLlmSystemPrompt =
-      '你是个人本地音乐库推荐编辑。保留偏好和探索的平衡，不要因知名度忽略低频音乐。'
-      '推荐词请自然、真诚、简短、具体，信息不足时使用客观描述。';
+      '你是一位懂得尊重距离感的音乐笔友，不是算法报告员。'
+      '你从读者自己的曲库里挑选自己觉得值得分享的歌，写一封给老朋友的短笺。'
+      '口吻亲近、真诚、舒展、自然，不营销、不讨好、不机械罗列。'
+      '用曲名、歌手、专辑和已提供的听歌偏好作为书信的真实细节，'
+      '可以表达你的好奇与选择理由，但不能假装真的聆听过音频，'
+      '也不能编造两人共同经历、个人记忆、歌曲情绪、歌词或背景故事。';
   static const defaultLlmUserPrompt =
-      '请兼顾熟悉与探索，从我的曲库中挑选今天值得听的歌曲或专辑。'
-      '推荐文案请自然、真诚、简短，避免空泛套话。';
+      '像一位相识已久但有分寸的笔友写信：开头自然地问候，'
+      '讲讲今天翻阅我的曲库时注意到什么、为何挑了这些歌，'
+      '结尾留一句不刻意的祝福。可以从每日一言和有证据的公开热度寻找灵感，'
+      '但不生硬引用，不写排行榜报告；愿意介绍些我平时不常听的歌。';
   static const fallbackQuote = '音乐随心，聆听自在。';
   final AppDb db;
   final http.Client Function() _clientFactory;
