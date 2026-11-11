@@ -29,6 +29,7 @@
 | [COVER_FLOW](COVER_FLOW.md) | 专辑 / 歌单封面流、分批数据接入与会话内视图切换 |
 | [PLAYER_LAYOUT_EDITOR](PLAYER_LAYOUT_EDITOR.md) | 播放页全画布组件、9 / 16 宫格编辑、统一封面与歌词页、模板与迁移 |
 | [DIAGNOSTIC_LOGGING](DIAGNOSTIC_LOGGING.md) | 用户主动启用的诊断日志、导出 / 分享与隐私边界 |
+| [Android 完整缓存快速 AO 恢复 V4](ANDROID_CACHED_EARLY_AO_RECOVERY_V4.md) | 双样本停滞判定、复用本地输出快速重载与原有兜底 |
 | [单曲循环 / 后台稳定性 V3](REPEATONE_BACKGROUND_STABILITY_V3.md) | 循环回绕进度基准修正与 2 秒 / 3 秒纯诊断采样；[分析](REPEATONE_BACKGROUND_STABILITY_V3_ANALYSIS.md) |
 | [单曲循环 EOF 错误竞争](REPEAT_ONE_EOF_ERROR_RACE.md) | 曲尾错误短暂延迟、完成事件协调与旧重连任务失效 |
 | [播放稳定性诊断 V2](PLAYBACK_STABILITY_DIAGNOSTICS_V2.md) | 通知 Play → FGS / 焦点 → mpv → AO 重载的关联日志及 ADB 双快照采集 |

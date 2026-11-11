@@ -1,5 +1,19 @@
 # 实施与验证记录
 
+## 2026-11-11 应用快速 AO 恢复 V4 并发布 1.0.39+52 / 1.0.39-openlist.22+52
+
+按用户“应用，推送更新”要求，将 SylphyMusic-Android-Cached-Early-AO-Recovery-V4.zip 内补丁直接应用到 main 与 feature/android-openlist-lite，两工作区检查通过。保留已有 V2 诊断、EOF 防护、V3 单曲循环基准、歌词翻译与 OpenList 播放租约；未重复前置补丁。已有文件备份在各自 .private/android-cached-early-ao-v4-before/，Dart 完成格式化，附带策略测试纳入但未执行，说明与架构 / 索引同步更新。
+
+Android 复用已打开本地 / 完整缓存输出、此前暂停时，2 秒 / 3 秒双样本均满足播放中、非缓冲、非忙碌、未确认进度、位置差不超过 250ms 及进度停滞门限，且各代次仍有效、无并行恢复、本意图尚未 AO 重载，才提前进入既有有界恢复执行器。迟到样本不构成独立证据，日志开关不控制恢复策略；首次打开与代理流不走快速恢复，12 秒验证与一次同曲重开兜底保留。无 PCM 发声保证。
+
+本次发布同时包含自 1.0.38 以来尚未发布的歌词行内译文、V2 诊断、EOF 错误竞争防护及 V3 回绕基准修正，标题、正文及清单均为面向用户的说明。普通版 Android 三 ABI、Windows 安装 EXE / 便携 ZIP 与摘要六个附件发布成功并保持 Latest；OpenList Android arm64 独立预发布，附当前应用、OpenList 后端 / 前端源码与许可证及摘要三个附件。四份 APK 正式签名通过且证书一致，OpenList JNI 与上一版相同。
+
+普通版 release.py 与特别版发布入口均输出 Release succeeded、退出码 0；Release 状态 / 标题 / 正文、全部附件大小 / SHA-256、四份更新清单原始 / 加速入口均匹配，特别版状态 complete。仅提交推送本轮清单：main/version.json 为 14fac69，main/version-openlist.json 为 51b381a；feature/android-openlist-lite/version.json 与 version-openlist.json 为 a44cbe8。源码、版本配置与其他已有修改未另行提交推送。
+
+普通版产物 build/releases/1.0.39-52/，日志 build/test_logs/release-1.0.39.log；特别版产物 build/releases/1.0.39-openlist.22-52/，日志 build/test_logs/openlist-release-52-prepare.log 和 openlist-release-52-publish.log。未运行 analyze、测试、ADB、应用启动或设备矩阵验证；编译与发布成功不等于实际发声恢复已验证。
+
+发布页：https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.39%2B52 及 https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.39-openlist.22%2B52 。
+
 ## 2026-11-11 按文档应用单曲循环 / 后台稳定性 V3
 
 按用户“按照文档应用补丁”要求处理 SylphyMusic-RepeatOne-Background-Stability-V3-Bundle.zip。main 与 feature/android-openlist-lite 已具备 V2 诊断和 EOF 竞争修复，因此遵循 README 只应用 03，未重复应用 01 / 02。恢复超时日志一处因现有 Dart 格式化上下文无法直接匹配，按补丁字段适配，其余代码直接应用；保留 OpenList 播放租约、缓存优先、歌词与其他已有修改。已有文件备份在各自 .private/repeatone-background-stability-v3-before/。

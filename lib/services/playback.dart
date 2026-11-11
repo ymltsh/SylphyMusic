@@ -17,6 +17,7 @@ import 'package:synchronized/synchronized.dart';
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'audio_output_recovery_policy.dart';
+import 'early_resume_recovery_policy.dart';
 import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
@@ -201,34 +202,66 @@ class PlaybackCoordinator extends ChangeNotifier {
     _earlyResumeProbeTimers.clear();
   }
 
-  /// Log the 2s/3s timeline *without* trying any recovery. A normal play is
-  /// deliberately sampled too, so a future report has a healthy baseline.
+  /// Sample ordinary starts for diagnosis, but enable early recovery only for
+  /// an existing local/verified-cache output resumed by a fresh Play intent.
+  /// Both probes must observe no material media-clock advancement. This timer
+  /// remains active when diagnostics are off; logging is strictly opt-in.
   void _armEarlyResumeProbes({
     required TrackRef? ref,
     required int generation,
     required int intent,
     required int navigation,
+    required bool reusedLocalOutput,
   }) {
     _cancelEarlyResumeProbes();
-    if (!Platform.isAndroid || diagnostics?.enabled != true) return;
+    if (!Platform.isAndroid ||
+        (!reusedLocalOutput && diagnostics?.enabled != true)) {
+      return;
+    }
     final baseline = position.inMilliseconds;
     final initialEvents = _positionEventSequence;
     final started = Stopwatch()..start();
+    var firstProbeStalled = false;
     for (final seconds in const [2, 3]) {
       final stage = seconds == 2 ? 'early_2s' : 'early_3s';
       _earlyResumeProbeTimers.add(
         Timer(Duration(seconds: seconds), () {
-          if (generation != _loadGeneration ||
-              intent != _playIntentGeneration ||
-              navigation != _navigationEpoch ||
-              currentRef != ref ||
-              !_playRequested ||
-              _userPaused ||
-              _focusWasLost) {
-            return;
-          }
+          final currentIntent =
+              generation == _loadGeneration &&
+              intent == _playIntentGeneration &&
+              navigation == _navigationEpoch &&
+              currentRef == ref &&
+              _playRequested &&
+              !_userPaused &&
+              !_focusWasLost;
+          if (!currentIntent) return;
           final currentMs = position.inMilliseconds;
+          final gapMs = _progressWatch.elapsedMilliseconds;
+          final elapsedMs = started.elapsedMilliseconds;
           final confirmed = _awaitingProgressIntent != intent;
+          final busy =
+              _opening ||
+              _seekPending ||
+              _finishingTrack ||
+              _loopPositionResetPending ||
+              _navigationInFlight != 0 ||
+              _handlingFailure ||
+              _stalledRecoveryRunning;
+          final stalledSample = isEarlyResumeStalledSample(
+            nativePlaying: playing,
+            buffering: buffering,
+            busy: busy,
+            progressConfirmed: confirmed,
+            baselinePositionMs: baseline,
+            positionMs: currentMs,
+            progressGapMs: gapMs,
+            minProgressGapMs: seconds == 2 ? 1800 : 2500,
+          );
+          // If the Dart isolate was frozen, two delayed callbacks are not two
+          // independent samples. Fall through to the original 12s watchdog.
+          if (seconds == 2) {
+            firstProbeStalled = stalledSample && elapsedMs <= 3000;
+          }
           diagnostics?.record(
             'playback',
             'early_resume_probe',
@@ -236,22 +269,69 @@ class PlaybackCoordinator extends ChangeNotifier {
               'stage': stage,
               'intent': intent,
               'load': generation,
-              'elapsed_ms': started.elapsedMilliseconds,
+              'elapsed_ms': elapsedMs,
               'baseline_ms': baseline,
               'position_ms': currentMs,
               'delta_ms': max(0, currentMs - baseline),
               'position_events': _positionEventSequence - initialEvents,
               'watchdog_position_ms': max(0, _watchdogPositionMs),
-              'progress_gap_ms': _progressWatch.elapsedMilliseconds,
+              'progress_gap_ms': gapMs,
               'native_playing': playing,
               'buffering': buffering,
               'mpv_confirmed': confirmed,
+              'reused_output': reusedLocalOutput,
+              'early_stalled': stalledSample,
               'source': _openedWithProxy
                   ? 'proxy'
                   : (_openedFromCompleteCache ? 'cache' : 'local'),
             },
           );
           if (!confirmed) _snapshotNative(stage);
+          if (seconds != 3 || !reusedLocalOutput) return;
+          final recoveryIdle = !_handlingFailure && !_stalledRecoveryRunning;
+          final eligible = shouldAttemptEarlyAudioReload(
+            isAndroid: Platform.isAndroid,
+            reusedLocalOutput: reusedLocalOutput && !_openedWithProxy,
+            currentIntent: currentIntent,
+            firstProbeStalled: firstProbeStalled,
+            secondProbeStalled: stalledSample && elapsedMs <= 4500,
+            recoveryIdle: recoveryIdle,
+            reloadNotTried:
+                _audioOutputReloadTriedIntent != intent ||
+                _audioOutputReloadTriedRef != ref,
+          );
+          diagnostics?.record(
+            'playback',
+            'early_recovery_decision',
+            details: {
+              'intent': intent,
+              'load': generation,
+              'elapsed_ms': elapsedMs,
+              'position_ms': currentMs,
+              'progress_gap_ms': gapMs,
+              'early_stalled': eligible,
+              'reason': eligible
+                  ? 'early_no_progress'
+                  : confirmed
+                  ? 'progress_confirmed'
+                  : !firstProbeStalled
+                  ? 'first_probe_not_stalled'
+                  : !stalledSample
+                  ? 'second_probe_not_stalled'
+                  : 'guarded',
+            },
+          );
+          if (!eligible) return;
+          _snapshotNative('early_recovery');
+          unawaited(
+            _reopenUnconfirmedResume(
+              ref,
+              generation,
+              intent,
+              navigation,
+              fromEarlyProbe: true,
+            ),
+          );
         }),
       );
     }
@@ -353,6 +433,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     required int intent,
     required int navigation,
     bool afterRecovery = false,
+    bool reusedLocalOutput = false,
   }) {
     _cancelResumeProgressTimer();
     // Ordinary remote startup gets the regular 45-second watchdog. After a
@@ -367,6 +448,7 @@ class PlaybackCoordinator extends ChangeNotifier {
         generation: generation,
         intent: intent,
         navigation: navigation,
+        reusedLocalOutput: reusedLocalOutput,
       );
     }
     final timeout = _openedWithProxy
@@ -379,6 +461,8 @@ class PlaybackCoordinator extends ChangeNotifier {
         'intent': intent,
         'load': generation,
         'resume_ms': timeout.inMilliseconds,
+        'output_state': 'unverified',
+        'reused_output': reusedLocalOutput,
       },
     );
     _resumeProgressTimer = Timer(timeout, () {
@@ -415,6 +499,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     int intent,
     int navigation, {
     bool fromWatchdog = false,
+    bool fromEarlyProbe = false,
   }) async {
     bool stillCurrent() =>
         _sameRecovery(ref, generation, intent) &&
@@ -436,12 +521,20 @@ class PlaybackCoordinator extends ChangeNotifier {
     _stalledRecoveryRunning = true;
     _handlingFailure = true;
     _cancelResumeProgressTimer();
+    _cancelEarlyResumeProbes();
     _snapshotNative('recovery_started');
     diagnostics?.record(
       'playback',
       'output_recovery_started',
       details: {
-        'trigger': fromWatchdog ? 'watchdog' : 'resume_check',
+        'trigger': fromWatchdog
+            ? 'watchdog'
+            : fromEarlyProbe
+            ? 'early_no_progress'
+            : 'resume_check',
+        'output_state': 'recovering',
+        'intent': intent,
+        'load': generation,
         'source': _openedWithProxy
             ? 'proxy'
             : (_openedFromCompleteCache ? 'cache' : 'local'),
@@ -989,6 +1082,7 @@ class PlaybackCoordinator extends ChangeNotifier {
                 'source': _openedWithProxy
                     ? 'proxy'
                     : (_openedFromCompleteCache ? 'cache' : 'local'),
+                'output_state': 'advancing',
               },
             );
             _snapshotNative('progress_resumed');
@@ -2375,6 +2469,11 @@ class PlaybackCoordinator extends ChangeNotifier {
           generation: _loadGeneration,
           intent: intentGeneration,
           navigation: navigationEpoch,
+          // This path reused an already opened mpv output. Fresh opens and
+          // proxy streams retain the original conservative 12s/45s checks.
+          reusedLocalOutput:
+              !wasRequested &&
+              (source.kind == SourceKind.local || _openedFromCompleteCache),
         );
         if (fadeIn && gainGeneration == _gainGeneration) {
           await _fadePlaybackGain(1, _fadeInDuration, gainGeneration);
