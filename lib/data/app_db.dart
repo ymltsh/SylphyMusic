@@ -10,6 +10,42 @@ import '../core/models.dart';
 import '../services/embedded_tags.dart';
 
 class AppDb {
+  static const _recommendationSchema = <String>[
+    '''CREATE TABLE listening_sessions(
+      session_id TEXT PRIMARY KEY,source_id TEXT NOT NULL,track_id TEXT NOT NULL,
+      started_at_ms INTEGER NOT NULL,updated_at_ms INTEGER NOT NULL,
+      listened_ms INTEGER NOT NULL DEFAULT 0,local_hour INTEGER NOT NULL,
+      local_weekday INTEGER NOT NULL,local_day TEXT NOT NULL,
+      qualified INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0)''',
+    '''CREATE TABLE track_listen_stats(
+      source_id TEXT NOT NULL,track_id TEXT NOT NULL,
+      play_count INTEGER NOT NULL DEFAULT 0,
+      completion_count INTEGER NOT NULL DEFAULT 0,
+      skip_count INTEGER NOT NULL DEFAULT 0,
+      total_listened_ms INTEGER NOT NULL DEFAULT 0,
+      last_played_at_ms INTEGER,PRIMARY KEY(source_id,track_id))''',
+    '''CREATE TABLE recommendation_snapshots(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,
+      local_day TEXT NOT NULL,generation INTEGER NOT NULL,
+      algorithm_version INTEGER NOT NULL,seed INTEGER NOT NULL,
+      item_count INTEGER NOT NULL DEFAULT 0,created_at_ms INTEGER NOT NULL,
+      UNIQUE(kind,local_day,generation))''',
+    '''CREATE TABLE recommendation_items(
+      snapshot_id INTEGER NOT NULL,position INTEGER NOT NULL,
+      item_kind TEXT NOT NULL,source_id TEXT NOT NULL,track_id TEXT,
+      album_key TEXT,representative_track_id TEXT,album_track_count INTEGER,
+      reason_code TEXT NOT NULL,score REAL NOT NULL,
+      PRIMARY KEY(snapshot_id,position))''',
+    '''CREATE TABLE recommendation_feedback(
+      source_id TEXT NOT NULL,track_id TEXT NOT NULL,action TEXT NOT NULL,
+      updated_at_ms INTEGER NOT NULL,PRIMARY KEY(source_id,track_id))''',
+    'CREATE INDEX idx_listening_sessions_time ON listening_sessions(started_at_ms)',
+    'CREATE INDEX idx_listening_sessions_context ON listening_sessions(local_hour,local_weekday,started_at_ms)',
+    'CREATE INDEX idx_stats_last_played ON track_listen_stats(last_played_at_ms)',
+    'CREATE INDEX idx_recommendation_items_source ON recommendation_items(source_id,track_id)',
+    'CREATE INDEX idx_recommendation_snapshot_date ON recommendation_snapshots(kind,local_day)',
+  ];
   static const _assetsTable = '''CREATE TABLE media_assets(
     source_id TEXT NOT NULL,asset_key TEXT NOT NULL,kind TEXT NOT NULL,
     version TEXT NOT NULL,relative_file TEXT NOT NULL,bytes INTEGER NOT NULL,
@@ -81,7 +117,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 9,
+      version: 10,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -147,6 +183,11 @@ class AppDb {
           await database.execute(_assetLinks);
           await database.execute(_assetLinksIndex);
         }
+        if (oldVersion < 10) {
+          for (final sql in _recommendationSchema) {
+            await database.execute(sql);
+          }
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -177,6 +218,9 @@ class AppDb {
           await d.execute(sql);
         }
         await _catalogSchema(d);
+        for (final sql in _recommendationSchema) {
+          await d.execute(sql);
+        }
       },
     );
     // A killed process never exposes an incomplete remote snapshot. Its staging
@@ -687,6 +731,14 @@ class AppDb {
   Future<void> removeSourceData(String id) async {
     // Never issues a remote mutation and never deletes original local audio.
     await db.transaction((tx) async {
+      for (final table in [
+        'listening_sessions',
+        'track_listen_stats',
+        'recommendation_feedback',
+        'recommendation_items',
+      ]) {
+        await tx.delete(table, where: 'source_id=?', whereArgs: [id]);
+      }
       await tx.delete('sources', where: 'id=?', whereArgs: [id]);
       await tx.delete('tracks', where: 'source_id=?', whereArgs: [id]);
       await tx.delete(

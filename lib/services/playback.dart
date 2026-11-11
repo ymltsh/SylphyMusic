@@ -22,6 +22,7 @@ import 'artwork.dart';
 import 'cache.dart';
 import 'diagnostic_logs.dart';
 import 'media_proxy.dart';
+import 'listening_events.dart';
 import 'media_session_projection.dart';
 import 'native_command_gate.dart';
 import 'notification_clock.dart';
@@ -41,6 +42,15 @@ MediaItem mediaItemForTrack(Track track, {Uri? artUri}) => MediaItem(
 
 class PlaybackCoordinator extends ChangeNotifier {
   PlaybackCoordinator(this.db, this.proxy, this.cache, {this.diagnostics});
+  final StreamController<ListeningBoundary> _listeningEvents =
+      StreamController<ListeningBoundary>.broadcast(sync: true);
+  Stream<ListeningBoundary> get listeningBoundaries => _listeningEvents.stream;
+  void _emitListeningBoundary(TrackRef? ref, ListeningBoundaryKind kind) {
+    if (ref != null && !_listeningEvents.isClosed) {
+      _listeningEvents.add(ListeningBoundary(ref, kind));
+    }
+  }
+
   static const _nativeDiagnosticChannel = MethodChannel(
     'music.sylphy/playback_diagnostics',
   );
@@ -1142,6 +1152,7 @@ class PlaybackCoordinator extends ChangeNotifier {
             _cancelPendingEndError();
             diagnostics?.record('playback', 'end_error_ignored');
           }
+          _emitListeningBoundary(currentRef, ListeningBoundaryKind.completed);
           diagnostics?.record(
             'playback',
             'track_completed',
@@ -1728,6 +1739,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     bool autoplay = true,
   }) async {
     if (tracks.isEmpty) return;
+    _emitListeningBoundary(currentRef, ListeningBoundaryKind.replaced);
     _cancelFocusResume();
     if (autoplay) _userPaused = false;
     final navigationEpoch = ++_navigationEpoch;
@@ -2568,6 +2580,9 @@ class PlaybackCoordinator extends ChangeNotifier {
       return;
     }
     final old = currentRef;
+    if (manual) {
+      _emitListeningBoundary(old, ListeningBoundaryKind.manualSkip);
+    }
     final newHistory = appendPlaybackHistory(snapshot.history, snapshot.index);
     var order = snapshot.order;
     if (snapshot.shuffle &&
@@ -2621,6 +2636,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       index = snapshot.index - 1;
     }
     if (index == null) return;
+    _emitListeningBoundary(currentRef, ListeningBoundaryKind.manualSkip);
     final navigationEpoch = ++_navigationEpoch;
     ++_loadGeneration;
     final old = currentRef;
@@ -3201,6 +3217,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       _leased = null;
     }
     await _nativeCommands.run(() => player.dispose(), isCurrent: () => true);
+    await _listeningEvents.close();
     super.dispose();
   }
 }

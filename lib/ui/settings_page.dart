@@ -16,6 +16,7 @@ import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
 import 'player_layout/layout_editor.dart';
 import 'about_page.dart';
+import 'recommendation_settings_page.dart';
 
 enum _Section {
   playback,
@@ -402,6 +403,19 @@ class _SettingsPageState extends State<SettingsPage> {
       _entry(Icons.lyrics_outlined, '歌词设置', '调整歌词显示效果', _Section.lyrics),
     ]),
     _group('外观与个性化', [
+      ListTile(
+        leading: _entryIcon(Icons.auto_awesome_outlined),
+        title: const Text('推荐设置'),
+        subtitle: const Text('个性化、在线热度与收听统计'),
+        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RecommendationSettingsPage(app: app),
+          ),
+        ),
+      ),
       _entry(Icons.palette_outlined, '主题与配色', '打造你喜欢的色彩', _Section.theme),
       _entry(Icons.wallpaper_outlined, '页面背景', '自定义页面背景', _Section.background),
       _entry(Icons.album_outlined, '播放器外观', '编辑播放页、唱片与迷你播放器', _Section.player),

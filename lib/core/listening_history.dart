@@ -19,7 +19,7 @@ class ListeningHistory extends ChangeNotifier {
     try {
       refs = (jsonDecode(await db.setting('listening_history') ?? '[]') as List)
           .whereType<String>()
-          .take(50)
+          .take(1000)
           .map(TrackRef.parse)
           .toList();
     } catch (_) {
@@ -38,7 +38,7 @@ class ListeningHistory extends ChangeNotifier {
       return;
     }
     _last = ref.key;
-    refs = [ref, ...refs.where((r) => r != ref)].take(50).toList();
+    refs = [ref, ...refs.where((r) => r != ref)].take(1000).toList();
     final value = jsonEncode(refs.map((r) => r.key).toList());
     _pending = _pending
         .then((_) => db.setSetting('listening_history', value))
@@ -49,14 +49,45 @@ class ListeningHistory extends ChangeNotifier {
   }
 
   Future<List<Track>> tracks() async {
-    final tracks = <Track>[];
-    for (final ref in [...refs]) {
-      final source = await db.source(ref.sourceId);
-      if (source == null || !source.enabled) continue;
-      final track = await db.track(ref);
-      if (track != null) tracks.add(track);
+    // Bulk-resolve up to 1000 identities without 2000 source/track queries.
+    final snapshot = [...refs];
+    final byKey = <String, Track>{};
+    for (var i = 0; i < snapshot.length; i += 150) {
+      final end = i + 150 < snapshot.length ? i + 150 : snapshot.length;
+      final part = snapshot.sublist(i, end);
+      if (part.isEmpty) continue;
+      final clauses = List.filled(
+        part.length,
+        '(t.source_id=? AND t.id=?)',
+      ).join(' OR ');
+      final args = <Object?>[];
+      for (final ref in part) {
+        args.addAll([ref.sourceId, ref.id]);
+      }
+      final rows = await db.db.rawQuery('''
+        SELECT t.* FROM tracks t JOIN sources s ON s.id=t.source_id
+        WHERE s.enabled=1 AND ($clauses)
+      ''', args);
+      for (final row in rows) {
+        final track = Track.fromRow(row);
+        byKey[track.ref.key] = track;
+      }
     }
-    return tracks;
+    return [
+      for (final ref in snapshot)
+        if (byKey[ref.key] != null) byKey[ref.key]!,
+    ];
+  }
+
+  Future<void> forgetSource(String sourceId) async {
+    refs = refs.where((r) => r.sourceId != sourceId).toList();
+    _last = null;
+    final value = jsonEncode(refs.map((r) => r.key).toList());
+    _pending = _pending
+        .then((_) => db.setSetting('listening_history', value))
+        .catchError((Object _) {});
+    notifyListeners();
+    await _pending;
   }
 
   Future<void> shutdown() async {

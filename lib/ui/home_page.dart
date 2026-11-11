@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../data/library_catalog.dart';
+import '../core/recommendation_models.dart';
+import 'daily_mix_page.dart';
 import 'cover_art.dart';
 import 'library_browser.dart';
 import 'playing_song_tile.dart';
@@ -32,6 +34,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Future<CatalogPage> albums;
+  late Future<DailyMix> dailyMix;
+  final Map<String, String> _albumReasons = {};
   late int revision;
   int _albumRefreshEpoch = 0;
 
@@ -40,12 +44,33 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     revision = widget.app.catalogRevision;
     albums = _albums();
+    dailyMix = widget.app.recommendations.daily();
     widget.app.catalogListenable.addListener(_catalogChanged);
   }
 
   Future<CatalogPage> _albums() async {
-    // Prefer real albums instead of filling the desktop showcase with several
-    // unrelated covers all labelled "未知专辑". Keep a fallback for untagged libraries.
+    final recommended = await widget.app.recommendations.albums();
+    if (recommended.isNotEmpty) {
+      _albumReasons
+        ..clear()
+        ..addEntries(
+          recommended.map(
+            (item) => MapEntry(
+              '${item.representative.ref.sourceId}|${item.groupKey}',
+              item.reason,
+            ),
+          ),
+        );
+      return CatalogPage([
+        for (final item in recommended)
+          CatalogRow({
+            ...item.representative.toRow(),
+            'catalog_key': item.groupKey,
+            'catalog_count': item.trackCount,
+            'catalog_sources': 1,
+          }),
+      ], recommended.length);
+    }
     final named = await widget.app.catalog.page(
       const CatalogQuery(view: 1, namedAlbumsOnly: true),
       limit: 8,
@@ -65,7 +90,10 @@ class _HomePageState extends State<HomePage> {
       final updated = await _albums();
       if (!mounted || epoch != _albumRefreshEpoch) return;
       // Retain the visible cards while WebDAV tags are being written.
-      setState(() => albums = SynchronousFuture(updated));
+      setState(() {
+        albums = SynchronousFuture(updated);
+        dailyMix = widget.app.recommendations.daily();
+      });
     } catch (_) {
       // A failed background refresh must not replace the current cards.
     }
@@ -83,6 +111,7 @@ class _HomePageState extends State<HomePage> {
       ++_albumRefreshEpoch;
       revision = widget.app.catalogRevision;
       albums = _albums();
+      dailyMix = widget.app.recommendations.daily();
     }
   }
 
@@ -161,7 +190,11 @@ class _HomePageState extends State<HomePage> {
             appBar: AppBar(title: Text(album)),
             body: LibraryBrowser(
               app: app,
-              query: const CatalogQuery(view: 1).songsIn('album', row.key),
+              query: CatalogQuery(
+                view: 1,
+                sourceId: track.ref.sourceId,
+                sort: 'track_number',
+              ).songsIn('album', row.key),
               onAction: widget.onAction,
             ),
           ),
@@ -179,7 +212,9 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           Text(
-            artist,
+            _albumReasons['${track.ref.sourceId}|${row.key}'] == null
+                ? artist
+                : '$artist · ${_albumReasons['${track.ref.sourceId}|${row.key}']}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall,
@@ -297,6 +332,73 @@ class _HomePageState extends State<HomePage> {
                 ),
                 _shortcut(Icons.download_outlined, '本地下载', widget.onDownloads),
               ],
+            );
+          },
+        ),
+        SizedBox(height: desktop ? 16 : 24),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '每日精选',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
+              ),
+              child: const Text('查看全部'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        FutureBuilder<DailyMix>(
+          future: dailyMix,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return SizedBox(
+                height: 104,
+                child: Center(
+                  child: snapshot.hasError
+                      ? const Text('每日精选暂时不可用')
+                      : const CircularProgressIndicator(),
+                ),
+              );
+            }
+            final mix = snapshot.data!;
+            if (mix.items.isEmpty) {
+              return Card.filled(
+                child: ListTile(
+                  title: const Text('开始聆听，发现曲库里的好音乐'),
+                  subtitle: const Text('添加来源或播放歌曲后，精选会更懂你'),
+                  onTap: () => widget.onLibrary(0),
+                ),
+              );
+            }
+            final first = mix.items.first.track;
+            return Card.filled(
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(12),
+                leading: CoverArt(app: app, track: first, size: 64),
+                title: const Text('今天，听点喜欢的'),
+                subtitle: Text(
+                  '${mix.items.length} 首 · 熟悉的旋律与新的发现',
+                  maxLines: 2,
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
+                ),
+                trailing: IconButton(
+                  tooltip: '播放每日精选',
+                  icon: const Icon(Icons.play_circle_fill_rounded),
+                  onPressed: () => unawaited(
+                    app.playback.setQueue(mix.refs).catchError((Object _) {}),
+                  ),
+                ),
+              ),
             );
           },
         ),

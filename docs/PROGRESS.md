@@ -1,5 +1,25 @@
 # 实施与验证记录
 
+## 2026-11-11 设置页增加推荐设置入口
+
+按用户要求，普通版与 OpenList 的“设置 → 音乐与存储”新增“推荐设置”入口，进入独立 RecommendationSettingsPage。提供带当前状态的个性化推荐、在线热度开关和清除推荐统计；读取在线热度失败可重试，操作期间禁用重复操作并显示进度。清除前确认操作后果，更改后重新生成每日精选与专辑推荐并 reload 刷新首页。每日精选原有菜单快捷操作保留，复用既有服务与数据库设置，不改变数据库结构。
+
+已有设置、推荐说明及进度记录备份在各自 .private/recommendation-settings-before/。Dart 文件已格式化，推荐文档同步更新。普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/recommendation-settings-build.log。
+
+未新增或运行测试，未执行 analyze、启动或设备验收；未修改版本号或清单，未提交、推送或发布。设置操作与页面交互交由用户确认。
+
+## 2026-11-11 应用推荐系统 V1 覆盖包
+
+按用户“应用”要求，审阅 SylphyMusic-recommendation-v1-overlay.zip 的安装脚本和新增代码后，普通版与 OpenList 均通过 8 个修改文件 / 9 个新文件预检查并应用。保留此前播放恢复、诊断、歌词与 OpenList 播放租约等已有修改。已有文件备份在各自 .private/recommendation-v1-before/。
+
+首页接入 24 首每日精选与最多 8 张独立来源作用域专辑推荐，提供详情、换一批、播放、保存本地歌单、隐藏歌曲及偏好开关。推荐使用 SQL 有界候选、来源与曲目身份，不跨来源替换音频或自动写云歌单；公开热榜只获取固定公共 ListenBrainz / Apple 榜单，不发送曲库或行为记录。最近播放由 50 个去重身份扩至 1000 个，并分批批量查询。SQLite v9→v10 新增收听会话、累计统计、快照、条目、反馈及索引，保留既有数据；会话明细保留 90 天，累计统计长期保存，移除来源清理相关数据。
+
+集成时补齐个性化关闭后的统计监听退出清理；关闭统计时立即阻止新增观察，并在启动期间等待旧会话清理，避免数据库关闭后遗留工作。新增服务纳入 disposeAsync，先停止监听并等待统计和推荐任务再关闭数据库。Dart 完成格式化，架构 / 索引及推荐说明同步更新。
+
+普通版 Android 三 ABI / Windows Release 编译和内部打包成功，产物 build/internal-review/；OpenList Android arm64 Release 编译成功，产物 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk。各工作区日志 build/test_logs/recommendation-v1-build.log。
+
+未新增或运行测试，未执行 analyze、启动、ADB、真实数据库迁移或设备验收，未实际请求公开热榜；未修改版本号或更新清单，未提交、推送或发布。推荐质量、迁移与页面交互效果仍由用户确认，编译成功不等于功能验证通过。
+
 ## 2026-11-11 应用快速 AO 恢复 V4 并发布 1.0.39+52 / 1.0.39-openlist.22+52
 
 按用户“应用，推送更新”要求，将 SylphyMusic-Android-Cached-Early-AO-Recovery-V4.zip 内补丁直接应用到 main 与 feature/android-openlist-lite，两工作区检查通过。保留已有 V2 诊断、EOF 防护、V3 单曲循环基准、歌词翻译与 OpenList 播放租约；未重复前置补丁。已有文件备份在各自 .private/android-cached-early-ao-v4-before/，Dart 完成格式化，附带策略测试纳入但未执行，说明与架构 / 索引同步更新。

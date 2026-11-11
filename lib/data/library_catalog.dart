@@ -112,6 +112,7 @@ class LibraryCatalog {
     final expression = switch (query.sort) {
       'year' => grouped ? 'MAX(t.year)' : 't.year',
       'duration' => grouped ? 'SUM(t.duration_ms)' : 't.duration_ms',
+      'track_number' => 't.disc,t.number',
       'artist' => 't.artist COLLATE NOCASE',
       'album' => 't.album COLLATE NOCASE',
       _ =>

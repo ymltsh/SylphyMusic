@@ -36,6 +36,9 @@ import '../services/source_connections.dart';
 import 'models.dart';
 import 'appearance.dart';
 import 'listening_history.dart';
+import '../data/recommendation_repository.dart';
+import '../services/listening_analytics.dart';
+import '../services/recommendation_service.dart';
 import 'player_layout_store.dart';
 
 class SylphyApp extends ChangeNotifier {
@@ -78,6 +81,15 @@ class SylphyApp extends ChangeNotifier {
   late final lrcApi = LrcApiClient(apiSettings, vault);
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
+  late final recommendationRepository = RecommendationRepository(db);
+  late final listeningAnalytics = ListeningAnalytics(
+    playback,
+    recommendationRepository,
+  );
+  late final recommendations = RecommendationService(
+    db,
+    recommendationRepository,
+  );
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};
   bool cloudFavoritesByDefault = false;
@@ -212,7 +224,12 @@ class SylphyApp extends ChangeNotifier {
     await app.apiSettings.initialize();
     await app.playerLayouts.initialize();
     await app.history.initialize();
+    await app.listeningAnalytics.initialize();
     app.history.addListener(app._indexChanged);
+    // Session checkpoints are pruned on startup; cumulative stats are retained.
+    await app.recommendationRepository
+        .pruneSessions(DateTime.now())
+        .catchError((Object _) {});
     app.cloudFavoritesByDefault =
         await db.setting('favorite_location') == 'cloud';
     app.autoSyncMinutes =
@@ -816,6 +833,8 @@ class SylphyApp extends ChangeNotifier {
     }
     await jobs.cancelAffected(sourceId: source.id);
     await cache.clear(sourceId: source.id);
+    await listeningAnalytics.forgetSource(source.id);
+    await history.forgetSource(source.id);
     await db.removeSourceData(source.id);
     await artwork.clearSource(source.id);
     await lyrics.clearSource(source.id);
@@ -1095,6 +1114,8 @@ class SylphyApp extends ChangeNotifier {
     apiSettings.removeListener(_apiChanged);
     lrcApi.dispose();
     apiSettings.dispose();
+    await listeningAnalytics.shutdown();
+    await recommendations.shutdown();
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
