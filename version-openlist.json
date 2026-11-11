@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.42-openlist.25",
-    "build": 55,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25 (arm64-v8a)",
+    "version": "1.0.43-openlist.26",
+    "build": 56,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.43-openlist.26 (arm64-v8a)",
     "date": "2026-11-12",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25\n\n- “最近播放、我的收藏、全部音乐、本地下载”四个快捷入口从首页合并到“我的”页面，常用功能集中查看。\n- 音乐来信支持由 LLM 为每轮推荐拟定标题，标题与信件一并保存；未提供标题时使用默认标题。\n- 调整来信页面排版，日期和歌曲数量纳入卡片，导出与分享操作移到完整信件和推荐理由之后。\n- 新增图片导出设置，可选择真实封面叠卡、推荐理由、浅深主题以及 1080 / 1440 像素宽度；图片布局与应用卡片保持一致。\n- 信件存档保存标题和封面引用，旧信件继续可读；图片仍默认保存到 Pictures/SylphyMusic，底部保留日期、项目名与 Logo。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.43-openlist.26\n\n- 每日一言改为每次启动刷新一次；切换页面或回到前台不重复请求，网络失败时保留缓存内容。\n- 优化“我的”页面布局：音乐空间、我的音乐和音乐管理分组更清晰，统一快捷卡片的图标、说明与间距。\n- 个人页支持宽屏居中及两列 / 四列自适应，兼顾手机底部播放器和较大系统字号。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.42-openlist.25%2B55/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.43-openlist.26%2B56/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.42-openlist.25%2B55"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.43-openlist.26%2B56"
   },
   "history": [
+    {
+      "version": "1.0.42-openlist.25",
+      "build": 55,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25 (arm64-v8a)",
+      "date": "2026-11-12",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.42-openlist.25\n\n- “最近播放、我的收藏、全部音乐、本地下载”四个快捷入口从首页合并到“我的”页面，常用功能集中查看。\n- 音乐来信支持由 LLM 为每轮推荐拟定标题，标题与信件一并保存；未提供标题时使用默认标题。\n- 调整来信页面排版，日期和歌曲数量纳入卡片，导出与分享操作移到完整信件和推荐理由之后。\n- 新增图片导出设置，可选择真实封面叠卡、推荐理由、浅深主题以及 1080 / 1440 像素宽度；图片布局与应用卡片保持一致。\n- 信件存档保存标题和封面引用，旧信件继续可读；图片仍默认保存到 Pictures/SylphyMusic，底部保留日期、项目名与 Logo。\n\n本特别版仅提供 Android arm64-v8a，内置 OpenList Lite。请从特别版更新入口下载安装。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.42-openlist.25%2B55/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.42-openlist.25%2B55"
+    },
     {
       "version": "1.0.41-openlist.24",
       "build": 54,
