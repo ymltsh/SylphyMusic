@@ -1,5 +1,39 @@
 # 实施与验证记录
 
+## 2026-11-12 导出统一入口与音乐信尾部操作
+
+按用户要求将“导出设置 / 导出图片 / 分享图片”合并为单个“导出”按钮。每次点击读取上次偏好并打开配置弹窗，用户确认封面、推荐理由、主题和清晰度后保存到相册 / Pictures/SylphyMusic；取消不导出。弹窗可选“保存后分享”，默认关闭。配置确认和导出期间防止重复点击，捕获本轮信件内容，保存成功后才打开系统分享。
+
+每日精选原顶部“播放全部”和“精选操作”菜单移到信件尾部，与导出按钮同一可换行操作组；保留菜单功能和曲目点击索引。“你的音乐 · 首数 · 日期”从卡片顶部移到正文与推荐理由之后。PNG 中数量及日期也移到品牌署名尾部，保留项目名和 Logo。历史信件复用相同单按钮导出流程。
+
+普通版与 OpenList 同步，修改前备份 .private/letter-footer-actions-before/，Dart 已格式化。普通版 Android 三 ABI / Windows Release 与内部打包成功，OpenList Android arm64 Release 编译成功；日志 build/test_logs/letter-footer-actions-build.log。包已复制到 \\GENAS\share\sylphy_music_release，逐文件大小和 SHA-256 一致，摘要 SHA256SUMS-letter-footer-actions.txt；复制记录为普通版 build/test_logs/letter-footer-actions-share-copy.json。未运行测试、analyze、应用启动或设备验收；交互与图片效果由用户确认。本轮未改版本号、提交、推送或发布。
+
+## 2026-11-12 发布每日一言与个人页更新 1.0.43
+
+按用户“推更新”授权，普通版 1.0.43+56 与 OpenList 1.0.43-openlist.26+56 完成正式构建、签名核对、附件上传和发布。更新说明包含每日一言每次启动刷新一次、网络失败保留缓存，以及个人页分组 / 卡片 / 宽屏与字号适配。普通版提供 Android 三 ABI、Windows 安装版和便携 ZIP；OpenList 提供 arm64 APK、对应源码和摘要，JNI 与上一版一致。
+
+两个 Release 状态、标题、正文、全部附件大小与 SHA-256、普通与特别版原始 / 加速清单均核对通过，普通版保持 Latest。仅提交推送清单：main c1422c4 / 5442e2f，feature 7c31cad，保留源码与本地文档改动。
+
+九个发布文件已复制到 \\GENAS\share\sylphy_music_release\1.0.43-56，OpenList 放独立子目录，大小及 SHA-256 核对一致。产物位于普通版 build/releases/1.0.43-56/、OpenList build/releases/1.0.43-openlist.26-56/。构建 / 发布日志为普通版 build/test_logs/release-1.0.43-build.log 和特别版 release-openlist-56-build.log / release-openlist-56-publish.log；复制记录为普通版 build/test_logs/release-56-share-copy.json。未运行 analyze、测试、启动冒烟或设备验收。
+
+## 2026-11-12 每次启动刷新每日一言与个人页排版优化
+
+每日一言从按日成功缓存改为每个 ApiSettings 会话只尝试一次：启动先展示已缓存文本，再异步请求；同日重新启动也刷新，失败仍保留缓存且本次会话不反复重试。移除前台恢复时的检查调用，切页不触发网络请求；主动修改 API 地址仍可立即刷新并拒绝旧端点在途结果。
+
+“我的”页面增加 1040dp 内容限宽和宽屏居中，保留音乐空间卡片；“我的音乐”四张统一样式卡片按可用宽度分两列 / 四列，增加图标底色、功能说明与箭头，按系统字号适配高度；“音乐管理”将缓存与存储、歌曲黑名单合并为带说明的工具卡片。手机保留播放器避让，桌面缩减底部留白。所有既有跳转保留。
+
+普通版与 OpenList 同步，修改前备份 .private/startup-quote-personal-before/，Dart 已格式化。普通版 Android 三 ABI / Windows Release 与内部打包成功，OpenList Android arm64 Release 编译成功；各工作区日志 build/test_logs/startup-quote-personal-build.log。包已复制到 \\GENAS\share\sylphy_music_release，逐文件大小与 SHA-256 一致，生成 SHA256SUMS-startup-quote-personal.txt；复制记录为普通版 build/test_logs/startup-quote-personal-share-copy.json。未运行测试、analyze、应用启动或真实每日一言请求；页面与网络行为交用户验收。本轮未修改版本号、提交、推送或发布。
+
+## 2026-11-12 来信布局导出 V13、个人页入口合并与 1.0.42 发布
+
+按用户授权应用 SylphyMusic-letter-layout-export-v13-patch.zip，两个版本均通过全部锚点检查后写入。新增可选 LLM 信件标题、SQLite v12→v13 前向迁移，快照及私人存档保存标题、四张真实封面引用及歌曲数；旧信件正文保留。详情日期和数量纳入卡片，导出操作位于全文及推荐理由之后；导出支持封面叠卡、理由、跟随应用 / 浅色 / 深色主题以及 1080 / 1440 宽度，选项保存在 settings。应用与导出共用封面几何布局，继续保留图片底部日期 / 项目名 / Logo、Pictures 保存与系统分享。修复补丁 topMetaY 的 Dart const 编译错误，图像资源保留到绘制结束。
+
+首页四个快捷卡片“最近播放、我的收藏、全部音乐、本地下载”整体移动至“我的”页面的音乐空间卡片下方，并合并移除原个人页重复列表入口。保留历史、收藏、曲库与下载的既有跳转功能；首页移除空置回调与卡片辅助代码。原补丁文件备份于 .private/letter-ui-before-20261112-023111/，导航文件备份于 .private/letter-v13-navigation-before/。保留 System / User 自定义及诊断日志，未新增或运行测试、analyze、应用启动或设备 / 实际数据库迁移验收。
+
+Dart 已格式化。普通版 1.0.42+55 完成 Android 三 ABI、Windows 安装程序与便携 ZIP 正式构建和发布；OpenList 1.0.42-openlist.25+55 完成 arm64 正式包、对应源码及摘要发布。签名、全部发布附件大小与 SHA-256、标题 / 正文 / 状态，以及普通和特别版原始 / 加速清单均核对通过；普通版保持 Latest。只提交推送清单：main c9df2e8 / 5e84b37，feature 3faf1ce。
+
+发布文件已复制到 \\GENAS\share\sylphy_music_release\1.0.42-55，特别版放 OpenList 子目录，九个文件长度与 SHA-256 核对一致。日志为普通版 build/test_logs/release-1.0.42-build.log、特别版 release-openlist-55-build.log / release-openlist-55-publish.log；复制记录为普通版 build/test_logs/release-55-share-copy.json。功能效果、PNG 布局和数据库升级由用户验收。
+
 ## 2026-11-12 今日音乐信图片分享与 1.0.41 发布
 
 今日音乐信与历史存档新增“导出图片”“分享图片”，通过独立 Canvas / TextPainter 排版完整正文生成 PNG，底部显示信件日期、风灵音乐 · Sylphy Music 和现有 assets/icon.png Logo；不依赖可见滚动区域截图。默认保存到 Pictures/SylphyMusic：Windows 通过 SHGetKnownFolderPath 获取实际图片目录，Android 10+ 通过 MediaStore pending 写入 / 完成，旧 Android 按需申请仅 maxSdk 28 的写存储权限后保存并扫描相册。使用独立时间戳文件名，保存失败清理未完成文件，分享先保留本地图片再交由系统面板选择目标。Dart 已格式化，两版本同步；修改前文件在 .private/letter-image-before/。

@@ -11,10 +11,16 @@ import 'sources.dart' show AuthVault;
 /// LLM output is advisory: it can only select indices offered by the local
 /// recommender, and may not invent tracks, albums, sources or media URLs.
 class LlmSelection {
-  const LlmSelection(this.order, this.reasons, this.introduction);
+  const LlmSelection(
+    this.order,
+    this.reasons,
+    this.introduction, {
+    this.title = '',
+  });
   final List<int> order;
   final Map<int, String> reasons;
   final String introduction;
+  final String title;
 }
 
 /// In-memory diagnostics for an explicit connection test; never persisted.
@@ -258,9 +264,12 @@ class LlmRecommendationClient {
                 '只有 public_chart_score 实际大于零时才可以提到外部热度，'
                 '并且不得凭该值声称具体榜名、名次或日期。'
                 '请只返回一个 JSON 对象：'
-                '{"intro":"写给朋友的一封短笺",'
+                '{"title":"由音乐笔友依据本轮歌曲拟的简短信件标题",'
+                '"intro":"写给朋友的一封短笺",'
                 '"order":[按推荐顺序排列的整数id],'
                 '"reasons":{"id":"每首歌曲/专辑的中文推荐理由"}}。'
+                '歌曲精选的 title 须为由你亲自起的 4~18 字中文短标题，'
+                '具体、温柔、自然，避免固定格式或营销感，不要冒充已有歌名。'
                 '歌曲精选的 intro 写 160 到 320 个中文字符，允许\n分段，'
                 '像给笔友写信，不要使用清单、广告宣传语、算法口吻。'
                 '短笺应包含自然问候、2~3 首真实候选的点名与选择理由、温和收尾。'
@@ -387,7 +396,11 @@ class LlmRecommendationClient {
       final introduction = parsed['intro'] is String
           ? _letter(parsed['intro'] as String)
           : '';
-      selection = LlmSelection(order, reasons, introduction);
+      final proposedTitle = parsed['title'];
+      final title = kind == '歌曲' && proposedTitle is String
+          ? _short(_plain(proposedTitle).replaceAll(RegExp(r'\s+'), ' '), 26)
+          : '';
+      selection = LlmSelection(order, reasons, introduction, title: title);
       return selection;
     } catch (exception) {
       // Automatic recommendations keep their local fallback; explicit tests

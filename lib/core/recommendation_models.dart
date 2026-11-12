@@ -9,11 +9,13 @@ class DailyMix {
     this.generation,
     this.items, {
     this.introduction = '',
+    this.title = '写给你的今日音乐信',
   });
   final String day;
   final int generation;
   final List<RecommendedTrack> items;
   final String introduction;
+  final String title;
   List<TrackRef> get refs => items.map((item) => item.track.ref).toList();
 }
 
@@ -49,6 +51,9 @@ class RecommendationLetter {
     required this.detailsText,
     required this.origin,
     required this.createdAtMs,
+    this.title = '写给你的今日音乐信',
+    this.coverRefs = const [],
+    this.trackCount = 0,
   });
 
   final int id;
@@ -58,6 +63,9 @@ class RecommendationLetter {
   final String detailsText;
   final String origin;
   final int createdAtMs;
+  final String title;
+  final List<TrackRef> coverRefs;
+  final int trackCount;
 }
 
 class TrackCandidate {

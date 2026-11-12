@@ -79,7 +79,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     app.diagnostics.record('app', 'lifecycle', details: {'state': state.name});
     if (state == AppLifecycleState.resumed) {
       unawaited(app.refreshIfStale());
-      unawaited(app.apiSettings.refreshQuote());
     }
   }
 
@@ -480,8 +479,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         return HomePage(
           app: app,
           onLibrary: _library,
-          onFavorites: _favorites,
-          onDownloads: _downloads,
           onSources: () => _open('音乐源管理', _sources),
           onAction: _trackAction,
         );
@@ -518,46 +515,177 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onFinish: _finishWelcome,
   );
 
-  Widget _personal() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 116),
-    children: [
-      MusicSpaceCard(
-        sources: app.sources,
-        playlistCount: app.playlists.length,
-        onTap: () => _open('音乐来源', _sources),
-      ),
-      const SizedBox(height: 16),
-      ListTile(
-        leading: const Icon(Icons.favorite_outline),
-        title: const Text('我的收藏'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _favorites,
-      ),
-      ListTile(
-        leading: const Icon(Icons.queue_music),
-        title: const Text('最近播放'),
-        subtitle: const Text('最多保留最近听过的 ${ListeningHistory.maxEntries} 首歌曲'),
-        onTap: () => _open('最近播放', () => ListeningHistoryPage(app: app)),
-      ),
-      ListTile(
-        leading: const Icon(Icons.download_outlined),
-        title: const Text('下载管理'),
-        onTap: _downloads,
-      ),
-      ListTile(
-        leading: const Icon(Icons.storage_outlined),
-        title: const Text('缓存与存储'),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => CacheStoragePage(app: app)),
+  Widget _personalShortcut(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: scheme.onPrimaryContainer,
+                      size: 23,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       ),
-      ListTile(
-        leading: const Icon(Icons.block_outlined),
-        title: const Text('歌曲黑名单'),
-        onTap: _showBlacklist,
+    );
+  }
+
+  Widget _personalHeading(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 24, 4, 12),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(fontWeight: FontWeight.w600),
+    ),
+  );
+
+  Widget _personal() => Align(
+    alignment: Alignment.topCenter,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1040),
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.sizeOf(context).width > 750 ? 32 : 116,
+        ),
+        children: [
+          MusicSpaceCard(
+            sources: app.sources,
+            playlistCount: app.playlists.length,
+            onTap: () => _open('音乐来源', _sources),
+          ),
+          _personalHeading('我的音乐'),
+          LayoutBuilder(
+            builder: (context, size) {
+              final columns = size.maxWidth >= 760 ? 4 : 2;
+              final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: columns,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio:
+                    size.maxWidth /
+                    columns /
+                    (158 + (textScale - 1).clamp(0.0, 3.0) * 65),
+                children: [
+                  _personalShortcut(
+                    Icons.history_rounded,
+                    '最近播放',
+                    '最多 ${ListeningHistory.maxEntries} 首播放记录',
+                    () => _open('最近播放', () => ListeningHistoryPage(app: app)),
+                  ),
+                  _personalShortcut(
+                    Icons.favorite_outline,
+                    '我的收藏',
+                    '喜欢的歌曲集中收藏',
+                    _favorites,
+                  ),
+                  _personalShortcut(
+                    Icons.library_music_outlined,
+                    '全部音乐',
+                    '浏览曲库中的所有歌曲',
+                    () => _library(0),
+                  ),
+                  _personalShortcut(
+                    Icons.download_outlined,
+                    '本地下载',
+                    '查看下载与缓存任务',
+                    _downloads,
+                  ),
+                ],
+              );
+            },
+          ),
+          _personalHeading('音乐管理'),
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  leading: const Icon(Icons.storage_outlined),
+                  title: const Text('缓存与存储'),
+                  subtitle: const Text('查看空间占用，管理离线资源'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CacheStoragePage(app: app),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, indent: 62, endIndent: 18),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  leading: const Icon(Icons.block_outlined),
+                  title: const Text('歌曲黑名单'),
+                  subtitle: const Text('管理不希望在曲库中显示的歌曲'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _showBlacklist,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-    ],
+    ),
   );
 
   Widget _tracks(

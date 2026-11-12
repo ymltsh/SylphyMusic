@@ -20,14 +20,12 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.app,
     required this.onLibrary,
-    required this.onFavorites,
-    required this.onDownloads,
     required this.onSources,
     required this.onAction,
   });
   final SylphyApp app;
   final void Function(int) onLibrary;
-  final VoidCallback onFavorites, onDownloads, onSources;
+  final VoidCallback onSources;
   final Future<void> Function(String, Track) onAction;
   @override
   State<HomePage> createState() => _HomePageState();
@@ -169,28 +167,6 @@ class _HomePageState extends State<HomePage> {
     } finally {
       if (mounted) setState(() => _exploring = false);
     }
-  }
-
-  Widget _shortcut(IconData icon, String title, VoidCallback tap) {
-    final desktop = MediaQuery.sizeOf(context).width > 750;
-    final content = InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: tap,
-      child: Padding(
-        padding: EdgeInsets.all(desktop ? 12 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            SizedBox(height: desktop ? 7 : 12),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-    return desktop
-        ? Card.outlined(margin: EdgeInsets.zero, child: content)
-        : Card.filled(margin: EdgeInsets.zero, child: content);
   }
 
   Widget _albumCard(CatalogRow row, double size) {
@@ -338,42 +314,6 @@ class _HomePageState extends State<HomePage> {
                 ),
             ],
           ),
-        ),
-        SizedBox(height: desktop ? 14 : 20),
-        LayoutBuilder(
-          builder: (context, size) {
-            final columns = size.maxWidth > 540 ? 4 : 2;
-            return GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: columns,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: size.maxWidth / columns / (desktop ? 86 : 110),
-              children: [
-                _shortcut(
-                  Icons.queue_music,
-                  '最近播放',
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        appBar: AppBar(title: const Text('最近播放')),
-                        body: ListeningHistoryPage(app: app),
-                      ),
-                    ),
-                  ),
-                ),
-                _shortcut(Icons.favorite_outline, '我的收藏', widget.onFavorites),
-                _shortcut(
-                  Icons.library_music_outlined,
-                  '全部音乐',
-                  () => widget.onLibrary(0),
-                ),
-                _shortcut(Icons.download_outlined, '本地下载', widget.onDownloads),
-              ],
-            );
-          },
         ),
         SizedBox(height: desktop ? 16 : 24),
         Row(

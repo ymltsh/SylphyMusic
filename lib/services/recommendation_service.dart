@@ -69,6 +69,9 @@ class RecommendationService {
           previous.generation,
           ready,
           introduction: previous.introduction,
+          title: previous.letterTitle.isEmpty
+              ? '写给你的今日音乐信'
+              : previous.letterTitle,
         );
       }
     }
@@ -112,6 +115,7 @@ class RecommendationService {
     }
     var finalTracks = hydrated;
     var introduction = _localLetter(hydrated);
+    var title = '写给你的今日音乐信';
     var letterFromLlm = false;
     if (!_closed && llm?.enabled == true && hydrated.isNotEmpty) {
       final options = [...hydrated];
@@ -149,6 +153,7 @@ class RecommendationService {
       );
       if (selection != null) {
         finalTracks = _mergeDailySelection(hydrated, options, selection);
+        if (selection.title.trim().isNotEmpty) title = selection.title.trim();
         if (selection.introduction.trim().isNotEmpty) {
           introduction = selection.introduction;
           letterFromLlm = true;
@@ -174,19 +179,33 @@ class RecommendationService {
             : 'no_candidates',
       );
     }
-    if (_closed)
-      return DailyMix(day, generation, finalTracks, introduction: introduction);
+    if (_closed) {
+      return DailyMix(
+        day,
+        generation,
+        finalTracks,
+        introduction: introduction,
+        title: title,
+      );
+    }
     await repository.saveDaily(
       day,
       generation,
       seed,
       finalTracks,
       introduction: introduction,
+      letterTitle: title,
       letterOrigin: letterFromLlm ? 'llm' : 'local',
       llmTag: llmTag,
     );
     _record('generation_completed', 'daily', count: finalTracks.length);
-    return DailyMix(day, generation, finalTracks, introduction: introduction);
+    return DailyMix(
+      day,
+      generation,
+      finalTracks,
+      introduction: introduction,
+      title: title,
+    );
   }
 
   /// A deterministic private note, used if no model is configured or available.

@@ -46,7 +46,7 @@ class ApiSettings extends ChangeNotifier {
   String llmSystemPrompt = defaultLlmSystemPrompt;
   int llmRevision = 0;
   String quote = fallbackQuote;
-  String _quoteDay = '';
+  bool _quoteAttempted = false;
   int _requestId = 0;
   bool _loading = false;
 
@@ -293,7 +293,6 @@ class ApiSettings extends ChangeNotifier {
     } on FormatException {
       llmUserPrompt = defaultLlmUserPrompt;
     }
-    _quoteDay = await db.setting('api_quote_day') ?? '';
     final cached = await db.setting('api_quote_text');
     quote = cached != null && cached.trim().isNotEmpty ? cached : fallbackQuote;
     notifyListeners();
@@ -304,7 +303,6 @@ class ApiSettings extends ChangeNotifier {
     final next = validateQuoteUrl(value);
     await db.setSetting('api_quote_url', next);
     quoteUrl = next;
-    _quoteDay = '';
     ++_requestId; // Invalidate an in-flight request to the old endpoint.
     _loading = false;
     notifyListeners();
@@ -331,9 +329,11 @@ class ApiSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// At most one successful fetch per local day. Failure preserves cached text.
+  /// One attempt per app session, including failures. Changing the API URL
+  /// explicitly may refresh again; cached text remains available while offline.
   Future<void> refreshQuote({bool force = false}) async {
-    if (!force && (_quoteDay == _day() || _loading)) return;
+    if (_loading || (!force && _quoteAttempted)) return;
+    _quoteAttempted = true;
     final requestId = ++_requestId;
     _loading = true;
     final client = _clientFactory();
@@ -351,7 +351,6 @@ class ApiSettings extends ChangeNotifier {
       if (requestId != _requestId) return;
       final day = _day();
       quote = text;
-      _quoteDay = day;
       notifyListeners();
       await db.setSetting('api_quote_text', text);
       await db.setSetting('api_quote_day', day);

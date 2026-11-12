@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import 'letter_image.dart';
 import '../core/recommendation_models.dart';
+import '../core/models.dart';
+import 'recommendation_showcase.dart';
 
 /// Private letters from each daily recommendation generation, kept separately
 /// from diagnostic logs and independent of old recommendation snapshots.
@@ -92,7 +94,17 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
     }
   }
 
+  Future<List<Track>> _coversForLetter(RecommendationLetter letter) async {
+    final covers = <Track>[];
+    for (final ref in letter.coverRefs) {
+      final track = await widget.app.db.track(ref);
+      if (track != null && !track.missing) covers.add(track);
+    }
+    return covers;
+  }
+
   void _openLetter(RecommendationLetter letter) {
+    final coversFuture = _coversForLetter(letter);
     Navigator.push(
       context,
       MaterialPageRoute<void>(
@@ -121,24 +133,46 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              '写给你的音乐信',
+                              letter.title,
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '${letter.day} · ${letter.origin == 'llm' ? '音乐笔友' : '本地精选'}',
+                              '${letter.day} · ${letter.trackCount > 0 ? '${letter.trackCount} 首 · ' : ''}${letter.origin == 'llm' ? '音乐笔友' : '本地精选'}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
+                            if (letter.coverRefs.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              FutureBuilder<List<Track>>(
+                                future: coversFuture,
+                                builder: (context, snapshot) {
+                                  final tracks =
+                                      snapshot.data ?? const <Track>[];
+                                  if (tracks.isEmpty)
+                                    return const SizedBox.shrink();
+                                  final mix = DailyMix(
+                                    letter.day,
+                                    letter.generation,
+                                    [
+                                      for (final t in tracks)
+                                        RecommendedTrack(t, '', 0),
+                                    ],
+                                  );
+                                  return Center(
+                                    child: RecommendationCoverDeck(
+                                      app: widget.app,
+                                      mix: mix,
+                                      size: 210,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                             const SizedBox(height: 24),
                             SelectableText(
                               letter.content,
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(height: 1.85),
-                            ),
-                            const SizedBox(height: 24),
-                            LetterImageActions(
-                              day: letter.day,
-                              content: letter.content,
                             ),
                             if (letter.detailsText.trim().isNotEmpty) ...[
                               const SizedBox(height: 28),
@@ -153,6 +187,25 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
                                     ?.copyWith(height: 1.8),
                               ),
                             ],
+                            const SizedBox(height: 24),
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            FutureBuilder<List<Track>>(
+                              future: coversFuture,
+                              builder: (context, snapshot) =>
+                                  LetterImageActions(
+                                    app: widget.app,
+                                    day: letter.day,
+                                    title: letter.title,
+                                    content: letter.content,
+                                    tracks: snapshot.data ?? const <Track>[],
+                                    trackCount: letter.trackCount,
+                                    detailsText: letter.detailsText
+                                        .split('\n')
+                                        .take(3)
+                                        .join('\n'),
+                                  ),
+                            ),
                           ],
                         ),
                       ),
@@ -232,9 +285,7 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
                             vertical: 8,
                           ),
                           leading: const Icon(Icons.mail_outline_rounded),
-                          title: Text(
-                            '${letter.day} · 第 ${letter.generation + 1} 封信',
-                          ),
+                          title: Text(letter.title),
                           subtitle: Text(
                             firstLine,
                             maxLines: 2,

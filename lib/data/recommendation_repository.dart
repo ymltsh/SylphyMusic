@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:sqflite/sqflite.dart';
@@ -299,13 +300,21 @@ class RecommendationRepository {
       int generation,
       int itemCount,
       String introduction,
+      String letterTitle,
       String llmTag,
     })?
   >
   latestSnapshot(String kind, String day) async {
     final rows = await database.db.query(
       'recommendation_snapshots',
-      columns: ['id', 'generation', 'item_count', 'introduction', 'llm_tag'],
+      columns: [
+        'id',
+        'generation',
+        'item_count',
+        'introduction',
+        'letter_title',
+        'llm_tag',
+      ],
       where: 'kind=? AND local_day=?',
       whereArgs: [kind, day],
       orderBy: 'generation DESC',
@@ -317,6 +326,7 @@ class RecommendationRepository {
       generation: rows.first['generation'] as int,
       itemCount: rows.first['item_count'] as int,
       introduction: rows.first['introduction'] as String? ?? '',
+      letterTitle: rows.first['letter_title'] as String? ?? '',
       llmTag: rows.first['llm_tag'] as String? ?? 'local',
     );
   }
@@ -384,12 +394,16 @@ class RecommendationRepository {
     int seed,
     List<RecommendedTrack> items, {
     String introduction = '',
+    String letterTitle = '写给你的今日音乐信',
     String letterOrigin = 'local',
     String llmTag = 'local',
   }) => _saveSnapshot(
     letterDetailsText: items
         .map((item) => '${item.track.title} · ${item.reason}')
         .join('\n'),
+    coverRefs: _letterCovers(items),
+    songCount: items.length,
+    letterTitle: letterTitle,
     introduction: introduction,
     letterOrigin: letterOrigin,
     llmTag: llmTag,
@@ -408,6 +422,24 @@ class RecommendationRepository {
         },
     ],
   );
+
+  // Archive the same four distinct-cover identities chosen by the UI.
+  List<String> _letterCovers(List<RecommendedTrack> items) {
+    final result = <String>[];
+    final albums = <String>{};
+    for (final item in items) {
+      final track = item.track;
+      if (albums.add('${track.ref.sourceId}:${track.albumGroup}')) {
+        result.add(track.ref.key);
+      }
+      if (result.length >= 4) return result;
+    }
+    for (final item in items) {
+      if (!result.contains(item.track.ref.key)) result.add(item.track.ref.key);
+      if (result.length >= 4) break;
+    }
+    return result;
+  }
 
   Future<int> saveAlbums(
     String day,
@@ -436,6 +468,9 @@ class RecommendationRepository {
   );
 
   Future<int> _saveSnapshot({
+    String letterTitle = '写给你的今日音乐信',
+    List<String> coverRefs = const [],
+    int songCount = 0,
     String introduction = '',
     String letterDetailsText = '',
     String letterOrigin = 'local',
@@ -449,6 +484,7 @@ class RecommendationRepository {
     final id = await tx.insert('recommendation_snapshots', {
       'kind': kind,
       'introduction': introduction,
+      'letter_title': kind == 'daily' ? letterTitle : '',
       'llm_tag': llmTag,
       'local_day': day,
       'generation': generation,
@@ -472,6 +508,9 @@ class RecommendationRepository {
         'local_day': day,
         'generation': generation,
         'content': introduction,
+        'title': letterTitle,
+        'cover_refs_json': jsonEncode(coverRefs),
+        'song_count': songCount,
         'details_text': letterDetailsText,
         'origin': letterOrigin,
         'created_at_ms': DateTime.now().millisecondsSinceEpoch,
@@ -535,10 +574,32 @@ class RecommendationRepository {
           generation: row['generation'] as int,
           content: row['content'] as String,
           detailsText: row['details_text'] as String? ?? '',
+          title: (row['title'] as String? ?? '').trim().isEmpty
+              ? '写给你的今日音乐信'
+              : row['title'] as String,
+          coverRefs: _parseCoverRefs(row['cover_refs_json'] as String? ?? '[]'),
+          trackCount: row['song_count'] as int? ?? 0,
           origin: row['origin'] as String,
           createdAtMs: row['created_at_ms'] as int,
         ),
     ];
+  }
+
+  List<TrackRef> _parseCoverRefs(String raw) {
+    try {
+      final parsed = jsonDecode(raw);
+      if (parsed is! List) return const [];
+      final refs = <TrackRef>[];
+      for (final value in parsed.take(4)) {
+        if (value is! String) continue;
+        try {
+          refs.add(TrackRef.parse(value));
+        } catch (_) {}
+      }
+      return refs;
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<void> clearLetters() async {

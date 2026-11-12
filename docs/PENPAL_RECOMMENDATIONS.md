@@ -25,3 +25,5 @@ SQLite v12 的 `recommendation_letters` 与 `recommendation_snapshots` 分离。
 ## 导出图片与分享
 
 今日音乐信及历史信件均支持“导出图片”“分享图片”。PNG 根据完整正文排版，底部署名为风灵音乐 · Sylphy Music、信件日期与项目 Logo。默认保存在系统 Pictures/SylphyMusic；Windows 使用已知图片目录（兼容重定向），Android 10+ 使用 MediaStore，Android 9 及以下按需请求写存储权限。分享会先保存本地图片，再由用户在系统分享面板选择目标。重复导出用独立时间戳保留文件；导出 / 分享失败显示提示。
+
+来信布局与导出更新至 SQLite v13：独立标题、封面引用及歌曲数随快照 / 存档保存，导出支持封面叠卡、推荐理由、主题和清晰度，固定保存及分享通道沿用。四个音乐快捷入口已从首页合并至“我的”。详见 [V13 说明](LETTER_UI_V13.md)。

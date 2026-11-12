@@ -15,6 +15,7 @@
 | [PROGRESS](PROGRESS.md) | 最新证据、剩余工作和验收输出 |
 | [TEST_PLAN](TEST_PLAN.md) | 完整真实环境验收清单 |
 | [RELEASE_GATES](RELEASE_GATES.md) | 独立验收待办，不属于发布流程 |
+| [来信布局与导出 V13](LETTER_UI_V13.md) | 自拟信件标题、封面主题与导出选项、v13 迁移 |
 | [音乐笔友与来信存档](PENPAL_RECOMMENDATIONS.md) | 分段推荐信、SQLite v12 私人存档与独立清理 |
 | [每日精选封面与提示词](RECOMMENDATION_SHOWCASE_PROMPT.md) | 首页 / 详情封面叠卡与自定义 LLM 推荐偏好 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |

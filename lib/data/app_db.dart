@@ -22,6 +22,12 @@ class AppDb {
     origin TEXT NOT NULL,
     created_at_ms INTEGER NOT NULL,
     UNIQUE(local_day,generation))''';
+  static const _letterV13Alter = <String>[
+    "ALTER TABLE recommendation_snapshots ADD COLUMN letter_title TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN title TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN cover_refs_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE recommendation_letters ADD COLUMN song_count INTEGER NOT NULL DEFAULT 0",
+  ];
   static const _recommendationLettersIndex =
       'CREATE INDEX idx_recommendation_letters_date ON recommendation_letters(created_at_ms DESC)';
   static const _recommendationSchema = <String>[
@@ -132,7 +138,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 12,
+      version: 13,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -224,6 +230,21 @@ class AppDb {
             WHERE kind='daily' AND trim(introduction) <> ''
           ''');
         }
+        if (oldVersion < 13) {
+          for (final sql in _letterV13Alter) {
+            await database.execute(sql);
+          }
+          // Retain older letters and their snapshot metadata if still present.
+          await database.execute(
+            "UPDATE recommendation_letters SET title='写给你的今日音乐信' WHERE title=''",
+          );
+          await database.execute('''
+            UPDATE recommendation_letters SET song_count=COALESCE(
+              (SELECT s.item_count FROM recommendation_snapshots s
+               WHERE s.id=recommendation_letters.snapshot_id),0)
+            WHERE song_count=0
+          ''');
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -259,6 +280,9 @@ class AppDb {
         }
         await d.execute(_recommendationLettersTable);
         await d.execute(_recommendationLettersIndex);
+        for (final sql in _letterV13Alter) {
+          await d.execute(sql);
+        }
       },
     );
     // A killed process never exposes an incomplete remote snapshot. Its staging

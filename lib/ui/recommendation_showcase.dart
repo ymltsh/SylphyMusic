@@ -6,6 +6,7 @@ import '../core/app_controller.dart';
 import '../core/recommendation_models.dart';
 import 'cover_art.dart';
 import 'letter_image.dart';
+import 'recommendation_cover_layout.dart';
 
 /// A layered display of actual cover art from a daily recommendation snapshot.
 /// No generated artwork and no changes to playback or TrackRef identity.
@@ -23,31 +24,12 @@ class RecommendationCoverDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Prefer distinct albums so adjacent cards do not repeat one cover.
-    final chosen = <RecommendedTrack>[];
-    final albums = <String>{};
-    for (final item in mix.items) {
-      if (albums.add('${item.track.ref.sourceId}:${item.track.albumGroup}')) {
-        chosen.add(item);
-      }
-      if (chosen.length >= 4) break;
-    }
-    if (chosen.length < 4) {
-      final refs = chosen.map((item) => item.track.ref.key).toSet();
-      for (final item in mix.items) {
-        if (refs.add(item.track.ref.key)) chosen.add(item);
-        if (chosen.length >= 4) break;
-      }
-    }
+    // Keep export geometry and UI card stack in sync.
+    final chosen = RecommendationCoverLayout.select(
+      mix.items.map((item) => item.track),
+    );
     final visible = math.min(4, chosen.length);
-    const offsets = [
-      Offset(.33, .03),
-      Offset(.04, .22),
-      Offset(.40, .25),
-      Offset(.18, .42),
-    ];
-    const angles = [.13, -.12, .10, -.06];
-    final coverSize = size * .54;
+    final coverSize = size * RecommendationCoverLayout.coverRatio;
     final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       width: size,
@@ -57,10 +39,14 @@ class RecommendationCoverDeck extends StatelessWidget {
         children: [
           for (var i = 0; i < visible; i++)
             Positioned(
-              left: size * (visible == 1 ? .23 : offsets[i].dx),
-              top: size * (visible == 1 ? .23 : offsets[i].dy),
+              left:
+                  size *
+                  (visible == 1 ? .23 : RecommendationCoverLayout.offsets[i].x),
+              top:
+                  size *
+                  (visible == 1 ? .23 : RecommendationCoverLayout.offsets[i].y),
               child: Transform.rotate(
-                angle: visible == 1 ? 0 : angles[i],
+                angle: visible == 1 ? 0 : RecommendationCoverLayout.angles[i],
                 child: Container(
                   padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
@@ -79,7 +65,7 @@ class RecommendationCoverDeck extends StatelessWidget {
                   ),
                   child: CoverArt(
                     app: app,
-                    track: chosen[i].track,
+                    track: chosen[i],
                     size: coverSize,
                     borderRadius: 10,
                   ),
@@ -103,6 +89,7 @@ class RecommendationShowcase extends StatelessWidget {
     this.detailed = false,
     this.onTap,
     this.onPlay,
+    this.footerActions = const [],
   });
 
   final SylphyApp app;
@@ -110,6 +97,7 @@ class RecommendationShowcase extends StatelessWidget {
   final bool detailed;
   final VoidCallback? onTap;
   final VoidCallback? onPlay;
+  final List<Widget> footerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +114,7 @@ class RecommendationShowcase extends StatelessWidget {
         Icon(Icons.auto_awesome_rounded, color: scheme.primary, size: 26),
         const SizedBox(height: 10),
         Text(
-          detailed ? '写给你的今日音乐信' : '今天，有一封音乐来信',
+          mix.title,
           style:
               (detailed
                       ? theme.textTheme.headlineSmall
@@ -134,12 +122,13 @@ class RecommendationShowcase extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),
-        Text(
-          '${mix.items.length} 首 · ${mix.day}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+        if (!detailed)
+          Text(
+            '${mix.items.length} 首 · ${mix.day}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-        ),
         const SizedBox(height: 10),
         Text(
           intro,
@@ -149,8 +138,6 @@ class RecommendationShowcase extends StatelessWidget {
         ),
         if (detailed) ...[
           const SizedBox(height: 18),
-          LetterImageActions(day: mix.day, content: intro),
-          const SizedBox(height: 14),
           Text('信里提到的几首歌', style: theme.textTheme.titleSmall),
           const SizedBox(height: 6),
           for (final item in mix.items.take(3))
@@ -165,6 +152,29 @@ class RecommendationShowcase extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 24),
+          Divider(color: scheme.outlineVariant),
+          const SizedBox(height: 14),
+          Text(
+            '你的音乐 · ${mix.items.length} 首 · ${mix.day}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LetterImageActions(
+            app: app,
+            day: mix.day,
+            title: mix.title,
+            content: intro,
+            tracks: mix.items.map((item) => item.track).toList(),
+            trackCount: mix.items.length,
+            additionalActions: footerActions,
+            detailsText: mix.items
+                .take(3)
+                .map((item) => '${item.track.title} · ${item.reason}')
+                .join('\n'),
+          ),
         ] else ...[
           const SizedBox(height: 9),
           Wrap(

@@ -144,92 +144,67 @@ class _DailyMixPageState extends State<DailyMixPage> {
             ),
           );
         }
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mix.day,
-                          style: Theme.of(context).textTheme.bodySmall,
+        return ListView.builder(
+          itemCount: mix.items.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+                child: RecommendationShowcase(
+                  app: widget.app,
+                  mix: mix,
+                  detailed: true,
+                  footerActions: [
+                    FilledButton.icon(
+                      onPressed: _working ? null : () => unawaited(_play(mix)),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('播放全部'),
+                    ),
+                    PopupMenuButton<String>(
+                      enabled: !_working,
+                      tooltip: '精选操作',
+                      onSelected: (action) => unawaited(_action(action, mix)),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'refresh', child: Text('换一批')),
+                        PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
+                        PopupMenuItem(value: 'charts', child: Text('切换在线热度开关')),
+                        PopupMenuItem(
+                          value: 'personal',
+                          child: Text('切换个性化推荐'),
                         ),
-                        Text(
-                          '${mix.items.length} 首 · 属于你的音乐',
-                          style: Theme.of(context).textTheme.titleMedium,
+                        PopupMenuItem(
+                          value: 'clear',
+                          child: Text('清除推荐统计（不可撤销）'),
                         ),
                       ],
                     ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: _working ? null : () => unawaited(_play(mix)),
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('播放全部'),
-                  ),
-                  PopupMenuButton<String>(
-                    enabled: !_working,
-                    tooltip: '精选操作',
-                    onSelected: (action) => unawaited(_action(action, mix)),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'refresh', child: Text('换一批')),
-                      PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
-                      PopupMenuItem(value: 'charts', child: Text('切换在线热度开关')),
-                      PopupMenuItem(value: 'personal', child: Text('切换个性化推荐')),
-                      PopupMenuItem(
-                        value: 'clear',
-                        child: Text('清除推荐统计（不可撤销）'),
-                      ),
-                    ],
-                  ),
+                  ],
+                ),
+              );
+            }
+            final trackIndex = index - 1;
+            final item = mix.items[trackIndex];
+            return PlayingSongTile(
+              app: widget.app,
+              track: item.track,
+              title: item.track.title,
+              subtitle: '${item.track.artist} · ${item.reason}',
+              onTap: () => unawaited(_play(mix, start: trackIndex)),
+              trailing: PopupMenuButton<String>(
+                tooltip: '推荐反馈',
+                onSelected: (value) async {
+                  if (value != 'hide') return;
+                  await widget.app.recommendations.hide(item.track.ref);
+                  if (mounted) {
+                    setState(() => _mix = widget.app.recommendations.daily());
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'hide', child: Text('不再推荐这首')),
                 ],
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: mix.items.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                      child: RecommendationShowcase(
-                        app: widget.app,
-                        mix: mix,
-                        detailed: true,
-                      ),
-                    );
-                  }
-                  final trackIndex = index - 1;
-                  final item = mix.items[trackIndex];
-                  return PlayingSongTile(
-                    app: widget.app,
-                    track: item.track,
-                    title: item.track.title,
-                    subtitle: '${item.track.artist} · ${item.reason}',
-                    onTap: () => unawaited(_play(mix, start: trackIndex)),
-                    trailing: PopupMenuButton<String>(
-                      tooltip: '推荐反馈',
-                      onSelected: (value) async {
-                        if (value != 'hide') return;
-                        await widget.app.recommendations.hide(item.track.ref);
-                        if (mounted) {
-                          setState(
-                            () => _mix = widget.app.recommendations.daily(),
-                          );
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'hide', child: Text('不再推荐这首')),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          },
         );
       },
     ),
