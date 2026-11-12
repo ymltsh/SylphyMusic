@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.50-openlist.33",
-    "build": 63,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.50-openlist.33 (arm64-v8a)",
+    "version": "1.0.51-openlist.34",
+    "build": 64,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.51-openlist.34 (arm64-v8a)",
     "date": "2026-11-13",
-    "notes": "- Android 更新播放引擎，新增默认关闭的 De-click 实验选项，尝试减少开始播放和拖动进度时的轻微啪声。\n- 可在设置 → 播放器设置中开启 De-click，对比声音表现；缓冲较多时跳转前可能额外等待。\n- 完善播放跳转与音频输出变化的诊断信息，便于排查偶发噪声。\n- 缩小文件夹列表底部留白，播放器收起时不再保留展开状态的空间。\n- 减少文件夹详情底部的重复留白，同时保留必要的播放器避让。\n",
+    "notes": "- 修复 Android 启动时提示 declick 未实现、无法进入应用的问题。\n- 修复 De-click 开关和音频诊断设置无法传递给播放器的问题。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.50-openlist.33%2B63/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.51-openlist.34%2B64/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.50-openlist.33%2B63"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.51-openlist.34%2B64"
   },
   "history": [
+    {
+      "version": "1.0.50-openlist.33",
+      "build": 63,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.50-openlist.33 (arm64-v8a)",
+      "date": "2026-11-13",
+      "notes": "- Android 更新播放引擎，新增默认关闭的 De-click 实验选项，尝试减少开始播放和拖动进度时的轻微啪声。\n- 可在设置 → 播放器设置中开启 De-click，对比声音表现；缓冲较多时跳转前可能额外等待。\n- 完善播放跳转与音频输出变化的诊断信息，便于排查偶发噪声。\n- 缩小文件夹列表底部留白，播放器收起时不再保留展开状态的空间。\n- 减少文件夹详情底部的重复留白，同时保留必要的播放器避让。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.50-openlist.33%2B63/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.50-openlist.33%2B63"
+    },
     {
       "version": "1.0.49-openlist.32",
       "build": 62,
