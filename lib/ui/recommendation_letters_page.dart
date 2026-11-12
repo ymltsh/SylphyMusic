@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
@@ -5,6 +7,8 @@ import 'letter_image.dart';
 import '../core/recommendation_models.dart';
 import '../core/models.dart';
 import 'recommendation_showcase.dart';
+import 'penpal_memory_page.dart';
+import 'penpal_chat_page.dart';
 
 /// Private letters from each daily recommendation generation, kept separately
 /// from diagnostic logs and independent of old recommendation snapshots.
@@ -60,7 +64,9 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清空每日推荐文案？'),
-        content: const Text('只删除私人信件存档，不会删除播放历史、曲库或推荐统计。此操作不能撤销。'),
+        content: const Text(
+          '删除私人信件存档，也会清除来源于这些信件的笔友记忆、回复和聊天记录；不会删除播放历史、曲库或推荐统计。此操作不能撤销。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -77,6 +83,7 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
     setState(() => _loading = true);
     try {
       await widget.app.recommendationRepository.clearLetters();
+      await widget.app.penpalMemory.clearLetterDerived();
       if (mounted) {
         setState(() {
           _letters.clear();
@@ -103,7 +110,34 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
     return covers;
   }
 
+  Future<void> _replyToLetter(RecommendationLetter letter) =>
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PenpalChatPage(
+            app: widget.app,
+            letterKey: '${letter.day}:${letter.generation}',
+            letterTitle: letter.title,
+            letterContext:
+                '${letter.title}\n${letter.content}\n${letter.detailsText}',
+          ),
+        ),
+      );
+
+  Widget _letterMore(RecommendationLetter letter) => PopupMenuButton<String>(
+    tooltip: '更多',
+    onSelected: (_) => _replyToLetter(letter),
+    itemBuilder: (_) => const [
+      PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
+    ],
+  );
+
   void _openLetter(RecommendationLetter letter) {
+    unawaited(
+      widget.app.penpalMemory
+          .recordOpenedLetter(letter)
+          .catchError((Object _) {}),
+    );
     final coversFuture = _coversForLetter(letter);
     Navigator.push(
       context,
@@ -192,19 +226,26 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
                             const SizedBox(height: 12),
                             FutureBuilder<List<Track>>(
                               future: coversFuture,
-                              builder: (context, snapshot) =>
-                                  LetterImageActions(
-                                    app: widget.app,
-                                    day: letter.day,
-                                    title: letter.title,
-                                    content: letter.content,
-                                    tracks: snapshot.data ?? const <Track>[],
-                                    trackCount: letter.trackCount,
-                                    detailsText: letter.detailsText
-                                        .split('\n')
-                                        .take(3)
-                                        .join('\n'),
+                              builder: (context, snapshot) => Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: LetterImageActions(
+                                      app: widget.app,
+                                      day: letter.day,
+                                      title: letter.title,
+                                      content: letter.content,
+                                      tracks: snapshot.data ?? const <Track>[],
+                                      trackCount: letter.trackCount,
+                                      detailsText: letter.detailsText
+                                          .split('\n')
+                                          .take(3)
+                                          .join('\n'),
+                                    ),
                                   ),
+                                  _letterMore(letter),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -226,6 +267,16 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
       appBar: AppBar(
         title: const Text('每日推荐文案'),
         actions: [
+          IconButton(
+            tooltip: '关于我的音乐笔友',
+            icon: const Icon(Icons.auto_stories_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PenpalMemoryPage(app: widget.app),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: '清空文案存档',
             icon: const Icon(Icons.delete_outline),
@@ -291,7 +342,7 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: _letterMore(letter),
                           onTap: () => _openLetter(letter),
                         ),
                       ),

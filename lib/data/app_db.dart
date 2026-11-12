@@ -11,6 +11,37 @@ import '../services/embedded_tags.dart';
 
 class AppDb {
   /// Private, durable letters, independent of snapshot pruning and diagnostics.
+  static const _penpalChatSchema = <String>[
+    """CREATE TABLE penpal_chat_messages(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      persona_key TEXT NOT NULL,
+      letter_key TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at_ms INTEGER NOT NULL)""",
+    'CREATE INDEX idx_penpal_chat_thread ON penpal_chat_messages(persona_key,letter_key,id)',
+  ];
+  static const _penpalMemorySchema = <String>[
+    '''CREATE TABLE penpal_memory_state(
+      id INTEGER PRIMARY KEY CHECK(id=1),
+      enabled INTEGER NOT NULL DEFAULT 1,
+      recall_enabled INTEGER NOT NULL DEFAULT 1,
+      soul_override TEXT NOT NULL DEFAULT '',
+      updated_at_ms INTEGER NOT NULL DEFAULT 0)''',
+    '''CREATE TABLE penpal_memory_events(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      text TEXT NOT NULL,
+      source_key TEXT,
+      related_letter_key TEXT,
+      topic TEXT NOT NULL DEFAULT '',
+      created_at_ms INTEGER NOT NULL,
+      expires_at_ms INTEGER,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(kind,source_key))''',
+    'CREATE INDEX idx_penpal_events_time ON penpal_memory_events(created_at_ms DESC)',
+    'CREATE INDEX idx_penpal_events_letter ON penpal_memory_events(related_letter_key)',
+  ];
   static const _recommendationLettersTable =
       '''CREATE TABLE recommendation_letters(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,7 +173,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 14,
+      version: 16,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -262,6 +293,22 @@ class AppDb {
             )
           ''');
         }
+        if (oldVersion < 15) {
+          for (final sql in _penpalMemorySchema) {
+            await database.execute(sql);
+          }
+        }
+        if (oldVersion < 16) {
+          for (final sql in _penpalChatSchema) {
+            await database.execute(sql);
+          }
+          await database.execute("""
+            INSERT INTO penpal_chat_messages(persona_key,letter_key,role,content,created_at_ms)
+            SELECT '',related_letter_key,'user',text,created_at_ms
+            FROM penpal_memory_events WHERE kind='user_reply' AND related_letter_key IS NOT NULL
+            ORDER BY created_at_ms,id
+          """);
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -301,6 +348,12 @@ class AppDb {
           await d.execute(sql);
         }
         for (final sql in _recommendationV14Alter) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalMemorySchema) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalChatSchema) {
           await d.execute(sql);
         }
       },

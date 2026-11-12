@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import 'penpal_memory_page.dart';
+import 'llm_recommendation_settings.dart';
 
 class RecommendationSettingsPage extends StatefulWidget {
   const RecommendationSettingsPage({super.key, required this.app});
@@ -170,6 +172,18 @@ class _RecommendationSettingsPageState
                     ),
                     const Divider(height: 1),
                     ListTile(
+                      leading: const Icon(Icons.auto_stories_outlined),
+                      title: const Text('关于我的音乐笔友'),
+                      subtitle: const Text('人格、长期记忆、共同经历与隐私管理'),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PenpalMemoryPage(app: widget.app),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
                       leading: const Icon(Icons.delete_outline),
                       title: const Text('清除推荐统计'),
                       subtitle: const Text('清除累计收听统计和推荐快照'),
@@ -179,6 +193,8 @@ class _RecommendationSettingsPageState
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              LlmRecommendationSettings(app: widget.app),
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text('个性化与在线热度变更会重新生成精选；自动换新次数只影响每日精选，不影响专辑，也不补发错过的时段。'),

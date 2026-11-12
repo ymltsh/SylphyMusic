@@ -554,6 +554,17 @@ class RecommendationRepository {
     return id;
   });
 
+  Future<bool> hasDailyLetter(String day) async {
+    final rows = await database.db.query(
+      'recommendation_letters',
+      columns: ['id'],
+      where: 'local_day=?',
+      whereArgs: [day],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
   /// Archives survive statistics/snapshot clearing, so their rounds must also
   /// participate in allocating the next daily generation.
   Future<int> nextDailyGeneration(String day, {int previous = -1}) async {

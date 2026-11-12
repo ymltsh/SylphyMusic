@@ -11,6 +11,9 @@ class ApiSettings extends ChangeNotifier {
   ApiSettings(this.db, {http.Client Function()? clientFactory})
     : _clientFactory = clientFactory ?? http.Client.new;
 
+  static const maxLlmSystemPromptLength = 64000;
+  static const maxLlmUserPromptLength = 2000;
+
   static const defaultQuoteUrl = 'https://v1.hitokoto.cn/?encode=json';
   static const defaultGitHubMirror = 'https://hub.wgen.top/';
   static const defaultLrcApiUrl = 'https://api.lrc.cx/lyrics';
@@ -189,7 +192,7 @@ class ApiSettings extends ChangeNotifier {
   /// user message. Security and output constraints are fixed in system.
   static String validateLlmUserPrompt(String value) {
     final trimmed = value.trim();
-    if (trimmed.length > 2000 ||
+    if (trimmed.length > maxLlmUserPromptLength ||
         RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]').hasMatch(trimmed)) {
       throw const FormatException('用户提示词不得超过 2000 字，且不能包含控制字符');
     }
@@ -198,9 +201,9 @@ class ApiSettings extends ChangeNotifier {
 
   static String validateLlmSystemPrompt(String value) {
     final trimmed = value.trim();
-    if (trimmed.length > 2000 ||
+    if (trimmed.length > maxLlmSystemPromptLength ||
         RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]').hasMatch(trimmed)) {
-      throw const FormatException('System 提示词不得超过 2000 字，且不能包含控制字符');
+      throw const FormatException('System 提示词不得超过 64000 字，且不能包含控制字符');
     }
     return trimmed.isEmpty ? defaultLlmSystemPrompt : trimmed;
   }

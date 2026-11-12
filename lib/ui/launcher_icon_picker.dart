@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../services/launcher_icon_service.dart';
+import '../services/api_settings.dart';
+import '../services/penpal_prompt_presets.dart';
 
 /// Uses installed Android aliases as the source of truth; preview is local.
 class LauncherIconPicker extends StatefulWidget {
   const LauncherIconPicker({
     super.key,
     this.service = const LauncherIconService(),
+    this.apiSettings,
   });
 
   final LauncherIconService service;
+  final ApiSettings? apiSettings;
 
   @override
   State<LauncherIconPicker> createState() => _LauncherIconPickerState();
@@ -43,6 +47,70 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
   String? _previewId;
   String? _changingId;
   bool _showInspiration = false;
+  bool _applyingCard = false;
+
+  Future<void> _applyCharacter(bool venti) async {
+    final name = venti ? '温迪' : '希露菲';
+    final settings = widget.apiSettings;
+    if (settings == null || _applyingCard) return;
+    setState(() => _applyingCard = true);
+    try {
+      final preset = await (venti
+          ? PenpalPromptPreset.venti()
+          : PenpalPromptPreset.sylphiette());
+      if (!mounted) return;
+      final previousSystem = settings.llmSystemPrompt;
+      final previousUser = settings.llmUserPrompt;
+      final unchanged =
+          previousSystem == preset.system && previousUser == preset.user;
+      await settings.setLlmPrompts(system: preset.system, user: preset.user);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            persist: false,
+            showCloseIcon: true,
+            content: Text(
+              unchanged
+                  ? '当前已是${name}的提示词'
+                  : settings.llmEnabled
+                  ? '${name}已成为音乐笔友，新推荐将使用这张卡'
+                  : '已应用${name}提示词，开启 LLM 后用于新推荐',
+            ),
+            duration: const Duration(seconds: 8),
+            action: unchanged
+                ? null
+                : SnackBarAction(
+                    label: '撤销',
+                    onPressed: () async {
+                      // Never undo a later edit made from another settings page.
+                      if (settings.llmSystemPrompt != preset.system ||
+                          settings.llmUserPrompt != preset.user)
+                        return;
+                      try {
+                        await settings.setLlmPrompts(
+                          system: previousSystem,
+                          user: previousUser,
+                        );
+                      } catch (_) {
+                        if (mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('撤销失败，请稍后重试')),
+                          );
+                      }
+                    },
+                  ),
+          ),
+        );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('角色提示词未能应用，请稍后重试')));
+    } finally {
+      if (mounted) setState(() => _applyingCard = false);
+    }
+  }
 
   String _name(String label) => label
       .replaceAll(RegExp(r'\s+'), '')
@@ -138,6 +206,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
         orElse: () => active,
       );
       final copy = _description(preview.label);
+      final isVenti = _name(preview.label) == '微风与低音';
       final isActive = preview.id == active.id;
       final colors = Theme.of(context).colorScheme;
       final textTheme = Theme.of(context).textTheme;
@@ -409,13 +478,52 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                             visualDensity: VisualDensity.compact,
                           ),
                         ),
-                        if (_showInspiration)
+                        if (_showInspiration) ...[
                           Text(
                             copy.inspiration!,
                             style: textTheme.bodySmall?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),
                           ),
+                          if ((isVenti || _name(preview.label) == '风精灵') &&
+                              widget.apiSettings != null) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              isVenti ? '温迪 · 音乐笔友' : '希露菲 · 音乐笔友',
+                              style: textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isVenti
+                                  ? '让吟游诗人的风，带来一点意外的好音乐。温迪会带着他的故事、俏皮与真心，为你选歌写信。'
+                                  : '温柔，也有自己的主意。让希露菲带着原本的故事与性格，为你选歌写信。',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _applyingCard
+                                  ? null
+                                  : () => _applyCharacter(isVenti),
+                              icon: const Icon(
+                                Icons.auto_fix_high_rounded,
+                                size: 16,
+                              ),
+                              label: Text(_applyingCard ? '正在应用…' : '应用为音乐笔友'),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '替换 System / User 提示词，可在 推荐设置中编辑或恢复默认。完整角色背景会随推荐发送给你配置的模型。',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
                     ],
                   ),
@@ -466,7 +574,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '仅更换桌面图标，不影响音乐与设置；桌面可能稍后刷新。',
+                      '上方图标按钮仅更换桌面图标；桌面可能稍后刷新。',
                       textAlign: TextAlign.center,
                       style: textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,

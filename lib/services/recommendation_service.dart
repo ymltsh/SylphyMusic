@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../core/models.dart';
 import '../core/recommendation_models.dart';
 import '../data/app_db.dart';
@@ -7,7 +9,10 @@ import '../data/recommendation_repository.dart';
 import 'public_music_trends.dart';
 import 'recommendation_engine.dart';
 import 'llm_recommendations.dart';
+import 'penpal_memory.dart';
 import 'diagnostic_logs.dart';
+
+enum DailyLetterStage { inviting, selecting, writing, sealing }
 
 /// Two independent daily snapshots, both based on the user's own library.
 class RecommendationService {
@@ -16,6 +21,7 @@ class RecommendationService {
     this.repository, {
     LlmRecommendationClient? llm,
     this.diagnostics,
+    this.memory,
   }) : llm = llm,
        _trends = PublicMusicTrends(db);
   final DiagnosticLogs? diagnostics;
@@ -30,11 +36,13 @@ class RecommendationService {
   final AppDb db;
   final RecommendationRepository repository;
   final LlmRecommendationClient? llm;
+  final PenpalMemory? memory;
   final PublicMusicTrends _trends;
   final RecommendationEngine _engine = const RecommendationEngine();
   Future<DailyMix>? _dailyInFlight;
   Future<List<RecommendedAlbum>>? _albumsInFlight;
   bool _closed = false;
+  final dailyStage = ValueNotifier(DailyLetterStage.inviting);
 
   static const allowedRefreshCounts = <int>[1, 2, 3, 4, 6];
 
@@ -67,6 +75,7 @@ class RecommendationService {
         onError: (Object _, StackTrace __) => daily(regenerate: true),
       );
     }
+    dailyStage.value = DailyLetterStage.inviting;
     return _dailyInFlight = _makeDaily(regenerate)
         .catchError((Object error) {
           _record('generation_failed', 'daily', reason: 'generation_error');
@@ -108,6 +117,7 @@ class RecommendationService {
         );
       }
     }
+    dailyStage.value = DailyLetterStage.selecting;
     final generation = await repository.nextDailyGeneration(
       day,
       previous: previous?.generation ?? -1,
@@ -146,10 +156,13 @@ class RecommendationService {
         hydrated.add(RecommendedTrack(full, item.reason, item.score));
       }
     }
+    final mainLetter = !await repository.hasDailyLetter(day);
     var finalTracks = hydrated;
-    var introduction = _localLetter(hydrated);
+    var introduction = _localLetter(hydrated, mainLetter: mainLetter);
     var title = '写给你的今日音乐信';
     var letterFromLlm = false;
+    var selfReflection = '';
+    var letterTopic = '';
     if (!_closed && llm?.enabled == true && hydrated.isNotEmpty) {
       final options = [...hydrated];
       if (llm!.settings.llmMode == 'lead') {
@@ -174,9 +187,23 @@ class RecommendationService {
           options.add(RecommendedTrack(full, '曲库中的更多发现', .18));
         }
       }
+      Map<String, Object?> memoryContext = const {};
+      List<String> explicitPreferences = const [];
+      if (memory != null) {
+        try {
+          memoryContext = await memory!.writeContext();
+          explicitPreferences = await memory!.explicitPreferences();
+        } catch (_) {
+          // Memory is optional: it must never interrupt music recommendations.
+        }
+      }
       final selection = await llm!.daily(
         options,
         now: now,
+        mainLetter: mainLetter,
+        penpalMemory: memoryContext,
+        explicitPreferences: explicitPreferences,
+        onWriting: () => dailyStage.value = DailyLetterStage.writing,
         playCounts: {
           for (final candidate in candidates)
             candidate.track.ref.key: candidate.plays,
@@ -187,6 +214,8 @@ class RecommendationService {
       if (selection != null) {
         finalTracks = _mergeDailySelection(hydrated, options, selection);
         if (selection.title.trim().isNotEmpty) title = selection.title.trim();
+        selfReflection = selection.selfReflection;
+        letterTopic = selection.topic;
         if (selection.introduction.trim().isNotEmpty) {
           introduction = selection.introduction;
           letterFromLlm = true;
@@ -222,6 +251,7 @@ class RecommendationService {
         llmSucceeded: letterFromLlm,
       );
     }
+    dailyStage.value = DailyLetterStage.sealing;
     await repository.saveDaily(
       day,
       generation,
@@ -234,6 +264,20 @@ class RecommendationService {
       refreshPeriod: period,
       llmSucceeded: letterFromLlm,
     );
+    if (memory != null) {
+      try {
+        await memory!.recordGeneratedLetter(
+          day: day,
+          generation: generation,
+          title: title,
+          mainLetter: mainLetter,
+          reflection: letterFromLlm ? selfReflection : '',
+          topic: letterFromLlm ? letterTopic : '',
+        );
+      } catch (_) {
+        // The letter has already been committed. Never fail it for memory.
+      }
+    }
     _record('generation_completed', 'daily', count: finalTracks.length);
     return DailyMix(
       day,
@@ -246,7 +290,7 @@ class RecommendationService {
   }
 
   /// A deterministic private note, used if no model is configured or available.
-  String _localLetter(List<RecommendedTrack> tracks) {
+  String _localLetter(List<RecommendedTrack> tracks, {bool mainLetter = true}) {
     if (tracks.isEmpty) return '';
     final titles = tracks
         .take(2)
@@ -256,6 +300,11 @@ class RecommendationService {
         )
         .toList();
     final songs = titles.join('和');
+    if (!mainLetter) {
+      return '今天又从曲库里挑出了$songs。'
+          '这次只留一张短笺：不必急着听完，遇见喜欢的再慢慢听。\n\n'
+          '你的音乐笔友';
+    }
     return '你好：\n\n'
         '今天翻看你的曲库时，我留意到了$songs。'
         '我不知道此刻你最想听哪一种声音，也不想替你的心情下结论。'
@@ -499,5 +548,6 @@ class RecommendationService {
     llm?.close();
     await _dailyInFlight?.catchError((Object _) => DailyMix('', 0, const []));
     await _albumsInFlight?.catchError((Object _) => <RecommendedAlbum>[]);
+    dailyStage.dispose();
   }
 }

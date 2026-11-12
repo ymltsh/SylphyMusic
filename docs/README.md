@@ -17,6 +17,9 @@
 | [RELEASE_GATES](RELEASE_GATES.md) | 独立验收待办，不属于发布流程 |
 | [每日分时推荐与 LLM V14](DAILY_SLOTS_LLM_V14.md) | 刷新时段、两阶段请求、等待预算及成功标记 |
 | [来信布局与导出 V13](LETTER_UI_V13.md) | 自拟信件标题、封面主题与导出选项、v13 迁移 |
+| [音乐笔友角色彩蛋](PENPAL_CHARACTER_PRESETS.md) | 风精灵希露菲卡片、应用入口与提示词范围 |
+| [与笔友聊天](PENPAL_CHAT.md) | 连续对话、主动观点与记忆管理 |
+| [音乐笔友记忆 V15](PENPAL_MEMORY_V15.md) | 独立人格、轻量长期记忆、真实互动与管理入口 |
 | [音乐笔友与来信存档](PENPAL_RECOMMENDATIONS.md) | 分段推荐信、SQLite v12 私人存档与独立清理 |
 | [每日精选封面与提示词](RECOMMENDATION_SHOWCASE_PROMPT.md) | 首页 / 详情封面叠卡与自定义 LLM 推荐偏好 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |

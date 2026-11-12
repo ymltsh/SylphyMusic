@@ -1,5 +1,33 @@
 # 实施与验证记录
 
+## 2026-11-12 回一句升级连续聊天与通知条收起优化
+
+原“回一句”升级为连续聊天，每日精选和历史来信的原入口 / 更多菜单打开同一信件会话；保留当前人格与模型，可带着信件讨论，也可取消关联闲聊。SQLite v15→v16 增量增加聊天表、复合索引并迁入旧主动回复。会话按人格摘要和信件键隔离，历史按 SQL 游标分页，成功时事务保存一问一答及用户原话；用户可选择是否记住，原话作为后续选曲及写信的明确偏好，模型回答不当作用户事实。尊重全局记忆 / 回忆开关，支持停止、手动重试、编辑后重发、清空对话和关联观点，全部记忆 / 来信清理同步处理聊天；请求及退出生命周期已接入，聊天内容不写诊断日志。
+
+同时修复带撤销操作的提示条常驻：根据本机 Flutter 源码确认带 action 默认 persist，显式设置 persist=false，保留 8 秒时长，增加关闭按钮，重复操作替换旧提示。
+
+普通版与 OpenList 同步，保留原有改动。Dart 已格式化，普通版 Android 三 ABI / Windows Release 与内部打包、OpenList Android arm64 Release 均成功；构建日志为各工作区 `build/test_logs/penpal-chat-build.log`。七个交付文件已复制到 `\\GENAS\share\sylphy_music_release`，逐文件长度及 SHA-256 一致，附 `SHA256SUMS-penpal-chat.txt`；复制记录见普通版 `build/test_logs/penpal-chat-share-copy.json`。本轮未使用测试凭据，未运行 analyze、测试、应用启动、真实模型请求或设备迁移验证。实际对话、迁移与设备交互由用户验收；未改版本号、提交、推送或发布。
+
+## 2026-11-12 发布音乐笔友记忆与加载体验更新 1.0.46
+
+普通版 1.0.46+59 与 OpenList 1.0.46-openlist.29+59 已完成正式构建及发布。本次公开更新说明包含音乐笔友记忆管理、主动回信、每日主信 / 后续短笺、推荐加载收信动画，以及首页播放入口尺寸和操作对齐。
+
+普通版 Android 三 ABI、Windows 安装程序与便携包；OpenList arm64 APK、对应应用 / OpenList 源码及摘要共九个附件的远端大小与 SHA-256 全部一致，四份 Android 包正式签名一致，OpenList JNI 与上一版一致。两版本 Release 标题、正文、状态及更新清单原始 / 加速入口核对通过，普通版保持 Latest。仅提交推送清单：main c7f4f33 / b4b5e63，feature 319380a；其余本地改动保留。
+
+交付文件复制到 `\\GENAS\share\sylphy_music_release\1.0.46-59`（特别版在 OpenList 子目录），逐文件长度与 SHA-256 一致。普通版产物 `build/releases/1.0.46-59/`，特别版 `build/releases/1.0.46-openlist.29-59/`。日志：普通版 `build/test_logs/release-1.0.46-build.log`，特别版 `build/test_logs/release-openlist-59-build.log` / `release-openlist-59-publish.log`；复制记录为普通版 `build/test_logs/release-59-share-copy.json`。未运行 analyze、测试、应用启动、真实模型请求或设备验收，实际功能与设备体验由用户确认。
+
+## 2026-11-12 推荐加载收信动画
+
+首页及每日精选共用新的 `RecommendationDeliveryBuilder`，以纸条邀约、翻找唱片、落笔写信、封装、乘风送达和拆信呈现加载。服务提供实际阶段通知，LLM 选曲 / 写信切换由真实请求边界触发；长等待保留轻柔动效与提示，不使用虚假百分比。生成完成后 UI 约 940ms 的送达 / 拆信过渡不阻塞服务，已有来信快速读取不强制播放整段动画；错误 / 空曲库直接显示原提示。换一批立即展示加载过程，过期 Future 不替换当前展示。Canvas 无新增资产或依赖，适配深浅色、减少动画、后台及路由不可见暂停；状态通过辅助功能播报。
+
+普通版与 OpenList 同步，原文件备份 `.private/recommendation-delivery-before/`，Dart 已格式化。普通版 Android 三 ABI / Windows Release 及内部打包成功，OpenList Android arm64 Release 成功；内部包位于各工作区 `build/internal-review/`。七个交付文件已复制到 `\\GENAS\share\sylphy_music_release`，逐文件长度和 SHA-256 一致，附 `SHA256SUMS-letter-loading.txt`；复制记录见普通版 `build/test_logs/letter-loading-share-copy.json`。本轮未使用测试凭据，未运行 analyze、测试、应用启动或设备验收，动画节奏和视觉效果由用户确认。未修改版本号、提交、推送或发布。
+
+## 2026-11-12 应用音乐笔友记忆 V15 补丁
+
+按用户“应用”要求，将 `SylphyMusic-penpal-memory-v15-patch.zip` 应用到目标 main 工作区。14 个文件的补丁锚点与新增文件冲突预检通过；原文件备份在 `.private/penpal-memory-v15-before-20261112-180711/`。新增笔友人格、反思、来信及主动回复记忆和管理页面；写信阶段使用有界记忆上下文，每日首信与后续短笺区分，SQLite v14→v15 增量建表；清理来信同步清理关联记忆及回复。补充架构与文档索引，12 个 Dart 文件已格式化。
+
+`tool/build_review.ps1` 成功：Android 三 ABI Release、Windows Release 编译完成，内部 APK / Windows ZIP 位于 `build/internal-review/`，打包脚本完成已跟踪文件及应用内容扫描。本轮未使用测试凭据，未运行 analyze、测试、应用启动、真实 LLM 或设备迁移验证；功能由用户验收。随后按用户追加要求同步到 OpenList 分支，保留其原有改动，OpenList Android arm64 Release 编译成功并独立命名打包。普通版三个 APK、Windows ZIP、说明 / 原摘要及 OpenList APK 共七个文件复制到 `\\GENAS\share\sylphy_music_release`，逐文件长度与 SHA-256 一致，并生成、复制 `SHA256SUMS-penpal-v15.txt`；复制记录为 `build/test_logs/penpal-v15-share-copy.json`。未提交、推送或发布。
+
 ## 2026-11-12 每日精选播放按钮尺寸与对齐
 
 参考用户示意图，首页每日精选播放按钮圆形视觉尺寸由约 50 缩至 36，图标由 30 缩至 22，并保留 padded 点击区域。将“查看这轮推荐”及箭头从左侧正文移至卡片底部，与右侧播放按钮共用一行并垂直居中；左右间隔和换行适配保留。推荐信内部导出 / 播放全部 / 更多及手势动效不变。两个工作区同步，备份 .private/daily-play-alignment-before/，Dart 已格式化。

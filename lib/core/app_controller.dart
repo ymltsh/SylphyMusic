@@ -37,6 +37,10 @@ import 'models.dart';
 import 'appearance.dart';
 import 'listening_history.dart';
 import '../data/recommendation_repository.dart';
+import '../data/penpal_memory_repository.dart';
+import '../data/penpal_chat_repository.dart';
+import '../services/penpal_chat.dart';
+import '../services/penpal_memory.dart';
 import '../services/listening_analytics.dart';
 import '../services/recommendation_service.dart';
 import '../services/llm_recommendations.dart';
@@ -83,6 +87,13 @@ class SylphyApp extends ChangeNotifier {
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   late final recommendationRepository = RecommendationRepository(db);
+  late final penpalMemory = PenpalMemory(PenpalMemoryRepository(db));
+  late final penpalChat = PenpalChatService(
+    apiSettings,
+    vault,
+    penpalMemory,
+    PenpalChatRepository(db),
+  );
   late final listeningAnalytics = ListeningAnalytics(
     playback,
     recommendationRepository,
@@ -91,6 +102,7 @@ class SylphyApp extends ChangeNotifier {
     db,
     recommendationRepository,
     diagnostics: diagnostics,
+    memory: penpalMemory,
     llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
   );
   List<PlaylistModel> playlists = [];
@@ -1116,9 +1128,11 @@ class SylphyApp extends ChangeNotifier {
     history.removeListener(_indexChanged);
     apiSettings.removeListener(_apiChanged);
     lrcApi.dispose();
+    await penpalChat.shutdown();
     apiSettings.dispose();
     await listeningAnalytics.shutdown();
     await recommendations.shutdown();
+    await penpalMemory.shutdown();
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();

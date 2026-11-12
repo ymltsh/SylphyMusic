@@ -10,6 +10,7 @@ import '../data/library_catalog.dart';
 import '../core/recommendation_models.dart';
 import 'daily_mix_page.dart';
 import 'recommendation_showcase.dart';
+import 'recommendation_delivery.dart';
 import 'cover_art.dart';
 import 'library_browser.dart';
 import 'playing_song_tile.dart';
@@ -343,8 +344,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ],
         ),
         const SizedBox(height: 8),
-        FutureBuilder<DailyMix>(
+        RecommendationDeliveryBuilder(
           future: dailyMix,
+          service: app.recommendations,
+          compact: true,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return SizedBox(

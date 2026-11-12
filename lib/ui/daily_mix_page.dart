@@ -7,6 +7,8 @@ import '../core/recommendation_models.dart';
 import 'recommendation_letters_page.dart';
 import 'playing_song_tile.dart';
 import 'recommendation_showcase.dart';
+import 'recommendation_delivery.dart';
+import 'penpal_chat_page.dart';
 import 'route_player_bar.dart';
 
 /// A dated, independent queue snapshot: regeneration never edits a playing queue.
@@ -22,6 +24,7 @@ class _DailyMixPageState extends State<DailyMixPage>
     with WidgetsBindingObserver {
   late Future<DailyMix> _mix = widget.app.recommendations.daily();
   bool _working = false;
+  final Set<String> _openedLetters = {};
   int _llmRevision = -1;
 
   @override
@@ -53,6 +56,20 @@ class _DailyMixPageState extends State<DailyMixPage>
     super.dispose();
   }
 
+  Future<void> _reply(DailyMix mix) => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PenpalChatPage(
+        app: widget.app,
+        letterKey: '${mix.day}:${mix.generation}',
+        letterTitle: mix.title,
+        letterContext:
+            '${mix.title}\n${mix.introduction}\n'
+            '${mix.items.map((item) => '${item.track.title} · ${item.track.artist}：${item.reason}').join('\n')}',
+      ),
+    ),
+  );
+
   Future<void> _play(DailyMix mix, {int start = 0}) async {
     if (mix.items.isEmpty) return;
     try {
@@ -69,9 +86,12 @@ class _DailyMixPageState extends State<DailyMixPage>
     if (_working) return;
     setState(() => _working = true);
     try {
-      if (action == 'refresh') {
-        final next = await widget.app.recommendations.daily(regenerate: true);
-        if (mounted) setState(() => _mix = Future.value(next));
+      if (action == 'chat') {
+        await _reply(mix);
+      } else if (action == 'refresh') {
+        final pending = widget.app.recommendations.daily(regenerate: true);
+        setState(() => _mix = pending);
+        await pending;
       } else if (action == 'save') {
         await widget.app.cloud.newLocal(
           '每日精选 · ${mix.day}',
@@ -111,8 +131,9 @@ class _DailyMixPageState extends State<DailyMixPage>
       ],
     ),
     floatingActionButton: RoutePlayerFab(app: widget.app),
-    body: FutureBuilder<DailyMix>(
+    body: RecommendationDeliveryBuilder(
       future: _mix,
+      service: widget.app.recommendations,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(child: Text('生成精选失败，请稍后重试'));
@@ -121,6 +142,18 @@ class _DailyMixPageState extends State<DailyMixPage>
           return const Center(child: CircularProgressIndicator());
         }
         final mix = snapshot.data!;
+        if (mix.items.isNotEmpty &&
+            _openedLetters.add('${mix.day}:${mix.generation}')) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              unawaited(
+                widget.app.penpalMemory
+                    .recordOpenedDailyMix(mix)
+                    .catchError((Object _) {}),
+              );
+            }
+          });
+        }
         if (mix.items.isEmpty) {
           return const Center(
             child: Padding(
@@ -152,6 +185,7 @@ class _DailyMixPageState extends State<DailyMixPage>
                     tooltip: '更多',
                     onSelected: (action) => unawaited(_action(action, mix)),
                     itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
                       PopupMenuItem(value: 'refresh', child: Text('换一批')),
                       PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
                     ],
