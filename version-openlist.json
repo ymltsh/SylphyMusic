@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.48-openlist.31",
-    "build": 61,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.48-openlist.31 (arm64-v8a)",
+    "version": "1.0.49-openlist.32",
+    "build": 62,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.49-openlist.32 (arm64-v8a)",
     "date": "2026-11-13",
-    "notes": "- 音乐库新增“文件夹”分类，可按文件所在目录浏览歌曲和批量操作。\n- 专辑 CoverFlow 切换按钮移到上方排序按钮旁。\n- 修复 Android 媒体通知和部分播放控制异常，进入应用时唤醒已有歌曲的媒体通知。\n- 改进播放页拖动进度后的显示，减少跳回旧进度的情况。\n- 切换歌曲时增加 0.3 秒间隔，尝试减轻切歌时的啪声。\n",
+    "notes": "- 设置中新增“音乐库分类”，可分别显示或隐藏歌曲、专辑、艺术家和文件夹，并记住选择。\n- 调整文件夹列表的条目间距与点击效果，修正异常灰色间隔区域。\n- 文件夹列表简化为名称、来源和歌曲数，不再显示完整路径。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.48-openlist.31%2B61/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.49-openlist.32%2B62/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.48-openlist.31%2B61"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.49-openlist.32%2B62"
   },
   "history": [
+    {
+      "version": "1.0.48-openlist.31",
+      "build": 61,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.48-openlist.31 (arm64-v8a)",
+      "date": "2026-11-13",
+      "notes": "- 音乐库新增“文件夹”分类，可按文件所在目录浏览歌曲和批量操作。\n- 专辑 CoverFlow 切换按钮移到上方排序按钮旁。\n- 修复 Android 媒体通知和部分播放控制异常，进入应用时唤醒已有歌曲的媒体通知。\n- 改进播放页拖动进度后的显示，减少跳回旧进度的情况。\n- 切换歌曲时增加 0.3 秒间隔，尝试减轻切歌时的啪声。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.48-openlist.31%2B61/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.48-openlist.31%2B61"
+    },
     {
       "version": "1.0.47-openlist.30",
       "build": 60,
