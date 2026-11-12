@@ -324,6 +324,7 @@ class LetterImageActions extends StatefulWidget {
     this.detailsText = '',
     this.trackCount = 0,
     this.additionalActions = const [],
+    this.trailingAction,
   });
 
   final SylphyApp app;
@@ -334,6 +335,7 @@ class LetterImageActions extends StatefulWidget {
   final List<Track> tracks;
   final int trackCount;
   final List<Widget> additionalActions;
+  final Widget? trailingAction;
 
   @override
   State<LetterImageActions> createState() => _LetterImageActionsState();
@@ -517,23 +519,33 @@ class _LetterImageActionsState extends State<LetterImageActions> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    alignment: WrapAlignment.start,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      OutlinedButton.icon(
-        onPressed: _busy || widget.content.trim().isEmpty ? null : _export,
-        icon: const Icon(Icons.ios_share_rounded),
-        label: Text(_busy ? '正在导出…' : '导出'),
-      ),
-      for (final action in widget.additionalActions)
-        IgnorePointer(
-          ignoring: _busy,
-          child: Opacity(opacity: _busy ? .5 : 1, child: action),
-        ),
-    ],
+  Widget _guard(Widget child) => IgnorePointer(
+    ignoring: _busy,
+    child: Opacity(opacity: _busy ? .5 : 1, child: child),
   );
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _busy || widget.content.trim().isEmpty ? null : _export,
+          icon: const Icon(Icons.ios_share_rounded),
+          label: Text(_busy ? '正在导出…' : '导出'),
+        ),
+        for (final action in widget.additionalActions) _guard(action),
+      ],
+    );
+    if (widget.trailingAction == null) return actions;
+    return Row(
+      children: [
+        Expanded(child: actions),
+        const SizedBox(width: 8),
+        _guard(widget.trailingAction!),
+      ],
+    );
+  }
 }

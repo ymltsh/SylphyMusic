@@ -467,6 +467,25 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _editLlmMode,
       ),
       ListTile(
+        key: const ValueKey('api-llm-timeout'),
+        leading: const Icon(Icons.timer_outlined),
+        title: const Text('LLM 总等待预算'),
+        subtitle: const Text('先选曲、再写信；网络或模型慢时可增加等待时间'),
+        trailing: DropdownButton<int>(
+          value: app.apiSettings.llmTimeoutSeconds,
+          underline: const SizedBox.shrink(),
+          items: [
+            for (final seconds in [60, 90, 120])
+              DropdownMenuItem(value: seconds, child: Text('$seconds 秒')),
+          ],
+          onChanged: (value) {
+            if (value != null) {
+              _act(() => app.apiSettings.setLlmTimeoutSeconds(value));
+            }
+          },
+        ),
+      ),
+      ListTile(
         key: const ValueKey('api-llm-user-prompt'),
         leading: const Icon(Icons.edit_note_rounded),
         title: const Text('自定义 Prompt'),

@@ -36,10 +36,38 @@ class RecommendationService {
   Future<List<RecommendedAlbum>>? _albumsInFlight;
   bool _closed = false;
 
+  static const allowedRefreshCounts = <int>[1, 2, 3, 4, 6];
+
+  Future<int> dailyRefreshCount() async {
+    final stored = int.tryParse(
+      await db.setting('recommendation_daily_refresh_count') ?? '',
+    );
+    return allowedRefreshCounts.contains(stored) ? stored! : 3;
+  }
+
+  Future<void> setDailyRefreshCount(int value) async {
+    if (!allowedRefreshCounts.contains(value)) {
+      throw ArgumentError.value(value, 'value', '支持 1、2、3、4、6 次');
+    }
+    await db.setSetting('recommendation_daily_refresh_count', '$value');
+  }
+
+  String _dailyPeriod(DateTime now, int count) =>
+      '$count:${(now.hour * count) ~/ 24}';
+
   Future<DailyMix> daily({bool regenerate = false}) {
     if (_closed)
       return Future.error(StateError('Recommendation service closed'));
-    return _dailyInFlight ??= _makeDaily(regenerate)
+    final ongoing = _dailyInFlight;
+    if (ongoing != null) {
+      if (!regenerate) return ongoing;
+      // An explicit "换一批" must not silently reuse an automatic request.
+      return ongoing.then(
+        (_) => daily(regenerate: true),
+        onError: (Object _, StackTrace __) => daily(regenerate: true),
+      );
+    }
+    return _dailyInFlight = _makeDaily(regenerate)
         .catchError((Object error) {
           _record('generation_failed', 'daily', reason: 'generation_error');
           throw error;
@@ -57,9 +85,13 @@ class RecommendationService {
     );
     final now = DateTime.now();
     final day = localDay(now);
+    final period = _dailyPeriod(now, await dailyRefreshCount());
     final previous = await repository.latestSnapshot('daily', day);
     final llmTag = llm?.configurationTag ?? 'local';
-    if (previous != null && !regenerate && previous.llmTag == llmTag) {
+    if (previous != null &&
+        !regenerate &&
+        previous.llmTag == llmTag &&
+        previous.refreshPeriod == period) {
       final ready = await repository.dailyItems(previous.id);
       if (ready.isNotEmpty &&
           ready.length >= (previous.itemCount * .75).ceil()) {
@@ -72,6 +104,7 @@ class RecommendationService {
           title: previous.letterTitle.isEmpty
               ? '写给你的今日音乐信'
               : previous.letterTitle,
+          llmSucceeded: previous.llmSucceeded,
         );
       }
     }
@@ -186,6 +219,7 @@ class RecommendationService {
         finalTracks,
         introduction: introduction,
         title: title,
+        llmSucceeded: letterFromLlm,
       );
     }
     await repository.saveDaily(
@@ -197,6 +231,8 @@ class RecommendationService {
       letterTitle: title,
       letterOrigin: letterFromLlm ? 'llm' : 'local',
       llmTag: llmTag,
+      refreshPeriod: period,
+      llmSucceeded: letterFromLlm,
     );
     _record('generation_completed', 'daily', count: finalTracks.length);
     return DailyMix(
@@ -205,6 +241,7 @@ class RecommendationService {
       finalTracks,
       introduction: introduction,
       title: title,
+      llmSucceeded: letterFromLlm,
     );
   }
 

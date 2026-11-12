@@ -1,5 +1,43 @@
 # 实施与验证记录
 
+## 2026-11-12 每日精选播放按钮尺寸与对齐
+
+参考用户示意图，首页每日精选播放按钮圆形视觉尺寸由约 50 缩至 36，图标由 30 缩至 22，并保留 padded 点击区域。将“查看这轮推荐”及箭头从左侧正文移至卡片底部，与右侧播放按钮共用一行并垂直居中；左右间隔和换行适配保留。推荐信内部导出 / 播放全部 / 更多及手势动效不变。两个工作区同步，备份 .private/daily-play-alignment-before/，Dart 已格式化。
+
+普通版 Android 三 ABI / Windows 内部打包成功，OpenList Android arm64 Release 编译成功；各工作区日志 build/test_logs/daily-play-alignment-build.log。七个交付文件复制到 \\GENAS\share\sylphy_music_release，逐文件大小与 SHA-256 一致；摘要 SHA256SUMS-daily-play-alignment.txt，普通版复制记录 build/test_logs/daily-play-alignment-share-copy.json。未运行 analyze、测试、应用启动或设备验收，实际视觉效果由用户确认。本轮未更新版本号、提交、推送或发布。
+
+## 2026-11-12 发布每日精选动效与卡片操作更新 1.0.45
+
+按用户“推送更新”授权，普通版 1.0.45+58 与 OpenList 1.0.45-openlist.28+58 已完成正式构建发布。本轮包含首页 / 推荐信封面叠卡手势动效、首页卡片右下角播放入口、推荐信卡片内导出 / 播放全部 / 更多操作、精选菜单精简和默认悬浮迷你播放器。
+
+普通版提供 Android 三 ABI、Windows 安装程序及便携 ZIP；OpenList 提供 arm64 APK、实际应用与对应 OpenList 源码及摘要。正式签名、Release 状态 / 标题 / 正文 / 附件大小及 SHA-256、普通与特别版原始 / 加速更新清单均核对通过，普通版保持 Latest。仅提交推送清单：main da934b2 / f6e3071，feature ff19c9c；保留其余工作区改动。
+
+九个发布文件已复制到 \\GENAS\share\sylphy_music_release\1.0.45-58（特别版位于 OpenList 子目录），逐文件大小和 SHA-256 一致；普通版复制记录 build/test_logs/release-58-share-copy.json。构建 / 发布日志为普通版 build/test_logs/release-1.0.45-build.log、特别版 build/test_logs/release-openlist-58-build.log / release-openlist-58-publish.log。未运行 analyze、测试、应用启动或设备验收；手势、排版与播放交互由用户验收。
+
+## 2026-11-12 推荐信卡片内操作与首页播放入口
+
+根据用户反馈，将导出、播放全部和更多移回推荐信卡片尾部。操作区占满卡片内部可用宽度，“更多”保持靠右且仍只保留换一批 / 保存为本地歌单；窄屏导出与播放全部允许换行。首页每日精选播放按钮独立放到卡片右下角，避免与查看推荐文字挤在一起，保留封面跟随手势动效及每日精选悬浮播放器。
+
+普通版与 OpenList 同步，修改前备份 .private/letter-card-actions-before/。Dart 已格式化，普通版 Android 三 ABI / Windows 内部打包和 OpenList Android arm64 Release 均完成；日志 build/test_logs/letter-card-actions-build.log。未启动应用、运行 analyze / 测试或设备验收，显示效果交由用户确认。用户随后授权推送更新，正式交付结果另记。
+
+## 2026-11-12 每日精选动效与悬浮迷你播放器
+
+每日精选共用封面叠卡增加轻微浮动、旋转和透视效果，首页与推荐信详情均可随触摸位置 / 鼠标移动产生位移，松手或移出后回正。使用被动指针监听保留点击与页面滚动；尊重系统减少动画、TickerMode 和应用前后台状态，封面组件不随每个动画帧重建。
+
+每日精选尾部的“更多”固定到右侧，与下方歌曲菜单使用相同水平内边距对齐，只保留“换一批”和“保存为本地歌单”。导出和播放全部保留在左侧操作组，窄屏允许换行。迷你播放器未保存偏好时默认悬浮按钮，保留用户已明确保存的设置；每日精选页独立默认收起为悬浮播放器，可展开与收起，歌曲列表预留底部空间。
+
+普通版与 OpenList 同步，修改前备份 .private/daily-motion-mini-before/，Dart 已格式化。普通版 Android 三 ABI / Windows Release 与内部打包成功，OpenList Android arm64 Release 编译成功；日志为各工作区 build/test_logs/daily-motion-mini-build.log。七个交付文件复制到 \\GENAS\share\sylphy_music_release，大小和 SHA-256 逐文件一致；摘要 SHA256SUMS-daily-motion-mini.txt，复制记录为普通版 build/test_logs/daily-motion-mini-share-copy.json。未运行测试、analyze、应用启动或设备验收，交互与视觉效果由用户验收。本轮未改版本号、提交、推送或发布。
+
+## 2026-11-12 每日分时推荐与 LLM 可靠性 V14 发布
+
+按用户“应用，推送更新”授权，审阅 SylphyMusic-daily-slots-llm-reliability-v14-patch.zip 后，两个版本均通过十一处文件锚点检查并应用。默认每日三个本地民用时段，推荐设置支持 1 / 2 / 3 / 4 / 6 次；启动及回到前台检查、同一时段复用，不后台定时唤醒或补发。手动换一批等待在途任务再生成独立轮次，不更改已建立播放队列。SQLite v13→v14 前向新增时段及实际 LLM 成功字段，根据旧信件 origin 恢复成功状态。
+
+LLM 改为选曲 / 写信两阶段，后阶段仅接收选中的候选；等待预算可设 60 / 90 / 120 秒，默认 90。补充阶段连接 / 整体响应读取共用截止时间、跨阶段配置变更拒收，以及写信缺少有效理由 / 正文的失败诊断。完整成功才持久化星光状态，失败保留本地推荐。保留 System / User 自定义、启动刷新一言、统一导出配置及尾部播放 / 更多布局。原文件备份 .private/recommendation-llm-time-slots-v14-before/20261112-095135/，Dart 已格式化，补充 docs/DAILY_SLOTS_LLM_V14.md 与索引。
+
+普通版 1.0.44+57 完成 Android 三 ABI / Windows 安装程序及便携 ZIP 正式构建发布，OpenList 1.0.44-openlist.27+57 完成 arm64 正式包、对应源码和摘要发布。正式签名、Release 状态 / 标题 / 正文 / 全部附件大小及 SHA-256、普通及特别版原始 / 加速更新清单均核对通过，普通版保持 Latest。只提交推送清单：main db663ad / e4bdbf8，feature 67f9f20。
+
+九个发布文件已复制到 \\GENAS\share\sylphy_music_release\1.0.44-57（OpenList 独立子目录），文件大小及 SHA-256 均核对一致。日志：普通版 build/test_logs/release-1.0.44-build.log，特别版 release-openlist-57-build.log / release-openlist-57-publish.log；复制记录为普通版 build/test_logs/release-57-share-copy.json。未运行 analyze、测试、应用启动、真实 LLM 请求或设备迁移验收；实际时段边界、模型兼容性及设备效果由用户验收。
+
 ## 2026-11-12 导出统一入口与音乐信尾部操作
 
 按用户要求将“导出设置 / 导出图片 / 分享图片”合并为单个“导出”按钮。每次点击读取上次偏好并打开配置弹窗，用户确认封面、推荐理由、主题和清晰度后保存到相册 / Pictures/SylphyMusic；取消不导出。弹窗可选“保存后分享”，默认关闭。配置确认和导出期间防止重复点击，捕获本轮信件内容，保存成功后才打开系统分享。

@@ -41,7 +41,7 @@ class Appearance extends ChangeNotifier {
   bool disc = false, ambient = false, glass = false;
   bool discRotation = false;
   bool solidBackground = true;
-  bool playerFab = false;
+  bool playerFab = true;
   double lyricFontSize = 24;
   double miniLyricFontSize = 20;
   static const lyricFontSizes = [20.0, 24.0, 28.0];
@@ -86,7 +86,7 @@ class Appearance extends ChangeNotifier {
     discRotation = await db.setting('ui_disc_rotation') == 'true';
     ambient = await db.setting('ui_ambient') == 'true';
     glass = await db.setting('ui_glass') == 'true';
-    playerFab = await db.setting('ui_player_fab') == 'true';
+    playerFab = await db.setting('ui_player_fab') != 'false';
     final storedSolid = await db.setting('ui_background_solid');
     solidBackground = storedSolid == null
         ? _backgroundName == null

@@ -42,6 +42,7 @@ class ApiSettings extends ChangeNotifier {
   String llmUrl = defaultLlmUrl;
   String llmModel = defaultLlmModel;
   String llmMode = 'assist'; // assist or lead
+  int llmTimeoutSeconds = 90;
   String llmUserPrompt = defaultLlmUserPrompt;
   String llmSystemPrompt = defaultLlmSystemPrompt;
   int llmRevision = 0;
@@ -174,6 +175,16 @@ class ApiSettings extends ChangeNotifier {
     await _updateLlmRevision();
   }
 
+  Future<void> setLlmTimeoutSeconds(int value) async {
+    if (![60, 90, 120].contains(value)) {
+      throw ArgumentError.value(value, 'value', '请选择 60、90 或 120 秒');
+    }
+    if (llmTimeoutSeconds == value) return;
+    await db.setSetting('api_llm_timeout_seconds', value.toString());
+    llmTimeoutSeconds = value;
+    notifyListeners();
+  }
+
   /// The entire user-authored preference segment of the Chat Completions
   /// user message. Security and output constraints are fixed in system.
   static String validateLlmUserPrompt(String value) {
@@ -278,6 +289,10 @@ class ApiSettings extends ChangeNotifier {
     final storedMode = await db.setting('api_llm_mode');
     llmMode = storedMode == 'lead' ? 'lead' : 'assist';
     llmEnabled = await db.setting('api_llm_enabled') == 'true';
+    final timeout = int.tryParse(
+      await db.setting('api_llm_timeout_seconds') ?? '',
+    );
+    llmTimeoutSeconds = [60, 90, 120].contains(timeout) ? timeout! : 90;
     llmRevision = int.tryParse(await db.setting('api_llm_revision') ?? '') ?? 0;
     try {
       llmSystemPrompt = validateLlmSystemPrompt(

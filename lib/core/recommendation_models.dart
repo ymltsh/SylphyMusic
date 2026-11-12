@@ -10,12 +10,14 @@ class DailyMix {
     this.items, {
     this.introduction = '',
     this.title = '写给你的今日音乐信',
+    this.llmSucceeded = false,
   });
   final String day;
   final int generation;
   final List<RecommendedTrack> items;
   final String introduction;
   final String title;
+  final bool llmSucceeded;
   List<TrackRef> get refs => items.map((item) => item.track.ref).toList();
 }
 

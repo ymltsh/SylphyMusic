@@ -7,6 +7,7 @@ import '../core/recommendation_models.dart';
 import 'recommendation_letters_page.dart';
 import 'playing_song_tile.dart';
 import 'recommendation_showcase.dart';
+import 'route_player_bar.dart';
 
 /// A dated, independent queue snapshot: regeneration never edits a playing queue.
 class DailyMixPage extends StatefulWidget {
@@ -17,7 +18,8 @@ class DailyMixPage extends StatefulWidget {
   State<DailyMixPage> createState() => _DailyMixPageState();
 }
 
-class _DailyMixPageState extends State<DailyMixPage> {
+class _DailyMixPageState extends State<DailyMixPage>
+    with WidgetsBindingObserver {
   late Future<DailyMix> _mix = widget.app.recommendations.daily();
   bool _working = false;
   int _llmRevision = -1;
@@ -25,6 +27,7 @@ class _DailyMixPageState extends State<DailyMixPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _llmRevision = widget.app.apiSettings.llmRevision;
     widget.app.apiSettings.addListener(_settingsChanged);
   }
@@ -37,7 +40,15 @@ class _DailyMixPageState extends State<DailyMixPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _mix = widget.app.recommendations.daily());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.app.apiSettings.removeListener(_settingsChanged);
     super.dispose();
   }
@@ -71,33 +82,6 @@ class _DailyMixPageState extends State<DailyMixPage> {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('已保存为本地歌单')));
         }
-      } else if (action == 'personal') {
-        final enabled = widget.app.listeningAnalytics.enabled;
-        await widget.app.listeningAnalytics.setEnabled(!enabled);
-        if (mounted) {
-          setState(
-            () => _mix = widget.app.recommendations.daily(regenerate: true),
-          );
-        }
-      } else if (action == 'clear') {
-        await widget.app.listeningAnalytics.clearStats();
-        if (mounted) {
-          setState(
-            () => _mix = widget.app.recommendations.daily(regenerate: true),
-          );
-        }
-      } else if (action == 'charts') {
-        final old = await widget.app.recommendations.onlineChartsEnabled;
-        await widget.app.recommendations.setOnlineChartsEnabled(!old);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                old ? '已关闭在线热度；下次生成将使用本地数据' : '已开启在线热度；下次生成将尝试获取公开榜单',
-              ),
-            ),
-          );
-        }
       }
     } catch (_) {
       if (mounted) {
@@ -126,6 +110,7 @@ class _DailyMixPageState extends State<DailyMixPage> {
         ),
       ],
     ),
+    floatingActionButton: RoutePlayerFab(app: widget.app),
     body: FutureBuilder<DailyMix>(
       future: _mix,
       builder: (context, snapshot) {
@@ -145,6 +130,7 @@ class _DailyMixPageState extends State<DailyMixPage> {
           );
         }
         return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 116),
           itemCount: mix.items.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) {
@@ -160,25 +146,16 @@ class _DailyMixPageState extends State<DailyMixPage> {
                       icon: const Icon(Icons.play_arrow_rounded),
                       label: const Text('播放全部'),
                     ),
-                    PopupMenuButton<String>(
-                      enabled: !_working,
-                      tooltip: '精选操作',
-                      onSelected: (action) => unawaited(_action(action, mix)),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'refresh', child: Text('换一批')),
-                        PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
-                        PopupMenuItem(value: 'charts', child: Text('切换在线热度开关')),
-                        PopupMenuItem(
-                          value: 'personal',
-                          child: Text('切换个性化推荐'),
-                        ),
-                        PopupMenuItem(
-                          value: 'clear',
-                          child: Text('清除推荐统计（不可撤销）'),
-                        ),
-                      ],
-                    ),
                   ],
+                  footerTrailingAction: PopupMenuButton<String>(
+                    enabled: !_working,
+                    tooltip: '更多',
+                    onSelected: (action) => unawaited(_action(action, mix)),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'refresh', child: Text('换一批')),
+                      PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
+                    ],
+                  ),
                 ),
               );
             }
@@ -186,6 +163,7 @@ class _DailyMixPageState extends State<DailyMixPage> {
             final item = mix.items[trackIndex];
             return PlayingSongTile(
               app: widget.app,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               track: item.track,
               title: item.track.title,
               subtitle: '${item.track.artist} · ${item.reason}',

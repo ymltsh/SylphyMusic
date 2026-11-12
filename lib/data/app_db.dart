@@ -28,6 +28,10 @@ class AppDb {
     "ALTER TABLE recommendation_letters ADD COLUMN cover_refs_json TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE recommendation_letters ADD COLUMN song_count INTEGER NOT NULL DEFAULT 0",
   ];
+  static const _recommendationV14Alter = <String>[
+    "ALTER TABLE recommendation_snapshots ADD COLUMN refresh_period TEXT NOT NULL DEFAULT ''",
+    'ALTER TABLE recommendation_snapshots ADD COLUMN llm_succeeded INTEGER NOT NULL DEFAULT 0',
+  ];
   static const _recommendationLettersIndex =
       'CREATE INDEX idx_recommendation_letters_date ON recommendation_letters(created_at_ms DESC)';
   static const _recommendationSchema = <String>[
@@ -138,7 +142,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 13,
+      version: 14,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -245,6 +249,19 @@ class AppDb {
             WHERE song_count=0
           ''');
         }
+        if (oldVersion < 14) {
+          for (final sql in _recommendationV14Alter) {
+            await database.execute(sql);
+          }
+          // Existing successful letters retain their AI badge after upgrade.
+          await database.execute('''
+            UPDATE recommendation_snapshots SET llm_succeeded=1
+            WHERE id IN (
+              SELECT snapshot_id FROM recommendation_letters
+              WHERE origin='llm' AND snapshot_id IS NOT NULL
+            )
+          ''');
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -281,6 +298,9 @@ class AppDb {
         await d.execute(_recommendationLettersTable);
         await d.execute(_recommendationLettersIndex);
         for (final sql in _letterV13Alter) {
+          await d.execute(sql);
+        }
+        for (final sql in _recommendationV14Alter) {
           await d.execute(sql);
         }
       },

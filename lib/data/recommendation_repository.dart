@@ -302,6 +302,8 @@ class RecommendationRepository {
       String introduction,
       String letterTitle,
       String llmTag,
+      String refreshPeriod,
+      bool llmSucceeded,
     })?
   >
   latestSnapshot(String kind, String day) async {
@@ -314,6 +316,8 @@ class RecommendationRepository {
         'introduction',
         'letter_title',
         'llm_tag',
+        'refresh_period',
+        'llm_succeeded',
       ],
       where: 'kind=? AND local_day=?',
       whereArgs: [kind, day],
@@ -328,6 +332,8 @@ class RecommendationRepository {
       introduction: rows.first['introduction'] as String? ?? '',
       letterTitle: rows.first['letter_title'] as String? ?? '',
       llmTag: rows.first['llm_tag'] as String? ?? 'local',
+      refreshPeriod: rows.first['refresh_period'] as String? ?? '',
+      llmSucceeded: (rows.first['llm_succeeded'] as int? ?? 0) == 1,
     );
   }
 
@@ -397,6 +403,8 @@ class RecommendationRepository {
     String letterTitle = '写给你的今日音乐信',
     String letterOrigin = 'local',
     String llmTag = 'local',
+    String refreshPeriod = '',
+    bool llmSucceeded = false,
   }) => _saveSnapshot(
     letterDetailsText: items
         .map((item) => '${item.track.title} · ${item.reason}')
@@ -407,6 +415,8 @@ class RecommendationRepository {
     introduction: introduction,
     letterOrigin: letterOrigin,
     llmTag: llmTag,
+    refreshPeriod: refreshPeriod,
+    llmSucceeded: llmSucceeded,
     kind: 'daily',
     day: day,
     generation: generation,
@@ -475,6 +485,8 @@ class RecommendationRepository {
     String letterDetailsText = '',
     String letterOrigin = 'local',
     String llmTag = 'local',
+    String refreshPeriod = '',
+    bool llmSucceeded = false,
     required String kind,
     required String day,
     required int generation,
@@ -486,6 +498,8 @@ class RecommendationRepository {
       'introduction': introduction,
       'letter_title': kind == 'daily' ? letterTitle : '',
       'llm_tag': llmTag,
+      'refresh_period': refreshPeriod,
+      'llm_succeeded': llmSucceeded ? 1 : 0,
       'local_day': day,
       'generation': generation,
       'algorithm_version': 1,
