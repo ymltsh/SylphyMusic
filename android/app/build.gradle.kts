@@ -35,6 +35,9 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake { arguments += "-DANDROID_STL=c++_static" }
+        }
     }
 
     signingConfigs {
@@ -53,11 +56,16 @@ extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
             else if (internalDebugSigning) signingConfig = signingConfigs.getByName("debug")
         }
     }
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
+    }
 }
 
 dependencies {
-    // AudioService snapshot calls expose its MediaBrowserServiceCompat parent.
+    // Legacy Dart dependencies remain available to non-Android playback code.
     implementation("androidx.media:media:1.7.0")
+    implementation("androidx.media3:media3-common:1.11.1")
+    implementation("androidx.media3:media3-session:1.11.1")
 }
 
 flutter {

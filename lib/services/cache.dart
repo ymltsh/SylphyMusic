@@ -56,12 +56,32 @@ class CacheManager {
     : quota = UnifiedCacheQuota(store, root.parent) {
     quota.audioProtected = (key) =>
         (_leases[key] ?? 0) > 0 ||
+        nativeLeaseActive(key) ||
         _active.containsKey(key) ||
         _downloads.containsKey(key);
   }
   final AppDb store;
   final AdapterFactory factory;
   final Directory root;
+  Directory nativeLeaseDirectory(String key) => Directory(
+    p.join(
+      root.path,
+      'native-leases',
+      '$pid',
+      sha256.convert(utf8.encode(key)).toString(),
+    ),
+  );
+  bool nativeLeaseActive(String key) {
+    if (!Platform.isAndroid) return false;
+    final directory = nativeLeaseDirectory(key);
+    try {
+      return directory.existsSync() && directory.listSync().isNotEmpty;
+    } on FileSystemException {
+      // Deletion must be conservative if lease state cannot be inspected.
+      return true;
+    }
+  }
+
   final UnifiedCacheQuota quota;
   final Map<String, TransferToken> _active = {};
   final Lock _commits = Lock();
@@ -165,6 +185,13 @@ class CacheManager {
     await for (final file in Directory(p.join(root.path, 'ready')).list()) {
       if (file is File &&
           !indexed.contains(p.relative(file.path, from: root.path))) {
+        final hash = p.basename(file.path).split('-').first;
+        if (Platform.isAndroid && hash.length == 64) {
+          final leases = Directory(
+            p.join(root.path, 'native-leases', '$pid', hash),
+          );
+          if (await leases.exists() && !await leases.list().isEmpty) continue;
+        }
         await file.delete();
       }
     }
@@ -207,7 +234,7 @@ class CacheManager {
       );
       _verifiedSignatures.remove(ref.key);
       if (await file.exists()) {
-        if ((_leases[ref.key] ?? 0) == 0) {
+        if ((_leases[ref.key] ?? 0) == 0 && !nativeLeaseActive(ref.key)) {
           await file.delete();
         } else {
           _retiredFiles.putIfAbsent(ref.key, () => []).add(file);
@@ -241,10 +268,15 @@ class CacheManager {
     final n = (_leases[ref.key] ?? 0) - 1;
     if (n <= 0) {
       _leases.remove(ref.key);
+      if (nativeLeaseActive(ref.key)) return;
       final retired = _retiredFiles.remove(ref.key) ?? [];
       if (retired.isNotEmpty) {
         final cleanup = Future<void>(() async {
           for (final file in retired) {
+            if (nativeLeaseActive(ref.key) || (_leases[ref.key] ?? 0) > 0) {
+              _retiredFiles.putIfAbsent(ref.key, () => []).add(file);
+              continue;
+            }
             if (await file.exists()) await file.delete();
           }
         });
@@ -260,6 +292,10 @@ class CacheManager {
             limit: 1,
           );
           if (row.isNotEmpty) {
+            if (nativeLeaseActive(ref.key) || (_leases[ref.key] ?? 0) > 0) {
+              _deleteWhenReleased.add(ref.key);
+              return;
+            }
             await store.db.delete(
               'cache',
               where: 'track_key=?',
@@ -320,7 +356,7 @@ class CacheManager {
         continue;
       }
       await cancel(ref);
-      if ((_leases[key] ?? 0) > 0) {
+      if ((_leases[key] ?? 0) > 0 || nativeLeaseActive(key)) {
         _deleteWhenReleased.add(key);
         continue;
       } // Cleanup after active reader releases.

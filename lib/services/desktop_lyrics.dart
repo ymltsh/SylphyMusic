@@ -105,7 +105,7 @@ class DesktopLyrics with WidgetsBindingObserver {
     // A restored queue is not a request to show an overlay on app startup.
     if (!appearance.desktopLyricsEnabled ||
         track == null ||
-        (!playback.playing && playback.player.state.playlist.medias.isEmpty)) {
+        (!playback.playing && !playback.hasLoadedOutput)) {
       _generation++;
       _ref = null;
       _lines = [];

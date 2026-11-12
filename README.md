@@ -107,7 +107,7 @@ Android 通过文件选择器导入的音频会复制到应用管理目录；桌
 | 音频播放 | media_kit / libmpv |
 | 数据与索引 | SQLite，过滤、分组与分页在 SQL 完成 |
 | 媒体传输 | 回环媒体代理，短期票据、Range 读取与完整校验 |
-| Android | audio_service 媒体会话，缓存 / 同步前台服务 |
+| Android | Media3 原生媒体会话 / libmpv，缓存 / 同步前台服务 |
 | Windows | 定制 Runner：SMTC、媒体键、系统托盘 |
 
 ## 项目文档

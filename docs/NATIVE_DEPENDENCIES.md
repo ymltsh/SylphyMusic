@@ -1,5 +1,7 @@
 # 原生媒体依赖记录
 
+2026-11-13：Android 媒体会话切换到固定版本 AndroidX Media3 common / session 1.11.1（Apache-2.0），未引入 ExoPlayer。新增自有 JNI 桥通过公开 client ABI 动态加载现有 media_kit_libs_android_audio 的 libmpv，不更换 mpv / FFmpeg 二进制。loadfile 使用兼容现有 mpv 0.35 的调用方式。旧 audio_service 路径依赖保留供公共类型与历史代码编译，Android Manifest 不再启用其 Service / Receiver。
+
 2026-10-29：`audio_service` 0.18.19 使用仓库内 `third_party/audio_service` 路径依赖，保留上游运行源码及 MIT 许可证。Android 10 / API 29 且媒体操作数为三个时，通知使用自定义 RemoteViews 和 DecoratedMediaCustomViewStyle，固定操作图标为白色，保留封面取色；替代此前 `setColorized(false)` 的处理。其他系统版本及操作数量沿用上游样式。来源摘要和维护说明见 [本地补丁记录](../third_party/audio_service/SYLPHY_PATCHES.md)。
 
 记录日期：2026-10-27。以下为当前调试构建实际加载的库及上游构建配置证据，不能代替完整的分发许可验收。

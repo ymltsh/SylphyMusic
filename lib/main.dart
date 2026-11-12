@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -12,7 +14,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await recordDartStartup();
   await configureSystemBars();
-  MediaKit.ensureInitialized();
+  if (!Platform.isAndroid) MediaKit.ensureInitialized();
   runApp(const _Bootstrap());
 }
 

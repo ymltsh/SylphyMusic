@@ -5,13 +5,57 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.ryanheise.audioservice.AudioService
-import com.ryanheise.audioservice.AudioServicePlugin
+import io.flutter.embedding.engine.dart.DartExecutor
+import com.ymltsh.sylphymusic.playback.FlutterMediaControllerBridge
+import org.json.JSONObject
+import java.io.File
+import java.util.concurrent.Executors
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 
 class SylphyApplication : Application() {
+    companion object { const val ENGINE_ID = "sylphy_business_engine" }
+    private val checkpointWriter = Executors.newSingleThreadExecutor()
+    private var playbackResolver: MethodChannel? = null
+    private var playbackBridge: FlutterMediaControllerBridge? = null
+    private var sourceReady = false
+    private val waitingResolvers = mutableListOf<Runnable>()
+    fun playbackUiVisible(visible: Boolean) { playbackBridge?.setUiVisible(visible) }
+    fun playbackStateChanged(playWhenReady: Boolean) { if (playWhenReady) playbackBridge?.observePlayback() }
+    fun playbackLeaseReleased(key: String) { playbackResolver?.invokeMethod("released", key) }
+    fun savePlaybackCheckpoint(file: File, value: String) {
+        checkpointWriter.execute {
+            try {
+                val temporary = File(file.parentFile, "${file.name}.tmp")
+                temporary.writeText(value)
+                if (!temporary.renameTo(file)) temporary.delete()
+            } catch (_: Exception) {}
+        }
+    }
+    fun resolvePlaybackSource(key: String, completed: (JSONObject?) -> Unit) {
+        engine()
+        val handler = android.os.Handler(mainLooper)
+        var finished = false
+        var invoke: Runnable? = null
+        val timeout = Runnable {
+            if (!finished) { finished = true; waitingResolvers.remove(invoke); completed(null) }
+        }
+        handler.postDelayed(timeout, 20000)
+        invoke = Runnable { if (!finished) playbackResolver!!.invokeMethod("resolve", key, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                val value = (result as? Map<*, *>)?.let(::JSONObject)
+                if (finished) {
+                    value?.optString("lease")?.takeIf { it.isNotEmpty() }?.let { File(it).delete() }
+                    return
+                }
+                finished = true; handler.removeCallbacks(timeout); completed(value)
+            }
+            override fun error(code: String, message: String?, details: Any?) { success(null) }
+            override fun notImplemented() { success(null) }
+        }) }
+        if (sourceReady) invoke.run() else waitingResolvers.add(invoke)
+    }
     override fun onCreate() {
         super.onCreate()
         Log.i("SylphyLifecycle", "application_created pid=${android.os.Process.myPid()}")
@@ -25,20 +69,34 @@ class SylphyApplication : Application() {
 
     @Synchronized
     fun engine(): FlutterEngine {
-        val engine = AudioServicePlugin.getFlutterEngine(this)
-        check(FlutterEngineCache.getInstance().get(AudioServicePlugin.getFlutterEngineId()) === engine)
+        val engine = installedEngine ?: FlutterEngine(this).also {
+            FlutterEngineCache.getInstance().put(ENGINE_ID, it)
+        }
         if (installedEngine === engine) return engine
         overlay.hide()
         SystemNotifications.register(this, engine)
-        // Register on the engine owned by audio_service, not MainActivity:
-        // notification/headset playback still needs the channel in background.
+        playbackResolver = MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/media3_sources")
+        sourceReady = false
+        playbackResolver!!.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "ready" -> {
+                    sourceReady = true
+                    val waiting = waitingResolvers.toList(); waitingResolvers.clear()
+                    waiting.forEach { it.run() }
+                    result.success(null)
+                }
+                "detach" -> { sourceReady = false; result.success(null) }
+                else -> result.notImplemented()
+            }
+        }
+        playbackBridge = FlutterMediaControllerBridge(this, engine)
         MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/playback_diagnostics")
             .setMethodCallHandler { call, result ->
                 if (call.method != "snapshot") {
                     result.notImplemented()
                 } else {
                     try {
-                        result.success(AudioService.diagnosticSnapshot(this))
+                        result.success(mapOf("backend" to "native_mpv_media3", "engineRunning" to engine.dartExecutor.isExecutingDart))
                     } catch (error: Exception) {
                         Log.w("SylphyDiagnostics", "native_snapshot_failed type=${error.javaClass.simpleName}")
                         result.error("snapshot_unavailable", "Native status unavailable", null)
@@ -114,6 +172,7 @@ class SylphyApplication : Application() {
                 result.success(null)
             } else result.notImplemented()
         }
+        if (!engine.dartExecutor.isExecutingDart) engine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
         return engine
     }
     private fun notificationState(owner: String): Map<String, Any> {

@@ -1,5 +1,7 @@
 # Android 媒体通知：单一媒体会话与稳定时钟
 
+> 2026-11-13：本文记录旧 audio_service 实现。当前 Android 路径已切换为 Media3，见 [实施说明](MEDIA3_NOTIFICATION_IMPLEMENTATION.md)。
+
 适用：当前普通版与 OpenList 工作区；时钟设计沿用原实现，状态映射已由 [MediaSessionProjection](MEDIA_SESSION_PROJECTION_REDESIGN_2026-11-09.md) 统一管理，不改变 libmpv 播放 / 代理 / 缓存 / 队列。
 
 ## 原则

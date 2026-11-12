@@ -19,7 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.math.roundToInt
 
-/** Lightweight overlay in the audio_service-owned app process. Not a second engine. */
+/** Lightweight overlay in the application-owned process. Not a second engine. */
 class DesktopLyricsOverlay(private val app: Application) {
     private val manager by lazy { app.getSystemService(WindowManager::class.java) }
     private var window: LinearLayout? = null

@@ -17,7 +17,11 @@ flowchart TD
   App --> Cloud[PlaylistSyncService]
   Cloud --> Adapters
   App --> Playback[PlaybackCoordinator]
-  Playback --> Native[media_kit / libmpv]
+  Playback --> Gateway[AndroidMedia3Playback / MediaController]
+  Gateway --> Session[MediaLibraryService / SimpleBasePlayer]
+  Session --> AndroidMpv[NativeMpvEngine / libmpv]
+  AndroidMpv --> NativeRange[NativeStreamAdapter / 原生 Range]
+  Playback --> Native[非 Android media_kit / libmpv]
   Native --> Proxy[MediaProxy / 127.0.0.1]
   Proxy --> Cache[CacheManager]
   Proxy --> Origin[远程原始音频]
@@ -41,7 +45,9 @@ flowchart TD
 | `lib/services/library_sync.dart` | 逐页暂存、进度、取消、中断恢复和原子发布 |
 | `lib/services/source_connections.dart` | 来源开关合并、重新验证与关闭验证中的连接 |
 | `lib/services/cloud_sync.dart` | 云歌单基线、保守合并、冲突、写入意图 |
-| `lib/services/playback.dart` | 队列、历史、状态、持久化、音频焦点和重连 |
+| `lib/services/playback.dart` | 公共播放接口与非 Android 的 media_kit 实现 |
+| `lib/services/android_media3_playback.dart` | Android Controller 网关、来源解析、缓存 / 封面业务及只读原生快照 |
+| `android/.../playback/`、`playbackcore/`、`cpp/` | 单一原生队列、mpv、焦点、Media3 会话 / 通知与 Range 传输 |
 | `lib/services/media_proxy.dart`、`byte_range.dart` | 回环票据、Range / HEAD、上游代理和缓存读取 |
 | `lib/services/cache.dart`、`cache_jobs.dart` | TEMP / READY、摘要、租约、预取、LRU 和持久化任务 |
 | `lib/services/local_library.dart`、`artwork.dart`、`lyrics.dart` | 本地导入和标签、封面缓存、LRC 解析 |
@@ -83,49 +89,19 @@ Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒�
 
 ## 播放、代理与缓存
 
+Android 由 `SylphyMediaLibraryService` 持有唯一的 `MpvMedia3Player` / libmpv context。通知、锁屏、耳机 / 蓝牙和 Flutter 界面都经同一 Media3 会话操作。`AndroidMedia3Playback` 实现公共 `PlaybackCoordinator` 接口，但不实例化父类的惰性 media_kit Player、不初始化 AudioHandler / Dart AudioSession，也不运行旧的通知时钟、EOF 推进或 AO 恢复定时器。非 Android 沿用原有 media_kit / 代理路径。
+
+原生队列为每个条目保存独立 entryId，保留重复歌曲；精确资源身份仍是 TrackRef(sourceId, id)。播放意图、临时失焦、实际时间推进与缓冲分开建模，使用附件基础包的 Kotlin reducer。所有 JNI 访问在进程内同一工作线程串行执行，样本与命令带观察代次；新服务等待旧 context 销毁后才能创建。Media3 自己管理默认通知与前台服务，等待通知进入前台的完成回调后才申请焦点。用户 Pause、永久失焦、noisy 和过期来源解析不能被旧回调撤销。临时失焦最多保留五分钟；实际播放使用有时限并按状态续期的 partial WakeLock，暂停 / 失败 / 销毁释放。
+
+原生每 200ms 观察 mpv 状态；准备、Seek 或停滞期间冻结系统时间线，实际推进后报告 READY，三秒无推进转缓冲，三十秒无推进转可重试错误，不自动跳过曲目。完整缓存与本地路径优先；原生 Range 转发由 NativeStreamAdapter 负责，来源 URL / headers 仅保存在其内存，TLS 使用平台默认校验，跳转限定同 scheme / host / port。在线地址与刷新仍由应用级 Flutter 业务引擎中的 MusicAdapter / AuthVault 解析，播放字节不经过 Dart MediaProxy。远程暂停后显式恢复会重新解析授权地址；完整缓存 / 本地输出长暂停后重开同曲并保留位置。
+
+CacheManager 的 READY、长度 / SHA-256 校验、资源版本与统一空间额度保持不变。音频读取增加进程作用域的原生租约文件；清理、校验替换及配额淘汰共同尊重租约，只有确认旧 decoder idle 或销毁后才释放。Android 普通完整缓存下载仍由现有 fetchWhole 验证提交；当前曲目和后两首按原生队列顺序进行可取消的自动完整缓存、封面和歌词预热。原生播放与后台完整缓存各自读取上游，可能增加网络流量；部分 Range 数据不写成 READY，也不引入 SimpleCache。
+
+通知封面复用 ArtworkStore，物化到专用 cache 目录后经只读 content FileProvider 提供，authority 随 applicationId 区分。Flutter 只采样 UI / 统计快照；队列仅在修订变化时传输，通知不依赖这个采样。重进界面读取现存服务，不用数据库旧快照覆盖；原生 checkpoint 原子保存队列、位置与本地路径，不保存 URL / headers，冷启动保持暂停。后台暂停时释放应用内部 Controller 绑定，由 Media3 管理前台降级。尚未实现全来源原生持久授权，因此不注册系统杀进程后的 MediaButtonReceiver / playback resumption，不宣称完整 Android Auto 曲库支持。详见 [本轮实施](MEDIA3_NOTIFICATION_IMPLEMENTATION.md) 与 [附件设计蓝图](ANDROID_MPV_MEDIA3_ARCHITECTURE.md)。
+
+非 Android 原有 NativeCommandGate、回环短期票据、完整缓存优先与有界重连继续保留。旧 Android audio_service / Dart 投影与 AO 恢复设计记录保留为历史材料，不再描述当前 Android 执行路径。
+
 推荐 V1 由 `RecommendationRepository` 在 SQL 内检索有界候选，`RecommendationEngine` 排序，`RecommendationService` 分别缓存每日 24 首混合与最多 8 张来源作用域专辑。SQLite v10 通过新增表 / 索引迁移保留 v9 数据；`ListeningAnalytics` 消费实际进度与完成 / 主动跳过边界，15 秒检查点串行落库，明细保留 90 天，累计统计长期保留。最近播放保存 1000 个去重身份并分批解析。来源移除清理相应统计、推荐及历史，退出先停止统计监听、等待推荐和统计任务，再关闭播放与数据库；关闭个性化后仍执行完整退出清理。公开热榜仅请求固定公共榜单，不上传个人曲库或播放记录；菜单可切换在线热度和个性化。详见 [推荐 V1](RECOMMENDATION_V1.md)。
-
-Android 本地 / 完整缓存快速恢复 V4 将早期采样用于暂停后复用已打开本地输出的恢复决策：约 2 秒与 3 秒均 nativePlaying 且非 buffering、未确认进度、位置差不超过 250ms，进度停滞分别达到 1800 / 2500ms，且没有加载、跳转、循环或其他恢复时，才调用既有有界执行器尝试本意图一次 AO 重载。迟到采样（首个超过 3 秒或第二个超过 4.5 秒）不作为双样本证据；策略不依赖日志开关，首次打开 / 代理流不走快速路径，12 秒验证与同曲一次重开兜底继续保留。详见 [Android 完整缓存快速 AO 恢复 V4](ANDROID_CACHED_EARLY_AO_RECOVERY_V4.md)。
-
-单曲循环 / 后台稳定性 V3 在内部原生 seek(0) 前重置看门狗位置与进度基准、取消旧恢复检查，并等待新循环位置样本；最多 5 秒过滤大于 4 秒的旧曲尾样本，避免回绕后真实推进低于旧基准而被误判停滞。原生命令按循环 / 加载 / 播放意图代次校验，成功、过期和失败分别记录。Android 用户开启诊断时增加 2 秒 / 3 秒早期位置与事件数采样，未确认进度时异步采集服务快照；早期采样不执行恢复，保留现有 12 秒与代理 30 秒复核阈值。暂停、跳转、加载、完成及关闭清理相应采样任务。详见 [单曲循环 / 后台稳定性 V3](REPEATONE_BACKGROUND_STABILITY_V3.md)。
-
-曲尾错误与曲终事件竞争：播放请求有效且进度距已知时长末尾不超过约 2.5 秒时，播放器错误暂缓 750 毫秒；同一加载代次收到有效完成事件则取消待处理错误，交给正常曲终流程。若未完成且加载 / 导航 / 播放意图 / 循环代次仍有效，则继续原有错误处理；暂停、跳转、新加载与关闭取消待处理回调。失败恢复在数据库查询及重试延迟后复核循环代次，防止旧任务在单曲循环已开始后再次打开曲尾。详见 [单曲循环 EOF 错误竞争](REPEAT_ONE_EOF_ERROR_RACE.md)。
-
-播放稳定性诊断 V2 沿用用户主动启用的 `DiagnosticLogs`，新增 Dart 实例内序号与单调运行时间，并在播放、焦点、来源选择、恢复定时和 AO 操作中关联意图 / 加载 / 导航代次。Android 快照通道注册在 audio_service 长期引擎与原生服务冷启动入口，异步尽力读取服务、FGS、WakeLock、电源及媒体会话状态；Dart 最多等待 2 秒，失败仅记录异常类型。快照不读取 libmpv AudioTrack 的 PCM 帧数，不能将会话进度当作发声证据；不改变恢复策略或阈值。日志使用字段白名单并轮转保留最多 4×1 MiB，原始 ADB 双快照工具仅供手动采集到 `.private/`。详见 [播放稳定性诊断 V2](PLAYBACK_STABILITY_DIAGNOSTICS_V2.md)。
-
-暂停后的播放请求优先检查完整缓存：此前经代理打开的远程歌曲若已完成缓存，重新打开时优先选择缓存文件，并显式传入当下播放位置，避免快速暂停 / 播放与异步保存竞争而回退进度；正在请求播放的会话不主动切换。缓存查询失败仍可继续既有代理恢复路径，查询后复核播放意图、导航、曲目与焦点代次，拒绝过期请求。重新打开仍由 `_loadCurrent` 在租约内再次读取可用完整缓存；残片不能成为离线播放依据。
-
-Android 14 恢复 v4 在初始化与原生播放器重建时设置 `options/gapless-audio=no` 并读取实际值记录是否确认；其他平台继续 `weak`。Android 本地来源暂停达到 15 分钟或时钟回拨时，显式播放同曲重开；本地文件与完整缓存重开后均复核实际进度。前台请求提交后 350 毫秒的首次负面观测只标记待确认，1 秒后再查一次；第二次仍非前台才撤销逻辑保留并释放唤醒锁，未知结果保持未知，旧代次检查失效。不增加持续轮询。
-
-播放输出停滞统一由 `_reopenUnconfirmedResume` 执行恢复，12 秒本地恢复检测与 45 秒看门狗共用同曲 / 加载 / 导航 / 播放意图边界及一次性预算。Android 本地 / 完整缓存先尝试一次实验性 mpv `ao-reload`，仍无真实进度或命令不支持时只重开同一首一次，再失败则暂停提示手动重试；代理来源仅在需要时检查 / 重启回环代理，重开后按 30 秒复核。不会因输出停滞主动跳歌。前台服务日志区分请求提交与 OS 尽力观测，旧观测由代次失效；观察不到不视为成功，观察到未处于前台则释放逻辑保留与唤醒锁。通知封面复制到专用 cache 目录，经只读 FileProvider 精确授权 URI；authority 随 applicationId 区分普通版与 OpenList。详见 [播放生命周期整合](INTEGRATED_PLAYBACK_LIFECYCLE.md)。
-
-媒体会话通过无 IO / Timer 的 `MediaSessionProjection` 统一映射运行快照：暂停优先于原生缓冲，临时焦点保留为 ready / playing=true / speed=0，准备 / 缓冲 / 恢复期间冻结进度，确认实际推进后才发布倍速。播放意图取消且最终报错时发布 error 与通用重试提示，避免原始错误中的 URL 或凭据进入系统会话；空队列移除控制与系统跳转动作。通知使用可撤销配置、暂停后退出前台、256×256 封面及固定折叠按钮顺序，不增加播放器或原生通知所有者。详见 [媒体会话状态投影重构](MEDIA_SESSION_PROJECTION_REDESIGN_2026-11-09.md)。
-
-音频焦点恢复由 `TransientFocusPolicy<TrackRef>` 统一持有临时恢复资格、焦点阻塞与前台保留状态。重复临时失焦不会取消原恢复资格；前台保留最长 5 分钟，实际进度恢复、手动暂停、永久失焦或超时会释放。媒体会话的 playing 可用于临时保留前台服务，通知速度仍依据真实进度，暂停时为 0。显式 `play()` 在直接恢复及缓存 / 代理重开前请求焦点，拒绝则不打开媒体，原生打开 / 播放另行检查已知焦点阻塞；初始队列自动播放与直接切歌尚未统一经过焦点申请入口。原有 V3 同曲有界重开继续保留。详见 [播放与音频焦点重构](PLAYBACK_ARCHITECTURE_FOCUS_REFACTOR.md)。
-
-播放传输命令通过 `NativeCommandGate` 统一串行执行，涵盖打开、恢复位置、播放、暂停、用户跳转、单曲循环、停止及异步关闭；排队任务取得锁后重新检查加载 / 导航代次与播放意图，避免旧命令操作新曲目或已替换引擎。打开保留 25 秒超时，其他传输命令使用 12 秒超时并复用安全重建逻辑。连续真实进度推进约 20 秒后刷新当前曲目的重连预算；暂停、加载或跳转会清除稳定进度证据。本地代理票据过期标记为 `local_ticket_expired`，与远端认证 / TLS 失败分开处理；导航历史最多保存 300 项。
-
-暂停的远程代理媒体在暂停达到 15 分钟、两小时票据距过期不足 5 分钟或检测到时钟回拨时，恢复会重新打开来源并沿用保存的队列位置；完整缓存与本地文件继续直接恢复。原生命令入队等待上限为 45 秒，超时任务失效并提示重启，不与仍在执行的原生操作并发重建或销毁引擎。代理保留有限期限的过期票据元数据以区分本地过期与上游鉴权失败，诊断不记录票据。详见 [后台暂停恢复补丁](BACKGROUND_RESUME_PATCH.md)。
-
-原生媒体打开与播放器重建通过同一互斥锁串行执行。打开超过 25 秒时先取消旧播放器监听并等待销毁，再创建引擎、恢复速率 / 音量 / 输出配置和监听；不能安全销毁时停止自动重试并提示重启。加载准备或曲终切换卡住 50 秒时看门狗触发恢复，加载、导航和切换代次阻止旧异步任务回写新状态。远程歌曲即使尚未产生播放进度也可按既有两次上限重连；恢复继续遵守播放意图与用户暂停。
-
-Android 媒体播放回调在等待 Dart / 数据库前尝试有界的临时前台服务提升，20 秒内未确认播放则撤回。ForegroundResumeState 独立记录服务已启动、前台与临时状态，不将 Dart 播放意图当作原生提升成功；已启动的服务恢复时不重复发送启动请求。系统拒绝仅记录异常类型，普通状态更新按 3 秒冷却重试，用户播放请求可立即再次尝试；不持有永久唤醒锁。播放层同时保留 V1 的票据临期刷新与命令入队超时保护，新增 V2 的代理打开标记和恢复进度诊断。详见 [Android 后台恢复 V2](ANDROID_BACKGROUND_RESUME_V2.md)。
-
-Android 后台恢复 V3 为完整缓存增加长暂停重开，并对本地 / 完整缓存的显式恢复播放执行 12 秒实际进度检查：同曲目、加载 / 导航代次、播放意图与焦点仍有效时，最多重开同一首歌一次，仍无进度则暂停并提示手动重试，不跳曲。进度确认、暂停、跳转、新加载与关闭均取消检查；代理流仍沿用 45 秒看门狗，本地与缓存停滞不再探测或重启 HTTP 代理；当前两类停滞检测已按播放生命周期整合补丁收敛到统一执行器，并增加 Android 本地 / 缓存的一次 AO 重载步骤。新的原生媒体播放手势会重新申明前台状态，系统拒绝时清除过时状态并释放唤醒锁。详见 [Android 后台恢复 V3](ANDROID_BACKGROUND_RESUME_V3.md)。
-
-可选桌面歌词由 `DesktopLyrics` 监听既有播放与外观状态，复用应用歌词加载入口，通过 `music.sylphy/desktop_lyrics` 通道更新平台窗口，不创建第二个播放器。Android 的 `DesktopLyricsOverlay` 仍由 Application 持有，用户授权悬浮窗后才显示；Windows Runner 的 `DesktopLyricsWindow` 使用独立无所有者的置顶分层窗口，以 GDI+ 绘制透明圆角歌词面板，不抢焦点、不进入任务栏，主窗口最小化或隐藏到托盘时仍可显示。Windows 窗口背景与关闭按钮在无操作 2.5 秒后用 350 毫秒淡出，仅保留歌词，鼠标移动或拖动恢复操作区；歌词变化不重置计时，隐藏和销毁时停止计时器。Windows 窗口支持拖动、右侧 × 关闭、DPI 与显示器工作区适配；位置存于 HKCU/Software/SylphyMusic/DesktopLyrics，关闭窗口回调同步持久化开关。颜色与字号复用 Appearance。退出时先移除监听、等待通道操作并隐藏浮窗，再关闭播放、歌词存储和数据库；Windows Runner 在释放 Flutter 引擎前销毁歌词窗口与绘图资源。
-
-Android 媒体通知区分播放意图、缓冲阶段和真实进度时钟：`MediaNotificationClock` 用单调时间与连续原生位置样本确认推进，加载、切歌、暂停、Seek 和进入缓冲时清除旧证据；已确认播放允许短暂稀疏回调，停止推进后冻结。`MediaSessionPublishGate` 仅在状态 / 倍速 / 歌曲变化、Seek、明显偏差或 20 秒校准时发布锚点。原生缓冲如实映射为 `STATE_BUFFERING`，前台服务继续由独立播放意图维持；标准 MediaStyle 按状态变化刷新通知，不再使用 Android 10 自定义白色按钮 RemoteViews。每秒定时器只检查时钟启停，退出时取消；详见 [媒体通知设计](MEDIA_NOTIFICATION_DESIGN.md)。
-
-播放失败通知由 `PlaybackNotice` 在应用根页面统一监听，以不阻断点击的浮动吐司显示，3 秒自动移除；恢复后提前收起，重复通知不排队。播放栏不常驻错误文字。播放器确认实际播放进度恢复时清空旧错误；失败后用户再次点击播放会重新加载媒体。
-
-`PlaybackCoordinator` 解析队列中的精确身份。远程媒体取得短期票据后，由 libmpv 请求监听 `127.0.0.1` 的 `MediaProxy`。代理逐请求校验票据及来源，优先读取有效 READY，否则带来源凭据读取原始音频。票据不包含服务器密码。本地文件直接交给播放器。
-
-代理处理 Range、后缀范围和 HEAD。播放捕获、主动整曲下载及提前预取由 `CacheManager` 协调。播放协调器按实际队列顺序预热后两首的封面和歌词，并顺序尝试完整音频缓存；列表循环可跨队尾，随机模式不猜测下一轮顺序，单曲循环不预取其他歌曲。完整文件仍须长度与摘要校验才能进入 READY。首个完整预取失败时回退到原有 P2 内存前缀机制：仅强 ETag 匹配时与余段复用，不进入 READY，也不跨进程保留。手动下载可接管同曲自动下载，队列计划变更只取消不再需要且未被用户接管的自动传输。
-
-完整文件须确认完整长度、计算 SHA-256、同卷 rename 并写缓存记录。读取时核对资源元数据版本和文件完整性；稀疏文件 / 部分内容不能表示离线缓存。租约保护使用中的文件，删除或替换遵守释放边界；清理遵守 LRU、容量预算和磁盘安全余量。
-
-`CacheJobs` 先保存歌单曲目快照，再调度下载。重建或取消不恢复半首歌曲为 READY。Android 下载使用独立 dataSync 前台服务，不借播放服务冒充下载任务。播放缓冲不足时后台任务让步；调度时序仍需压力验证。
 
 ## 自动同步与收藏
 
@@ -174,7 +150,7 @@ Emby 内嵌文本歌词优先请求带时间轴的 SRT，由 `services/lyrics.da
 
 ## 平台与待完成边界
 
-Android 以 `AudioServiceActivity` 承载媒体服务，另有缓存前台服务；Windows 定制 Runner 提供 SMTC / 媒体键 / 托盘。Linux Runner 和 CI 已准备，本机原生验收未完成。
+Android 使用标准 FlutterActivity、应用级业务引擎与独立 MediaLibraryService，另有缓存 / 同步前台服务；Windows 定制 Runner 提供 SMTC / 媒体键 / 托盘。Linux Runner 和 CI 已准备，本机原生验收未完成。
 
 `StrictTransport` 对安全读取有限重试，当前拒绝未经验证的重定向。合法签名播放跳转的完整兼容性仍是待办，不能简单开启自动跟随并转发凭据。WebDAV Basic 认证与文件名索引也不能称为全协议 / 全标签支持。
 
@@ -207,11 +183,11 @@ WebDAV 的 `WebDavTags` 由 SylphyApp 共享给 ArtworkStore / LyricsStore：按
 
 WebDAV 文本标签通过 WebDavTags.onTags 回调交给 AppDb 事务保存；SQLite v7 新增 webdav_track_tags，并为索引暂存补充 resource_version。commitIndex 仅合并匹配资源版本的标签，避免 PROPFIND 重扫覆盖已解析的艺术家 / 专辑。WebDavMetadataEnricher 在进程内按 50 首分页渐进补全，可见曲目优先，catalogRevision 最多每两秒通知；退出时先停止补全生产，再取消标签读取，等待遍历与可见任务后关闭 SQLite。
 
-手动同步通过 SyncForeground / SyncForegroundService 管理 dataSync 通知与取消；Android 引擎由 audio_service 创建和正常销毁，SylphyApplication 获取该实例并注册同步 / 缓存 Channel。EngineLeaseManager 让同步与缓存各持独立租约，共用 AudioService 绑定，最后任务退出才解绑；不拦截引擎销毁或异步恢复缓存。普通暂停等待 Dart 清理回执，系统超时立即停服。Windows 同步复用相同业务入口，桥接不调用 Android Channel。退出等待前台同步 future 与标签遍历后关闭数据库；详见 [Android 同步服务](ANDROID_SYNC_FGS.md)。
+手动同步通过 SyncForeground / SyncForegroundService 管理 dataSync 通知与取消；Android 业务引擎由 SylphyApplication 创建 / 缓存并注册同步、缓存、来源解析与桌面歌词 Channel。EngineLeaseManager 让同步与缓存各持独立业务引擎租约，不再绑定播放服务。普通暂停等待 Dart 清理回执，系统超时立即停服。Windows 同步复用相同业务入口，桥接不调用 Android Channel。退出等待前台同步 future 与标签遍历后关闭数据库；详见 [Android 同步服务](ANDROID_SYNC_FGS.md)。
 
 WebDAV 扫描范围保存于来源配置：SQLite v8 为 sources 增加 webdav_base_path 与 webdav_max_depth，默认空路径和 -1 保留原递归行为。目录选择通过只读 Depth: 1 PROPFIND 逐层浏览；扫描从基础目录开始按层级限制遍历，曲目 ID 仍相对于服务器 URL。修改范围先取消旧索引与标签补全，再重新同步；提交索引前核对扫描范围，拒绝过期结果，失败保留旧索引。
 
-启动恢复队列时，在装配媒体控制前调用 prepareRestoredQueue，以暂停状态预备当前曲目并复用后两首预取链路；不自动播放。媒体状态按当前曲目与实际打开 / 播放意图区分 idle、buffering 和 ready。Android 的本地 audio_service 补丁可为已有元数据的暂停 ready 会话发布首条媒体通知，不经播放中的前台服务启动路径，通知取消后重置创建状态。设备上的通知与恢复表现仍由用户验收。
+Android 启动连接现有 Media3 会话，必要时从原生 checkpoint 暂停恢复；首次迁移没有原生队列时，读取数据库旧队列并以暂停状态提交。非 Android 继续由 prepareRestoredQueue 预备恢复歌曲。设备上的通知与恢复表现由用户验收。
 
 缓存任务按 jobId 持有当前曲目的 TransferToken，先登记令牌再核对数据库状态；取消或暂停会取消令牌，避免状态检查与 fetchWhole 之间的竞态启动新请求。移除任务先取消仍活跃的工作，再事务删除任务条目及任务记录；已完成且校验通过的整曲缓存保留。下载结束后的状态更新附带原状态条件，任务记录已移除时不重新创建；失败任务同时提供重试和移除入口。
 

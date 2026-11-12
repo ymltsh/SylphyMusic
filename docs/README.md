@@ -29,6 +29,8 @@
 | [Android 后台恢复 V3](ANDROID_BACKGROUND_RESUME_V3.md) | 完整缓存恢复、实际进度检查、同曲有界重开与前台状态重申 |
 | [Android 后台恢复 V2](ANDROID_BACKGROUND_RESUME_V2.md) | 媒体回调临时前台服务提升、拒绝重试与恢复进度诊断 |
 | [后台暂停恢复补丁](BACKGROUND_RESUME_PATCH.md) | 远程暂停恢复、票据刷新、原生命令入队超时与用户验证建议 |
+| [Media3 通知实施](MEDIA3_NOTIFICATION_IMPLEMENTATION.md) | 原生 mpv、单一 MediaLibraryService、Controller、缓存租约与当前边界 |
+| [mpv + Media3 设计蓝图](ANDROID_MPV_MEDIA3_ARCHITECTURE.md) | 附件设计参考；实施范围以本轮实施说明为准 |
 | [媒体通知设计](MEDIA_NOTIFICATION_DESIGN.md) | 单一媒体会话、真实进度时钟、标准 MediaStyle 与状态发布边界 |
 | [ANDROID_SYNC_FGS](ANDROID_SYNC_FGS.md) | 手动同步通知、引擎生命周期、暂停与系统时限 |
 | [ANDROID_SYSTEM_BARS](ANDROID_SYSTEM_BARS.md) | Android 手势条透明沉浸、系统图标明暗与安全边距 |

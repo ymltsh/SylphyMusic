@@ -17,7 +17,7 @@ class MediaArtworkFileProvider : FileProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
         if (mode != "r") throw FileNotFoundException("Read-only media artwork")
         val fd = super.openFile(uri, mode)
-        // audio_service loads this URI in our own process before publishing the
+        // Media3 loads this URI in our own process before publishing the
         // metadata, granting cross-process consumers the same narrow URI.
         for (consumer in MEDIA_CONSUMERS) {
             try {

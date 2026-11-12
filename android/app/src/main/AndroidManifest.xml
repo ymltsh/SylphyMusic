@@ -143,13 +143,15 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/media_artwork_paths" />
         </provider>
-        <service android:name="com.ryanheise.audioservice.AudioService"
+        <service android:name=".playback.SylphyMediaLibraryService"
             android:foregroundServiceType="mediaPlayback" android:exported="true">
-            <intent-filter><action android:name="android.media.browse.MediaBrowserService" /></intent-filter>
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
         </service>
-        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
-        </receiver>
+        <!-- System-killed playback resumption is not advertised until a native
+             source authorization checkpoint is available for every source. -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

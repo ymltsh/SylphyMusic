@@ -45,7 +45,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   final StreamController<ListeningBoundary> _listeningEvents =
       StreamController<ListeningBoundary>.broadcast(sync: true);
   Stream<ListeningBoundary> get listeningBoundaries => _listeningEvents.stream;
-  void _emitListeningBoundary(TrackRef? ref, ListeningBoundaryKind kind) {
+  @protected
+  void emitListeningBoundary(TrackRef? ref, ListeningBoundaryKind kind) {
     if (ref != null && !_listeningEvents.isClosed) {
       _listeningEvents.add(ListeningBoundary(ref, kind));
     }
@@ -58,7 +59,8 @@ class PlaybackCoordinator extends ChangeNotifier {
   final MediaProxy proxy;
   final CacheManager cache;
   final DiagnosticLogs? diagnostics;
-  Player player = Player();
+  late Player player = Player();
+  bool get hasLoadedOutput => player.state.playlist.medias.isNotEmpty;
   QueueSnapshot snapshot = const QueueSnapshot();
   Track? current;
   bool playing = false, buffering = false;
@@ -1152,7 +1154,7 @@ class PlaybackCoordinator extends ChangeNotifier {
             _cancelPendingEndError();
             diagnostics?.record('playback', 'end_error_ignored');
           }
-          _emitListeningBoundary(currentRef, ListeningBoundaryKind.completed);
+          emitListeningBoundary(currentRef, ListeningBoundaryKind.completed);
           diagnostics?.record(
             'playback',
             'track_completed',
@@ -1739,7 +1741,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     bool autoplay = true,
   }) async {
     if (tracks.isEmpty) return;
-    _emitListeningBoundary(currentRef, ListeningBoundaryKind.replaced);
+    emitListeningBoundary(currentRef, ListeningBoundaryKind.replaced);
     _cancelFocusResume();
     if (autoplay) _userPaused = false;
     final navigationEpoch = ++_navigationEpoch;
@@ -2581,7 +2583,7 @@ class PlaybackCoordinator extends ChangeNotifier {
     }
     final old = currentRef;
     if (manual) {
-      _emitListeningBoundary(old, ListeningBoundaryKind.manualSkip);
+      emitListeningBoundary(old, ListeningBoundaryKind.manualSkip);
     }
     final newHistory = appendPlaybackHistory(snapshot.history, snapshot.index);
     var order = snapshot.order;
@@ -2636,7 +2638,7 @@ class PlaybackCoordinator extends ChangeNotifier {
       index = snapshot.index - 1;
     }
     if (index == null) return;
-    _emitListeningBoundary(currentRef, ListeningBoundaryKind.manualSkip);
+    emitListeningBoundary(currentRef, ListeningBoundaryKind.manualSkip);
     final navigationEpoch = ++_navigationEpoch;
     ++_loadGeneration;
     final old = currentRef;
@@ -3165,6 +3167,12 @@ class PlaybackCoordinator extends ChangeNotifier {
         speed: view.progressRate,
       ),
     );
+  }
+
+  @protected
+  void disposeNativeGateway() {
+    unawaited(_listeningEvents.close());
+    super.dispose();
   }
 
   @override

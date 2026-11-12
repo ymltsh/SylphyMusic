@@ -19,6 +19,7 @@ import '../services/cloud_sync.dart';
 import '../services/diagnostic_logs.dart';
 import '../services/media_proxy.dart';
 import '../services/playback.dart';
+import '../services/android_media3_playback.dart';
 import '../services/playback_sleep_timer.dart';
 import '../services/sources.dart';
 import '../services/desktop.dart';
@@ -203,12 +204,9 @@ class SylphyApp extends ChangeNotifier {
     await cache.initialize();
     final proxy = MediaProxy(db, cache, factory, diagnostics: diagnostics);
     await proxy.start();
-    final playback = PlaybackCoordinator(
-      db,
-      proxy,
-      cache,
-      diagnostics: diagnostics,
-    );
+    final PlaybackCoordinator playback = Platform.isAndroid
+        ? AndroidMedia3Playback(db, proxy, cache, diagnostics: diagnostics)
+        : PlaybackCoordinator(db, proxy, cache, diagnostics: diagnostics);
     await playback.initialize();
     final cloud = PlaylistSyncService(db, factory);
     final jobs = CacheJobs(db, cache);

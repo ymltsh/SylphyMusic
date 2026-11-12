@@ -1,5 +1,29 @@
 # 实施与验证记录
 
+## 2026-11-13 修复 Media3 通知与播放页控制回归
+
+用户反馈媒体通知消失、播放页进度不可拖动、切歌及其他播放控制异常，实际设备交互未通过，上一轮编译不能代表功能可用。核对固定版本官方源码，确认旧 Callback.onConnect 默认返回带特殊标记的空命令占位；上一版复制其中的空权限，导致应用及内部通知 Controller 没有标准播放、Seek、时间线读取、切歌、音量 / 速率等权限，而自定义队列命令仍能执行。改用 onConnectAsync 和按 Controller 初始化的 AcceptedResultBuilder，保留标准权限并仅为本应用补充私有命令；下发标准操作前显式检查可用性。
+
+同时修复队列修订在 Dart 真正接受前被提前确认、快速缓冲切歌漏掉新意图焦点申请、prepare / play 重复打开、Seek 旧位置回写，以及首次恢复设置被原生默认响应覆盖的问题。保留单一 Media3 会话 / 原生 mpv，没有回退到双播放器。详细原因和边界更新于 MEDIA3_NOTIFICATION_IMPLEMENTATION.md。
+
+Android 三 ABI Release、Windows Release 及内部打包成功，日志 build/test_logs/media3-control-fix-review.log。新包独立命名放在 build/internal-review/media3-control-fix/，附 SHA256SUMS.txt。未新增或运行 analyze、测试、应用启动、设备检查或真实来源请求，修复后的实际通知和播放页交互仍由用户确认。仅修改主工作区，未修改版本号、提交、推送或发布。
+
+## 2026-11-13 Android 媒体通知 / Media3 原生服务重构
+
+依据用户提供的 MPV-Media3 Architecture Foundation 指南，在主工作区完成单一 MediaLibraryService / MediaLibrarySession / SimpleBasePlayer 与原生 libmpv JNI 桥；原生接管队列、焦点、EOF、循环、Seek、速度 / 音量、实际进度与缓冲 / 错误，Flutter 经 MediaController 连接同一会话。移除 Android Manifest 中旧 audio_service Service / Receiver，Activity 改用 FlutterActivity，业务引擎及同步 / 缓存 / 桌面歌词通道迁出音频插件。保留非 Android media_kit 路径和现有缓存数据库 / READY 校验，新增原生文件租约及原生 Range 读取，封面复用 content FileProvider。保留完整缓存预热；原生播放与自动完整缓存是独立上游请求，可能增加流量。
+
+在线授权 / 地址解析仍依赖应用级 Flutter 业务引擎，未交付全来源原生持久授权与系统杀进程 playback resumption，因此没有注册新 MediaButtonReceiver；完整 Android Auto 曲库也不在本轮完成范围。新服务复用现有 mpv 0.35 / FFmpeg 二进制，不宣称更换 Media3 已解决 OEM 无声。实施与当前边界见 MEDIA3_NOTIFICATION_IMPLEMENTATION.md，附件设计保留为蓝图。OpenList 工作区未修改；保留开始时已有的 PROGRESS 修改。
+
+普通入口 Android 三 ABI Release、Windows Release 及内部打包成功。最终 APK 与 Windows ZIP 位于 build/internal-review/；APK 包内容确认各 ABI 同时包含自有 libsylphy_mpv.so 与既有 libmpv.so。日志为 build/test_logs/media3-notification-review.log、media3-notification-final-android.log、media3-notification-package.log，打包脚本完成已跟踪源码及应用内容扫描。本轮未使用测试凭据，未新增或运行 analyze、测试、应用启动、设备检查或真实来源请求；通知、HyperOS、焦点、后台恢复、实际声音与来源兼容性由用户验收。未改版本号、提交、推送或发布。
+
+## 2026-11-12 推荐设置归类、来信菜单与 1.0.47 发布
+
+LLM 开关、推荐参与方式、等待预算和 System / User 提示词迁入推荐设置，由独立 LlmRecommendationSettings 组件承接；API 设置仅保留 LLM 接口、模型、密钥和连接测试。沿用原持久化键及配置代次，现有配置不变。提示入口同步更新。当前来信和历史来信删除独立聊天按钮，仅在更多菜单显示；历史列表卡片右侧及打开后的信卡片右侧增加更多。
+
+普通版 1.0.47+60 与 OpenList 1.0.47-openlist.30+60 完成正式编译及发布，同时交付连续聊天、旧回复迁移、主动观点个性化及通知条自动收起改进。普通版三 ABI APK / Windows 安装程序与便携 ZIP、特别版 arm64 APK / 对应源码等九个附件的远端大小和 SHA-256 核对一致，正式签名核对通过，OpenList JNI 保持上一版。Release 状态、标题、正文及两版本原始 / 加速清单核对通过，普通版保持 Latest。仅提交推送清单：main 675f716 / 9c41cfc，feature 1b2222a；其余工作区改动保留。
+
+交付文件复制到 `\\GENAS\share\sylphy_music_release\1.0.47-60`，特别版位于 OpenList 子目录，逐文件长度与摘要一致。日志为普通版 `build/test_logs/release-1.0.47-build.log`，特别版 `build/test_logs/release-openlist-60-build.log` / `release-openlist-60-publish.log`；复制记录为普通版 `build/test_logs/release-60-share-copy.json`。未运行 analyze、测试、应用启动、真实模型请求或设备验收，实际交互与模型表现由用户确认。
+
 ## 2026-11-12 回一句升级连续聊天与通知条收起优化
 
 原“回一句”升级为连续聊天，每日精选和历史来信的原入口 / 更多菜单打开同一信件会话；保留当前人格与模型，可带着信件讨论，也可取消关联闲聊。SQLite v15→v16 增量增加聊天表、复合索引并迁入旧主动回复。会话按人格摘要和信件键隔离，历史按 SQL 游标分页，成功时事务保存一问一答及用户原话；用户可选择是否记住，原话作为后续选曲及写信的明确偏好，模型回答不当作用户事实。尊重全局记忆 / 回忆开关，支持停止、手动重试、编辑后重发、清空对话和关联观点，全部记忆 / 来信清理同步处理聊天；请求及退出生命周期已接入，聊天内容不写诊断日志。
