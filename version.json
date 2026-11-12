@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.45",
-    "build": 58,
-    "name": "风灵音乐 v1.0.45",
+    "version": "1.0.46",
+    "build": 59,
+    "name": "风灵音乐 v1.0.46",
     "date": "2026-11-12",
-    "notes": "风灵音乐 1.0.45\n\n- 每日精选封面叠卡新增轻微浮动、旋转和跟随手势效果，首页与推荐信内均可互动，支持系统减少动画设置。\n- 首页每日精选的播放按钮移至卡片右下角；推荐信内的导出、播放全部和更多集中放在卡片底部，更多保持靠右。\n- 精选菜单精简为“换一批”和“保存为本地歌单”。\n- 迷你播放器默认使用悬浮按钮，保留已保存的外观选择；每日精选页新增默认收起的悬浮播放器，点击可展开。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+    "notes": "风灵音乐 1.0.46\n\n- 推荐加载新增翻找唱片、写信、送达与拆信动画，选曲和写信进度随实际阶段切换；“换一批”也会展示加载过程。\n- 音乐笔友新增记忆管理与“回一句”，可管理人格、删除记忆、关闭回忆或清空记录；清理来信时同步清理相关记忆与回复。\n- 每日第一封来信与后续短笺采用不同长度，后续推荐更简洁。\n- 调整首页每日精选播放按钮尺寸与底部操作对齐。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46%2B59/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46%2B59/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46%2B59/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46%2B59/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46%2B59/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.45+58"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.46+59"
   },
   "history": [
+    {
+      "version": "1.0.45",
+      "build": 58,
+      "name": "风灵音乐 v1.0.45",
+      "date": "2026-11-12",
+      "notes": "风灵音乐 1.0.45\n\n- 每日精选封面叠卡新增轻微浮动、旋转和跟随手势效果，首页与推荐信内均可互动，支持系统减少动画设置。\n- 首页每日精选的播放按钮移至卡片右下角；推荐信内的导出、播放全部和更多集中放在卡片底部，更多保持靠右。\n- 精选菜单精简为“换一批”和“保存为本地歌单”。\n- 迷你播放器默认使用悬浮按钮，保留已保存的外观选择；每日精选页新增默认收起的悬浮播放器，点击可展开。\n\n提供 Android 三架构版本、Windows 安装版和便携版。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.45%2B58/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.45+58"
+    },
     {
       "version": "1.0.44",
       "build": 57,
