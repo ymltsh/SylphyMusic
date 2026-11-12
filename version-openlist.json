@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.46-openlist.29",
-    "build": 59,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.46-openlist.29 (arm64-v8a)",
+    "version": "1.0.47-openlist.30",
+    "build": 60,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.47-openlist.30 (arm64-v8a)",
     "date": "2026-11-12",
-    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.46-openlist.29+59\n\n- 推荐加载新增翻找唱片、写信、送达与拆信动画，选曲和写信进度随实际阶段切换；“换一批”也会展示加载过程。\n- 音乐笔友新增记忆管理与“回一句”，可管理人格、删除记忆、关闭回忆或清空记录；清理来信时同步清理相关记忆与回复。\n- 每日第一封来信与后续短笺采用不同长度，后续推荐更简洁。\n- 调整首页每日精选播放按钮尺寸与底部操作对齐。\n\n仅提供 Android arm64-v8a，使用独立包名与更新通道，可与普通版共存。内置 OpenList 网盘服务，附对应应用与 OpenList 源码及许可证。\n",
+    "notes": "风灵音乐 OpenList-Lite 特别版 1.0.47-openlist.30+60\n\n- LLM 增强推荐开关、参与方式、等待时间和自定义提示词统一移至推荐设置；API 设置保留接口、模型、密钥和连接测试，原有设置自动沿用。\n- “回一句”升级为连续聊天，可围绕来信交流，也可随意聊聊；支持停止回复、失败后重试和清空对话。\n- 选择记住的聊天观点可用于后续选曲和写信，支持在记忆管理中删除；原来保存的回复会保留。\n- 聊天入口统一收纳到“更多”，历史来信卡片右侧也可直接进入。\n- 改进带撤销操作的通知条，支持定时收起和手动关闭。\n\n仅提供 Android arm64-v8a，使用独立包名与更新通道，可与普通版共存。内置 OpenList 网盘服务，附对应应用与 OpenList 源码及许可证。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46-openlist.29%2B59/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.47-openlist.30%2B60/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.46-openlist.29%2B59"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.47-openlist.30%2B60"
   },
   "history": [
+    {
+      "version": "1.0.46-openlist.29",
+      "build": 59,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.46-openlist.29 (arm64-v8a)",
+      "date": "2026-11-12",
+      "notes": "风灵音乐 OpenList-Lite 特别版 1.0.46-openlist.29+59\n\n- 推荐加载新增翻找唱片、写信、送达与拆信动画，选曲和写信进度随实际阶段切换；“换一批”也会展示加载过程。\n- 音乐笔友新增记忆管理与“回一句”，可管理人格、删除记忆、关闭回忆或清空记录；清理来信时同步清理相关记忆与回复。\n- 每日第一封来信与后续短笺采用不同长度，后续推荐更简洁。\n- 调整首页每日精选播放按钮尺寸与底部操作对齐。\n\n仅提供 Android arm64-v8a，使用独立包名与更新通道，可与普通版共存。内置 OpenList 网盘服务，附对应应用与 OpenList 源码及许可证。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.46-openlist.29%2B59/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.46-openlist.29%2B59"
+    },
     {
       "version": "1.0.45-openlist.28",
       "build": 58,
