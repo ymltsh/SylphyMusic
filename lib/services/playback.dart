@@ -76,6 +76,14 @@ class PlaybackCoordinator extends ChangeNotifier {
   Future<void> setNativeDiagnostics(bool enabled) async {}
   double speed = 1.0;
   double volume = 100;
+  double _lastAudibleVolume = 100;
+  @protected
+  void rememberAudibleVolume(double value) {
+    if (volume > 0) _lastAudibleVolume = volume;
+    if (value > 0) _lastAudibleVolume = value.clamp(0, 100);
+  }
+
+  Future<void> toggleMute() => setVolume(volume > 0 ? 0 : _lastAudibleVolume);
   // Avoid cutting the PCM waveform at an arbitrary non-zero sample on pause.
   // This envelope is separate from saved volume and Android audio ducking.
   static const _fadeOutDuration = Duration(milliseconds: 48);
@@ -2955,6 +2963,7 @@ class PlaybackCoordinator extends ChangeNotifier {
   }
 
   Future<void> setVolume(double v) async {
+    rememberAudibleVolume(v);
     volume = v.clamp(0, 100);
     await _applyPlayerVolume();
     await db.setSetting('volume', '$volume');

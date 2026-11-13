@@ -39,11 +39,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late int revision;
   int _albumRefreshEpoch = 0;
   int _lastLlmRevision = -1;
+  Timer? _catalogRefreshDelay;
 
   void _llmSettingsChanged() {
     final updated = widget.app.apiSettings.llmRevision;
     if (!mounted || updated == _lastLlmRevision) return;
     _lastLlmRevision = updated;
+    _catalogRefreshDelay?.cancel();
+    ++_albumRefreshEpoch;
     setState(() {
       dailyMix = widget.app.recommendations.daily();
       albums = _albums();
@@ -96,17 +99,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _catalogChanged() {
     if (!mounted || revision == widget.app.catalogRevision) return;
     revision = widget.app.catalogRevision;
-    unawaited(_refreshAlbums(++_albumRefreshEpoch));
+    final epoch = ++_albumRefreshEpoch;
+    _catalogRefreshDelay?.cancel();
+    _catalogRefreshDelay = Timer(const Duration(milliseconds: 350), () {
+      _catalogRefreshDelay = null;
+      unawaited(_refreshAlbums(epoch));
+    });
   }
 
   Future<void> _refreshAlbums(int epoch) async {
     try {
-      final updated = await _albums();
-      if (!mounted || epoch != _albumRefreshEpoch) return;
+      final app = widget.app;
+      final results = await Future.wait<Object>([
+        _albums(),
+        app.recommendations.daily(),
+      ]);
+      if (!mounted ||
+          epoch != _albumRefreshEpoch ||
+          !identical(app, widget.app))
+        return;
+      final updated = results[0] as CatalogPage;
+      final mix = results[1] as DailyMix;
       // Retain the visible cards while WebDAV tags are being written.
       setState(() {
         albums = SynchronousFuture(updated);
-        dailyMix = widget.app.recommendations.daily();
+        dailyMix = SynchronousFuture(mix);
       });
     } catch (_) {
       // A failed background refresh must not replace the current cards.
@@ -119,16 +136,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!identical(oldWidget.app, widget.app)) {
       oldWidget.app.catalogListenable.removeListener(_catalogChanged);
       oldWidget.app.apiSettings.removeListener(_llmSettingsChanged);
+      _catalogRefreshDelay?.cancel();
+      ++_albumRefreshEpoch;
       widget.app.catalogListenable.addListener(_catalogChanged);
       widget.app.apiSettings.addListener(_llmSettingsChanged);
       _lastLlmRevision = widget.app.apiSettings.llmRevision;
-    }
-    if (!identical(oldWidget.app, widget.app) ||
-        revision != widget.app.catalogRevision) {
-      ++_albumRefreshEpoch;
       revision = widget.app.catalogRevision;
+      _albumReasons.clear();
       albums = _albums();
       dailyMix = widget.app.recommendations.daily();
+    } else if (revision != widget.app.catalogRevision) {
+      _catalogChanged();
     }
   }
 
@@ -142,6 +160,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _catalogRefreshDelay?.cancel();
+    ++_albumRefreshEpoch;
     widget.app.catalogListenable.removeListener(_catalogChanged);
     widget.app.apiSettings.removeListener(_llmSettingsChanged);
     super.dispose();
@@ -345,6 +365,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 8),
         RecommendationDeliveryBuilder(
+          key: ValueKey((app.recommendations, app.apiSettings.activeCardId)),
           future: dailyMix,
           service: app.recommendations,
           compact: true,

@@ -65,7 +65,23 @@ abstract class MusicAdapter {
     return url == null ? [] : [url];
   }
 
+  /// Artist portraits are independent of song/album covers.
+  Future<List<Uri>> artistCoverUrls(Track track) async => const [];
+
   void close();
+}
+
+String? artistItemId(Track track) {
+  final items = track.remote['ArtistItems'];
+  if (items is! List) return null;
+  return items
+      .whereType<Map>()
+      .where(
+        (item) =>
+            item['Name']?.toString().trim().toLowerCase() == track.artistGroup,
+      )
+      .firstOrNull?['Id']
+      ?.toString();
 }
 
 class AuthVault {
@@ -183,6 +199,35 @@ class EmbyAdapter extends MusicAdapter {
   EmbyAdapter(super.profile, this.vault);
   final AuthVault vault;
   final StrictTransport transport = StrictTransport();
+
+  @override
+  Future<List<Uri>> artistCoverUrls(Track track) async {
+    var id = artistItemId(track);
+    if (id == null) {
+      final result = await _api('GET', 'Artists', {
+        'UserId': await _userId,
+        'SearchTerm': track.artist,
+        'Limit': '20',
+      });
+      final items = (result['Items'] as List?)?.whereType<Map>() ?? [];
+      id = items
+          .where(
+            (item) =>
+                item['Name']?.toString().trim().toLowerCase() ==
+                track.artistGroup,
+          )
+          .firstOrNull?['Id']
+          ?.toString();
+    }
+    if (id == null || id.isEmpty) return [];
+    return [
+      appendPath(profile, 'Items/${Uri.encodeComponent(id)}/Images/Primary', {
+        'MaxWidth': '512',
+        'Quality': '90',
+      }),
+    ];
+  }
+
   Future<Map<String, String>> _headers() async {
     final token = await vault.read(profile.id, 'token');
     return {
@@ -634,6 +679,18 @@ class EmbyAdapter extends MusicAdapter {
 }
 
 class SubsonicAdapter extends MusicAdapter {
+  @override
+  Future<List<Uri>> artistCoverUrls(Track track) async {
+    final id = track.remote['artistId']?.toString();
+    if (id == null || id.isEmpty) return [];
+    final result = await _api('getArtist', {'id': id});
+    final cover = (result['artist'] as Map?)?['coverArt']?.toString();
+    if (cover == null || cover.isEmpty) return [];
+    return [
+      await _url('getCoverArt', {'id': cover, 'size': '512'}),
+    ];
+  }
+
   bool _readonly(Map data) =>
       data['readonly'] == true ||
       (data['owner'] is String &&

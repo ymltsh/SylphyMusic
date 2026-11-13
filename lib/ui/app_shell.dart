@@ -240,7 +240,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   ],
                 ),
         ),
-        if (wide && !playerCollapsed) _desktopPlayerBar(),
       ],
     );
     final solidBackground = app.appearance.solidBackground;
@@ -325,7 +324,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             : main,
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
         bottomNavigationBar: wide
-            ? null
+            ? (playerCollapsed ? null : _desktopPlayerBar())
             : Stack(
                 clipBehavior: Clip.none,
                 children: [

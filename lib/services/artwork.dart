@@ -30,31 +30,67 @@ class ArtworkStore {
   final WebDavTags tags;
   final bool _ownsTags;
   final Map<HttpClient, String> _clients = {};
+  final Map<MusicAdapter, String> _adapters = {};
   final List<Completer<void>> _waiting = [];
   final Set<Future<File?>> _loads = {};
   final Map<String, int> _epochs = {};
   int _readers = 0;
   bool _stopped = false;
-  String key(Track track) => jsonEncode([
-    'cover',
-    track.remote.containsKey('format') ? track.ref.key : track.artworkIdentity,
-    'Primary',
-    800,
-    90,
-    track.remote.containsKey('format') ? 2 : 1,
-  ]);
+  String key(Track track, {bool artist = false}) => artist
+      ? jsonEncode(['artist-portrait', track.artistGroup, 512, 1])
+      : jsonEncode([
+          'cover',
+          track.remote.containsKey('format')
+              ? track.ref.key
+              : track.artworkIdentity,
+          'Primary',
+          800,
+          90,
+          track.remote.containsKey('format') ? 2 : 1,
+        ]);
   int revision(Track track) => assets.revision(track.ref.sourceId, key(track));
-  void retain(Track track) => assets.retain(track.ref.sourceId, key(track));
-  void release(Track track) => assets.release(track.ref.sourceId, key(track));
-  Future<File?> load(Track track, {bool forceRefresh = false}) {
+  void retain(Track track, {bool artist = false}) =>
+      assets.retain(track.ref.sourceId, key(track, artist: artist));
+  void release(Track track, {bool artist = false}) =>
+      assets.release(track.ref.sourceId, key(track, artist: artist));
+  Future<File?> load(
+    Track track, {
+    bool forceRefresh = false,
+    bool artist = false,
+  }) {
     if (_stopped) return Future.value(null);
-    final future = _load(track, forceRefresh).catchError((Object _) => null);
+    final future =
+        (artist ? _loadArtist(track, forceRefresh) : _load(track, forceRefresh))
+            .catchError((Object _) => null);
     _loads.add(future);
     unawaited(future.whenComplete(() => _loads.remove(future)));
     return future;
   }
 
   String _hash(String value) => sha256.convert(utf8.encode(value)).toString();
+
+  String _artistVersion(Track track) => jsonEncode([
+    track.remote['ArtistItems'],
+    track.remote['artistId'],
+    track.remote['grandparentThumb'],
+    track.remote['grandparentRatingKey'],
+  ]);
+
+  Future<File?> _loadArtist(Track track, bool force) async {
+    final source = await db.source(track.ref.sourceId);
+    if (source == null || !source.enabled || _stopped) return null;
+    final cacheKey = key(track, artist: true);
+    final asset = await assets.get(
+      source,
+      cacheKey,
+      'cover',
+      _artistVersion(track),
+      (previous) => _download(track, source, previous, artist: true),
+      forceRefresh: force,
+    );
+    return asset?.file;
+  }
+
   Future<File?> _load(Track track, bool force) async {
     final epoch = _epochs[track.ref.sourceId] ?? 0;
     final source = await db.source(track.ref.sourceId);
@@ -123,8 +159,9 @@ class ArtworkStore {
   Future<AssetPayload?> _download(
     Track track,
     SourceProfile source,
-    MediaAsset? previous,
-  ) async {
+    MediaAsset? previous, {
+    bool artist = false,
+  }) async {
     final epoch = _epochs[source.id] ?? 0;
     if (_readers < 6) {
       _readers++;
@@ -138,7 +175,10 @@ class ArtworkStore {
     try {
       if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
       adapter = factory.create(source);
-      final urls = await adapter.coverUrls(track);
+      _adapters[adapter] = source.id;
+      final urls = artist
+          ? await adapter.artistCoverUrls(track)
+          : await adapter.coverUrls(track);
       if (_stopped || epoch != (_epochs[source.id] ?? 0)) return null;
       client = HttpClient()..connectionTimeout = const Duration(seconds: 12);
       _clients[client] = source.id;
@@ -150,7 +190,8 @@ class ArtworkStore {
         (await adapter.mediaHeaders()).forEach(
           (k, v) => request.headers.set(k, v),
         );
-        if (previous?.version == track.artworkVersion) {
+        if (previous?.version ==
+            (artist ? _artistVersion(track) : track.artworkVersion)) {
           if (previous?.etag != null) {
             request.headers.set('If-None-Match', previous!.etag!);
           }
@@ -200,6 +241,7 @@ class ArtworkStore {
         _clients.remove(client);
       }
       adapter?.close();
+      _adapters.remove(adapter);
       if (_waiting.isEmpty) {
         _readers--;
       } else {
@@ -214,6 +256,9 @@ class ArtworkStore {
     assets.suspendSource(id);
     for (final entry in _clients.entries.toList()) {
       if (entry.value == id) entry.key.close(force: true);
+    }
+    for (final entry in _adapters.entries.toList()) {
+      if (entry.value == id) entry.key.close();
     }
   }
 
@@ -230,6 +275,9 @@ class ArtworkStore {
     if (_ownsTags) await tags.shutdown();
     for (final client in _clients.keys.toList()) {
       client.close(force: true);
+    }
+    for (final adapter in _adapters.keys.toList()) {
+      adapter.close();
     }
     await Future.wait(_loads.toList());
     if (_ownsAssets) await assets.shutdown();

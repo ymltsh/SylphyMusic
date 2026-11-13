@@ -75,6 +75,10 @@ UI 和服务通过 `SourceKind.cloudPlaylists` 判断云歌单读取能力，新
 
 ## 索引与浏览
 
+文件夹浏览按来源和完整路径保持身份，在 SQLite 中将每条已索引歌曲的目录投影为当前层直属子目录，同层直属歌曲与目录分开分组；查询与分页不加载全库 Track 元数据。初始节点是各来源内没有其他存歌祖先的实际存歌目录，跳过系统根目录与空的中间父目录；入口基于有效索引确定，不随搜索关键词改变。相对路径统一以 ./ 作为边界，直属源根目录的歌曲与相对路径子目录可在同一树中浏览。进入目录后继续逐层浏览，目录播放及批量操作按路径分隔边界包含子树，不使用可能误匹配通配符的 LIKE。无可用目录的曲目保留「未提供目录」分组，不虚构服务器目录。
+
+艺术家行使用独立圆形头像。Emby / Jellyfin 按艺术家身份（旧索引可在同一来源内精确匹配艺术家名称）读取 Primary 图片；Plex 使用艺术家的 grandparentThumb，OpenSubsonic 使用艺术家 coverArt。艺术家分页在当前筛选范围内选择支持头像的来源作为图片代表，额外读取限于当前分页。头像沿用 ArtworkStore 的并发、来源取消和退出链路及 MediaAssetStore 的完整校验、配额和租约，缓存身份包含来源与艺术家，不覆盖歌曲 / 专辑封面关联；图片缺失使用默认头像，不向外部搜图服务发送艺术家信息。
+
 Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒体资源生命周期。Jellyfin 使用账号密码换取令牌并核对服务器 / 用户身份；Plex 使用已有访问令牌，绑定服务器 machineIdentifier，更换令牌须添加独立来源。Plex 媒体和封面仅接受同服务器相对路径，凭据只通过请求头传递；不支持账户 PIN 授权或转码。两者云歌单仅可读取，收藏使用本地能力。来源枚举追加成员，沿用数据库 v9，不迁移现有数据。来源 Logo 使用 assets/source/jellyfin.png 和 plex.png。
 
 封面读取优先使用 Emby 单曲 `ImageTags.Primary` 对应的歌曲 ID 和 tag，再使用有 tag 的专辑 / 继承图片；只有 404 才尝试其他候选，不把鉴权失败当作缺图。URL 保留来源配置的反向代理前缀。封面磁盘与请求合并 key 包含图片版本，tag 更新后重新读取；失败请求不永久记忆，网络读取最多六路并发。
@@ -116,6 +120,8 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 `sync_intents` 记录未决写入，避免服务器成功而响应丢失后重复追加。权限变化保留本地操作，写请求不按网络失败盲目重放。WebDAV 不参加云歌单同步，不执行远程文件写操作。
 
 ## 生命周期
+
+设备间快速迁移由 `DeviceTransferConfig` 按白名单导出及合并手动配置，`DeviceTransferPage` 提供发送、配对、导入预览与确认，首次引导也可直接接收。`device_transfer_transport.dart` 使用页面作用域的 UDP 发现和临时 TCP 会话，X25519 / HKDF / AES-GCM 保护传输，双方人工核对配对码后发送数据；离开页面释放网络资源。凭据仅在迁移内存与安全存储间流转，不复制数据库、曲库或缓存。细节见 [设备间快速迁移](DEVICE_TRANSFER.md)。
 
 - 停用来源：先 disabled，再暂停并失效匹配播放连接，取消索引、撤销代理票据 / 上游，停止封面和下载；保留索引、READY、个人引用与任务快照。
 - 重新启用：先验证身份 / 认证，再持久化启用并索引；保持暂停，用户继续时重新打开媒体连接。
@@ -229,3 +235,10 @@ Android 播放运行库与可选 De-click 已更新为固定 mpv-android 2026-09
 ## 音乐笔友角色卡 V18
 
 `PenpalCardStore` 经 `ApiSettings` 装配，使用稳定 `card_id` 保存角色名称、System/User 提示词和本地头像路径，激活角色的 Prompt 镜像到现有 LLM 配置。数据库 v18 增加角色表和按角色保存的记忆开关；聊天、记忆和来信按角色标识分隔，数据库 v19 迁移直接删除未归属旧记忆，界面和查询层不再保留相应入口；未归属旧来信与聊天维持原处理。内置彩蛋仅在主动发现后进入角色列表，原始 JSON 保持不变。角色卡在 `disposeAsync()` 中先等待头像读写与清理完成，再随 `ApiSettings.dispose()` 结束生命周期。详情见 [角色卡与隐藏彩蛋 V18](CHARACTER_CARDS_V18.md)。
+
+
+## 横屏与 PC 设置
+
+DesktopPreferences 由 SylphyApp 装配，保存横屏控制选项、快捷键开关和 Windows 受管字体文件；启动加载，退出排空写入后在 SQLite 关闭前释放。MaterialApp 主题订阅外观及该配置以应用字体，前台键盘入口通过 PlaybackShortcuts 路由到已有播放协调器。WideMiniPlayer 复用同一播放队列、播放模式、收藏和音量，详见 [横屏与 PC](DESKTOP_LANDSCAPE.md)。
+
+Windows 官方字体目录仅内置元数据；DesktopFontDownload 在用户选择后流式下载官方 ZIP，通过后台解码与固定字体摘要校验，保存原始字体、独立许可及来源。DesktopPreferences 串行提交后切换字体，失败保留当前选择，shutdown 取消下载并等待完成。安装包和应用源码不包含厂商字体二进制。

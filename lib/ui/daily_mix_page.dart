@@ -26,6 +26,7 @@ class _DailyMixPageState extends State<DailyMixPage>
   bool _working = false;
   final Set<String> _openedLetters = {};
   int _llmRevision = -1;
+  int _deliveryGeneration = 0;
 
   @override
   void initState() {
@@ -90,7 +91,10 @@ class _DailyMixPageState extends State<DailyMixPage>
         await _reply(mix);
       } else if (action == 'refresh') {
         final pending = widget.app.recommendations.daily(regenerate: true);
-        setState(() => _mix = pending);
+        setState(() {
+          ++_deliveryGeneration;
+          _mix = pending;
+        });
         await pending;
       } else if (action == 'save') {
         await widget.app.cloud.newLocal(
@@ -132,6 +136,11 @@ class _DailyMixPageState extends State<DailyMixPage>
     ),
     floatingActionButton: RoutePlayerFab(app: widget.app),
     body: RecommendationDeliveryBuilder(
+      key: ValueKey((
+        widget.app.recommendations,
+        widget.app.apiSettings.activeCardId,
+        _deliveryGeneration,
+      )),
       future: _mix,
       service: widget.app.recommendations,
       builder: (context, snapshot) {

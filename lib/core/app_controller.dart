@@ -36,6 +36,7 @@ import '../services/library_sync.dart';
 import '../services/source_connections.dart';
 import 'models.dart';
 import 'appearance.dart';
+import 'desktop_preferences.dart';
 import 'listening_history.dart';
 import '../data/recommendation_repository.dart';
 import '../data/penpal_memory_repository.dart';
@@ -78,6 +79,7 @@ class SylphyApp extends ChangeNotifier {
   final ValueNotifier<int> catalogListenable = ValueNotifier<int>(0);
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
+  late final desktopPreferences = DesktopPreferences(db);
   late final desktopLyrics = DesktopLyrics(
     playback: playback,
     appearance: appearance,
@@ -236,6 +238,7 @@ class SylphyApp extends ChangeNotifier {
       onHide: () => app._appForeground = false,
     );
     await app.appearance.initialize();
+    await app.desktopPreferences.initialize();
     app.apiSettings.addListener(app._apiChanged);
     await app.apiSettings.initialize();
     await app.playerLayouts.initialize();
@@ -1160,6 +1163,7 @@ class SylphyApp extends ChangeNotifier {
     await artwork.shutdown();
     await lyrics.shutdown();
     await assets.shutdown();
+    await desktopPreferences.shutdown();
     await appearance.shutdown();
     await playerLayouts.shutdown();
     await diagnostics.shutdown();

@@ -375,6 +375,7 @@ class AndroidMedia3Playback extends PlaybackCoordinator {
 
   @override
   Future<void> setVolume(double v) async {
+    rememberAudibleVolume(v);
     await _command('volume', {'value': v.clamp(0, 100)});
     await db.setSetting('volume', '$volume');
   }

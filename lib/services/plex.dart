@@ -3,6 +3,19 @@ part of 'sources.dart';
 /// Basic Plex Media Server adapter using a user-supplied server access token.
 /// PIN/JWT account authorization and transcoding are deliberately out of scope.
 class PlexAdapter extends MusicAdapter {
+  @override
+  Future<List<Uri>> artistCoverUrls(Track track) async {
+    var thumb = _safeRelativeKey(track.remote['grandparentThumb']);
+    if (thumb.isEmpty) {
+      final data = await _container(
+        'library/metadata/${Uri.encodeComponent(track.ref.id)}',
+      );
+      final item = _entries(data, 'Metadata').firstOrNull;
+      thumb = _safeRelativeKey(item?['grandparentThumb']);
+    }
+    return thumb.isEmpty ? [] : [_resourceUrl(thumb)];
+  }
+
   PlexAdapter(super.profile, this.vault);
 
   final AuthVault vault;
@@ -176,6 +189,8 @@ class PlexAdapter extends MusicAdapter {
         'coverUpdatedAt': item['updatedAt'],
         'thumb': thumb,
         'parentThumb': parentThumb,
+        'grandparentThumb': _safeRelativeKey(item['grandparentThumb']),
+        'grandparentRatingKey': item['grandparentRatingKey'],
       },
     );
   }

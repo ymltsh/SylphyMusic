@@ -17,8 +17,10 @@ import 'cache_tasks.dart';
 import 'theme_color_dialog.dart';
 import 'player_layout/layout_editor.dart';
 import 'about_page.dart';
+import 'desktop_settings_page.dart';
 import 'recommendation_settings_page.dart';
 import 'recommendation_letters_page.dart';
+import 'device_transfer_page.dart';
 
 enum _Section {
   library,
@@ -638,6 +640,16 @@ class _SettingsPageState extends State<SettingsPage> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: widget.onSources,
       ),
+      ListTile(
+        leading: _entryIcon(Icons.swap_horiz_rounded),
+        title: const Text('设备间快速迁移'),
+        subtitle: const Text('通过局域网安全迁移音乐源、API 和自定义 UI'),
+        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => DeviceTransferPage(app: app)),
+        ),
+      ),
       _entry(
         Icons.library_music_outlined,
         '音乐库分类',
@@ -662,6 +674,19 @@ class _SettingsPageState extends State<SettingsPage> {
           context,
           MaterialPageRoute(
             builder: (_) => RecommendationSettingsPage(app: app),
+          ),
+        ),
+      ),
+      ListTile(
+        leading: _entryIcon(Icons.desktop_windows_outlined),
+        title: const Text('横屏与 PC'),
+        subtitle: const Text('迷你播放器、快捷键与 Windows 字体'),
+        trailing: const Icon(Icons.chevron_right),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => DesktopSettingsPage(app: app),
           ),
         ),
       ),

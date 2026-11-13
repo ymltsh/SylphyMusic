@@ -12,21 +12,26 @@ class CoverArt extends StatefulWidget {
     required this.track,
     this.size = 48,
     this.borderRadius = 10,
+    this.artist = false,
   });
   final SylphyApp app;
   final Track track;
   final double size;
   final double borderRadius;
+  final bool artist;
   @override
   State<CoverArt> createState() => _CoverArtState();
 }
 
 class _CoverArtState extends State<CoverArt> {
-  late Future<File?> cover = widget.app.artwork.load(widget.track);
+  late Future<File?> cover = widget.app.artwork.load(
+    widget.track,
+    artist: widget.artist,
+  );
   @override
   void initState() {
     super.initState();
-    widget.app.artwork.retain(widget.track);
+    widget.app.artwork.retain(widget.track, artist: widget.artist);
     widget.app.assets.addListener(_assetChanged);
   }
 
@@ -34,12 +39,13 @@ class _CoverArtState extends State<CoverArt> {
     final change = widget.app.assets.lastChange;
     if (change != null &&
         (change.sourceId != widget.track.ref.sourceId ||
-            change.key != widget.app.artwork.key(widget.track))) {
+            change.key !=
+                widget.app.artwork.key(widget.track, artist: widget.artist))) {
       return;
     }
     if (mounted) {
       setState(() {
-        cover = widget.app.artwork.load(widget.track);
+        cover = widget.app.artwork.load(widget.track, artist: widget.artist);
       });
     }
   }
@@ -47,7 +53,7 @@ class _CoverArtState extends State<CoverArt> {
   @override
   void dispose() {
     widget.app.assets.removeListener(_assetChanged);
-    widget.app.artwork.release(widget.track);
+    widget.app.artwork.release(widget.track, artist: widget.artist);
     super.dispose();
   }
 
@@ -55,10 +61,11 @@ class _CoverArtState extends State<CoverArt> {
   void didUpdateWidget(CoverArt oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.track.ref != widget.track.ref ||
+        oldWidget.artist != widget.artist ||
         oldWidget.track.artworkVersion != widget.track.artworkVersion) {
-      widget.app.artwork.release(oldWidget.track);
-      widget.app.artwork.retain(widget.track);
-      cover = widget.app.artwork.load(widget.track);
+      widget.app.artwork.release(oldWidget.track, artist: oldWidget.artist);
+      widget.app.artwork.retain(widget.track, artist: widget.artist);
+      cover = widget.app.artwork.load(widget.track, artist: widget.artist);
     }
   }
 
@@ -73,7 +80,7 @@ class _CoverArtState extends State<CoverArt> {
           final fallback = ColoredBox(
             color: Theme.of(context).colorScheme.secondaryContainer,
             child: Icon(
-              Icons.music_note_rounded,
+              widget.artist ? Icons.person_rounded : Icons.music_note_rounded,
               size: (widget.size * .32).clamp(20, 80),
               color: Theme.of(context).colorScheme.onSecondaryContainer,
             ),

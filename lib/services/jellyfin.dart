@@ -2,6 +2,28 @@ part of 'sources.dart';
 
 /// Jellyfin native HTTP API. Deliberately separate from Emby authentication.
 class JellyfinAdapter extends MusicAdapter {
+  @override
+  Future<List<Uri>> artistCoverUrls(Track track) async {
+    var id = artistItemId(track);
+    if (id == null) {
+      final artist = await _api(
+        'GET',
+        'Artists/${Uri.encodeComponent(track.artist)}',
+        query: {'UserId': await _userId},
+      );
+      if (artist['Name']?.toString().trim().toLowerCase() != track.artistGroup)
+        return [];
+      id = artist['Id']?.toString();
+    }
+    if (id == null || id.isEmpty) return [];
+    return [
+      appendPath(profile, 'Items/${Uri.encodeComponent(id)}/Images/Primary', {
+        'MaxWidth': '512',
+        'Quality': '90',
+      }),
+    ];
+  }
+
   JellyfinAdapter(super.profile, this.vault);
 
   final AuthVault vault;

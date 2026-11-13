@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
+import 'wide_mini_player.dart';
 import 'cover_palette.dart';
 import 'now_playing.dart';
 import 'playing_song_tile.dart';
@@ -72,6 +73,19 @@ class PlayerBar extends StatelessWidget {
     final player = app.playback, track = app.playback.current;
     final scheme = Theme.of(context).colorScheme;
     final enabled = player.snapshot.tracks.isNotEmpty;
+    final size = MediaQuery.sizeOf(context);
+    if (compact &&
+        (docked ||
+            ((Platform.isWindows || size.width > size.height) &&
+                size.width >= 600 &&
+                !immersive))) {
+      return WideMiniPlayer(
+        app: app,
+        onOpen: () => Navigator.of(context).push(_nowPlayingRoute(app)),
+        onQueue: () => showQueue(context),
+        onCollapse: onCollapse,
+      );
+    }
     if (compact) {
       final bar = Material(
         color: scheme.surfaceContainerHigh.withValues(

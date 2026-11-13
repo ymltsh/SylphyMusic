@@ -11,6 +11,8 @@ import android.util.Log
 class MainActivity : FlutterActivity() {
     private var letterImages: LetterImageStore? = null
     private val notificationRequests = mutableListOf<MethodChannel.Result>()
+    private val lanRequests = mutableListOf<MethodChannel.Result>()
+    private val lanPermission = "android.permission.ACCESS_LOCAL_NETWORK"
     // Correlate the observed foreground recovery with the Dart watchdog gap.
     override fun onStart() {
         super.onStart()
@@ -47,6 +49,20 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/local_network")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "request") {
+                    result.notImplemented()
+                } else if (Build.VERSION.SDK_INT < 37 ||
+                    checkSelfPermission(lanPermission) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    result.success(true)
+                } else {
+                    val requesting = lanRequests.isNotEmpty()
+                    lanRequests.add(result)
+                    if (!requesting) requestPermissions(arrayOf(lanPermission), 44)
+                }
+            }
         letterImages = LetterImageStore(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/letter_images")
             .setMethodCallHandler { call, result -> letterImages?.handle(call, result) ?: result.error("unavailable", "图片服务不可用", null) }
@@ -77,6 +93,15 @@ class MainActivity : FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 42) completeNotificationRequests()
         if (requestCode == 43) letterImages?.permissionResult()
+        if (requestCode == 44) completeLanRequests(
+            grantResults.isNotEmpty() &&
+            grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED)
+    }
+
+    private fun completeLanRequests(granted: Boolean) {
+        val pending = lanRequests.toList()
+        lanRequests.clear()
+        pending.forEach { it.success(granted) }
     }
 
     private fun completeNotificationRequests() {
@@ -91,11 +116,14 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/letter_images").setMethodCallHandler(null)
         // Activity detach must not leave Dart awaiting a permission result.
         completeNotificationRequests()
+        completeLanRequests(false)
         // The engine survives this Activity; do not retain a dead Activity in
         // icon/permission channel handlers after swiping it from Recents.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/launcher_icons")
             .setMethodCallHandler(null)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/notification_permission")
+            .setMethodCallHandler(null)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/local_network")
             .setMethodCallHandler(null)
         super.cleanUpFlutterEngine(flutterEngine)
     }

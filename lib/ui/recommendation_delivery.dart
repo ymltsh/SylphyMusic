@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show mapEquals;
 
 import '../core/recommendation_models.dart';
 import '../services/recommendation_service.dart';
@@ -43,12 +44,50 @@ class _RecommendationDeliveryBuilderState
   @override
   void didUpdateWidget(RecommendationDeliveryBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.future != widget.future) _watch();
+    if (oldWidget.service != widget.service) _result = null;
+    if (oldWidget.future != widget.future ||
+        oldWidget.service != widget.service)
+      _watch();
+  }
+
+  bool _sameMix(DailyMix previous, DailyMix next) {
+    if (previous.day != next.day ||
+        previous.generation != next.generation ||
+        previous.title != next.title ||
+        previous.introduction != next.introduction ||
+        previous.llmSucceeded != next.llmSucceeded ||
+        previous.items.length != next.items.length)
+      return false;
+    for (var i = 0; i < previous.items.length; i++) {
+      final a = previous.items[i], b = next.items[i];
+      if (a.reason != b.reason ||
+          a.score != b.score ||
+          !mapEquals(a.track.toRow(), b.track.toRow()))
+        return false;
+    }
+    return true;
   }
 
   void _watch() {
     final epoch = ++_epoch;
     _delay?.cancel();
+    final previous = _result?.data;
+    if (previous != null) {
+      // Revalidating a snapshot must not unmount the cover deck, reset its
+      // animation or replace the card with a shorter loading placeholder.
+      widget.future.then(
+        (mix) {
+          if (!mounted || epoch != _epoch || _sameMix(previous, mix)) return;
+          setState(
+            () => _result = AsyncSnapshot.withData(ConnectionState.done, mix),
+          );
+        },
+        onError: (Object _, StackTrace __) {
+          // Keep the last usable letter on a background refresh failure.
+        },
+      );
+      return;
+    }
     _result = null;
     _arrival = null;
     _visible = false;

@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../services/api_settings.dart';
+import '../services/device_transfer_config.dart';
+import 'device_transfer_page.dart';
 import 'music_source_ui.dart';
 
-/// Three explicit steps: welcome, choose a source, configure public APIs.
+/// Welcome, device transfer, source selection, then optional public APIs.
 class QuickStartWizard extends StatefulWidget {
   const QuickStartWizard({
     super.key,
@@ -49,6 +51,20 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
   }
 
   void _go(int step) => setState(() => _step = step);
+
+  Future<void> _receiveFromDevice() => _runSource(() async {
+    final scope = await Navigator.of(context).push<TransferScope>(
+      MaterialPageRoute(
+        builder: (_) => DeviceTransferReceivePage(app: widget.app),
+      ),
+    );
+    if (!mounted || scope == null) return;
+    if (scope == TransferScope.all) {
+      await _complete();
+    } else {
+      _go(3); // Only sources transferred; keep the API setup step.
+    }
+  });
 
   void _showError(Object error) {
     if (!mounted) return;
@@ -141,7 +157,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
     final theme = Theme.of(context);
     final sourceBusy = _sourceWorking || _saving || widget.app.busy;
     return Scaffold(
-      backgroundColor: _step == 0 && theme.brightness == Brightness.light
+      backgroundColor: _step <= 1 && theme.brightness == Brightness.light
           ? const Color(0xFFF7F9FE)
           : null,
       body: SafeArea(
@@ -150,18 +166,18 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
             constraints: const BoxConstraints(maxWidth: 620),
             child: Column(
               children: [
-                if (_step != 0)
+                if (_step > 1)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          '快速上手  ·  ${_step + 1}/3',
+                          '快速上手  ·  ${_step + 1}/4',
                           style: theme.textTheme.labelLarge,
                         ),
                         const SizedBox(height: 10),
-                        LinearProgressIndicator(value: (_step + 1) / 3),
+                        LinearProgressIndicator(value: (_step + 1) / 4),
                       ],
                     ),
                   ),
@@ -170,12 +186,13 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                     duration: const Duration(milliseconds: 220),
                     child: switch (_step) {
                       0 => _welcome(theme),
-                      1 => _sources(theme, sourceBusy),
+                      1 => _transferWelcome(theme, sourceBusy),
+                      2 => _sources(theme, sourceBusy),
                       _ => _api(theme),
                     },
                   ),
                 ),
-                if (_step != 0)
+                if (_step > 1)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                     child: _buttons(_saving),
@@ -247,6 +264,206 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
       );
     },
   );
+
+  Widget _transferWelcome(ThemeData theme, bool busy) => LayoutBuilder(
+    key: const ValueKey('quick-start-transfer'),
+    builder: (context, constraints) {
+      final colors = theme.colorScheme;
+      final compact = constraints.maxHeight < 700;
+      return SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: '返回欢迎页',
+                      onPressed: busy ? null : () => _go(0),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '02 / 04',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      _transferIllustration(theme, compact ? 168 : 208),
+                      const SizedBox(height: 24),
+                      Text(
+                        '熟悉的一切，\n随音乐一起抵达',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontSize: compact ? 26 : 30,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '从旧设备接过你的音乐源、API 与自定义外观。\n'
+                        '少一些重新设置，多一些即刻熟悉。',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.7,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 16,
+                        runSpacing: 10,
+                        children: [
+                          _transferHint(theme, Icons.wifi_rounded, '同一局域网'),
+                          _transferHint(
+                            theme,
+                            Icons.lock_outline_rounded,
+                            '配对加密',
+                          ),
+                          _transferHint(theme, Icons.tune_rounded, '仅迁移配置'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FilledButton.icon(
+                      key: const ValueKey('quick-start-receive'),
+                      onPressed: busy ? null : _receiveFromDevice,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(54),
+                      ),
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('从旧设备迁移'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: busy ? null : () => _go(2),
+                      child: const Text('首次使用，手动设置'),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '在旧设备打开「设置 → 设备间快速迁移 → 发送」',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
+  Widget _transferHint(ThemeData theme, IconData icon, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 16, color: theme.colorScheme.primary),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
+
+  Widget _transferIllustration(ThemeData theme, double size) {
+    final colors = theme.colorScheme;
+    Widget device(IconData icon) => Container(
+      width: size * .34,
+      height: size * .44,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.primary.withValues(alpha: .18)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withValues(alpha: .08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Icon(icon, size: size * .21, color: colors.primary),
+    );
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  colors.primary.withValues(alpha: .12),
+                  colors.primary.withValues(alpha: .02),
+                ],
+              ),
+              border: Border.all(color: colors.primary.withValues(alpha: .08)),
+            ),
+          ),
+          Container(
+            width: size * .72,
+            height: size * .72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: colors.primary.withValues(alpha: .12)),
+            ),
+          ),
+          Positioned(
+            left: size * .04,
+            top: size * .2,
+            child: Transform.rotate(
+              angle: -.12,
+              child: device(Icons.phonelink_rounded),
+            ),
+          ),
+          Positioned(
+            right: size * .04,
+            bottom: size * .14,
+            child: Transform.rotate(
+              angle: .1,
+              child: device(Icons.phone_android_rounded),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: colors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.arrow_forward_rounded,
+              color: colors.onPrimary,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _sources(ThemeData theme, bool busy) => ListView(
     key: const ValueKey('quick-start-sources'),
@@ -358,17 +575,17 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
   );
 
   Widget _buttons(bool busy) {
-    if (_step == 1) {
+    if (_step == 2) {
       return Row(
         children: [
           OutlinedButton(
-            onPressed: busy ? null : () => _go(0),
+            onPressed: busy ? null : () => _go(1),
             child: const Text('上一步'),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed: busy ? null : () => _go(2),
+              onPressed: busy ? null : () => _go(3),
               child: const Text('下一步：API 配置'),
             ),
           ),
@@ -382,7 +599,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
         Row(
           children: [
             OutlinedButton(
-              onPressed: busy ? null : () => _go(1),
+              onPressed: busy ? null : () => _go(2),
               child: const Text('上一步'),
             ),
             const SizedBox(width: 12),

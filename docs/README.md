@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [设备间快速迁移](DEVICE_TRANSFER.md) | 局域网配对、手动配置迁移范围、接收排障与使用限制 |
 | [更新与发布流程](../update.md) | 手动更新、正式 / 测试版清单、本地打包与显式 GitHub 发布 |
 | [Android 正式签名](ANDROID_SIGNING.md) | 正式证书、私钥备份、验签与测试版迁移限制 |
 | [项目 README](../README.md) | 面向用户的功能、音源、下载、快速开始与技术栈 |
@@ -38,6 +39,7 @@
 | [ANDROID_SYSTEM_BARS](ANDROID_SYSTEM_BARS.md) | Android 手势条透明沉浸、系统图标明暗与安全边距 |
 | [LLM 推荐增强](LLM_RECOMMENDATION.md) | 默认关闭的模型重排、推荐文案、API 配置与元数据发送边界 |
 | [推荐设置](RECOMMENDATION_SETTINGS.md) | 基础推荐、LLM 增强、换新与数据分区及操作逻辑 |
+| [横屏与 PC](DESKTOP_LANDSCAPE.md) | 横屏迷你播放器、应用内快捷键与 Windows 自定义字体 |
 | [RECOMMENDATION_V1](RECOMMENDATION_V1.md) | 每日精选、专辑推荐、数据统计和热榜缓存 |
 | [UI_REFRESH](UI_REFRESH.md) | 本轮导航、首次引导、首页、播放器与外观调整范围 |
 | [COVER_FLOW](COVER_FLOW.md) | 专辑 / 歌单封面流、分批数据接入与会话内视图切换 |

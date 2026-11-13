@@ -324,13 +324,14 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
 
   void _group(CatalogRow row) {
     final album = widget.query.view == 1;
+    final folder = widget.query.view == 3 && row.isFolder;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(
             title: Text(
-              widget.query.view == 3
+              folder
                   ? row.folderTitle
                   : album
                   ? row.track.album
@@ -338,11 +339,32 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
             ),
           ),
           bottomNavigationBar: RoutePlayerBar(app: widget.app),
-          body: LibraryBrowser(
-            app: widget.app,
-            query: widget.query.songsIn(widget.query.groupType, row.key),
-            bottomPadding: widget.query.view == 3 ? 12 : null,
-            onAction: widget.onAction,
+          body: Column(
+            children: [
+              if (folder)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${_source(row.track)} · ${row.folderLocation}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: LibraryBrowser(
+                  app: widget.app,
+                  query: folder
+                      ? widget.query.folderIn(row.key)
+                      : widget.query.songsIn(widget.query.groupType, row.key),
+                  bottomPadding: folder ? 12 : null,
+                  onAction: widget.onAction,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -359,7 +381,10 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         onChanged: (v) => widget.onSelection?.call(track, v == true),
       );
     }
-    final album = widget.query.view == 1, grouped = widget.query.view != 0;
+    final folder = widget.query.view == 3 && row.isFolder;
+    final album = widget.query.view == 1;
+    final artist = widget.query.view == 2;
+    final grouped = album || artist || folder;
     final batch = widget.batchSelection;
     final batchKey = grouped ? row.key : track.ref.key;
     final selecting = batch?.active == true;
@@ -408,13 +433,18 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       onLongPress: batch == null || widget.query.blocked
           ? null
           : () => batch.begin(batchKey),
-      leading: widget.query.view == 3
+      leading: folder
           ? const Icon(Icons.folder_outlined)
-          : widget.query.view == 2
-          ? const Icon(Icons.person_outline)
+          : artist
+          ? CoverArt(
+              app: widget.app,
+              track: row.portraitTrack,
+              artist: true,
+              borderRadius: 24,
+            )
           : CoverArt(app: widget.app, track: track),
       title: Text(
-        widget.query.view == 3
+        folder
             ? row.folderTitle
             : album
             ? (track.album.isEmpty ? '未知专辑' : track.album)
@@ -425,7 +455,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        widget.query.view == 3
+        folder
             ? '${_source(track)} · ${row.count} 首'
             : grouped
             ? '${album ? '${track.albumArtist.isEmpty ? track.artist : track.albumArtist} · ' : ''}${row.count} 首 · ${row.sources} 个来源'
@@ -449,7 +479,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
               ),
             )
           : grouped
-          ? null
+          ? const Icon(Icons.chevron_right_rounded)
           : widget.query.blocked
           ? IconButton(
               tooltip: '取消屏蔽',

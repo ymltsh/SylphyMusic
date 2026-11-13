@@ -10,6 +10,8 @@ import 'ui/app_identity.dart';
 import 'ui/app_shell.dart';
 import 'ui/system_bars.dart';
 import 'ui/app_theme.dart';
+import 'ui/playback_shortcuts.dart';
+import 'ui/player_bar.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +32,7 @@ class _Bootstrap extends StatefulWidget {
 }
 
 class _BootstrapState extends State<_Bootstrap> {
+  final _navigator = GlobalKey<NavigatorState>();
   late final Future<SylphyApp> ready = SylphyApp.bootstrap();
   @override
   Widget build(BuildContext context) => FutureBuilder<SylphyApp>(
@@ -37,15 +40,38 @@ class _BootstrapState extends State<_Bootstrap> {
     builder: (context, snapshot) {
       final app = snapshot.data;
       return AnimatedBuilder(
-        animation: app?.appearance ?? const AlwaysStoppedAnimation(0),
+        animation: app == null
+            ? const AlwaysStoppedAnimation(0)
+            : Listenable.merge([app.appearance, app.desktopPreferences]),
         builder: (context, _) => MaterialApp(
+          navigatorKey: _navigator,
           themeMode: app?.appearance.mode ?? ThemeMode.system,
-          builder: (context, child) =>
-              AppSystemBars(child: child ?? const SizedBox.shrink()),
+          builder: (context, child) {
+            final content = AppSystemBars(
+              child: child ?? const SizedBox.shrink(),
+            );
+            if (app == null) return content;
+            return PlaybackShortcuts(
+              app: app,
+              child: content,
+              onQueue: () {
+                final target = _navigator.currentState?.overlay?.context;
+                if (target != null) PlayerBar(app: app).showQueue(target);
+              },
+            );
+          },
           debugShowCheckedModeBanner: false,
           onGenerateTitle: (_) => appDisplayName(),
-          theme: sylphyTheme(app?.appearance, Brightness.light),
-          darkTheme: sylphyTheme(app?.appearance, Brightness.dark),
+          theme: sylphyTheme(
+            app?.appearance,
+            Brightness.light,
+            fontFamily: app?.desktopPreferences.fontFamily,
+          ),
+          darkTheme: sylphyTheme(
+            app?.appearance,
+            Brightness.dark,
+            fontFamily: app?.desktopPreferences.fontFamily,
+          ),
           home: snapshot.hasData
               ? SylphyShell(app: snapshot.data!)
               : Scaffold(

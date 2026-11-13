@@ -3,7 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../core/appearance.dart';
 
-ThemeData sylphyTheme(Appearance? appearance, Brightness brightness) {
+ThemeData sylphyTheme(
+  Appearance? appearance,
+  Brightness brightness, {
+  String? fontFamily,
+}) {
   final seed = appearance?.seed ?? Appearance.defaultSeed;
   final generated = ColorScheme.fromSeed(
     seedColor: seed,
@@ -30,6 +34,7 @@ ThemeData sylphyTheme(Appearance? appearance, Brightness brightness) {
   );
   return ThemeData(
     useMaterial3: true,
+    fontFamily: fontFamily,
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
