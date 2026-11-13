@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.56-openlist.39",
-    "build": 69,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.56-openlist.39 (arm64-v8a)",
+    "version": "1.0.58-openlist.40",
+    "build": 71,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.58-openlist.40 (arm64-v8a)",
     "date": "2026-11-13",
-    "notes": "- 新增设备间快速迁移，可在同一局域网内发送和接收音乐源、API 及自定义外观配置，核对配对码后加密传输。\n- 首次启动第二页改为独立迁移欢迎引导，可选择从旧设备导入或继续手动设置。\n- 设备名称改用音符和随机设备编号，方便在扫描列表中辨认接收设备。\n- 接收页新增故障排除：查看本机接收状态和网络信息，处理发现、连接与权限问题；支持重新请求 Android 本地网络权限。\n- 导入前可预览内容，已有相同音乐源会跳过；歌曲文件、缓存、歌单和播放历史不迁移，部分服务器可能需要重新登录。\n- OpenList 网盘挂载及内置服务配置需在新设备单独设置。\n",
+    "notes": "- 文件夹初始层改为各分支中最上层直接存有歌曲的目录，自动跳过没有直属歌曲的系统目录和中间父目录。\n- 支持逐层进入子文件夹、查看同层歌曲和当前位置；播放全部包含当前目录及子目录中的歌曲。\n- 艺术家列表新增圆形头像，支持读取 Emby、Jellyfin、Plex 和 OpenSubsonic / Navidrome 提供的艺术家图片。\n- 头像缺失时显示默认头像；本地音乐、WebDAV 和飞牛音乐暂不自动补充艺术家图片。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.56-openlist.39%2B69/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.58-openlist.40%2B71/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.56-openlist.39%2B69"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.58-openlist.40%2B71"
   },
   "history": [
+    {
+      "version": "1.0.56-openlist.39",
+      "build": 69,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.56-openlist.39 (arm64-v8a)",
+      "date": "2026-11-13",
+      "notes": "- 新增设备间快速迁移，可在同一局域网内发送和接收音乐源、API 及自定义外观配置，核对配对码后加密传输。\n- 首次启动第二页改为独立迁移欢迎引导，可选择从旧设备导入或继续手动设置。\n- 设备名称改用音符和随机设备编号，方便在扫描列表中辨认接收设备。\n- 接收页新增故障排除：查看本机接收状态和网络信息，处理发现、连接与权限问题；支持重新请求 Android 本地网络权限。\n- 导入前可预览内容，已有相同音乐源会跳过；歌曲文件、缓存、歌单和播放历史不迁移，部分服务器可能需要重新登录。\n- OpenList 网盘挂载及内置服务配置需在新设备单独设置。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.56-openlist.39%2B69/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.56-openlist.39%2B69"
+    },
     {
       "version": "1.0.55-openlist.38",
       "build": 68,
