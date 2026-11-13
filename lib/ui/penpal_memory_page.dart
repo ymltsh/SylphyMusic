@@ -16,6 +16,25 @@ class PenpalMemoryPage extends StatefulWidget {
 class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
   late Future<PenpalMemorySnapshot> _state = widget.app.penpalMemory.snapshot();
   bool _busy = false;
+  late String _currentCard = widget.app.apiSettings.activeCardId;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.app.apiSettings.addListener(_cardChanged);
+  }
+
+  void _cardChanged() {
+    if (!mounted || _currentCard == widget.app.apiSettings.activeCardId) return;
+    _currentCard = widget.app.apiSettings.activeCardId;
+    setState(() => _state = widget.app.penpalMemory.snapshot());
+  }
+
+  @override
+  void dispose() {
+    widget.app.apiSettings.removeListener(_cardChanged);
+    super.dispose();
+  }
 
   Future<void> _run(Future<void> Function() task) async {
     if (_busy) return;
@@ -40,7 +59,7 @@ class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
     final next = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('笔友的人格'),
+        title: const Text('当前角色的补充设定'),
         content: SizedBox(
           width: 540,
           child: TextField(
@@ -49,7 +68,7 @@ class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
             maxLines: 8,
             minLines: 4,
             decoration: const InputDecoration(
-              helperText: '这是笔友的稳定性格，不是用户画像；留空恢复默认',
+              helperText: '这里补充个人想法，不会覆盖角色卡原设定；留空取消补充',
               border: OutlineInputBorder(),
             ),
           ),
@@ -78,7 +97,7 @@ class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
       builder: (context) => AlertDialog(
         title: const Text('清空笔友记忆？'),
         content: const Text(
-          '会删除自我反思、共同记忆、保存过的回复和聊天记录，并将人格恢复默认。'
+          '只清除当前角色的自我反思、共同记忆和聊天；角色卡和其他角色不会改变。'
           '已有来信、曲库及播放统计不会删除；此操作无法撤销。',
         ),
         actions: [
@@ -109,7 +128,7 @@ class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
           ListTile(title: Text(title), subtitle: Text(description)),
           for (final memory in memories.take(40))
             ListTile(
-              title: Text(memory.text),
+              title: Text(memory.displayText),
               subtitle: Text(
                 '${DateTime.fromMillisecondsSinceEpoch(memory.createdAtMs).toLocal().year}-'
                 '${DateTime.fromMillisecondsSinceEpoch(memory.createdAtMs).toLocal().month}-'
@@ -198,15 +217,19 @@ class _PenpalMemoryPageState extends State<PenpalMemoryPage> {
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.auto_stories_outlined),
-                    title: const Text('它是什么样的笔友'),
-                    subtitle: Text(data.soul),
+                    title: Text('关于${data.personaName}'),
+                    subtitle: Text(
+                      data.soulCustomized ? data.soul : '以角色卡为准；可补充个人设定',
+                    ),
                     trailing: const Icon(Icons.edit_outlined),
-                    onTap: _busy ? null : () => _editSoul(data.soul),
+                    onTap: _busy
+                        ? null
+                        : () => _editSoul(data.soulCustomized ? data.soul : ''),
                   ),
                 ),
-                _memoryGroup('它最近在想', '由真实来信延伸出的有限自我反思', self),
-                _memoryGroup('我们记住的事', '记录打开信件、主动回复和选择记住的聊天原话，不猜测感受', bond),
-                _memoryGroup('它写过的信', '短摘要；完整内容仍在每日来信存档', episodes),
+                _memoryGroup('${data.personaName}最近在想', '最近想继续分享的念头', self),
+                _memoryGroup('我们记住的事', '相处时留下的真实片段', bond),
+                _memoryGroup('${data.personaName}写过的信', '完整内容仍在来信存档', episodes),
                 const Padding(
                   padding: EdgeInsets.all(12),
                   child: Text(

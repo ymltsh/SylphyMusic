@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
-import 'penpal_memory_page.dart';
+import '../services/recommendation_service.dart';
 import 'llm_recommendation_settings.dart';
+import 'recommendation_settings_section.dart';
 
 class RecommendationSettingsPage extends StatefulWidget {
   const RecommendationSettingsPage({super.key, required this.app});
@@ -15,49 +16,61 @@ class RecommendationSettingsPage extends StatefulWidget {
 
 class _RecommendationSettingsPageState
     extends State<RecommendationSettingsPage> {
-  late Future<bool> _charts = widget.app.recommendations.onlineChartsEnabled;
-  late Future<int> _refreshCount = widget.app.recommendations
-      .dailyRefreshCount();
+  SylphyApp get app => widget.app;
+  late Future<bool> _charts = app.recommendations.onlineChartsEnabled;
+  late Future<int> _refreshCount = app.recommendations.dailyRefreshCount();
   bool _busy = false;
+  bool _needsRefresh = false;
+  bool _llmBusy = false;
+  bool get _locked => _busy || _llmBusy;
+  String _activity = '';
 
-  Future<void> _changeRefreshCount(int count) async {
-    if (_busy) return;
-    setState(() => _busy = true);
+  void _notice(String message) {
+    if (mounted)
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _save(
+    Future<void> Function() action, {
+    bool affectsSelection = true,
+  }) async {
+    if (_locked) return;
+    setState(() {
+      _busy = true;
+      _activity = '正在保存设置';
+    });
     try {
-      await widget.app.recommendations.setDailyRefreshCount(count);
-      if (mounted) setState(() => _refreshCount = Future.value(count));
-      // Signal the home page to re-evaluate the current period.
-      await widget.app.reload();
+      await action();
+      if (mounted)
+        setState(() {
+          _charts = app.recommendations.onlineChartsEnabled;
+          _refreshCount = app.recommendations.dailyRefreshCount();
+          _needsRefresh = _needsRefresh || affectsSelection;
+        });
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('保存自动刷新次数失败')));
-      }
+      _notice('保存失败，请重试');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _update(Future<void> Function() action) async {
-    if (_busy) return;
-    setState(() => _busy = true);
+  Future<void> _refresh() async {
+    if (_locked) return;
+    setState(() {
+      _busy = true;
+      _activity = '正在更新每日精选和专辑推荐';
+    });
     try {
-      await action();
-      await widget.app.recommendations.daily(regenerate: true);
-      await widget.app.recommendations.albums(regenerate: true);
-      await widget.app.reload();
+      await app.recommendations.daily(regenerate: true);
+      await app.recommendations.albums(regenerate: true);
+      await app.reload();
+      if (mounted) setState(() => _needsRefresh = false);
+      _notice('推荐已更新');
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('操作未完成，请稍后重试')));
-      }
+      _notice('更新未完成，已保存的设置仍然有效，可稍后重试');
     } finally {
-      if (mounted) {
-        setState(() {
-          _charts = widget.app.recommendations.onlineChartsEnabled;
-          _busy = false;
-        });
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -66,7 +79,9 @@ class _RecommendationSettingsPageState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清除推荐统计？'),
-        content: const Text('将清除收听统计和推荐快照，并重新生成精选。此操作无法撤销。'),
+        content: const Text(
+          '将删除累计收听统计和推荐快照。收藏、歌单、笔友记忆及已存来信保留。清除后下次换新会重新生成推荐，此操作无法撤销。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -74,14 +89,72 @@ class _RecommendationSettingsPageState
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('清除'),
+            child: const Text('清除统计'),
           ),
         ],
       ),
     );
     if (!mounted || confirmed != true) return;
-    await _update(widget.app.listeningAnalytics.clearStats);
+    await _save(app.listeningAnalytics.clearStats);
   }
+
+  Widget _refreshSchedule() => FutureBuilder<int>(
+    future: _refreshCount,
+    builder: (context, snapshot) {
+      if (snapshot.hasError)
+        return ListTile(
+          title: const Text('换新频率读取失败'),
+          trailing: TextButton(
+            onPressed: _locked
+                ? null
+                : () => setState(() {
+                    _refreshCount = app.recommendations.dailyRefreshCount();
+                  }),
+            child: const Text('重试'),
+          ),
+        );
+      final count = snapshot.data;
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('每日自动换新'),
+            const SizedBox(height: 6),
+            const Text('每日精选按本地时间分段，打开或返回应用时更新；错过的时段不补发。'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final value in RecommendationService.allowedRefreshCounts)
+                  ChoiceChip(
+                    label: Text('$value 次'),
+                    selected: count == value,
+                    onSelected: _locked || count == null
+                        ? null
+                        : (selected) {
+                            if (selected && value != count)
+                              _save(
+                                () => app.recommendations.setDailyRefreshCount(
+                                  value,
+                                ),
+                                affectsSelection: false,
+                              );
+                          },
+                  ),
+              ],
+            ),
+            if (count != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('每 ${24 ~/ count} 小时一个时段 · 仅影响每日精选'),
+              ),
+          ],
+        ),
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -93,113 +166,113 @@ class _RecommendationSettingsPageState
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
-              Card(
-                margin: EdgeInsets.zero,
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: const Text('个性化推荐'),
-                      subtitle: const Text('根据收藏和收听习惯生成精选，关闭后停止新增收听统计'),
-                      value: widget.app.listeningAnalytics.enabled,
-                      onChanged: _busy
-                          ? null
-                          : (value) => _update(
-                              () => widget.app.listeningAnalytics.setEnabled(
-                                value,
-                              ),
-                            ),
-                    ),
-                    FutureBuilder<bool>(
-                      future: _charts,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return ListTile(
-                            title: const Text('在线热度设置读取失败'),
-                            trailing: TextButton(
-                              onPressed: _busy
-                                  ? null
-                                  : () => setState(() {
-                                      _charts = widget
-                                          .app
-                                          .recommendations
-                                          .onlineChartsEnabled;
-                                    }),
-                              child: const Text('重试'),
-                            ),
-                          );
-                        }
-                        return SwitchListTile(
-                          title: const Text('在线热度'),
-                          subtitle: const Text('获取公开榜单辅助推荐，不上传个人曲库或收听记录'),
-                          value: snapshot.data ?? false,
-                          onChanged: _busy || !snapshot.hasData
-                              ? null
-                              : (value) => _update(
-                                  () => widget.app.recommendations
-                                      .setOnlineChartsEnabled(value),
-                                ),
+              RecommendationSettingsSection(
+                icon: Icons.library_music_outlined,
+                title: '基础推荐',
+                description: '从自己的曲库发现音乐，决定选曲依据。',
+                status: '始终可用',
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.favorite_border_rounded),
+                    title: const Text('根据我的喜好选曲'),
+                    subtitle: const Text('参考收藏和收听习惯；关闭后随机探索，并停止新增收听统计。'),
+                    value: app.listeningAnalytics.enabled,
+                    onChanged: _locked
+                        ? null
+                        : (value) => _save(
+                            () => app.listeningAnalytics.setEnabled(value),
+                          ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  FutureBuilder<bool>(
+                    future: _charts,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError)
+                        return ListTile(
+                          title: const Text('在线热度设置读取失败'),
+                          trailing: TextButton(
+                            onPressed: _locked
+                                ? null
+                                : () => setState(() {
+                                    _charts =
+                                        app.recommendations.onlineChartsEnabled;
+                                  }),
+                            child: const Text('重试'),
+                          ),
                         );
-                      },
-                    ),
-                    const Divider(height: 1),
-                    FutureBuilder<int>(
-                      future: _refreshCount,
-                      builder: (context, snapshot) => ListTile(
-                        leading: const Icon(Icons.schedule_rounded),
-                        title: const Text('每日自动换新次数'),
-                        subtitle: const Text(
-                          '按本地时间均分每天；进入或返回应用时每个时段最多自动生成一轮，错过不补',
-                        ),
-                        trailing: DropdownButton<int>(
-                          value: snapshot.data ?? 3,
-                          items: [
-                            for (final count in [1, 2, 3, 4, 6])
-                              DropdownMenuItem(
-                                value: count,
-                                child: Text('$count 次'),
+                      return SwitchListTile(
+                        secondary: const Icon(Icons.trending_up_rounded),
+                        title: const Text('参考公开热度'),
+                        subtitle: const Text('联网获取公开榜单辅助选曲，不上传个人曲库或收听记录。'),
+                        value: snapshot.data ?? false,
+                        onChanged: _locked || !snapshot.hasData
+                            ? null
+                            : (value) => _save(
+                                () => app.recommendations
+                                    .setOnlineChartsEnabled(value),
                               ),
-                          ],
-                          onChanged: _busy || !snapshot.hasData
-                              ? null
-                              : (value) {
-                                  if (value != null) _changeRefreshCount(value);
-                                },
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.auto_stories_outlined),
-                      title: const Text('关于我的音乐笔友'),
-                      subtitle: const Text('人格、长期记忆、共同经历与隐私管理'),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PenpalMemoryPage(app: widget.app),
-                        ),
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.delete_outline),
-                      title: const Text('清除推荐统计'),
-                      subtitle: const Text('清除累计收听统计和推荐快照'),
-                      enabled: !_busy,
-                      onTap: _clear,
-                    ),
-                  ],
-                ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              LlmRecommendationSettings(
+                app: app,
+                disabled: _busy,
+                onBusyChanged: (value) {
+                  if (mounted) setState(() => _llmBusy = value);
+                },
+              ),
+              const SizedBox(height: 24),
+              RecommendationSettingsSection(
+                icon: Icons.update_rounded,
+                title: '换新与数据',
+                description: '安排每日精选的节奏，管理推荐使用的收听统计。',
+                children: [
+                  _refreshSchedule(),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline),
+                    title: const Text('清除推荐统计'),
+                    subtitle: const Text('删除收听统计和推荐快照，保留收藏、歌单与笔友内容'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _locked ? null : _clear,
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              LlmRecommendationSettings(app: widget.app),
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('个性化与在线热度变更会重新生成精选；自动换新次数只影响每日精选，不影响专辑，也不补发错过的时段。'),
+              Card(
+                margin: EdgeInsets.zero,
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _needsRefresh ? '设置已保存，选曲调整将在下次换新生效' : '想现在听到新的选择？',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text('立即更新每日精选和专辑推荐；开启 LLM 时会请求模型服务，可能产生费用。'),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _locked ? null : _refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(_busy ? _activity : '立即更新推荐'),
+                      ),
+                      if (_busy)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: LinearProgressIndicator(),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              if (_busy) const LinearProgressIndicator(),
             ],
           ),
         ),

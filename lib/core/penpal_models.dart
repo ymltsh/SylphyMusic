@@ -1,4 +1,4 @@
-/// A deliberately small memory model. Raw letters stay in recommendation_letters.
+/// Compact local memories. The original letters remain in recommendation_letters.
 class PenpalMemoryEntry {
   const PenpalMemoryEntry({
     required this.id,
@@ -18,6 +18,19 @@ class PenpalMemoryEntry {
   final int createdAtMs;
   final bool pinned;
 
+  /// Presentation is separate from the factual event, and never adds rules.
+  String get displayText {
+    if (kind == 'letter_opened') {
+      final title = RegExp(r'《[^》]{1,70}》').firstMatch(text)?.group(0);
+      if (title != null) return '你翻开过$title。';
+    }
+    if (kind == 'letter_written') {
+      final title = RegExp(r'《[^》]{1,70}》').firstMatch(text)?.group(0);
+      if (title != null) return '我写过$title。';
+    }
+    return text;
+  }
+
   factory PenpalMemoryEntry.fromRow(Map<String, Object?> row) =>
       PenpalMemoryEntry(
         id: row['id'] as int,
@@ -35,11 +48,15 @@ class PenpalMemorySnapshot {
     required this.enabled,
     required this.recallEnabled,
     required this.soul,
+    required this.soulCustomized,
+    required this.personaName,
     required this.entries,
   });
 
   final bool enabled;
   final bool recallEnabled;
   final String soul;
+  final bool soulCustomized;
+  final String personaName;
   final List<PenpalMemoryEntry> entries;
 }

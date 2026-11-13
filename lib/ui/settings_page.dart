@@ -26,11 +26,11 @@ enum _Section {
   sync,
   lyrics,
   theme,
-  background,
   player,
   icon,
   cache,
   api,
+  llmConnection,
   diagnostics,
   about,
 }
@@ -38,6 +38,12 @@ enum _Section {
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.app, required this.onSources})
     : _section = null;
+  const SettingsPage.llmConnection({super.key, required this.app})
+    : onSources = _ignoreSources,
+      _section = _Section.llmConnection;
+
+  static void _ignoreSources() {}
+
   const SettingsPage._({
     required this.app,
     required this.onSources,
@@ -118,12 +124,12 @@ class _SettingsPageState extends State<SettingsPage> {
         _Section.sync => '同步与收藏',
         _Section.library => '音乐库分类',
         _Section.lyrics => '歌词设置',
-        _Section.theme => '主题与配色',
-        _Section.background => '页面背景',
+        _Section.theme => '主题与背景',
         _Section.player => '播放器外观',
         _Section.icon => '应用图标',
         _Section.cache => '下载与缓存',
         _Section.api => 'API 设置',
+        _Section.llmConnection => '模型连接',
         _Section.diagnostics => '诊断与反馈',
         _Section.about => '关于风灵音乐',
       };
@@ -144,10 +150,14 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? _directory(context)
                           : section == _Section.lyrics
                           ? _lyricCards()
+                          : section == _Section.theme
+                          ? _themeCards()
                           : section == _Section.player
                           ? _playerAppearanceCards()
                           : section == _Section.api
                           ? _apiCards()
+                          : section == _Section.llmConnection
+                          ? [_llmConnectionCard()]
                           : [
                               Card(
                                 margin: EdgeInsets.zero,
@@ -162,6 +172,65 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     },
   );
+
+  List<Widget> _themeCards() => [
+    _group('主题与配色', _controls(_Section.theme)),
+    _group('页面背景', [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Text('主题颜色对所有页面生效；背景图片显示在首页、音乐库、歌单和我的页面。'),
+      ),
+      ..._backgroundControls(),
+    ]),
+  ];
+
+  List<Widget> _backgroundControls() => [
+    SwitchListTile(
+      secondary: const Icon(Icons.format_color_fill_outlined),
+      title: const Text('纯色底色'),
+      subtitle: const Text('浅色纯白、深色炭灰；关闭后使用背景图片或主题底色'),
+      value: app.appearance.solidBackground,
+      onChanged: (v) => _act(() => app.appearance.update(solid: v)),
+    ),
+    ListTile(
+      title: const Text('自定义背景图'),
+      subtitle: Text(
+        app.appearance.backgroundFile == null
+            ? '选择背景图片'
+            : app.appearance.solidBackground
+            ? '已选择 · 关闭纯色背景后显示'
+            : '已设置背景图片',
+      ),
+      leading: const Icon(Icons.wallpaper_outlined),
+      trailing: app.appearance.backgroundFile == null
+          ? const Icon(Icons.chevron_right)
+          : IconButton(
+              tooltip: '移除背景',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () => _act(app.appearance.clearBackground),
+            ),
+      onTap: () => _act(app.appearance.pickBackground),
+    ),
+    if (app.appearance.backgroundFile != null &&
+        !app.appearance.solidBackground)
+      ListTile(
+        title: const Text('背景可见度'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${(app.appearance.backgroundVisibility * 100).round()}%'),
+            Slider(
+              min: .1,
+              max: .4,
+              divisions: 30,
+              value: app.appearance.backgroundVisibility,
+              onChanged: (v) =>
+                  _act(() => app.appearance.update(visibility: v)),
+            ),
+          ],
+        ),
+      ),
+  ];
 
   List<Widget> _playerAppearanceCards() => [
     _group('播放页面', [
@@ -405,47 +474,43 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _editLrcApiToken,
       ),
     ]),
-    _group('LLM 连接', [
-      ListTile(
-        key: const ValueKey('api-llm-url'),
-        leading: const Icon(Icons.link_outlined),
-        title: const Text('LLM 接口地址'),
-        subtitle: Text(app.apiSettings.llmUrl),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: _editLlmUrl,
-      ),
-      ListTile(
-        key: const ValueKey('api-llm-model'),
-        leading: const Icon(Icons.psychology_outlined),
-        title: const Text('LLM 模型'),
-        subtitle: Text(app.apiSettings.llmModel),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: _editLlmModel,
-      ),
-      ListTile(
-        key: const ValueKey('api-llm-token'),
-        leading: const Icon(Icons.key_outlined),
-        title: const Text('LLM API Key'),
-        subtitle: const Text('保存在系统安全存储；留空清除'),
-        trailing: const Icon(Icons.edit_outlined),
-        onTap: _editLlmToken,
-      ),
-      ListTile(
-        key: const ValueKey('api-llm-test'),
-        leading: const Icon(Icons.network_check_outlined),
-        title: Text(_llmTestRunning ? '正在测试 LLM 连接…' : '测试 LLM 连接'),
-        subtitle: Text(
-          app.apiSettings.llmEnabled
-              ? '仅使用合成歌曲元数据；可能产生少量 API 用量'
-              : '请先在推荐设置中开启 LLM 增强推荐',
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: app.apiSettings.llmEnabled && !_llmTestRunning
-            ? _testLlmConnection
-            : null,
-      ),
-    ]),
+    _llmConnectionCard(),
   ];
+
+  Widget _llmConnectionCard() => _group('LLM 连接', [
+    ListTile(
+      key: const ValueKey('api-llm-url'),
+      leading: const Icon(Icons.link_outlined),
+      title: const Text('LLM 接口地址'),
+      subtitle: Text(app.apiSettings.llmUrl),
+      trailing: const Icon(Icons.edit_outlined),
+      onTap: _editLlmUrl,
+    ),
+    ListTile(
+      key: const ValueKey('api-llm-model'),
+      leading: const Icon(Icons.psychology_outlined),
+      title: const Text('LLM 模型'),
+      subtitle: Text(app.apiSettings.llmModel),
+      trailing: const Icon(Icons.edit_outlined),
+      onTap: _editLlmModel,
+    ),
+    ListTile(
+      key: const ValueKey('api-llm-token'),
+      leading: const Icon(Icons.key_outlined),
+      title: const Text('LLM API Key'),
+      subtitle: const Text('保存在系统安全存储；留空清除'),
+      trailing: const Icon(Icons.edit_outlined),
+      onTap: _editLlmToken,
+    ),
+    ListTile(
+      key: const ValueKey('api-llm-test'),
+      leading: const Icon(Icons.network_check_outlined),
+      title: Text(_llmTestRunning ? '正在测试 LLM 连接…' : '测试 LLM 连接'),
+      subtitle: const Text('仅发送合成歌曲元数据，不会开启增强推荐；可能产生少量 API 用量'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: _llmTestRunning ? null : _testLlmConnection,
+    ),
+  ]);
 
   List<Widget> _lyricCards() => [
     _group('歌词页面', [
@@ -600,8 +665,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
-      _entry(Icons.palette_outlined, '主题与配色', '打造你喜欢的色彩', _Section.theme),
-      _entry(Icons.wallpaper_outlined, '页面背景', '自定义页面背景', _Section.background),
+      _entry(Icons.palette_outlined, '主题与背景', '外观模式、主题颜色与背景图片', _Section.theme),
       _entry(Icons.album_outlined, '播放器外观', '编辑播放页、唱片与迷你播放器', _Section.player),
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
         _entry(Icons.apps_outlined, '应用图标', '选择你喜欢的图标', _Section.icon),
@@ -825,52 +889,6 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: _chooseThemeColor,
       ),
     ],
-    _Section.background => [
-      SwitchListTile(
-        title: const Text('纯色背景'),
-        subtitle: const Text('使用简洁的纯色背景'),
-        value: app.appearance.solidBackground,
-        onChanged: (v) => _act(() => app.appearance.update(solid: v)),
-      ),
-      ListTile(
-        title: const Text('自定义背景图'),
-        subtitle: Text(
-          app.appearance.backgroundFile == null
-              ? '选择背景图片'
-              : app.appearance.solidBackground
-              ? '已选择 · 关闭纯色背景后显示'
-              : '已设置背景图片',
-        ),
-        leading: const Icon(Icons.wallpaper_outlined),
-        trailing: app.appearance.backgroundFile == null
-            ? const Icon(Icons.chevron_right)
-            : IconButton(
-                tooltip: '移除背景',
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _act(app.appearance.clearBackground),
-              ),
-        onTap: () => _act(app.appearance.pickBackground),
-      ),
-      if (app.appearance.backgroundFile != null &&
-          !app.appearance.solidBackground)
-        ListTile(
-          title: const Text('背景可见度'),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${(app.appearance.backgroundVisibility * 100).round()}%'),
-              Slider(
-                min: .1,
-                max: .4,
-                divisions: 30,
-                value: app.appearance.backgroundVisibility,
-                onChanged: (v) =>
-                    _act(() => app.appearance.update(visibility: v)),
-              ),
-            ],
-          ),
-        ),
-    ],
     _Section.player => [],
     _Section.icon => [LauncherIconPicker(apiSettings: app.apiSettings)],
     _Section.cache => [
@@ -907,6 +925,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     ],
     _Section.api => _apiCards(),
+    _Section.llmConnection => [_llmConnectionCard()],
     _Section.diagnostics => [
       ListTile(
         key: const ValueKey('recommendation-letters-archive'),

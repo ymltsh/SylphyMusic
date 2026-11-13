@@ -56,8 +56,10 @@ class RecommendationLetter {
     this.title = '写给你的今日音乐信',
     this.coverRefs = const [],
     this.trackCount = 0,
+    this.cardId = '',
   });
 
+  final String cardId;
   final int id;
   final String day;
   final int generation;

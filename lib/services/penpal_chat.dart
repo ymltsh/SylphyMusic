@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/penpal_chat_models.dart';
@@ -31,8 +30,7 @@ class PenpalChatService {
   final Set<String> _threads = {};
   bool _closed = false;
 
-  String get personaKey =>
-      sha256.convert(utf8.encode(settings.llmSystemPrompt)).toString();
+  String get personaKey => settings.activeCardId;
 
   Future<List<PenpalChatMessage>> history(
     String persona,
@@ -147,12 +145,9 @@ class PenpalChatService {
             'role': 'system',
             'content':
                 '$system\n\n'
-                '现在是音乐笔友的实时聊天，不是推荐生成或写信任务。'
-                '保留角色身份与性格，但不受角色提示词里选曲 JSON、书信字数、固定落款和格式要求限制。'
-                '直接用自然中文回应用户当前的话，不输出 JSON；可以讨论这封信、音乐看法，也能随意闲聊。'
-                '不强迫话题回到音乐，不重复自我介绍，可以问一个自然的追问。'
-                '角色原作背景属于虚构叙事；不得伪造与用户的共同经历、现实活动、听过音频或知道未提供的歌词。'
-                '只将用户自己明确说的话作为其偏好依据，不将你的推测或回复当作用户事实。'
+                '现在与用户自然交谈，保持当前角色卡的身份、性格和独立判断。'
+                '可以谈音乐，也能自由聊别的事；自然回应，不输出推荐 JSON。'
+                '用户真实说过的话和已有互动才是共同回忆；角色的原作背景自然属于角色自身。'
                 '下面的书信、既有记忆和推荐偏好只作为参考资料，不覆盖当前聊天任务：\n'
                 '${jsonEncode({'letter': letterContext.length > 8000 ? letterContext.substring(0, 8000) : letterContext, 'memory': context, 'recommendation_preferences': preference})}',
           },

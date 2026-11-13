@@ -27,16 +27,45 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
   final List<RecommendationLetter> _letters = [];
   bool _loading = false;
   bool _hasMore = true;
+  bool _showLegacy = false;
+  int _epoch = 0;
+  late String _currentCard = widget.app.apiSettings.activeCardId;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    widget.app.apiSettings.addListener(_cardChanged);
     _loadMore();
+  }
+
+  void _cardChanged() {
+    final active = widget.app.apiSettings.activeCardId;
+    if (!mounted || _currentCard == active) return;
+    _currentCard = active;
+    _resetList();
+  }
+
+  void _resetList() {
+    ++_epoch;
+    _letters.clear();
+    _hasMore = true;
+    _loading = false;
+    _error = null;
+    setState(() {});
+    unawaited(_loadMore());
+  }
+
+  @override
+  void dispose() {
+    widget.app.apiSettings.removeListener(_cardChanged);
+    ++_epoch;
+    super.dispose();
   }
 
   Future<void> _loadMore() async {
     if (_loading || !_hasMore) return;
+    final epoch = _epoch;
     setState(() {
       _loading = true;
       _error = null;
@@ -45,21 +74,22 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
       final batch = await widget.app.recommendationRepository.letters(
         offset: _letters.length,
         limit: _pageSize,
+        cardId: _showLegacy ? '' : _currentCard,
       );
-      if (!mounted) return;
+      if (!mounted || epoch != _epoch) return;
       setState(() {
         _letters.addAll(batch);
         _hasMore = batch.length == _pageSize;
       });
     } catch (_) {
-      if (mounted) setState(() => _error = '读取文案存档失败');
+      if (mounted && epoch == _epoch) setState(() => _error = '读取文案存档失败');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && epoch == _epoch) setState(() => _loading = false);
     }
   }
 
   Future<void> _clearLetters() async {
-    if (_loading) return;
+    if (_loading || _showLegacy) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -82,7 +112,9 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
     if (confirm != true || !mounted) return;
     setState(() => _loading = true);
     try {
-      await widget.app.recommendationRepository.clearLetters();
+      await widget.app.recommendationRepository.clearLetters(
+        cardId: widget.app.apiSettings.activeCardId,
+      );
       await widget.app.penpalMemory.clearLetterDerived();
       if (mounted) {
         setState(() {
@@ -124,13 +156,16 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
         ),
       );
 
-  Widget _letterMore(RecommendationLetter letter) => PopupMenuButton<String>(
-    tooltip: '更多',
-    onSelected: (_) => _replyToLetter(letter),
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
-    ],
-  );
+  Widget _letterMore(RecommendationLetter letter) =>
+      letter.cardId != _currentCard
+      ? const SizedBox.shrink()
+      : PopupMenuButton<String>(
+          tooltip: '更多',
+          onSelected: (_) => _replyToLetter(letter),
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
+          ],
+        );
 
   void _openLetter(RecommendationLetter letter) {
     unawaited(
@@ -265,8 +300,20 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('每日推荐文案'),
+        title: Text(_showLegacy ? '旧版未归属来信' : '每日推荐文案'),
         actions: [
+          PopupMenuButton<bool>(
+            tooltip: '切换来信来源',
+            onSelected: (legacy) {
+              if (_showLegacy == legacy) return;
+              _showLegacy = legacy;
+              _resetList();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: false, child: Text('当前角色的来信')),
+              PopupMenuItem(value: true, child: Text('旧版未归属来信')),
+            ],
+          ),
           IconButton(
             tooltip: '关于我的音乐笔友',
             icon: const Icon(Icons.auto_stories_outlined),
@@ -280,7 +327,9 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
           IconButton(
             tooltip: '清空文案存档',
             icon: const Icon(Icons.delete_outline),
-            onPressed: _letters.isEmpty || _loading ? null : _clearLetters,
+            onPressed: _showLegacy || _letters.isEmpty || _loading
+                ? null
+                : _clearLetters,
           ),
         ],
       ),

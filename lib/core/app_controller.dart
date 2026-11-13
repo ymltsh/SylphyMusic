@@ -88,7 +88,10 @@ class SylphyApp extends ChangeNotifier {
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   late final recommendationRepository = RecommendationRepository(db);
-  late final penpalMemory = PenpalMemory(PenpalMemoryRepository(db));
+  late final penpalMemory = PenpalMemory(
+    PenpalMemoryRepository(db),
+    apiSettings,
+  );
   late final penpalChat = PenpalChatService(
     apiSettings,
     vault,
@@ -1128,6 +1131,7 @@ class SylphyApp extends ChangeNotifier {
     apiSettings.removeListener(_apiChanged);
     lrcApi.dispose();
     await penpalChat.shutdown();
+    await apiSettings.cards.shutdown();
     apiSettings.dispose();
     await listeningAnalytics.shutdown();
     await recommendations.shutdown();

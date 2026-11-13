@@ -1793,3 +1793,48 @@ Emby 收藏分页读取当前用户的 Audio 收藏，通过 FavoriteItems POST 
 应用用户提供的 SylphyMusic_icon_picker_design_and_flutter.zip 设计及 Flutter 示例，适配现有设置页。图标页面采用当前图标卡、8 项网格、点击预览、故事 / 彩蛋及固定底部应用按钮；仅按应用后调用原生选择，完成后重新读取系统状态。深浅色沿用应用主题。用户 logo/ 素材导入并更新 Android 各密度图标、别名 / 目录 / nodpi 和 Windows ICO；新增吹响！上低音号，已有 6 款备用图标 ID / 路径均保留。about.png 不纳入选择。主分支和 OpenList 分支同步修改，保留其他未提交工作，不运行 analyze、测试或设备验证，不提交、推送或发布。
 
 编译交付：主分支 Android 三个 ABI、Windows Release 和内部 ZIP / APK 打包成功；OpenList 分支三个 ABI Android Release 编译成功。主分支产物更新至 `sylphy_music_main/build/internal-review/`。页面视觉及 Android 桌面切换行为未在设备上验收，交由用户验证；本轮未提交、推送或发布。
+
+
+## 2026-11-13 应用角色卡 V18 补丁
+
+按用户提供的 `SylphyMusic-character-cards-v18-patch.zip` 应用到主分支工作区。新增稳定角色 ID、角色卡管理与 JSON 导入导出、本地角色图片，以及按角色隔离的聊天、记忆和来信；数据库从 v16 前向迁移至 v18，保留未归属旧记录。温迪与希露菲仍经图标彩蛋主动发现，原始角色 JSON 未修改。OpenList 特性工作区未应用此补丁。
+
+补丁全文替换文件与当前源码仅存在 CRLF/LF 差异，规范化核对一致后应用；旧源码已备份至 `.private/character-cards-v18-before/`，模型文件另存 `.private/character-cards-v18-model-before/`。补齐原安装脚本遗漏的 `lib/core/penpal_models.dart`，并将图片选择适配现有 file_picker 13 接口。
+
+编译交付：`tool/build_review.ps1` 成功，Android 三个 ABI 与 Windows Release 构建及内部打包完成，产物位于 `build/internal-review/`；打包脚本完成已跟踪输入和应用包内容检查。本轮未使用私密联调凭据。构建日志：`build/character-cards-v18-build.log`。未运行 analyze、测试、启动或设备检查，功能与数据库迁移验收由用户负责；未提交、推送或发布。
+
+
+## 2026-11-13 移除未归属旧记忆
+
+按用户要求移除旧版未归属记忆，不再保留其查询、模型字段和折叠管理入口。数据库升级至 v19，通过前向迁移删除 `penpal_memory_events` 中空 `card_id` 的记录，兼容此前已升级到 v18 的安装；已归属角色的记忆继续保留。本次清理仅涉及记忆，旧来信和聊天处理维持原样。
+
+`tool/build_review.ps1` 成功，Android 三个 ABI 和 Windows Release 均编译并完成内部打包检查；更新产物位于 `build/internal-review/`，日志为 `build/character-cards-v19-build.log`。未运行 analyze、测试、启动或设备检查，迁移与功能验收交由用户；未提交、推送或发布。
+
+
+## 2026-11-13 推荐设置分区与交互重设计
+
+推荐设置改为基础推荐、LLM 增强、换新与数据三个功能区，统一图标标题、说明、状态标记与卡片层级。基础推荐集中喜好选曲和公开热度；基础选曲调整保存后于下次换新生效，可一次“立即更新推荐”，不再每切换一项就强制生成。频率改用可见选项并说明时段；清理统计保持后果确认并明确保留收藏、歌单、笔友内容。
+
+LLM 增强集中开关、专用模型连接入口、辅助／主导选曲、等待时间、角色卡与记忆；参与方式窄屏纵排、宽屏并排。关闭增强仍可配置连接和管理角色，参与方式及等待时间禁用但保留设置。模型连接复用原 API 设置控件；显式连接测试可在增强关闭时执行，使用合成歌曲元数据且不修改开关，普通推荐仍受增强开关控制。删除已无入口的旧 Prompt 对话框。保存与更新状态显示进度并锁定相关操作，失败保留已保存配置并提供重试反馈。详见 `docs/RECOMMENDATION_SETTINGS.md`。
+
+交付：最终 `tool/build_review.ps1` 成功，Android 三个 ABI 与 Windows Release 均编译、打包完成；内容检查完成，产物更新于 `build/internal-review/`，日志 `build/recommendation-settings-redesign-build.log`。本轮未使用私密联调凭据，未运行 analyze、测试、启动或设备检查；页面视觉与功能交由用户验收，未提交、推送或发布。
+
+
+## 2026-11-13 移除绘画功能并开放角色卡编辑与删除
+
+按用户反馈移除绘画提示词、角色图片选择/显示及其模型、服务和 JSON 导入导出字段；旧数据库列保持兼容但不再读写。角色卡统一提供可见的“编辑提示词与角色”按钮，名称、System 和 User 在同一窗口编辑并一次保存，新建角色也可直接填写提示词。默认、自定义和彩蛋角色均可编辑和删除；编辑彩蛋卡仅修改本地实例并标为自定义，不修改原始角色 JSON。
+
+角色内容与当前配置镜像事务更新，原角色 ID、聊天和记忆保持不变。删除当前角色在同一事务内切换其他角色；删除最后一张卡会创建新 ID 的默认笔友，删除的角色聊天与记忆同步清理，历史来信保留。启动时允许从剩余角色恢复，不再依赖默认卡一定存在。角色卡导入窗口使用组件自身管理文本生命周期。
+
+最终 `tool/build_review.ps1` 成功，Android 三个 ABI 和 Windows Release 均编译并完成内部打包检查，产物更新至 `build/internal-review/`；日志 `build/penpal-card-editing-build.log`。未运行 analyze、功能测试、启动或设备检查；未使用私密联调凭据，未提交、推送或发布。
+
+
+## 2026-11-13 笔友头像、统一外观入口与音乐源管理播放器调整
+
+按用户新要求支持笔友自定义头像，列表点击头像或菜单可选择 PNG/JPEG/WebP，也可恢复默认；角色列表及聊天页头部显示该笔友头像。头像按角色独立，读入上限 8 MiB，最长边缩至 512 像素后以 PNG 原子保存到受管目录，不影响用户原图、不传模型、不导入导出头像。复用原 art_path 数据库列保存相对路径，不增加 schema 版本；绘画提示词和 AI 绘画仍不提供。头像更换、移除与角色删除串行执行，退出等待相关任务后关闭数据库。
+
+设置首页“页面背景”和“主题与配色”合并为“主题与背景”，内部分配配色和背景两个卡片组，统一外观模式、主色、纯色底色、背景图片及可见度，保留既有持久化选项。补充纯色和主题底色关系及图片适用范围的说明。
+
+音乐源管理各入口统一经 _openSources 打开，取消路由迷你播放器及底部占位；最近播放等其他路由保持原播放器行为。
+
+最终 tool/build_review.ps1 成功，Android 三个 ABI 与 Windows Release 均编译并完成内部打包检查，产物位于 build/internal-review/，日志 build/avatar-appearance-sources-build.log。未使用私密联调凭据；未运行 analyze、测试、启动或设备检查，功能和视觉验收交由用户；未提交、推送或发布。

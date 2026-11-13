@@ -402,6 +402,7 @@ class RecommendationRepository {
     String introduction = '',
     String letterTitle = '写给你的今日音乐信',
     String letterOrigin = 'local',
+    String cardId = '',
     String llmTag = 'local',
     String refreshPeriod = '',
     bool llmSucceeded = false,
@@ -414,6 +415,7 @@ class RecommendationRepository {
     letterTitle: letterTitle,
     introduction: introduction,
     letterOrigin: letterOrigin,
+    cardId: cardId,
     llmTag: llmTag,
     refreshPeriod: refreshPeriod,
     llmSucceeded: llmSucceeded,
@@ -484,6 +486,7 @@ class RecommendationRepository {
     String introduction = '',
     String letterDetailsText = '',
     String letterOrigin = 'local',
+    String cardId = '',
     String llmTag = 'local',
     String refreshPeriod = '',
     bool llmSucceeded = false,
@@ -527,6 +530,7 @@ class RecommendationRepository {
         'song_count': songCount,
         'details_text': letterDetailsText,
         'origin': letterOrigin,
+        'card_id': cardId,
         'created_at_ms': DateTime.now().millisecondsSinceEpoch,
       });
     }
@@ -581,12 +585,15 @@ class RecommendationRepository {
   Future<List<RecommendationLetter>> letters({
     int offset = 0,
     int limit = 30,
+    String? cardId,
   }) async {
     if (offset < 0 || limit < 1 || limit > 100) {
       throw ArgumentError('Invalid letter archive page');
     }
     final rows = await database.db.query(
       'recommendation_letters',
+      where: cardId == null ? null : 'card_id=?',
+      whereArgs: cardId == null ? null : [cardId],
       orderBy: 'created_at_ms DESC,id DESC',
       offset: offset,
       limit: limit,
@@ -605,6 +612,7 @@ class RecommendationRepository {
           coverRefs: _parseCoverRefs(row['cover_refs_json'] as String? ?? '[]'),
           trackCount: row['song_count'] as int? ?? 0,
           origin: row['origin'] as String,
+          cardId: row['card_id'] as String? ?? '',
           createdAtMs: row['created_at_ms'] as int,
         ),
     ];
@@ -627,8 +635,12 @@ class RecommendationRepository {
     }
   }
 
-  Future<void> clearLetters() async {
-    await database.db.delete('recommendation_letters');
+  Future<void> clearLetters({String? cardId}) async {
+    await database.db.delete(
+      'recommendation_letters',
+      where: cardId == null ? null : 'card_id=?',
+      whereArgs: cardId == null ? null : [cardId],
+    );
   }
 
   Future<void> hideTrack(TrackRef ref) async {

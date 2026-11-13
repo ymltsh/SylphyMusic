@@ -7,6 +7,7 @@ import '../core/app_controller.dart';
 import '../core/penpal_chat_models.dart';
 import '../services/penpal_chat.dart';
 import 'penpal_memory_page.dart';
+import 'penpal_avatar.dart';
 
 class PenpalChatPage extends StatefulWidget {
   const PenpalChatPage({
@@ -46,12 +47,15 @@ class _PenpalChatPageState extends State<PenpalChatPage> {
     if (!mounted) return;
     final persona = widget.app.penpalChat.personaKey;
     if (persona != _persona) {
+      // The old letter context belongs to another character. Leave the route
+      // rather than attaching it to a new card's conversation.
       _request?.cancel();
-      _persona = persona;
-      unawaited(_load());
-    } else {
-      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.maybePop(context);
+      });
+      return;
     }
+    setState(() {});
   }
 
   Future<void> _load() async {
@@ -229,7 +233,19 @@ class _PenpalChatPageState extends State<PenpalChatPage> {
     final enabled = widget.app.apiSettings.llmEnabled;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('与笔友聊天'),
+        title: Row(
+          children: [
+            PenpalAvatar(store: widget.app.apiSettings.cards, radius: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.app.apiSettings.cards.activeName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
         actions: [
           PopupMenuButton<String>(
             enabled: !_busy && !_loading,

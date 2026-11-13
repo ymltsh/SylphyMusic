@@ -134,16 +134,20 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     });
   }
 
-  void _open(String title, Widget Function() page) {
+  void _open(String title, Widget Function() page, {bool showPlayer = true}) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AnimatedBuilder(
-          animation: Listenable.merge([app, app.appearance, app.playback]),
+          animation: Listenable.merge([
+            app,
+            app.appearance,
+            if (showPlayer) app.playback,
+          ]),
           builder: (context, _) => Scaffold(
             appBar: AppBar(title: Text(title)),
             body: SafeArea(top: false, child: page()),
-            bottomNavigationBar: RoutePlayerBar(app: app),
+            bottomNavigationBar: showPlayer ? RoutePlayerBar(app: app) : null,
           ),
         ),
       ),
@@ -282,10 +286,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute<void>(
-                    builder: (_) => SettingsPage(
-                      app: app,
-                      onSources: () => _open('音乐源管理', _sources),
-                    ),
+                    builder: (_) =>
+                        SettingsPage(app: app, onSources: () => _openSources()),
                   ),
                 ),
                 icon: const Icon(Icons.settings_outlined),
@@ -477,7 +479,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         return HomePage(
           app: app,
           onLibrary: _library,
-          onSources: () => _open('音乐源管理', _sources),
+          onSources: () => _openSources(),
           onAction: _trackAction,
         );
       case 1:
@@ -605,7 +607,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           MusicSpaceCard(
             sources: app.sources,
             playlistCount: app.playlists.length,
-            onTap: () => _open('音乐来源', _sources),
+            onTap: () => _openSources(),
           ),
           _personalHeading('我的音乐'),
           LayoutBuilder(
@@ -1279,6 +1281,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       });
     }
   }
+
+  void _openSources() => _open('音乐源管理', _sources, showPlayer: false);
 
   Widget _sources() => MusicSourcesPanel(
     app: app,

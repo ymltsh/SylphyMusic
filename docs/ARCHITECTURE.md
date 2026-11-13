@@ -224,3 +224,8 @@ LLM 设置按用途分布：API 设置保留接口地址、模型、密钥与连
 音乐库文件夹分类在 LibraryCatalog 内按来源和父目录 SQL 分组，详情和批量动作复用相同分组键。已有索引无需重新导入；无路径元数据的来源显示“未提供目录”，Emby 后续同步显式请求 Path。切歌在旧输出停止完成后加入 300ms 间隔，过期加载代次不再打开。
 
 Android 播放运行库与可选 De-click 已更新为固定 mpv-android 2026-09-17；afade 在音频滤镜链按样本处理，默认关闭，诊断通过既有轮转日志桥接。单一 Session、缓存租约与来源解析边界不变，详见 ANDROID_DECLICK.md / NATIVE_DEPENDENCIES.md。
+
+
+## 音乐笔友角色卡 V18
+
+`PenpalCardStore` 经 `ApiSettings` 装配，使用稳定 `card_id` 保存角色名称、System/User 提示词和本地头像路径，激活角色的 Prompt 镜像到现有 LLM 配置。数据库 v18 增加角色表和按角色保存的记忆开关；聊天、记忆和来信按角色标识分隔，数据库 v19 迁移直接删除未归属旧记忆，界面和查询层不再保留相应入口；未归属旧来信与聊天维持原处理。内置彩蛋仅在主动发现后进入角色列表，原始 JSON 保持不变。角色卡在 `disposeAsync()` 中先等待头像读写与清理完成，再随 `ApiSettings.dispose()` 结束生命周期。详情见 [角色卡与隐藏彩蛋 V18](CHARACTER_CARDS_V18.md)。

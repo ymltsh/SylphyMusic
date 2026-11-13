@@ -97,6 +97,7 @@ class RecommendationService {
     final period = _dailyPeriod(now, await dailyRefreshCount());
     final previous = await repository.latestSnapshot('daily', day);
     final llmTag = llm?.configurationTag ?? 'local';
+    final activeCardId = memory?.personaKey ?? 'primary';
     if (previous != null &&
         !regenerate &&
         previous.llmTag == llmTag &&
@@ -251,6 +252,18 @@ class RecommendationService {
         llmSucceeded: letterFromLlm,
       );
     }
+    // A role switch during generation cannot silently archive a letter
+    // under the newly selected character.
+    if (memory != null && activeCardId != memory!.personaKey) {
+      return DailyMix(
+        day,
+        generation,
+        finalTracks,
+        introduction: introduction,
+        title: title,
+        llmSucceeded: false,
+      );
+    }
     dailyStage.value = DailyLetterStage.sealing;
     await repository.saveDaily(
       day,
@@ -260,6 +273,7 @@ class RecommendationService {
       introduction: introduction,
       letterTitle: title,
       letterOrigin: letterFromLlm ? 'llm' : 'local',
+      cardId: activeCardId,
       llmTag: llmTag,
       refreshPeriod: period,
       llmSucceeded: letterFromLlm,
@@ -271,6 +285,7 @@ class RecommendationService {
           generation: generation,
           title: title,
           mainLetter: mainLetter,
+          expectedPersonaKey: activeCardId,
           reflection: letterFromLlm ? selfReflection : '',
           topic: letterFromLlm ? letterTopic : '',
         );

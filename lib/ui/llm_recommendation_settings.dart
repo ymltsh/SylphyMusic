@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
-import '../services/api_settings.dart';
+import 'penpal_cards_page.dart';
+import 'penpal_memory_page.dart';
+import 'recommendation_settings_section.dart';
+import 'settings_page.dart';
 
-/// Recommendation behavior shares persisted settings with the connection page.
 class LlmRecommendationSettings extends StatefulWidget {
-  const LlmRecommendationSettings({super.key, required this.app});
+  const LlmRecommendationSettings({
+    super.key,
+    required this.app,
+    this.disabled = false,
+    this.onBusyChanged,
+  });
   final SylphyApp app;
+  final bool disabled;
+  final ValueChanged<bool>? onBusyChanged;
+
   @override
   State<LlmRecommendationSettings> createState() =>
       _LlmRecommendationSettingsState();
@@ -15,10 +25,12 @@ class LlmRecommendationSettings extends StatefulWidget {
 class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
   SylphyApp get app => widget.app;
   bool _saving = false;
+  bool get _locked => _saving || widget.disabled;
 
   Future<void> _act(Future<void> Function() action) async {
-    if (_saving) return;
+    if (_locked) return;
     setState(() => _saving = true);
+    widget.onBusyChanged?.call(true);
     try {
       await action();
     } catch (_) {
@@ -26,16 +38,22 @@ class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('保存推荐设置失败，请稍后重试')));
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        widget.onBusyChanged?.call(false);
+      }
     }
   }
 
-  Future<bool> _confirm(String message) async =>
-      await showDialog<bool>(
+  Future<void> _toggle(bool value) => _act(() async {
+    if (value) {
+      final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('开启 LLM 增强推荐？'),
-          content: Text(message),
+          content: const Text(
+            '候选歌曲的名称、歌手、专辑及有限的听歌统计会发送到你配置的模型服务。开启记忆时还可能发送精简的角色记忆与已保存观点；聊天会发送输入内容。不会发送音源地址、账号或音频文件。第三方接口可能收费。',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -43,241 +61,217 @@ class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('开启'),
+              child: const Text('开启增强'),
             ),
           ],
         ),
-      ) ??
-      false;
-
-  Future<void> _editLlmMode() async {
-    final value = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('LLM 推荐参与方式'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'assist'),
-            child: const Text('辅助推荐 · 重排现有精选并撰写推荐词'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(context, 'lead'),
-            child: const Text('主导推荐 · 从扩展候选中选择并撰写推荐词'),
-          ),
-        ],
-      ),
-    );
-    if (value != null && mounted) {
-      await _act(() => app.apiSettings.setLlmMode(value));
+      );
+      if (!mounted || confirmed != true) return;
     }
-  }
+    await app.apiSettings.setLlmEnabled(value);
+  });
 
-  Future<void> _editLlmPrompts() async {
-    final value = await showDialog<({String system, String user})>(
-      context: context,
-      builder: (_) => _LlmPromptDialog(
-        system: app.apiSettings.llmSystemPrompt,
-        user: app.apiSettings.llmUserPrompt,
+  Widget _mode(String value, String title, String detail, IconData icon) {
+    final selected = app.apiSettings.llmMode == value;
+    final enabled = app.apiSettings.llmEnabled && !_locked;
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? colors.secondaryContainer : colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? colors.primary : colors.outlineVariant,
+        ),
       ),
-    );
-    if (value == null || !mounted) return;
-    await _act(
-      () =>
-          app.apiSettings.setLlmPrompts(system: value.system, user: value.user),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: enabled
+            ? () {
+                if (!selected) _act(() => app.apiSettings.setLlmMode(value));
+              }
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    size: 20,
+                    color: enabled ? colors.primary : colors.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(detail, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: app.apiSettings,
-    builder: (context, _) => Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    listenable: Listenable.merge([app.apiSettings, app.apiSettings.cards]),
+    builder: (context, _) {
+      final enabled = app.apiSettings.llmEnabled;
+      return RecommendationSettingsSection(
+        icon: Icons.auto_awesome_outlined,
+        title: 'LLM 增强',
+        description: '让模型参与选曲、专辑排序和来信，延续音乐笔友的个性。',
+        status: enabled ? '已开启' : '未开启',
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              'LLM 推荐',
-              style: Theme.of(context).textTheme.titleMedium,
+          SwitchListTile(
+            key: const ValueKey('recommendation-llm-enabled'),
+            title: const Text('启用增强推荐'),
+            subtitle: Text(
+              enabled ? '当前由模型参与推荐；请求失败时使用基础推荐。' : '可先配置模型和笔友，开启后参与推荐。',
             ),
+            value: enabled,
+            onChanged: _locked ? null : _toggle,
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text('接口地址、模型和密钥在 API 设置中配置。'),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.hub_outlined),
+            title: const Text('模型连接'),
+            subtitle: Text(
+              '${app.apiSettings.llmModel} · 接口、密钥与连接测试',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _locked
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => SettingsPage.llmConnection(app: app),
+                    ),
+                  ),
           ),
-          IgnorePointer(
-            ignoring: _saving,
+          Padding(
+            key: const ValueKey('recommendation-llm-mode'),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SwitchListTile(
-                  key: const ValueKey('recommendation-llm-enabled'),
-                  secondary: const Icon(Icons.auto_awesome_outlined),
-                  title: const Text('LLM 增强推荐'),
-                  subtitle: const Text('可选：AI 参与每日精选和专辑排序，并生成推荐词'),
-                  value: app.apiSettings.llmEnabled,
-                  onChanged: (value) => _act(() async {
-                    if (value &&
-                        !await _confirm(
-                          '开启后，候选歌曲名称、歌手、专辑及有限的本机听歌统计会发送给你配置的 LLM 服务。聊天时会发送你输入的内容，已选择记住的观点也可能用于后续推荐。不会发送音乐源地址、账号或音频文件；第三方接口可能收费。是否开启？',
-                        ))
-                      return;
-                    await app.apiSettings.setLlmEnabled(value);
-                  }),
-                ),
-                ListTile(
-                  key: const ValueKey('recommendation-llm-mode'),
-                  leading: const Icon(Icons.tune_outlined),
-                  title: const Text('LLM 推荐参与方式'),
-                  subtitle: Text(
-                    app.apiSettings.llmMode == 'lead'
-                        ? '主导：在扩展候选中选歌、重排和撰写推荐词'
-                        : '辅助：保留本地候选，LLM 重排并撰写推荐词',
+                Text('参与方式', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                if (!enabled)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: Text('开启增强后可切换参与方式；已选设置会保留。'),
                   ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _editLlmMode,
-                ),
-                ListTile(
-                  key: const ValueKey('recommendation-llm-timeout'),
-                  leading: const Icon(Icons.timer_outlined),
-                  title: const Text('LLM 总等待预算'),
-                  subtitle: const Text('先选曲、再写信；网络或模型慢时可增加等待时间'),
-                  trailing: DropdownButton<int>(
-                    value: app.apiSettings.llmTimeoutSeconds,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      for (final seconds in [60, 90, 120])
-                        DropdownMenuItem(
-                          value: seconds,
-                          child: Text('$seconds 秒'),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        _act(() => app.apiSettings.setLlmTimeoutSeconds(value));
-                      }
-                    },
-                  ),
-                ),
-                ListTile(
-                  key: const ValueKey('recommendation-llm-user-prompt'),
-                  leading: const Icon(Icons.edit_note_rounded),
-                  title: const Text('自定义 Prompt'),
-                  subtitle: Text(
-                    app.apiSettings.llmUserPrompt,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: _editLlmPrompts,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final assist = _mode(
+                      'assist',
+                      '辅助选曲',
+                      '在基础推荐的候选中重排，并撰写推荐词。',
+                      Icons.tune_rounded,
+                    );
+                    final lead = _mode(
+                      'lead',
+                      '主导选曲',
+                      '从更大的曲库候选中挑选，再组织推荐和来信。',
+                      Icons.explore_outlined,
+                    );
+                    return constraints.maxWidth < 480
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              assist,
+                              const SizedBox(height: 10),
+                              lead,
+                            ],
+                          )
+                        : Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: assist),
+                              const SizedBox(width: 10),
+                              Expanded(child: lead),
+                            ],
+                          );
+                  },
                 ),
               ],
             ),
           ),
+          ListTile(
+            key: const ValueKey('recommendation-llm-timeout'),
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('等待时间'),
+            subtitle: const Text('选曲与写信共用；模型较慢时可适当增加'),
+            enabled: enabled && !_locked,
+            trailing: DropdownButton<int>(
+              value: app.apiSettings.llmTimeoutSeconds,
+              underline: const SizedBox.shrink(),
+              items: [
+                for (final seconds in [60, 90, 120])
+                  DropdownMenuItem(value: seconds, child: Text('$seconds 秒')),
+              ],
+              onChanged: !enabled || _locked
+                  ? null
+                  : (value) {
+                      if (value != null)
+                        _act(() => app.apiSettings.setLlmTimeoutSeconds(value));
+                    },
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            key: const ValueKey('recommendation-llm-user-prompt'),
+            leading: const Icon(Icons.badge_outlined),
+            title: const Text('音乐笔友与角色卡'),
+            subtitle: Text('当前：${app.apiSettings.cards.activeName} · 管理角色与提示词'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _locked
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => PenpalCardsPage(app: app),
+                    ),
+                  ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_stories_outlined),
+            title: const Text('记忆与相处'),
+            subtitle: const Text('管理当前角色的记忆、补充设定与隐私'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _locked
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => PenpalMemoryPage(app: app),
+                    ),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Text(
+              '模型配置变更后，首页会按新设置更新推荐。关闭增强会保留连接、角色和记忆。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
           if (_saving) const LinearProgressIndicator(),
         ],
-      ),
-    ),
-  );
-}
-
-class _LlmPromptDialog extends StatefulWidget {
-  const _LlmPromptDialog({required this.system, required this.user});
-  final String system;
-  final String user;
-
-  @override
-  State<_LlmPromptDialog> createState() => _LlmPromptDialogState();
-}
-
-class _LlmPromptDialogState extends State<_LlmPromptDialog> {
-  late final system = TextEditingController(text: widget.system);
-  late final user = TextEditingController(text: widget.user);
-  String? error;
-
-  @override
-  void dispose() {
-    system.dispose();
-    user.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    try {
-      final value = (
-        system: ApiSettings.validateLlmSystemPrompt(system.text),
-        user: ApiSettings.validateLlmUserPrompt(user.text),
       );
-      Navigator.pop(context, value);
-    } on FormatException catch (exception) {
-      setState(() => error = exception.message);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('自定义 Prompt'),
-    content: SizedBox(
-      width: 560,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('可调整推荐角色、选曲侧重和文案风格。真实候选范围、禁止编造和 JSON 输出格式由应用固定。'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: system,
-              minLines: 4,
-              maxLines: 7,
-              maxLength: ApiSettings.maxLlmSystemPromptLength,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'System Prompt（推荐角色与策略）',
-                helperText: '作为 System 指导发送，固定约束仍会追加；留空恢复默认。',
-                helperMaxLines: 2,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: user,
-              minLines: 4,
-              maxLines: 7,
-              maxLength: 2000,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'User Prompt（个人偏好）',
-                hintText: '例如：偏好华语独立音乐；文案带一点诗意。',
-                helperText: '随候选数据发送；留空恢复默认。请勿填写密钥。',
-                helperMaxLines: 2,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('保存后会重新生成推荐，可能产生 API 费用。'),
-            if (error != null)
-              Text(
-                error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () {
-          system.text = ApiSettings.defaultLlmSystemPrompt;
-          user.text = ApiSettings.defaultLlmUserPrompt;
-          setState(() => error = null);
-        },
-        child: const Text('恢复默认'),
-      ),
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('取消'),
-      ),
-      FilledButton(onPressed: _save, child: const Text('保存')),
-    ],
+    },
   );
 }

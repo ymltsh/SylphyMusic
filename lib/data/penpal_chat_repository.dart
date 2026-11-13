@@ -14,7 +14,7 @@ class PenpalChatRepository {
     final rows = await database.db.query(
       'penpal_chat_messages',
       where:
-          "(persona_key=? OR persona_key='') AND letter_key=?"
+          "persona_key=? AND letter_key=?"
           '${before == null ? '' : ' AND id<?'}',
       whereArgs: [persona, letter, if (before != null) before],
       orderBy: 'id DESC',
@@ -55,6 +55,7 @@ class PenpalChatRepository {
       });
       // Only the user's own words become personalization evidence.
       await tx.insert('penpal_memory_events', {
+        'card_id': persona,
         'kind': 'chat_preference',
         'text': user,
         'source_key': 'chat:$id',
@@ -71,7 +72,7 @@ class PenpalChatRepository {
       final rows = await tx.query(
         'penpal_chat_messages',
         columns: ['id'],
-        where: "(persona_key=? OR persona_key='') AND letter_key=?",
+        where: "persona_key=? AND letter_key=?",
         whereArgs: [persona, letter],
       );
       for (final row in rows) {
@@ -83,14 +84,13 @@ class PenpalChatRepository {
       }
       await tx.delete(
         'penpal_chat_messages',
-        where: "(persona_key=? OR persona_key='') AND letter_key=?",
+        where: "persona_key=? AND letter_key=?",
         whereArgs: [persona, letter],
       );
-      // Replies from before chat was introduced have no persona identifier.
       await tx.delete(
         'penpal_memory_events',
-        where: "kind='user_reply' AND related_letter_key=?",
-        whereArgs: [letter],
+        where: "kind='user_reply' AND card_id=? AND related_letter_key=?",
+        whereArgs: [persona, letter],
       );
     });
   }

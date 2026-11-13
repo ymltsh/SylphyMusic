@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/launcher_icon_service.dart';
 import '../services/api_settings.dart';
-import '../services/penpal_prompt_presets.dart';
 
 /// Uses installed Android aliases as the source of truth; preview is local.
 class LauncherIconPicker extends StatefulWidget {
@@ -55,15 +54,12 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
     if (settings == null || _applyingCard) return;
     setState(() => _applyingCard = true);
     try {
-      final preset = await (venti
-          ? PenpalPromptPreset.venti()
-          : PenpalPromptPreset.sylphiette());
       if (!mounted) return;
-      final previousSystem = settings.llmSystemPrompt;
-      final previousUser = settings.llmUserPrompt;
-      final unchanged =
-          previousSystem == preset.system && previousUser == preset.user;
-      await settings.setLlmPrompts(system: preset.system, user: preset.user);
+      final previousId = settings.activeCardId;
+      final selected = await settings.cards.discover(
+        venti ? 'venti' : 'sylphiette',
+      );
+      final unchanged = previousId == selected.id;
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
@@ -85,14 +81,9 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                     label: '撤销',
                     onPressed: () async {
                       // Never undo a later edit made from another settings page.
-                      if (settings.llmSystemPrompt != preset.system ||
-                          settings.llmUserPrompt != preset.user)
-                        return;
+                      if (settings.activeCardId != selected.id) return;
                       try {
-                        await settings.setLlmPrompts(
-                          system: previousSystem,
-                          user: previousUser,
-                        );
+                        await settings.cards.activate(previousId);
                       } catch (_) {
                         if (mounted)
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -517,7 +508,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '替换 System / User 提示词，可在 推荐设置中编辑或恢复默认。完整角色背景会随推荐发送给你配置的模型。',
+                              '仅在主动选择后加入你的角色卡。内置角色卡保留原文，复制后可自定义。完整角色背景会随推荐发送给你配置的模型。',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),

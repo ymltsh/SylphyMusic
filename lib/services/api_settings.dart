@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/app_db.dart';
+import 'penpal_card_store.dart';
 
 /// User-configurable public endpoints. These URLs never carry music credentials.
 class ApiSettings extends ChangeNotifier {
@@ -48,6 +49,8 @@ class ApiSettings extends ChangeNotifier {
   int llmTimeoutSeconds = 90;
   String llmUserPrompt = defaultLlmUserPrompt;
   String llmSystemPrompt = defaultLlmSystemPrompt;
+  String activeCardId = PenpalCardStore.primaryId;
+  late final cards = PenpalCardStore(db, this);
   int llmRevision = 0;
   String quote = fallbackQuote;
   bool _quoteAttempted = false;
@@ -220,6 +223,17 @@ class ApiSettings extends ChangeNotifier {
     if (nextSystem == llmSystemPrompt && nextUser == llmUserPrompt) return;
     final revision = llmRevision + 1;
     await db.db.transaction((tx) async {
+      await tx.update(
+        'penpal_cards',
+        {
+          'system_prompt': nextSystem,
+          'is_builtin': 0,
+          'user_prompt': nextUser,
+          'updated_at_ms': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'card_id=?',
+        whereArgs: [activeCardId],
+      );
       for (final entry in {
         'api_llm_system_prompt': nextSystem,
         'api_llm_user_prompt': nextUser,
@@ -234,6 +248,21 @@ class ApiSettings extends ChangeNotifier {
     llmSystemPrompt = nextSystem;
     llmUserPrompt = nextUser;
     llmRevision = revision;
+    notifyListeners();
+  }
+
+  /// Called only after the active card and Prompt settings are committed.
+  /// Do not mutate the selected card or bump the revision from a getter.
+  void adoptCharacterCard(
+    String id,
+    String system,
+    String user, {
+    int? revision,
+  }) {
+    activeCardId = id;
+    llmSystemPrompt = system;
+    llmUserPrompt = user;
+    if (revision != null) llmRevision = revision;
     notifyListeners();
   }
 
@@ -311,6 +340,7 @@ class ApiSettings extends ChangeNotifier {
     } on FormatException {
       llmUserPrompt = defaultLlmUserPrompt;
     }
+    await cards.initialize();
     final cached = await db.setting('api_quote_text');
     quote = cached != null && cached.trim().isNotEmpty ? cached : fallbackQuote;
     notifyListeners();
@@ -383,6 +413,7 @@ class ApiSettings extends ChangeNotifier {
   @override
   void dispose() {
     ++_requestId; // Prevent an in-flight response from updating a disposed app.
+    cards.dispose();
     super.dispose();
   }
 }

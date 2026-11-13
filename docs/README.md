@@ -20,6 +20,7 @@
 | [音乐笔友角色彩蛋](PENPAL_CHARACTER_PRESETS.md) | 风精灵希露菲卡片、应用入口与提示词范围 |
 | [与笔友聊天](PENPAL_CHAT.md) | 连续对话、主动观点与记忆管理 |
 | [音乐笔友记忆 V15](PENPAL_MEMORY_V15.md) | 独立人格、轻量长期记忆、真实互动与管理入口 |
+| [角色卡与隐藏彩蛋 V18](CHARACTER_CARDS_V18.md) | 稳定角色身份、彩蛋默认隐藏、独立聊天/记忆、角色编辑与删除 |
 | [音乐笔友与来信存档](PENPAL_RECOMMENDATIONS.md) | 分段推荐信、SQLite v12 私人存档与独立清理 |
 | [每日精选封面与提示词](RECOMMENDATION_SHOWCASE_PROMPT.md) | 首页 / 详情封面叠卡与自定义 LLM 推荐偏好 |
 | [APPEARANCE](APPEARANCE.md) | 一级页自定义背景、可选主色、页面标题与连续列表 |
@@ -36,6 +37,7 @@
 | [ANDROID_SYNC_FGS](ANDROID_SYNC_FGS.md) | 手动同步通知、引擎生命周期、暂停与系统时限 |
 | [ANDROID_SYSTEM_BARS](ANDROID_SYSTEM_BARS.md) | Android 手势条透明沉浸、系统图标明暗与安全边距 |
 | [LLM 推荐增强](LLM_RECOMMENDATION.md) | 默认关闭的模型重排、推荐文案、API 配置与元数据发送边界 |
+| [推荐设置](RECOMMENDATION_SETTINGS.md) | 基础推荐、LLM 增强、换新与数据分区及操作逻辑 |
 | [RECOMMENDATION_V1](RECOMMENDATION_V1.md) | 每日精选、专辑推荐、数据统计和热榜缓存 |
 | [UI_REFRESH](UI_REFRESH.md) | 本轮导航、首次引导、首页、播放器与外观调整范围 |
 | [COVER_FLOW](COVER_FLOW.md) | 专辑 / 歌单封面流、分批数据接入与会话内视图切换 |

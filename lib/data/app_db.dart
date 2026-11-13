@@ -42,6 +42,31 @@ class AppDb {
     'CREATE INDEX idx_penpal_events_time ON penpal_memory_events(created_at_ms DESC)',
     'CREATE INDEX idx_penpal_events_letter ON penpal_memory_events(related_letter_key)',
   ];
+  // v18: the default character comes from existing Prompt settings on boot.
+  // Built-in Easter eggs are not automatically inserted into this table.
+  static const _characterCardsV18Schema = <String>[
+    '''CREATE TABLE penpal_cards(
+      card_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      system_prompt TEXT NOT NULL,
+      user_prompt TEXT NOT NULL,
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      preset_id TEXT NOT NULL DEFAULT '',
+      art_prompt TEXT NOT NULL DEFAULT '',
+      art_path TEXT NOT NULL DEFAULT '',
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL)''',
+    '''CREATE TABLE penpal_card_memory_state(
+      card_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      recall_enabled INTEGER NOT NULL DEFAULT 1,
+      soul_override TEXT NOT NULL DEFAULT '',
+      updated_at_ms INTEGER NOT NULL DEFAULT 0)''',
+    "ALTER TABLE penpal_memory_events ADD COLUMN card_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN card_id TEXT NOT NULL DEFAULT ''",
+    'CREATE INDEX idx_penpal_events_card ON penpal_memory_events(card_id,created_at_ms DESC)',
+    'CREATE INDEX idx_penpal_letters_card ON recommendation_letters(card_id,created_at_ms DESC)',
+  ];
   static const _recommendationLettersTable =
       '''CREATE TABLE recommendation_letters(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,7 +198,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 16,
+      version: 19,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -309,6 +334,21 @@ class AppDb {
             ORDER BY created_at_ms,id
           """);
         }
+        if (oldVersion < 18) {
+          for (final sql in _characterCardsV18Schema) {
+            await database.execute(sql);
+          }
+          // The previous global opt-out should survive on the original card.
+          await database.execute("""
+            INSERT OR IGNORE INTO penpal_card_memory_state(
+              card_id,enabled,recall_enabled,updated_at_ms)
+            SELECT 'primary',enabled,recall_enabled,updated_at_ms
+            FROM penpal_memory_state WHERE id=1
+          """);
+        }
+        if (oldVersion < 19) {
+          await database.delete('penpal_memory_events', where: "card_id=''");
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -354,6 +394,9 @@ class AppDb {
           await d.execute(sql);
         }
         for (final sql in _penpalChatSchema) {
+          await d.execute(sql);
+        }
+        for (final sql in _characterCardsV18Schema) {
           await d.execute(sql);
         }
       },
