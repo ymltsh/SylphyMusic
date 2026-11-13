@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.54-openlist.37",
-    "build": 67,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.54-openlist.37 (arm64-v8a)",
+    "version": "1.0.55-openlist.38",
+    "build": 68,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.55-openlist.38 (arm64-v8a)",
     "date": "2026-11-13",
-    "notes": "- 重新设计横屏与 PC 迷你播放器：歌曲信息、播放控制和音量分区排列，支持直接调节应用内音量、切歌、进度、倍速和播放队列。\n- 优化播放器底栏高度、封面与按钮比例，修复底栏异常撑满窗口、遮挡主界面的问题。\n- 新增应用内键盘快捷键，支持播放暂停、切歌、快进快退、音量和静音。\n- 设置新增“横屏与 PC”，集中管理底栏、快捷键和 Windows 界面字体。\n- Windows 支持导入本地字体，并可选择 HarmonyOS Sans 或 MiSans；选择后才从厂商官网下载，保存后可离线加载，可随时恢复系统字体。\n- 两款官方字体分别遵循厂商许可，字体设置中提供官网与许可入口。\n",
+    "notes": "- 横屏与 PC 迷你播放器在空间不足时直接切换为单行极简样式，不再使用两行布局。\n- 极简底栏保留封面、歌曲信息、上一首、播放/暂停、下一首和播放队列；音量、倍速、播放模式、收藏和歌词集中在更多菜单。\n- 优化窗口缩放时的布局切换，按可用宽度与系统字号分配空间，减少按钮挤压和底栏比例失调。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.54-openlist.37%2B67/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.55-openlist.38%2B68/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.54-openlist.37%2B67"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.55-openlist.38%2B68"
   },
   "history": [
+    {
+      "version": "1.0.54-openlist.37",
+      "build": 67,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.54-openlist.37 (arm64-v8a)",
+      "date": "2026-11-13",
+      "notes": "- 重新设计横屏与 PC 迷你播放器：歌曲信息、播放控制和音量分区排列，支持直接调节应用内音量、切歌、进度、倍速和播放队列。\n- 优化播放器底栏高度、封面与按钮比例，修复底栏异常撑满窗口、遮挡主界面的问题。\n- 新增应用内键盘快捷键，支持播放暂停、切歌、快进快退、音量和静音。\n- 设置新增“横屏与 PC”，集中管理底栏、快捷键和 Windows 界面字体。\n- Windows 支持导入本地字体，并可选择 HarmonyOS Sans 或 MiSans；选择后才从厂商官网下载，保存后可离线加载，可随时恢复系统字体。\n- 两款官方字体分别遵循厂商许可，字体设置中提供官网与许可入口。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.54-openlist.37%2B67/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.54-openlist.37%2B67"
+    },
     {
       "version": "1.0.53-openlist.36",
       "build": 66,
