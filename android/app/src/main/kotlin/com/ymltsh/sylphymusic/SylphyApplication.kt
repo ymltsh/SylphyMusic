@@ -23,6 +23,7 @@ class SylphyApplication : Application() {
     private val waitingResolvers = mutableListOf<Runnable>()
     fun playbackUiVisible(visible: Boolean) { playbackBridge?.setUiVisible(visible) }
     fun playbackStateChanged(playWhenReady: Boolean) { if (playWhenReady) playbackBridge?.observePlayback() }
+    fun playbackDiagnostics(records: String) { if (sourceReady) playbackResolver?.invokeMethod("diagnostics",records) }
     fun playbackLeaseReleased(key: String) { playbackResolver?.invokeMethod("released", key) }
     fun savePlaybackCheckpoint(file: File, value: String) {
         checkpointWriter.execute {

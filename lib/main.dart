@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'core/app_controller.dart';
 import 'services/native_lifecycle.dart';
+import 'services/native_licenses.dart';
 import 'ui/app_identity.dart';
 import 'ui/app_shell.dart';
 import 'ui/system_bars.dart';
@@ -14,7 +15,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await recordDartStartup();
   await configureSystemBars();
-  if (!Platform.isAndroid) MediaKit.ensureInitialized();
+  if (Platform.isAndroid) {
+    registerAndroidNativeLicenses();
+  } else {
+    MediaKit.ensureInitialized();
+  }
   runApp(const _Bootstrap());
 }
 

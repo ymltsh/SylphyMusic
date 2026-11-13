@@ -1,5 +1,7 @@
 # 原生媒体依赖记录
 
+2026-11-13 De-click 更新：Android 使用固定的 mpv-android 2026-09-17 原生库（mpv v0.41.0-1049-g0b7ed670f），通过本地 media_kit_libs_android_audio 包装包提供三个 ABI；逐个核对上游 APK 的 SHA-256 后仅提取列出的原生依赖，不导入上游播放器应用、权限或 libplayer.so。替换旧精简库以获得 afade、ashowinfo 等音频滤镜。来源、对应源代码与完整依赖版本见 [新运行库说明](native_licenses/mpv-android-2026-09-17-NOTICE.md)，保留 GPL / LGPL 版权及许可证文本；原有 LGPL-only 构建记录属于历史。VM 注册改用 FFmpeg 的 av_jni_set_java_vm，仍只有 Media3 服务创建一个 mpv context。Windows 运行库未更换。
+
 2026-11-13：Android 媒体会话切换到固定版本 AndroidX Media3 common / session 1.11.1（Apache-2.0），未引入 ExoPlayer。新增自有 JNI 桥通过公开 client ABI 动态加载现有 media_kit_libs_android_audio 的 libmpv，不更换 mpv / FFmpeg 二进制。loadfile 使用兼容现有 mpv 0.35 的调用方式。旧 audio_service 路径依赖保留供公共类型与历史代码编译，Android Manifest 不再启用其 Service / Receiver。
 
 2026-10-29：`audio_service` 0.18.19 使用仓库内 `third_party/audio_service` 路径依赖，保留上游运行源码及 MIT 许可证。Android 10 / API 29 且媒体操作数为三个时，通知使用自定义 RemoteViews 和 DecoratedMediaCustomViewStyle，固定操作图标为白色，保留封面取色；替代此前 `setColorized(false)` 的处理。其他系统版本及操作数量沿用上游样式。来源摘要和维护说明见 [本地补丁记录](../third_party/audio_service/SYLPHY_PATCHES.md)。

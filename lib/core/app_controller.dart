@@ -1105,6 +1105,7 @@ class SylphyApp extends ChangeNotifier {
     if (_disposed) return;
     await db.setSetting('diagnostic_logs_enabled', value.toString());
     await diagnostics.setEnabled(value);
+    await playback.setNativeDiagnostics(value);
     notifyListeners();
   }
 

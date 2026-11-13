@@ -6,8 +6,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /** All JNI access, including destruction, is serialized off the session Looper. */
+@androidx.annotation.Keep
 class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
-                      private val failed: (Long) -> Unit) {
+                      private val failed: (Long) -> Unit,
+                      private val diagnostic: (String) -> Unit) {
     companion object {
         init { System.loadLibrary("sylphy_mpv") }
         // A recreated service cannot create its context before the old one's
@@ -17,7 +19,9 @@ class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
     private val main = Handler(Looper.getMainLooper())
     private var handle = 0L
     private var epoch = 0L
-    private var closed = false
+    @Volatile private var closed = false
+    @Volatile private var pauseRequested = true
+    fun setPauseIntent(paused: Boolean) { pauseRequested = paused }
     private val polling: java.util.concurrent.ScheduledFuture<*>
     init {
         worker.execute {
@@ -28,6 +32,8 @@ class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
                 val generation = epoch
                 try {
                     val value = sample(handle)
+                    val records = diagnostics(handle)
+                    if (records != "[]") main.post { if (!closed) diagnostic(records) }
                     main.post { if (!closed) observed(generation, value) }
                 } catch (_: Exception) { main.post { if (!closed) failed(generation) } }
             }
@@ -57,5 +63,6 @@ class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
     private external fun command(handle: Long, args: Array<String>)
     private external fun sample(handle: Long): DoubleArray
     private external fun stop(handle: Long)
+    private external fun diagnostics(handle: Long): String
     private external fun destroy(handle: Long)
 }

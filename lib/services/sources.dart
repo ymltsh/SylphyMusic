@@ -365,7 +365,7 @@ class EmbyAdapter extends MusicAdapter {
     await for (final page in _itemPages('Users/$userId/Items', {
       'Recursive': 'true',
       'IncludeItemTypes': 'Audio',
-      'Fields': 'Genres,DateCreated,DateModified,MediaSources,MediaStreams,Album,AlbumArtist,Artists,ProductionYear',
+      'Fields': 'Path,Genres,DateCreated,DateModified,MediaSources,MediaStreams,Album,AlbumArtist,Artists,ProductionYear',
     })) {
       yield page.map(_track).toList();
     }

@@ -186,6 +186,7 @@ def prepare(args, version, build, output):
     installer = output / 'sylphy-music-setup.exe'
     if not installer.is_file():
         raise ValueError('Installer compiler did not produce the expected EXE.')
+    run([sys.executable, 'tool/package_source.py', output / 'sylphy-music-source.zip'])
     return existing_packages(output, version, build)
 
 
@@ -196,6 +197,9 @@ def existing_packages(output, version, build):
     if not all((output / name).is_file() for name in artifacts.values()):
         raise ValueError('Expected APK, Windows installer or portable ZIP is missing; build first.')
     hashes = {name: digest(output / name) for name in artifacts.values()}
+    source = output / 'sylphy-music-source.zip'
+    if source.is_file():
+        hashes[source.name] = digest(source)
     sums = output / 'SHA256SUMS.txt'
     sums.write_text(''.join(f'{value}  {name}\n' for name, value in sorted(hashes.items())), encoding='utf-8')
     hashes[sums.name] = digest(sums)

@@ -28,6 +28,14 @@ class DiagnosticLogs {
 
   static final RegExp _safeToken = RegExp(r'^[A-Za-z][A-Za-z0-9_]{0,47}$');
   static const Set<String> _detailKeys = {
+    'log_events',
+    'filter_pts_ms',
+    'sample_rate',
+    'channels',
+    'format',
+    'declick',
+    'output_reconfigs',
+    'fade_ms',
     'request_id',
     'candidate_count',
     'requested_count',

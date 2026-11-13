@@ -64,7 +64,21 @@ class AndroidMedia3Playback extends PlaybackCoordinator {
     final savedVolume =
         double.tryParse(await db.setting('volume') ?? '100') ?? 100;
     final savedGain = await db.setting('replaygain') ?? 'no';
+    final savedDeClick = await db.setting('declick_enabled') == 'true';
     _sources.setMethodCallHandler((call) async {
+      if (call.method == 'diagnostics' && !_closing) {
+        try {
+          for (final raw in jsonDecode(call.arguments as String) as List) {
+            final event = Map<String, dynamic>.from(raw as Map);
+            final name = event.remove('event');
+            if (name is String)
+              diagnostics?.record('native_audio', name, details: event);
+          }
+        } catch (_) {
+          /* Diagnostics cannot interrupt source resolution. */
+        }
+        return null;
+      }
       if (call.method == 'released') {
         if (!_closing) cache.release(TrackRef.parse(call.arguments as String));
         return null;
@@ -113,6 +127,8 @@ class AndroidMedia3Playback extends PlaybackCoordinator {
         'shuffle': savedQueue.shuffle,
       });
     }
+    await _command('declick', {'value': savedDeClick});
+    await setNativeDiagnostics(diagnostics?.enabled == true);
     _initializing = false;
   }
 
@@ -166,6 +182,7 @@ class AndroidMedia3Playback extends PlaybackCoordinator {
     speed = (data['rate'] as num).toDouble();
     volume = (data['volume'] as num).toDouble();
     replayGain = data['gain'] as String? ?? 'no';
+    deClickEnabled = data['declick'] == true;
     _loadedOutput = data['loaded'] == true;
     final changed =
         oldRef != currentRef ||
@@ -340,6 +357,16 @@ class AndroidMedia3Playback extends PlaybackCoordinator {
 
   @override
   Future<void> retry() => _command('retry');
+  @override
+  Future<void> setDeClick(bool enabled) async {
+    await _command('declick', {'value': enabled});
+    await db.setSetting('declick_enabled', '$enabled');
+  }
+
+  @override
+  Future<void> setNativeDiagnostics(bool enabled) =>
+      _command('audioDiagnostics', {'value': enabled});
+
   @override
   Future<void> setSpeed(double v) async {
     await _command('rate', {'value': v.clamp(0.5, 2)});

@@ -1,5 +1,67 @@
 # 实施与验证记录
 
+## 2026-11-13 文件夹灰色异常区域修复
+
+截图中的大块灰色与 Flutter Release ErrorWidget 一致。代码发现 folderTitle 对 Emby / 本地等普通目录名也调用 Uri.decodeComponent；Dart SDK 对原始中文等非 ASCII 字符及错误百分号抛出 ArgumentError，旧逻辑只捕获 FormatException，导致列表条目构建失败。变高的错误占位也使列表尾部看似有巨大留白，先前 padding / Material 调整未解决该原因。
+
+SQL 文件夹结果增加仅用于显示的 WebDAV 编码标志，普通来源保留目录原名，仅 WebDAV 路径解码；WebDAV 无效百分号或 UTF-8 分别捕获 ArgumentError / FormatException 并保留原名。分组身份与数据库结构不变，继续只显示最后一级目录。两工作区同步修改，按约定仅编译 / 打包 / 发布，不运行测试、analyze、应用启动或设备检查，实际页面由用户验收。
+
+## 2026-11-13 启动通道遗漏修复
+
+普通版 1.0.51+64（三 ABI Android、Windows 安装包 / 便携包）与 OpenList 1.0.51-openlist.34+64（arm64）均编译、签名核对、发布成功。十个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest，以及两分支原始与加速清单核对通过；清单提交 main 4e0e92c / 79b432f、feature 38a5cb4，源码继续保留工作区并随 Release 归档交付。产物已复制到 `\\GENAS\share\sylphy_music_release\1.0.51-64`，特别版在 OpenList 子目录，十个文件摘要一致。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查，编译成功不代表实机启动验收通过。
+
+日志：普通版 build/test_logs/startup-64-prepare.log、startup-64-publish.log；特别版 startup-openlist-64-build.log、startup-openlist-64-publish.log；共享复制记录为普通版 release-64-share-copy.json。
+
+用户反馈启动 MissingPluginException(declick)。根因是 Flutter 初始化已发送 declick / audioDiagnostics，而 FlutterMediaControllerBridge 的显式命令列表漏转发这两个 action；Media3 服务与 mpv Player 端已有实现。两工作区均补齐原有 sylphy.control 转发，不吞掉异常，不改变播放器架构。逐项阅读 Dart 命令与通道分发，未发现其他遗漏。此前独立原生探针仅覆盖 JNI 音频链，未覆盖 Flutter 通道，不能证明应用启动正常。本轮按约定仅编译与发布，应用启动和功能由用户验收。
+
+## 2026-11-13 原生 De-click、新 mpv 与音频诊断
+
+普通版 1.0.50+63 与 OpenList 1.0.50-openlist.33+63 已完成正式编译与发布。普通版三 ABI APK、Windows 安装程序 / 便携 ZIP / 对应应用源码，特别版 arm64 APK / 完整对应源码，以及各自摘要共十个附件的远端大小与 SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支原始 / 加速清单均核对通过。新原生 mpv 在三个 ABI 的 APK 内与固定上游字节摘要一致，许可证资源存在，JNI 反射访问的字段名经 Release DEX 核对保留；原正式签名保持不变。只提交推送清单：main c346d4d / a55f0e7，feature f4354c6；源码改动保留工作区，精确源码随 Release 附件交付。
+
+产物已复制到 `\\GENAS\share\sylphy_music_release\1.0.50-63`，特别版位于 OpenList 子目录，十个文件长度与摘要一致。最终日志为普通版 `build/test_logs/declick-63-delivery-prepare.log` / `declick-63-kept-android.log` / `declick-63-publish.log`，特别版 `build/test_logs/declick-openlist-63-kept-android.log` / `declick-openlist-63-publish.log`；共享复制记录为普通版 `build/test_logs/release-63-share-copy.json`。未做实体设备实听，实际啪声及页面交互仍由用户确认。
+
+经用户明确要求，Android 更换为固定上游 mpv-android 2026-09-17 原生运行库（v0.41.0-1049-g0b7ed670f），逐 ABI 校验 APK SHA-256 后只提取原生依赖，保留单一 Media3 Session / mpv context；FFmpeg 公开 VM 注册替代旧扩展接口。新增默认关闭的 De-click 实验开关，afade 按 PCM 样本计算半余弦包络（正常速度淡出 12ms / 淡入 20ms），不使用定时音量阶梯，不修改 audio-buffer / audio-stream-silence。等待旧 PCM 队列最多一秒，避免升级直接改变拖动手感；原有 300ms 切歌间隔与本轮文件夹留白修复保留。
+
+原生 Seek、Playback Restart、Audio Reconfig、AO 格式 / 采样率 / 通道数与包络阶段纳入既有可关闭的诊断日志。仅解析滤镜数值时钟，原始 FFmpeg 文本不离开 JNI；MPV 将 FFmpeg INFO 映射为 verbose，客户端与模块按 v 接收。Audio Reconfig 不单独证明 AudioTrack 对象重建。运行库来源、对应代码、版权与 GPL/LGPL 文本纳入源码附件及 Android 许可证页。
+
+本轮用户明确要求 A/B，因此执行合成音频专项检查：主机 FFmpeg 完成 12 组 PCM 包络检查（6 种输入，0 / 200ms 起点），增益误差检查通过。现有 API35 x86_64 模拟器用独立无凭据原生探针验证与正式 APK 完全相同的 JNI 桥，覆盖 WAV 44.1k mono / 48k stereo、FLAC 96k stereo、MP3、AAC、Opus 的关闭 / 开启共 12 组初始播放、准确 Seek、Restart 与实际进度检查，6 次开启态淡出均确认完成。开启态 Seek 调用等待 545–905ms，说明滤镜之前排队的 PCM 会引入延迟，故默认关闭。测试仅使用合成文件、独立测试包及不保存更改的模拟器，测试包已卸载、模拟器已退出；不读取用户音源或真实凭据。未进行实体设备扬声器 / 耳机实听 A/B，不能据此确认啪声根因或实际消除效果；未运行全库 analyze 或无关回归测试。
+
+证据：build/test_logs/declick-pcm-63.json、declick-native-probe-63.log、declick-native-probe-build.log。编译 / 发布结果见本节开头。
+
+## 2026-11-13 文件夹底部留白修复
+
+用户确认底部问题为留白过大。文件夹主页不再无条件保留 96dp：播放器收起、没有当前歌曲或桌面停靠布局时仅保留 12dp；手机迷你播放器展开时继续预留 96dp，避免遮挡最后一项。文件夹详情使用 Scaffold.bottomNavigationBar 停靠播放器，内容只保留 12dp，不重复预留浮层空间。仅改变文件夹视图，通过可选 bottomPadding 参数传递页面实际遮挡空间，其余分类保持现状。同步 OpenList 并按既有授权发布；不运行 analyze、测试、应用启动或设备检查，实际留白由用户确认。
+
+## 2026-11-13 音乐库分类显示设置与文件夹列表修正
+
+普通版 1.0.49+62 与 OpenList 1.0.49-openlist.32+62 编译并发布成功。普通版三 ABI APK、Windows 安装程序 / 便携 ZIP 和特别版 arm64 APK / 对应源码归档等九个附件的远端大小与 SHA-256 核对通过；Release 标题 / 正文 / 状态、普通版 Latest，以及两分支原始 / 加速清单均核对通过。正式签名保持原证书，OpenList JNI 未更换。仅提交推送清单：main 79978a7 / 0d20b78、feature 66d9fa1，源码改动保留工作区。
+
+产物复制到 `\\GENAS\share\sylphy_music_release\1.0.49-62`，特别版位于 OpenList 子目录，九个文件长度与摘要一致。日志：普通版 `build/test_logs/release-1.0.49-build.log`，特别版 `build/test_logs/release-openlist-62-build.log` / `release-openlist-62-publish.log`；复制记录为普通版 `build/test_logs/release-62-share-copy.json`。未使用测试凭据。
+
+新增设置 → 音乐库分类，四项默认启用、至少保留一项，配置持久化；隐藏当前分类后回退首个可见分类并清理多选，首页快捷入口 / 来源入口也遵守可见配置。文件夹行删除完整路径，仅保留名称、来源与歌曲数；内部来源 + 完整目录分组键不变。分组列表不再强制歌曲行高，各条目使用独立且裁剪的 Material，限制点击背景的绘制范围，避免截图中的整行灰色残留。共享修改同步 OpenList，保留该分支原有入口和其他差异。
+
+本轮按仓库约定仅编译与发布，不运行 analyze、测试、应用启动或设备检查；设置切换和异常间隔的实际显示由用户验收。
+
+## 2026-11-13 文件夹分类与切歌间隔
+
+普通版 1.0.48+61 的 Android 三 ABI、Windows 安装程序及便携 ZIP 编译发布成功；OpenList 1.0.48-openlist.31+61 的 arm64 APK 与对应源码归档发布成功。九个附件的远端大小与 SHA-256、Release 标题 / 正文 / 状态、正式版 Latest、普通版及 OpenList 在两分支的原始 / 加速清单均核对通过。Android 继续使用原正式签名，未重建或替换 OpenList JNI。仅提交推送版本清单：main 6bf0614 / c6cca2e，feature b2e26c9；源码改动保留工作区，OpenList 对应源码附于其 Release。
+
+发布产物复制到 `\\GENAS\share\sylphy_music_release\1.0.48-61`，特别版位于 OpenList 子目录；九个文件长度与摘要一致。日志：普通版 `build/test_logs/release-1.0.48-build.log`，特别版 `build/test_logs/release-openlist-61-build.log` / `release-openlist-61-publish.log`，共享复制记录为普通版 `build/test_logs/release-61-share-copy.json`。未使用测试凭据，未新增或运行 analyze、测试、应用启动、设备检查或真实来源请求。通知、拖动手感、切歌啪声及来源兼容性仍由用户实机确认。
+
+音乐库新增与歌曲、专辑、艺术家并列的文件夹分类，按来源与完整父目录分组；SQLite 递归路径拆分、计数、过滤和分页，不在启动时读取全库元数据。支持本地、WebDAV / 内置 OpenList、服务端提供的 Path / MediaSources.Path；未提供路径的歌曲按来源归入“未提供目录”。分组详情及批量操作沿用精确 TrackRef。专辑 CoverFlow 入口移到上方排序按钮旁。
+
+切歌先停止旧输出，待停止完成后保留 300ms 间隔再打开下一首；Android 使用 Handler 和加载代次撤销过期切歌，非 Android 在串行原生命令中等待并重新核对加载代次。暂停 / 停止 / 新导航不会被过期任务恢复。此改动是缓解啪声的尝试，实际声音由用户设备确认。
+
+共享媒体通知、控制权限、进度确认及上述改动同步到 OpenList 工作区，保留包名、服务、独立更新渠道和播放租约。不运行 analyze、测试、应用启动或设备检查。
+
+## 2026-11-13 进入 App 唤醒媒体通知与进度拖动回跳修复
+
+按用户反馈，界面首次连接及 Activity 再次可见时，经现有 MediaController 发送 wake 命令，恢复已有曲目的标准媒体通知。暂停队列使用元数据 READY 显示卡片，不自动播放、申请焦点或打开音频；活动播放状态保留，空队列不造媒体条目。通知刷新继续由唯一 Media3 服务管理。
+
+Seek 不再在提交命令时返回成功：经同一 Session 等待原生 SEEK / PLAYBACK_RESTART 事件及目标附近有效位置，确认快照更新后才结束 UI 等待，从而让既有滑块拖动值维持到真正跳转，避免旧进度先回写。收紧原 1.5 秒位置容差，新增八秒有界等待与过期 / 切曲 / 停止 / 销毁清理。JNI 保留原库，新增 restart 事件观察。
+
+Android 三 ABI Release、Windows Release 与内部打包成功，日志 build/test_logs/media3-wake-seek-review.log。独立命名的 Android APK 位于 build/internal-review/media3-wake-seek-fix/，附 SHA256SUMS.txt；Windows ZIP 仍在 build/internal-review/。未使用测试凭据，未新增或运行 analyze、测试、应用启动、设备检查或真实来源请求，通知恢复与拖动手感由用户实机确认。保留工作区其他修改，未改版本号、提交、推送或发布。
+
 ## 2026-11-13 修复 Media3 通知与播放页控制回归
 
 用户反馈媒体通知消失、播放页进度不可拖动、切歌及其他播放控制异常，实际设备交互未通过，上一轮编译不能代表功能可用。核对固定版本官方源码，确认旧 Callback.onConnect 默认返回带特殊标记的空命令占位；上一版复制其中的空权限，导致应用及内部通知 Controller 没有标准播放、Seek、时间线读取、切歌、音量 / 速率等权限，而自定义队列命令仍能执行。改用 onConnectAsync 和按 Controller 初始化的 AcceptedResultBuilder，保留标准权限并仅为本应用补充私有命令；下发标准操作前显式检查可用性。

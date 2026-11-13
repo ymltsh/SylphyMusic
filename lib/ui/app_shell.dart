@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/appearance.dart';
 import '../core/listening_history.dart';
 import '../core/models.dart';
 import 'cache_tasks.dart';
@@ -64,6 +65,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     app.addListener(_update);
     app.playback.addListener(_update);
+    libraryView = app.appearance.libraryCategories.first;
     playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
     app.appearance.addListener(_appearanceChanged);
     unawaited(_loadWelcome());
@@ -93,6 +95,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   }
 
   void _appearanceChanged() {
+    if (!app.appearance.libraryCategories.contains(libraryView)) {
+      _librarySelection.clear();
+      libraryView = app.appearance.libraryCategories.first;
+    }
     if (_defaultPlayerFab != app.appearance.playerFab) {
       playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
     }
@@ -148,7 +154,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     _librarySelection.clear();
     setState(() {
       tab = 1;
-      libraryView = view;
+      libraryView = app.appearance.libraryCategories.contains(view)
+          ? view
+          : app.appearance.libraryCategories.first;
     });
   }
 
@@ -391,22 +399,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   _librarySelection.clear();
                   setState(() => libraryView = value);
                 },
-                options: const [
-                  CapsuleOption(
-                    value: 0,
-                    label: '歌曲',
-                    icon: Icons.music_note_outlined,
-                  ),
-                  CapsuleOption(
-                    value: 1,
-                    label: '专辑',
-                    icon: Icons.album_outlined,
-                  ),
-                  CapsuleOption(
-                    value: 2,
-                    label: '艺术家',
-                    icon: Icons.person_outline,
-                  ),
+                options: [
+                  for (final category in app.appearance.libraryCategories)
+                    CapsuleOption(
+                      value: category,
+                      label: Appearance.libraryCategoryNames[category],
+                      icon: Appearance.libraryCategoryIcons[category],
+                    ),
                 ],
               ),
             ),
@@ -418,19 +417,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 onPressed: _librarySelection.count == 0
                     ? null
                     : () => unawaited(_libraryBatchActions()),
-              )
-            else if (libraryView == 1)
-              SizedBox.square(
-                dimension: 48,
-                child: IconButton(
-                  key: const ValueKey('album-cover-flow-toggle'),
-                  tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
-                  isSelected: albumCoverFlow,
-                  onPressed: () =>
-                      setState(() => albumCoverFlow = !albumCoverFlow),
-                  icon: const Icon(Icons.view_carousel_outlined),
-                  selectedIcon: const Icon(Icons.view_list_rounded),
-                ),
               ),
           ],
         ),
@@ -441,6 +427,18 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   Widget _sortControls() => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
+      if (libraryView == 1 && !_librarySelection.active)
+        SizedBox.square(
+          dimension: 48,
+          child: IconButton(
+            key: const ValueKey('album-cover-flow-toggle'),
+            tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
+            isSelected: albumCoverFlow,
+            onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
+            icon: const Icon(Icons.view_carousel_outlined),
+            selectedIcon: const Icon(Icons.view_list_rounded),
+          ),
+        ),
       SizedBox.square(
         dimension: 48,
         child: PopupMenuButton<String>(
@@ -494,6 +492,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             ),
             onAction: _trackAction,
             batchSelection: _librarySelection,
+            bottomPadding: libraryView == 3
+                ? (MediaQuery.sizeOf(context).width > 750 ||
+                          playerCollapsed ||
+                          app.playback.current == null
+                      ? 12
+                      : 96)
+                : null,
             coverFlow:
                 libraryView == 1 && albumCoverFlow && !_librarySelection.active,
             viewControls: _libraryFilterBar(),
@@ -821,11 +826,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       context,
       app,
       count: count,
-      countUnit: query.view == 0
-          ? '首'
-          : query.view == 1
-          ? '张专辑'
-          : '位艺术家',
+      countUnit: query.countUnit,
       resolve: () async {
         if (query.view == 0) {
           final refs = await app.catalog.queue(query.songs);
@@ -835,7 +836,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 ref,
           ];
         }
-        final kind = query.view == 1 ? 'album' : 'artist';
+        final kind = query.groupType;
         if (all) {
           final refs = await app.catalog.queue(query.songs);
           final omitted = <String>{};
@@ -1288,7 +1289,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onSelect: (source) {
       setState(() {
         tab = 1;
-        libraryView = 0;
+        libraryView = app.appearance.libraryCategories.first;
       });
       // Sources can be opened above nested settings routes. Reveal the shell's
       // library rather than just exposing the previous settings page.

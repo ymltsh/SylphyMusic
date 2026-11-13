@@ -220,3 +220,7 @@ SQLite v11 为推荐快照增加 introduction 和 llm_tag 字段，以保证同�
 
 
 LLM 设置按用途分布：API 设置保留接口地址、模型、密钥与连接测试；推荐设置中的 `LlmRecommendationSettings` 统一提供 LLM 开关、参与方式、等待预算及 System / User 提示词编辑。只迁移界面入口，沿用原持久化字段和配置代次，现有值不变。聊天仅在来信更多菜单提供，当前信和历史信不显示独立聊天按钮，历史列表卡片及打开后的信卡片右侧均有更多入口。
+
+音乐库文件夹分类在 LibraryCatalog 内按来源和父目录 SQL 分组，详情和批量动作复用相同分组键。已有索引无需重新导入；无路径元数据的来源显示“未提供目录”，Emby 后续同步显式请求 Path。切歌在旧输出停止完成后加入 300ms 间隔，过期加载代次不再打开。
+
+Android 播放运行库与可选 De-click 已更新为固定 mpv-android 2026-09-17；afade 在音频滤镜链按样本处理，默认关闭，诊断通过既有轮转日志桥接。单一 Session、缓存租约与来源解析边界不变，详见 ANDROID_DECLICK.md / NATIVE_DEPENDENCIES.md。

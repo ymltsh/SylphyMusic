@@ -87,7 +87,7 @@ class FlutterMediaControllerBridge(private val app: SylphyApplication, engine: F
                                 override fun notImplemented() { result.notImplemented() }
                             })
                         }
-                        "queue", "gain", "art", "invalidate", "retry" -> custom(value, call.method, args, result)
+                        "queue", "gain", "art", "invalidate", "retry", "declick", "audioDiagnostics" -> custom(value, call.method, args, result)
                         else -> result.notImplemented()
                     }
                 } catch (_: Exception) { result.error("media3_command", "媒体操作失败", null) }

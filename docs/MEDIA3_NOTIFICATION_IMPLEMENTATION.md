@@ -31,8 +31,20 @@
 
 本轮仍按仓库约定仅编译、打包；设备交互是否恢复由用户确认，不能把前一轮或本轮编译成功当成功能验收。
 
+## 2026-11-13 进入 App 唤醒通知与 Seek 确认
+
+Activity 再次可见，以及界面首次连接 Controller 时，发送仅本应用可用的 wake 会话命令。已有队列以暂停的元数据 READY 恢复媒体卡片，并通过 Media3 triggerNotificationUpdate 显式刷新；不因展示通知打开音频、申请焦点或改变播放意图。正在播放时保留原状态；空队列不创建无曲目的媒体卡片。
+
+此前 UI 的 seek Future 在命令提交后即返回，滑块立刻释放拖动值，可能先回到旧采样再跳到新位置；旧 1.5 秒匹配容差也过宽。现仍经同一 MediaController / Session 操作唯一 Player，Seek 返回值等待原生 SEEK / PLAYBACK_RESTART 事件及接近目标的有效位置采样；位置容差按速率限定，确认后的快照先更新，再完成 UI 等待。原生 JNI 新增 playback restart 观察，八秒超时及来源失效 / 停止 / 切曲 / 销毁边界清理等待，旧目标不会完成新一次 Seek。
+
+本轮没有运行测试、应用启动或设备验收；仅完成普通入口编译和内部打包，结果见 PROGRESS。
+
 ## 编译与验收
 
 按仓库约定只进行普通入口 Android 三 ABI / Windows Release 编译与内部打包。没有运行 analyze、单元 / Widget / 集成测试、应用启动、设备命令或真实来源请求。构建记录与产物以本轮 PROGRESS 条目为准；通知显示、后台长暂停、HyperOS、蓝牙、真实声音与来源兼容性由用户验收。
 
 参考：[Media3 后台服务](https://developer.android.com/media/media3/session/background-playback)、[SimpleBasePlayer](https://developer.android.com/reference/androidx/media3/common/SimpleBasePlayer)、[固定依赖版本](https://developer.android.com/jetpack/androidx/releases/media3)。附件原始设计保留于 [架构蓝图](ANDROID_MPV_MEDIA3_ARCHITECTURE.md)，其中尚未交付的里程碑不能视为已完成。
+
+## De-click 更新
+
+2026-11-13：经用户授权，Android 更换为带完整所需滤镜的固定 mpv-android 2026-09-17 原生运行库，先前“沿用 mpv 0.35 精简库”的描述属于历史。保持现有单一 Media3 Session / mpv context；新增默认关闭的 De-click 实验开关、逐样本 afade、原生事件日志和输出格式诊断。缓冲参数不变，滤镜淡出需要等待已排队的 PCM，可能产生额外跳转延迟。实现、来源及实听边界见 ANDROID_DECLICK.md / NATIVE_DEPENDENCIES.md。

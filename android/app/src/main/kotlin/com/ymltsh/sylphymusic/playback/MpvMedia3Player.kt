@@ -48,10 +48,11 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     private var level = 1f
     private var ducked = false
     private var gain = "no"
+    private var declick = false
     private var loaded = false
     private var openPending = false
     private var pendingSeek: Long? = null
-    private var seekCompletion: SettableFuture<Void>? = null
+    private var seekCompletion: SettableFuture<Void?>? = null
     private var seekTimeout: Runnable? = null
     private var seekObserved = false
     private var notificationAwake = false
@@ -75,7 +76,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) { setIntent(false) }
     }
-    private val engine = NativeMpvEngine(::sample, { epoch -> if (epoch == nativeEpoch && !closed) fail("native_audio") })
+    private val engine = NativeMpvEngine(::sample, { epoch -> if (epoch == nativeEpoch && !closed) fail("native_audio") }, app::playbackDiagnostics)
     init {
         if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("DEPRECATION") app.registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
@@ -90,6 +91,8 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
                 rate = saved.optDouble("rate", 1.0).toFloat().coerceIn(0.5f, 2f)
                 level = saved.optDouble("volume", 1.0).toFloat().coerceIn(0f, 1f)
                 gain = saved.optString("gain", "no")
+                declick = saved.optBoolean("declick",false)
+                engine.execute(nativeEpoch) { property("sylphy-declick",if (declick) "yes" else "no") }
                 order = (queue.indices).toMutableList()
                 if (shuffled && order.isNotEmpty()) { order.remove(index); order.shuffle(); order.add(0, index) }
                 if (queue.isNotEmpty()) core = PlaybackReducer.reduce(core, PlaybackEvent.SetMedia(queue[index].getString("key"), saved.optLong("position").coerceAtLeast(0), false)).copy(phase = PlaybackPhase.IDLE)
@@ -108,6 +111,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     }
     private fun notifyState() {
         if (closed) return
+        engine.setPauseIntent(!core.desiredPlay || core.focus != FocusPhase.HELD)
         val now = SystemClock.elapsedRealtime()
         if (core.desiredPlay && core.focus == FocusPhase.HELD && core.phase != PlaybackPhase.FAILED && core.phase != PlaybackPhase.ENDED) {
             if (!wakeLock.isHeld || now - wakeRenewedAt > 20000) { wakeLock.acquire(35000); wakeRenewedAt = now }
@@ -164,7 +168,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         notificationAwake = true
         notifyState()
     }
-    fun awaitSeek(): ListenableFuture<Void> = seekCompletion ?: Futures.immediateVoidFuture()
+    fun awaitSeek(): ListenableFuture<Void?> = seekCompletion ?: Futures.immediateVoidFuture()
     private fun cancelSeek() {
         seekTimeout?.let { main.removeCallbacks(it) }; seekTimeout = null
         val completion = seekCompletion; seekCompletion = null
@@ -175,7 +179,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         cancelSeek()
         pendingSeek = position; seekObserved = opening
         seekRequestedAt = SystemClock.elapsedRealtime()
-        val completion = SettableFuture.create<Void>()
+        val completion = SettableFuture.create<Void?>()
         seekCompletion = completion
         val timeout = Runnable { if (seekCompletion === completion) fail("seek_timeout") }
         seekTimeout = timeout
@@ -191,10 +195,12 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         .put("playWhenReady", core.desiredPlay).put("playing", core.desiredPlay && core.focus == FocusPhase.HELD && core.output == OutputPhase.ADVANCING)
         .put("buffering", core.desiredPlay && (core.phase == PlaybackPhase.OPENING || core.phase == PlaybackPhase.BUFFERING || core.output != OutputPhase.ADVANCING))
         .put("loaded", loaded).put("duration", queue.getOrNull(index)?.optLong("duration") ?: 0)
-        .put("error", core.errorCode ?: JSONObject.NULL).put("rate", rate).put("volume", level * 100).put("gain", gain).toString()
+        .put("error", core.errorCode ?: JSONObject.NULL).put("rate", rate).put("volume", level * 100).put("gain", gain).put("declick",declick).toString()
 
     fun custom(action: String, data: JSONObject) {
         when (action) {
+            "declick" -> { declick=data.getBoolean("value"); engine.execute(nativeEpoch) { property("sylphy-declick",if (declick) "yes" else "no") }; notifyState(); saveCheckpoint() }
+            "audioDiagnostics" -> { val enabled=data.getBoolean("value"); engine.execute(nativeEpoch) { property("sylphy-diagnostics",if (enabled) "yes" else "no") } }
             "queue" -> {
                 val array = data.getJSONArray("items")
                 val next = (0 until array.length()).map { array.getJSONObject(it) }.toMutableList()
@@ -304,6 +310,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     }
     private fun open(target: Int, position: Long, play: Boolean) {
         if (target !in queue.indices) return
+        val switching = loaded || openPending
         cancelSeek()
         transition++; revision++
         index = target; loaded = false; openPending = true; pendingSeek = null
@@ -316,7 +323,6 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         val retired = currentLease; val retiredKey = currentLeaseKey
         currentLease = null; currentLeaseKey = null
         stream.cancel()
-        engine.execute(epoch) { stopAndDrain(); main.post { releaseLease(retired, retiredKey) } }
         val entry = queue[index]
         val key = entry.getString("key")
         val resolved: (JSONObject?) -> Unit = resolved@ { descriptor ->
@@ -352,21 +358,34 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
             } catch (_: Exception) { releaseLease(lease, key); fail("source_unavailable") }
             notifyState()
         }
-        val local = entry.optJSONObject("local")
-        val localFile = local?.optString("file")?.let(::File)
-        if (local != null && localFile != null && localFile.isFile && localFile.length() == local.optLong("bytes") && localFile.lastModified() == local.optLong("modified") && local.optString("leaseRoot").isNotEmpty()) {
-            val directory = File(local.getString("leaseRoot"), "${android.os.Process.myPid()}/${local.getString("leaseKey")}")
-            directory.mkdirs()
-            val marker = File(directory, UUID.randomUUID().toString())
-            try {
-                marker.writeText("")
-                resolved(JSONObject(local.toString()).put("lease", marker.absolutePath))
-            } catch (_: Exception) { marker.delete(); app.resolvePlaybackSource(key, resolved) }
-        } else app.resolvePlaybackSource(key, resolved)
+        // Begin the quiet interval after the old decoder has actually drained.
+        // Epoch checks prevent a delayed skip from reopening an obsolete item.
+        engine.execute(epoch) {
+            stopAndDrain()
+            main.post {
+                releaseLease(retired, retiredKey)
+                if (!closed && load == sourceEpoch) main.postDelayed({
+                    if (!closed && load == sourceEpoch) {
+                        val local = entry.optJSONObject("local")
+                        val localFile = local?.optString("file")?.let(::File)
+                        if (local != null && localFile != null && localFile.isFile && localFile.length() == local.optLong("bytes") && localFile.lastModified() == local.optLong("modified") && local.optString("leaseRoot").isNotEmpty()) {
+                            val directory = File(local.getString("leaseRoot"), "${android.os.Process.myPid()}/${local.getString("leaseKey")}")
+                            directory.mkdirs()
+                            val marker = File(directory, UUID.randomUUID().toString())
+                            try {
+                                marker.writeText("")
+                                resolved(JSONObject(local.toString()).put("lease", marker.absolutePath))
+                            } catch (_: Exception) { marker.delete(); app.resolvePlaybackSource(key, resolved) }
+                        } else app.resolvePlaybackSource(key, resolved)
+                    }
+                }, if (switching) 300L else 0L)
+            }
+        }
         notifyState()
     }
     private fun sample(epoch: Long, values: DoubleArray) {
         if (closed || epoch != nativeEpoch || queue.isEmpty()) return
+        if (values.size > 9) declick = values[9] != 0.0
         val now = SystemClock.elapsedRealtime()
         if (pendingSeek != null) seekObserved = seekObserved || values[7] != 0.0 || values.getOrElse(8) { 0.0 } != 0.0
         if (values[5] != 0.0) { fail("native_stream"); return }
@@ -517,7 +536,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         // Metadata and verified local paths only. Never persist remote URLs or headers.
         val copy = queue.map { JSONObject(it.toString()) }
         val json = JSONObject().put("items", JSONArray(copy)).put("index", index).put("position", core.positionMs).put("repeat", repeat).put("shuffle", shuffled)
-            .put("rate", rate).put("volume", level).put("gain", gain)
+            .put("rate", rate).put("volume", level).put("gain", gain).put("declick",declick)
         val value = json.toString()
         // The queue file is small; I/O stays off the MediaSession application thread.
         app.savePlaybackCheckpoint(checkpoint, value)

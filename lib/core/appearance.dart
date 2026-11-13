@@ -42,6 +42,29 @@ class Appearance extends ChangeNotifier {
   bool discRotation = false;
   bool solidBackground = true;
   bool playerFab = true;
+  int _libraryCategoryMask = 15;
+  static const libraryCategoryNames = ['歌曲', '专辑', '艺术家', '文件夹'];
+  static const libraryCategoryIcons = [
+    Icons.music_note_outlined,
+    Icons.album_outlined,
+    Icons.person_outline,
+    Icons.folder_outlined,
+  ];
+  List<int> get libraryCategories => [
+    for (var index = 0; index < 4; index++)
+      if ((_libraryCategoryMask & (1 << index)) != 0) index,
+  ];
+  Future<void> setLibraryCategory(int index, bool enabled) async {
+    if (_closed || index < 0 || index >= 4) return;
+    final next = enabled
+        ? _libraryCategoryMask | (1 << index)
+        : _libraryCategoryMask & ~(1 << index);
+    if (next == 0 || next == _libraryCategoryMask) return;
+    _libraryCategoryMask = next;
+    notifyListeners();
+    await db.setSetting('ui_library_categories', '$next');
+  }
+
   double lyricFontSize = 24;
   double miniLyricFontSize = 20;
   static const lyricFontSizes = [20.0, 24.0, 28.0];
@@ -87,6 +110,12 @@ class Appearance extends ChangeNotifier {
     ambient = await db.setting('ui_ambient') == 'true';
     glass = await db.setting('ui_glass') == 'true';
     playerFab = await db.setting('ui_player_fab') != 'false';
+    final categories = int.tryParse(
+      await db.setting('ui_library_categories') ?? '',
+    );
+    if (categories != null && categories > 0 && categories <= 15) {
+      _libraryCategoryMask = categories;
+    }
     final storedSolid = await db.setting('ui_background_solid');
     solidBackground = storedSolid == null
         ? _backgroundName == null

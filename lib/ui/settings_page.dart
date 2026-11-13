@@ -21,6 +21,7 @@ import 'recommendation_settings_page.dart';
 import 'recommendation_letters_page.dart';
 
 enum _Section {
+  library,
   playback,
   sync,
   lyrics,
@@ -115,6 +116,7 @@ class _SettingsPageState extends State<SettingsPage> {
         null => '设置',
         _Section.playback => '播放器设置',
         _Section.sync => '同步与收藏',
+        _Section.library => '音乐库分类',
         _Section.lyrics => '歌词设置',
         _Section.theme => '主题与配色',
         _Section.background => '页面背景',
@@ -571,6 +573,12 @@ class _SettingsPageState extends State<SettingsPage> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         onTap: widget.onSources,
       ),
+      _entry(
+        Icons.library_music_outlined,
+        '音乐库分类',
+        '显示或隐藏歌曲、专辑、艺术家和文件夹',
+        _Section.library,
+      ),
       _entry(Icons.sync_outlined, '同步与收藏', '自动同步与收藏偏好', _Section.sync),
       _entry(Icons.storage_outlined, '下载与缓存', '管理离线音乐与空间', _Section.cache),
     ]),
@@ -634,6 +642,22 @@ class _SettingsPageState extends State<SettingsPage> {
   ];
 
   List<Widget> _controls(_Section section) => switch (section) {
+    _Section.library => [
+      const ListTile(subtitle: Text('选择音乐库显示的分类，至少保留一项。隐藏分类不会删除音乐。')),
+      for (var category = 0; category < 4; category++)
+        SwitchListTile(
+          title: Text(Appearance.libraryCategoryNames[category]),
+          secondary: Icon(Appearance.libraryCategoryIcons[category]),
+          value: app.appearance.libraryCategories.contains(category),
+          onChanged:
+              app.appearance.libraryCategories.length == 1 &&
+                  app.appearance.libraryCategories.contains(category)
+              ? null
+              : (enabled) => _act(
+                  () => app.appearance.setLibraryCategory(category, enabled),
+                ),
+        ),
+    ],
     _Section.sync => [
       ListTile(
         title: const Text('自动同步间隔'),
@@ -701,6 +725,13 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+        SwitchListTile(
+          title: const Text('De-click 平滑跳转（实验）'),
+          subtitle: const Text('开始播放和跳转时短暂淡出 / 淡入；跳转前可能额外等待，关闭可对比声音。'),
+          value: app.playback.deClickEnabled,
+          onChanged: (enabled) => _act(() => app.playback.setDeClick(enabled)),
+        ),
       ListTile(
         title: const Text('响度均衡'),
         trailing: DropdownButton<String>(

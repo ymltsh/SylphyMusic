@@ -21,6 +21,7 @@ class LibraryBrowser extends StatefulWidget {
     this.songActions,
     this.viewControls,
     this.coverFlow = false,
+    this.bottomPadding,
     this.batchSelection,
     this.selected,
     this.onSelection,
@@ -31,6 +32,9 @@ class LibraryBrowser extends StatefulWidget {
   final Widget? songActions;
   final Widget? viewControls;
   final bool coverFlow;
+
+  /// Space owned by an overlay; a docked route player needs no extra reserve.
+  final double? bottomPadding;
   final BatchSelection? batchSelection;
   final Set<String>? selected;
   final void Function(Track, bool)? onSelection;
@@ -107,6 +111,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     }
   }
 
+  double get _rowExtent =>
+      (MediaQuery.sizeOf(context).width > 750 ? 64 : 76) *
+      MediaQuery.textScalerOf(context).scale(14) /
+      14;
+
   // Virtual rows keep only six SQL batches of metadata, even in a huge library.
   Widget _virtualRow(int index) {
     final start = index ~/ 100 * 100;
@@ -114,25 +123,42 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     if (rows != null) {
       batches[start] = rows;
       final at = index - start;
-      if (at < rows.length) return _row(rows[at]);
+      if (at < rows.length) {
+        final tile = _row(rows[at]);
+        // Each scrolling group owns and clips its own ink. Drawing on the
+        // Scaffold material can leave a wide highlight between visible rows.
+        return widget.query.view == 0
+            ? tile
+            : Material(
+                type: MaterialType.transparency,
+                clipBehavior: Clip.hardEdge,
+                child: tile,
+              );
+      }
       return const SizedBox.shrink();
     }
     if (failed.contains(start)) {
-      return Center(
-        child: TextButton(
-          onPressed: () => setState(() {
-            failed.remove(start);
-            _request(start);
-          }),
-          child: const Text('加载失败，点击重试'),
+      return SizedBox(
+        height: _rowExtent,
+        child: Center(
+          child: TextButton(
+            onPressed: () => setState(() {
+              failed.remove(start);
+              _request(start);
+            }),
+            child: const Text('加载失败，点击重试'),
+          ),
         ),
       );
     }
     _request(start);
-    return const Center(
-      child: SizedBox.square(
-        dimension: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
+    return SizedBox(
+      height: _rowExtent,
+      child: const Center(
+        child: SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       ),
     );
   }
@@ -303,12 +329,19 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(
-            title: Text(album ? row.track.album : row.track.artist),
+            title: Text(
+              widget.query.view == 3
+                  ? row.folderTitle
+                  : album
+                  ? row.track.album
+                  : row.track.artist,
+            ),
           ),
           bottomNavigationBar: RoutePlayerBar(app: widget.app),
           body: LibraryBrowser(
             app: widget.app,
-            query: widget.query.songsIn(album ? 'album' : 'artist', row.key),
+            query: widget.query.songsIn(widget.query.groupType, row.key),
+            bottomPadding: widget.query.view == 3 ? 12 : null,
             onAction: widget.onAction,
           ),
         ),
@@ -375,11 +408,15 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       onLongPress: batch == null || widget.query.blocked
           ? null
           : () => batch.begin(batchKey),
-      leading: widget.query.view == 2
+      leading: widget.query.view == 3
+          ? const Icon(Icons.folder_outlined)
+          : widget.query.view == 2
           ? const Icon(Icons.person_outline)
           : CoverArt(app: widget.app, track: track),
       title: Text(
-        album
+        widget.query.view == 3
+            ? row.folderTitle
+            : album
             ? (track.album.isEmpty ? '未知专辑' : track.album)
             : widget.query.view == 2
             ? track.artist
@@ -388,7 +425,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        grouped
+        widget.query.view == 3
+            ? '${_source(track)} · ${row.count} 首'
+            : grouped
             ? '${album ? '${track.albumArtist.isEmpty ? track.artist : track.albumArtist} · ' : ''}${row.count} 首 · ${row.sources} 个来源'
             : '${track.artist} · ${track.album} · ${_source(track)}',
         maxLines: 1,
@@ -552,13 +591,13 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                     key: ValueKey('${widget.query.signature}:$generation'),
                     controller: _scrollController,
                     cacheExtent: 0,
+                    clipBehavior: Clip.hardEdge,
                     padding: EdgeInsets.only(
-                      bottom: MediaQuery.sizeOf(context).width > 750 ? 24 : 96,
+                      bottom:
+                          widget.bottomPadding ??
+                          (MediaQuery.sizeOf(context).width > 750 ? 24 : 96),
                     ),
-                    itemExtent:
-                        (MediaQuery.sizeOf(context).width > 750 ? 64 : 76) *
-                        MediaQuery.textScalerOf(context).scale(14) /
-                        14,
+                    itemExtent: widget.query.view == 0 ? _rowExtent : null,
                     itemCount: result.total,
                     itemBuilder: (_, i) => _virtualRow(i),
                   ),
@@ -584,11 +623,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           ),
           title: Text(
             '已选 ${widget.batchSelection!.count} '
-            '${widget.query.view == 0
-                ? '首'
-                : widget.query.view == 1
-                ? '张专辑'
-                : '位艺术家'}',
+            '${widget.query.countUnit}',
           ),
           trailing: TextButton(
             onPressed: result == null

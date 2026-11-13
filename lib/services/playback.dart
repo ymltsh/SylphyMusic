@@ -71,6 +71,9 @@ class PlaybackCoordinator extends ChangeNotifier {
   String? error;
   int failures = 0;
   String replayGain = 'no';
+  bool deClickEnabled = false;
+  Future<void> setDeClick(bool enabled) async {}
+  Future<void> setNativeDiagnostics(bool enabled) async {}
   double speed = 1.0;
   double volume = 100;
   // Avoid cutting the PCM waveform at an arbitrary non-zero sample on pause.
@@ -1315,6 +1318,11 @@ class PlaybackCoordinator extends ChangeNotifier {
           throw StateError('原生播放器无法安全恢复，请重新启动应用');
         }
         try {
+          if (player.state.playlist.medias.isNotEmpty) {
+            await player.stop().timeout(const Duration(seconds: 12));
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+            if (generation != _loadGeneration) return;
+          }
           await player
               .open(media, play: play && _playRequested && !_focusWasLost)
               .timeout(const Duration(seconds: 25));
