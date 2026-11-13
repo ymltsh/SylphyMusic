@@ -1975,3 +1975,19 @@ dart format 已执行；tool/build_review.ps1 成功完成 Android 三 ABI Relea
 仅提交推送清单：main/version.json 为 d63a1c2，feature/version.json 与 version-openlist.json 为 6539ea9，main/version-openlist.json 为 ca78807。源码保留在本地工作区并随 Release 附件交付；先前普通版 1.0.57+70 保留为历史版本，当前 Latest 为修正版 1.0.58+71。未发布 OpenList 构建号 70。
 
 产物为普通版 build/releases/1.0.58-71/ 与特别版 build/releases/1.0.58-openlist.40-71/；日志为普通版 build/release71-publish.log、特别版 build/openlist-release71-build.log 及 build/openlist-release71-publish.log。本轮未使用测试凭据，未运行 analyze、测试、应用启动或设备检查；文件夹层级、初始位置及头像显示仍由用户实机验收。
+
+
+## 2026-11-13 在线封面兜底补丁应用与发布准备
+
+按用户要求应用 SylphyMusic_在线封面兜底补丁.zip，并同步 OpenList。两工作区精确锚点匹配通过，保留既有修改及补丁附带的用户可选测试资料，未运行测试或 analyze。原音源封面 / 艺术家图片优先，404 或无图片时启用 TheAudioDB，专辑可继续使用 MusicBrainz / Cover Art Archive。默认启用，仅发送艺术家 / 专辑名，独立客户端不携带音源凭据；已在 README 和媒体资源说明中记录这一行为。
+
+合并时补齐来源代次与请求取消：同来源查询合并，全局最多两任务；停用取消对应在途及等待操作，退出关闭客户端并等待读取；艺术家元数据 404 可进入在线兜底，认证及其他错误不隐藏。过大响应直接放弃并在任务结束中止请求，错误 / 跳转响应排空有超时。保留校验、原子提交、来源隔离及缓存配额，无数据库迁移、无新第三方依赖。准备发布普通版 1.0.59+72 与 OpenList 1.0.59-openlist.41+72；本轮未使用测试凭据，未运行应用启动或设备检查。
+
+
+## 2026-11-13 在线封面兜底发布 1.0.59+72
+
+普通版 1.0.59+72（三 ABI Android、Windows 安装程序 / 便携包、对应应用源码）与 OpenList 1.0.59-openlist.41+72（arm64 APK、包含对应后端 / 前端的源码）已发布。普通版 7 个及特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始 / 加速清单均核对通过，特别版状态为 complete；Android 正式签名保持原证书。
+
+仅推送清单：main/version.json 为 6913300，feature/version.json 与 version-openlist.json 为 dc82f10，main/version-openlist.json 为 e136bd8。源码修改保留工作区，完整对应源码随 Release 附件提供。产物为普通版 build/releases/1.0.59-72/ 与特别版 build/releases/1.0.59-openlist.41-72/；日志为普通版 build/release72-publish.log、特别版 build/openlist-release72-build.log 及 build/openlist-release72-publish.log。
+
+本轮未使用测试凭据，未运行 analyze、测试、应用启动或设备检查，也未用私人曲库信息请求在线图片站点。编译与发布核对不代表图片命中或实机交互已通过验证，实际在线封面 / 头像效果由用户验收。

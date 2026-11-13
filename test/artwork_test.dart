@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/data/app_db.dart';
 import 'package:sylphy_music/services/artwork.dart';
+import 'package:sylphy_music/services/online_artwork.dart';
 import 'package:sylphy_music/services/playback.dart';
 import 'package:sylphy_music/services/sources.dart';
 
@@ -235,6 +236,117 @@ void main() {
     expect(requests.length, 1);
   });
   test(
+    'online fallback runs after server 404s and reuses disk cache',
+    () async {
+      final image = await File('test/fixtures/cover.png').readAsBytes();
+      final fallback = _FixtureOnline(image);
+      await store.shutdown();
+      store = ArtworkStore(
+        db,
+        AdapterFactory(adapter.vault),
+        root,
+        onlineArtwork: fallback,
+      );
+      statuses['song'] = 404;
+      statuses['album'] = 404;
+      final song = Track(
+        ref: const TrackRef('s', 'song'),
+        title: 'Da Funk',
+        artist: 'Daft Punk',
+        album: 'Homework',
+        coverId: 'album',
+        remote: {
+          'AlbumId': 'album',
+          'ImageTags': {'Primary': 'song-v1'},
+        },
+      );
+      expect(await store.load(song), isNotNull);
+      expect(requests.length, 2);
+      expect(fallback.calls, 1);
+      expect(await store.load(song), isNotNull);
+      expect(fallback.calls, 1);
+    },
+  );
+
+  test('source artwork takes priority over the online fallback', () async {
+    final image = await File('test/fixtures/cover.png').readAsBytes();
+    final fallback = _FixtureOnline(image);
+    await store.shutdown();
+    store = ArtworkStore(
+      db,
+      AdapterFactory(adapter.vault),
+      root,
+      onlineArtwork: fallback,
+    );
+    final song = Track(
+      ref: const TrackRef('s', 'song'),
+      title: 'Da Funk',
+      artist: 'Daft Punk',
+      album: 'Homework',
+      remote: {
+        'ImageTags': {'Primary': 'song-v1'},
+      },
+    );
+    expect(await store.load(song), isNotNull);
+    expect(fallback.calls, 0);
+  });
+
+  test('missing local cover is filled from online and cached', () async {
+    final image = await File('test/fixtures/cover.png').readAsBytes();
+    final fallback = _FixtureOnline(image);
+    await store.shutdown();
+    store = ArtworkStore(
+      db,
+      AdapterFactory(adapter.vault),
+      root,
+      onlineArtwork: fallback,
+    );
+    await db.putSource(
+      const SourceProfile(
+        id: 'local',
+        name: 'Local',
+        kind: SourceKind.local,
+        url: '',
+        username: '',
+      ),
+    );
+    const song = Track(
+      ref: TrackRef('local', 'local-song'),
+      title: 'Da Funk',
+      artist: 'Daft Punk',
+      album: 'Homework',
+    );
+    expect(await store.load(song), isNotNull);
+    expect(fallback.calls, 1);
+    expect(await store.load(song), isNotNull);
+    expect(fallback.calls, 1);
+  });
+
+  test('authorization failure is NOT hidden by online fallback', () async {
+    final image = await File('test/fixtures/cover.png').readAsBytes();
+    final fallback = _FixtureOnline(image);
+    await store.shutdown();
+    store = ArtworkStore(
+      db,
+      AdapterFactory(adapter.vault),
+      root,
+      onlineArtwork: fallback,
+    );
+    statuses['song'] = 401;
+    final song = Track(
+      ref: const TrackRef('s', 'song'),
+      title: 'Da Funk',
+      artist: 'Daft Punk',
+      album: 'Homework',
+      remote: {
+        'ImageTags': {'Primary': 'song-v1'},
+      },
+    );
+    expect(await store.load(song), isNull);
+    expect(fallback.calls, 0);
+  });
+
+  test(
     'persisted image validators support a 304 refresh without replacing bytes',
     () async {
       final first = await store.load(track());
@@ -247,4 +359,23 @@ void main() {
       expect(requests.length, 2);
     },
   );
+}
+
+class _FixtureOnline implements OnlineArtworkSource {
+  _FixtureOnline(this.bytes);
+  final List<int> bytes;
+  int calls = 0;
+
+  @override
+  Future<List<int>?> fetch(
+    Track track, {
+    required bool artist,
+    bool forceRefresh = false,
+  }) async {
+    calls++;
+    return bytes;
+  }
+
+  @override
+  void close() {}
 }

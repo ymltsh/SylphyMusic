@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../core/models.dart';
 import '../data/app_db.dart';
 import 'media_assets.dart';
+import 'online_artwork.dart';
 import 'sources.dart';
 import 'webdav_tags.dart';
 
@@ -18,10 +19,14 @@ class ArtworkStore {
     this.root, {
     MediaAssetStore? assets,
     WebDavTags? tags,
+    OnlineArtworkSource? onlineArtwork,
+    this.enableOnlineFallback = true,
   }) : assets = assets ?? MediaAssetStore(db, root),
        _ownsAssets = assets == null,
        tags = tags ?? WebDavTags(factory),
-       _ownsTags = tags == null;
+       _ownsTags = tags == null,
+       onlineArtwork = onlineArtwork ?? OnlineArtworkProvider(),
+       _ownsOnlineArtwork = onlineArtwork == null;
   final AppDb db;
   final AdapterFactory factory;
   final Directory root;
@@ -29,6 +34,9 @@ class ArtworkStore {
   final bool _ownsAssets;
   final WebDavTags tags;
   final bool _ownsTags;
+  final OnlineArtworkSource onlineArtwork;
+  final bool _ownsOnlineArtwork;
+  final bool enableOnlineFallback;
   final Map<HttpClient, String> _clients = {};
   final Map<MusicAdapter, String> _adapters = {};
   final List<Completer<void>> _waiting = [];
@@ -76,7 +84,33 @@ class ArtworkStore {
     track.remote['grandparentRatingKey'],
   ]);
 
+  Future<AssetPayload?> _online(
+    Track track,
+    int epoch, {
+    required bool artist,
+    bool forceRefresh = false,
+  }) async {
+    if (!enableOnlineFallback ||
+        _stopped ||
+        epoch != (_epochs[track.ref.sourceId] ?? 0)) {
+      return null;
+    }
+    final bytes = await onlineArtwork.fetch(
+      track,
+      artist: artist,
+      forceRefresh: forceRefresh,
+    );
+    if (bytes == null ||
+        _stopped ||
+        epoch != (_epochs[track.ref.sourceId] ?? 0)) {
+      return null;
+    }
+    await assets.validate('cover', bytes);
+    return AssetPayload(bytes);
+  }
+
   Future<File?> _loadArtist(Track track, bool force) async {
+    final epoch = _epochs[track.ref.sourceId] ?? 0;
     final source = await db.source(track.ref.sourceId);
     if (source == null || !source.enabled || _stopped) return null;
     final cacheKey = key(track, artist: true);
@@ -85,7 +119,18 @@ class ArtworkStore {
       cacheKey,
       'cover',
       _artistVersion(track),
-      (previous) => _download(track, source, previous, artist: true),
+      (previous) async {
+        AssetPayload? native;
+        if (source.kind != SourceKind.local) {
+          try {
+            native = await _download(track, source, previous, artist: true);
+          } on HttpFailure catch (error) {
+            if (error.status != 404) rethrow;
+          }
+        }
+        if (native != null) return native;
+        return await _online(track, epoch, artist: true, forceRefresh: force);
+      },
       forceRefresh: force,
     );
     return asset?.file;
@@ -97,7 +142,19 @@ class ArtworkStore {
     if (source == null || !source.enabled || _stopped) return null;
     if (source.kind == SourceKind.local) {
       final path = track.remote['coverPath']?.toString();
-      return path != null && await File(path).exists() ? File(path) : null;
+      if (path != null && path.isNotEmpty && await File(path).exists()) {
+        return File(path);
+      }
+      await assets.link(track.ref, key(track), 'cover');
+      final fallback = await assets.get(
+        source,
+        key(track),
+        'cover',
+        track.artworkVersion,
+        (previous) => _online(track, epoch, artist: false, forceRefresh: force),
+        forceRefresh: force,
+      );
+      return fallback?.file;
     }
     // Lazily adopt pre-manifest artwork without requiring the server online.
     final oldVersion = jsonEncode([
@@ -148,7 +205,9 @@ class ArtworkStore {
             /* fetch a clean image */
           }
         }
-        return _download(track, source, previous);
+        final native = await _download(track, source, previous);
+        if (native != null) return native;
+        return await _online(track, epoch, artist: false, forceRefresh: force);
       },
       forceRefresh: force,
     );
@@ -252,6 +311,9 @@ class ArtworkStore {
 
   void suspendSource(String id) {
     tags.suspendSource(id);
+    if (onlineArtwork case final OnlineArtworkProvider provider) {
+      provider.suspendSource(id);
+    }
     _epochs[id] = (_epochs[id] ?? 0) + 1;
     assets.suspendSource(id);
     for (final entry in _clients.entries.toList()) {
@@ -272,6 +334,7 @@ class ArtworkStore {
   void invalidate() {} // Persistent freshness is driven by the selected image version.
   Future<void> shutdown() async {
     _stopped = true;
+    if (_ownsOnlineArtwork) onlineArtwork.close();
     if (_ownsTags) await tags.shutdown();
     for (final client in _clients.keys.toList()) {
       client.close(force: true);

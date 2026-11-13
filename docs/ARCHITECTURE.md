@@ -77,7 +77,7 @@ UI 和服务通过 `SourceKind.cloudPlaylists` 判断云歌单读取能力，新
 
 文件夹浏览按来源和完整路径保持身份，在 SQLite 中将每条已索引歌曲的目录投影为当前层直属子目录，同层直属歌曲与目录分开分组；查询与分页不加载全库 Track 元数据。初始节点是各来源内没有其他存歌祖先的实际存歌目录，跳过系统根目录与空的中间父目录；入口基于有效索引确定，不随搜索关键词改变。相对路径统一以 ./ 作为边界，直属源根目录的歌曲与相对路径子目录可在同一树中浏览。进入目录后继续逐层浏览，目录播放及批量操作按路径分隔边界包含子树，不使用可能误匹配通配符的 LIKE。无可用目录的曲目保留「未提供目录」分组，不虚构服务器目录。
 
-艺术家行使用独立圆形头像。Emby / Jellyfin 按艺术家身份（旧索引可在同一来源内精确匹配艺术家名称）读取 Primary 图片；Plex 使用艺术家的 grandparentThumb，OpenSubsonic 使用艺术家 coverArt。艺术家分页在当前筛选范围内选择支持头像的来源作为图片代表，额外读取限于当前分页。头像沿用 ArtworkStore 的并发、来源取消和退出链路及 MediaAssetStore 的完整校验、配额和租约，缓存身份包含来源与艺术家，不覆盖歌曲 / 专辑封面关联；图片缺失使用默认头像，不向外部搜图服务发送艺术家信息。
+艺术家行使用独立圆形头像。Emby / Jellyfin 按艺术家身份（旧索引可在同一来源内精确匹配艺术家名称）读取 Primary 图片；Plex 使用艺术家的 grandparentThumb，OpenSubsonic 使用艺术家 coverArt。艺术家分页在当前筛选范围内选择支持头像的来源作为图片代表，额外读取限于当前分页。头像沿用 ArtworkStore 的并发、来源取消和退出链路及 MediaAssetStore 的完整校验、配额和租约，缓存身份包含来源与艺术家，不覆盖歌曲 / 专辑封面关联；图片缺失时由在线兜底查询 TheAudioDB，仍无结果则显示默认头像。
 
 Jellyfin / Plex 通过独立适配器接入既有索引、代理、缓存和媒体资源生命周期。Jellyfin 使用账号密码换取令牌并核对服务器 / 用户身份；Plex 使用已有访问令牌，绑定服务器 machineIdentifier，更换令牌须添加独立来源。Plex 媒体和封面仅接受同服务器相对路径，凭据只通过请求头传递；不支持账户 PIN 授权或转码。两者云歌单仅可读取，收藏使用本地能力。来源枚举追加成员，沿用数据库 v9，不迁移现有数据。来源 Logo 使用 assets/source/jellyfin.png 和 plex.png。
 
@@ -130,6 +130,8 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 - 退出：依次关闭索引、来源验证、缓存任务、播放、代理、音频缓存、封面、歌词与媒体资源存储，最后关闭 SQLite。新增后台资源加入同一关闭链路。
 
 ## 封面与歌词资源
+
+原音源封面缺失后，ArtworkStore 可自动在线补充艺术家头像 / 专辑封面，默认启用；独立 OnlineArtworkProvider 仅发送艺术家 / 专辑名，经 TheAudioDB、MusicBrainz / Cover Art Archive 匹配，沿用 MediaAssetStore 完整校验与缓存。在线查询具备来源取消与退出关闭边界，不携带音源凭据，不替代认证错误。详见 [在线封面兜底](ONLINE_ARTWORK.md)。
 
 封面与远程歌词共用 MediaAssetStore，采用 SQLite 资源索引、不可变内容文件、本地优先与后台刷新。ArtworkStore / LyricsStore 管理协议和兼容旧文件，界面订阅资源版本变化。手动歌词独立固定，不参加普通 LRU；旧未区分来源的歌词保留恢复副本，迁移标记防止反复导入。细节与验证见 [媒体资源缓存](MEDIA_ASSETS.md)。
 
