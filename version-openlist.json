@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.52-openlist.35",
-    "build": 65,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.52-openlist.35 (arm64-v8a)",
+    "version": "1.0.53-openlist.36",
+    "build": 66,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.53-openlist.36 (arm64-v8a)",
     "date": "2026-11-13",
-    "notes": "- 修复文件夹列表中的大块灰色区域和异常底部空白。\n- 修复中文目录及含百分号目录的名称显示，保留文件夹原名。\n",
+    "notes": "- 新增音乐笔友角色卡，可自定义设定、切换和删除笔友，并分别管理头像、聊天和记忆。\n- 重新整理推荐设置，集中管理基础选曲、LLM 增强、笔友和换新频率。\n- 将“主题与配色”和“页面背景”合并为“主题与背景”。\n- 音乐源管理页面不再显示迷你播放器。\n- 优化每日精选的后台刷新，减少返回应用或曲库变化时的卡片闪动与重复动画。\n- 升级时清理无法归属到笔友的旧记忆，已归属角色的记忆继续保留。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.52-openlist.35%2B65/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.53-openlist.36%2B66/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.52-openlist.35%2B65"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.53-openlist.36%2B66"
   },
   "history": [
+    {
+      "version": "1.0.52-openlist.35",
+      "build": 65,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.52-openlist.35 (arm64-v8a)",
+      "date": "2026-11-13",
+      "notes": "- 修复文件夹列表中的大块灰色区域和异常底部空白。\n- 修复中文目录及含百分号目录的名称显示，保留文件夹原名。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.52-openlist.35%2B65/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.52-openlist.35%2B65"
+    },
     {
       "version": "1.0.51-openlist.34",
       "build": 64,
