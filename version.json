@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.59",
-    "build": 72,
-    "name": "风灵音乐 v1.0.59",
+    "version": "1.0.60",
+    "build": 73,
+    "name": "风灵音乐 v1.0.60",
     "date": "2026-11-13",
-    "notes": "- 新增在线封面兜底：音乐源没有图片时，自动尝试补充专辑封面和艺术家头像。\n- 优先使用本地、WebDAV 或音乐服务器提供的原有图片，在线匹配失败时保留默认图，不影响播放。\n- 支持 TheAudioDB、MusicBrainz 和 Cover Art Archive，成功读取的图片沿用本地缓存。\n- 在线兜底默认启用，仅发送匹配所需的艺术家和专辑名，不发送服务器地址、音频文件或音源登录凭据。\n",
+    "notes": "- 修复部分 Android 13 设备打开艺术家或文件夹页面时出现的数据库兼容问题。\n- 音乐库仅点击左侧播放按钮才会播放全部，点击数量或空白区域不会开始播放。\n\n升级提示：请在音乐源管理中对已有来源执行一次重新同步 / 重新扫描，以恢复文件夹目录显示。重新同步前，旧目录会暂时显示“未提供目录”；已有歌曲数据保留，无需清除数据或卸载应用。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.59+72"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.60+73"
   },
   "history": [
+    {
+      "version": "1.0.59",
+      "build": 72,
+      "name": "风灵音乐 v1.0.59",
+      "date": "2026-11-13",
+      "notes": "- 新增在线封面兜底：音乐源没有图片时，自动尝试补充专辑封面和艺术家头像。\n- 优先使用本地、WebDAV 或音乐服务器提供的原有图片，在线匹配失败时保留默认图，不影响播放。\n- 支持 TheAudioDB、MusicBrainz 和 Cover Art Archive，成功读取的图片沿用本地缓存。\n- 在线兜底默认启用，仅发送匹配所需的艺术家和专辑名，不发送服务器地址、音频文件或音源登录凭据。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.59%2B72/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.59+72"
+    },
     {
       "version": "1.0.58",
       "build": 71,
