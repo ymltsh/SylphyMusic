@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.60",
-    "build": 73,
-    "name": "风灵音乐 v1.0.60",
-    "date": "2026-11-13",
-    "notes": "- 修复部分 Android 13 设备打开艺术家或文件夹页面时出现的数据库兼容问题。\n- 音乐库仅点击左侧播放按钮才会播放全部，点击数量或空白区域不会开始播放。\n\n升级提示：请在音乐源管理中对已有来源执行一次重新同步 / 重新扫描，以恢复文件夹目录显示。重新同步前，旧目录会暂时显示“未提供目录”；已有歌曲数据保留，无需清除数据或卸载应用。\n",
+    "version": "1.0.61",
+    "build": 74,
+    "name": "风灵音乐 v1.0.61",
+    "date": "2026-11-14",
+    "notes": "- 改进 Android 连续切歌时的音频焦点衔接，减少后台切歌后无法继续播放的情况。\n- 调整后台播放的唤醒保持机制；暂停、结束或播放失败时及时释放。\n- 对已正常播放后出现的进度停滞，增加最多一次同曲原位恢复尝试。\n- 开启诊断日志后，补充后台播放状态记录及原生日志备份，便于排查长时间锁屏后的异常。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.60+73"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.61+74"
   },
   "history": [
+    {
+      "version": "1.0.60",
+      "build": 73,
+      "name": "风灵音乐 v1.0.60",
+      "date": "2026-11-13",
+      "notes": "- 修复部分 Android 13 设备打开艺术家或文件夹页面时出现的数据库兼容问题。\n- 音乐库仅点击左侧播放按钮才会播放全部，点击数量或空白区域不会开始播放。\n\n升级提示：请在音乐源管理中对已有来源执行一次重新同步 / 重新扫描，以恢复文件夹目录显示。重新同步前，旧目录会暂时显示“未提供目录”；已有歌曲数据保留，无需清除数据或卸载应用。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.60%2B73/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.60+73"
+    },
     {
       "version": "1.0.59",
       "build": 72,
