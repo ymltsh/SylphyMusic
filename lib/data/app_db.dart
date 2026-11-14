@@ -184,6 +184,34 @@ class AppDb {
       '''CREATE TABLE sync_intents(playlist_id TEXT PRIMARY KEY,
     before_json TEXT NOT NULL, local_json TEXT NOT NULL, desired_json TEXT NOT NULL,
     before_name TEXT NOT NULL, desired_name TEXT NOT NULL)''';
+  // SQLite JSON1-free catalog compatibility (Android 13).
+  // Directory metadata is stored separately from audio tags. Existing sources
+  // should be synced again; no old remote_json backfill is performed.
+  static String? _catalogPath(Track track, SourceKind kind) {
+    if (kind == SourceKind.webdav) return track.ref.id;
+    final media = track.remote['MediaSources'];
+    final first = media is List && media.isNotEmpty ? media.first : null;
+    final mediaPath = first is Map ? first['Path'] : null;
+    for (final value in [
+      track.remote['Path'],
+      mediaPath,
+      track.remote['path'],
+    ]) {
+      if (value is String && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static const _trackFolderPaths =
+      'CREATE TABLE IF NOT EXISTS track_folder_paths('
+      'source_id TEXT NOT NULL,id TEXT NOT NULL,path TEXT NOT NULL,'
+      'PRIMARY KEY(source_id,id))';
+  static const _indexFolderPaths =
+      'CREATE TABLE IF NOT EXISTS index_folder_paths('
+      'run_id TEXT NOT NULL,source_id TEXT NOT NULL,'
+      'id TEXT NOT NULL,path TEXT NOT NULL,'
+      'PRIMARY KEY(run_id,source_id,id))';
+
   AppDb(this.root);
   final Directory root;
   late final Database db;
@@ -401,9 +429,13 @@ class AppDb {
         }
       },
     );
+    // Additive, empty side tables; no schema-version bump or old-data scan.
+    await db.execute(_trackFolderPaths);
+    await db.execute(_indexFolderPaths);
     // A killed process never exposes an incomplete remote snapshot. Its staging
     // data is discarded; the next sync starts a fresh server pagination pass.
     await db.delete('index_tracks');
+    await db.delete('index_folder_paths');
     await db.insert(
       'playlists',
       const PlaylistModel(
@@ -459,6 +491,13 @@ class AppDb {
         where: 'source_id=?',
         whereArgs: [id],
       );
+      final kind = SourceKind.values.byName(source.single['kind'] as String);
+      // Replace directory information atomically with the track snapshot.
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
       final batch = tx.batch();
       for (final track in tracks) {
         batch.insert(
@@ -466,6 +505,14 @@ class AppDb {
           track.toRow(),
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
+        final path = _catalogPath(track, kind);
+        if (path != null) {
+          batch.insert('track_folder_paths', {
+            'source_id': track.ref.sourceId,
+            'id': track.ref.id,
+            'path': path,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
       await batch.commit(noResult: true);
     });
@@ -481,6 +528,15 @@ class AppDb {
       throw StateError('索引包含其他来源的歌曲');
     }
     await db.transaction((tx) async {
+      final source = await tx.query(
+        'sources',
+        columns: ['kind'],
+        where: 'id=?',
+        whereArgs: [sourceId],
+        limit: 1,
+      );
+      if (source.isEmpty) throw StateError('来源已移除');
+      final kind = SourceKind.values.byName(source.single['kind'] as String);
       final batch = tx.batch();
       for (final track in page) {
         batch.insert('index_tracks', {
@@ -488,13 +544,30 @@ class AppDb {
           ...track.toRow(),
           'resource_version': track.resourceVersion,
         });
+        final path = _catalogPath(track, kind);
+        if (path != null) {
+          batch.insert('index_folder_paths', {
+            'run_id': runId,
+            'source_id': track.ref.sourceId,
+            'id': track.ref.id,
+            'path': path,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
       await batch.commit(noResult: true);
     });
   }
 
-  Future<void> discardIndex(String runId) =>
-      db.delete('index_tracks', where: 'run_id=?', whereArgs: [runId]);
+  Future<void> discardIndex(String runId) async {
+    await db.transaction((tx) async {
+      await tx.delete('index_tracks', where: 'run_id=?', whereArgs: [runId]);
+      await tx.delete(
+        'index_folder_paths',
+        where: 'run_id=?',
+        whereArgs: [runId],
+      );
+    });
+  }
 
   Future<void> commitIndex(String runId, SourceProfile original) async {
     await db.transaction((tx) async {
@@ -541,6 +614,25 @@ class AppDb {
         WHERE i.run_id=?
       ''',
         [runId],
+      );
+      // Switch staged directory paths in the SAME transaction as song rows.
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [original.id],
+      );
+      await tx.rawInsert(
+        '''
+        INSERT INTO track_folder_paths(source_id,id,path)
+        SELECT source_id,id,path FROM index_folder_paths
+        WHERE run_id=? AND source_id=?
+      ''',
+        [runId, original.id],
+      );
+      await tx.delete(
+        'index_folder_paths',
+        where: 'run_id=?',
+        whereArgs: [runId],
       );
       await tx.update(
         'sources',
@@ -919,6 +1011,16 @@ class AppDb {
       }
       await tx.delete('sources', where: 'id=?', whereArgs: [id]);
       await tx.delete('tracks', where: 'source_id=?', whereArgs: [id]);
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
+      await tx.delete(
+        'index_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
       await tx.delete(
         'webdav_track_tags',
         where: 'source_id=?',

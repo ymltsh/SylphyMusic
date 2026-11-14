@@ -668,9 +668,13 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         ListTile(
           key: const ValueKey('song-summary'),
           contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),
-          leading: const Tooltip(
-            message: '播放全部',
-            child: Icon(Icons.play_circle),
+          leading: IconButton(
+            key: const ValueKey('play-all-library-tracks'),
+            tooltip: '播放全部',
+            icon: const Icon(Icons.play_circle),
+            onPressed: result == null || result.total == 0
+                ? null
+                : () => _act(_play),
           ),
           title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
           trailing: Row(
@@ -691,7 +695,6 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
               if (widget.songActions != null) widget.songActions!,
             ],
           ),
-          onTap: result == null || result.total == 0 ? null : () => _act(_play),
         ),
       if (widget.viewControls != null) widget.viewControls!,
       Expanded(child: content),

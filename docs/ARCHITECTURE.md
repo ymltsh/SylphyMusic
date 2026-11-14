@@ -244,3 +244,8 @@ Android 播放运行库与可选 De-click 已更新为固定 mpv-android 2026-09
 DesktopPreferences 由 SylphyApp 装配，保存横屏控制选项、快捷键开关和 Windows 受管字体文件；启动加载，退出排空写入后在 SQLite 关闭前释放。MaterialApp 主题订阅外观及该配置以应用字体，前台键盘入口通过 PlaybackShortcuts 路由到已有播放协调器。WideMiniPlayer 复用同一播放队列、播放模式、收藏和音量，详见 [横屏与 PC](DESKTOP_LANDSCAPE.md)。
 
 Windows 官方字体目录仅内置元数据；DesktopFontDownload 在用户选择后流式下载官方 ZIP，通过后台解码与固定字体摘要校验，保存原始字体、独立许可及来源。DesktopPreferences 串行提交后切换字体，失败保留当前选择，shutdown 取消下载并等待完成。安装包和应用源码不包含厂商字体二进制。
+
+
+### Android 13 SQLite 目录与艺术家兼容
+
+音乐库 SQL 不依赖 JSON1：艺术家代表曲目以 hex 编码传递身份，文件夹键在 Dart 编码。打开数据库时幂等创建 track_folder_paths 和 index_folder_paths 附属表，保持 user_version；不回填旧 remote_json。已有来源需重新同步后恢复目录，未同步时显示“未提供目录”。全量替换及远程渐进扫描在歌曲快照同一事务中切换目录索引，失败 / 取消不替换现有目录。

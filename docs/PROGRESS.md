@@ -1991,3 +1991,23 @@ dart format 已执行；tool/build_review.ps1 成功完成 Android 三 ABI Relea
 仅推送清单：main/version.json 为 6913300，feature/version.json 与 version-openlist.json 为 dc82f10，main/version-openlist.json 为 e136bd8。源码修改保留工作区，完整对应源码随 Release 附件提供。产物为普通版 build/releases/1.0.59-72/ 与特别版 build/releases/1.0.59-openlist.41-72/；日志为普通版 build/release72-publish.log、特别版 build/openlist-release72-build.log 及 build/openlist-release72-publish.log。
 
 本轮未使用测试凭据，未运行 analyze、测试、应用启动或设备检查，也未用私人曲库信息请求在线图片站点。编译与发布核对不代表图片命中或实机交互已通过验证，实际在线封面 / 头像效果由用户验收。
+
+
+## 2026-11-13 播放全部仅按钮响应
+
+按用户截图要求，将音乐库摘要栏及共用曲目列表摘要栏的整行播放事件移至左侧独立 IconButton；点击数量或空白处不创建队列。音乐库未完成加载 / 空结果时按钮禁用；保留定位、排序及多选各自入口。两工作区同点修改，保留已有改动，dart format 已执行。
+
+普通版 tool/build_review.ps1 成功完成三 ABI Android、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/play-all-button-build.log。未运行 analyze、测试、启动或设备检查，本轮未使用测试凭据；实际触控由用户验收。该轮改动未提交、推送或发布。
+
+
+## 2026-11-13 Android 13 SQLite 兼容补丁
+
+按用户要求将补丁应用于两个工作区，锚点匹配通过；保留既有源码及播放按钮改动，附带测试资料随补丁保留但不运行。SQL 移除 JSON1 依赖，新增空附属表保存同步目录；歌曲与目录原子切换，既有数据不迁移，需重新同步来源。准备发布普通版 1.0.60+73 及 OpenList 1.0.60-openlist.42+73。本轮无测试凭据，不运行 analyze、测试、应用启动或设备检查。
+
+## 2026-11-13 SQLite 兼容修复发布 1.0.60+73
+
+普通版 1.0.60+73（三 ABI Android、Windows 安装版 / 便携包及对应源码）与 OpenList 1.0.60-openlist.42+73（arm64 APK 及含后端 / 前端源码）已发布，包含 SQLite JSON1 兼容修复与播放全部仅按钮响应。普通版 7 个、特别版 3 个附件的远端大小 / SHA-256、Release 状态 / 正文、普通版 Latest、两分支原始及加速清单核对均通过；特别版发布状态 complete，Android 正式签名证书一致。
+
+仅提交推送清单：main/version.json 为 f349a8e，feature 两清单为 1431de2，main/version-openlist.json 为 d4066db。应用源码改动保留工作区并随 Release 附件交付。普通版产物 build/releases/1.0.60-73/、日志 build/release73-publish.log；特别版产物 build/releases/1.0.60-openlist.42-73/，日志 build/openlist-release73-build.log 与 build/openlist-release73-publish.log。
+
+未运行 analyze、测试、启动或设备检查；编译成功不代表 Android 13 实机效果验证通过。升级提示已写入发布说明及更新清单：已有来源需重新同步 / 扫描恢复目录，保留歌曲数据，无需清除数据或卸载。

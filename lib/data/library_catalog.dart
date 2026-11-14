@@ -140,17 +140,17 @@ class LibraryCatalog {
   static const _album =
       "lower(trim(CASE WHEN t.album_artist='' THEN t.artist ELSE t.album_artist END)) || '|' || lower(trim(t.album))";
 
-  static const _folder = 'json_array(t.source_id,f.directory)';
+  // SQLite JSON1-free catalog compatibility (Android 13).
+  // Folder entries are grouped by separate columns, not JSON array IDs.
+  static const _folder = 't.source_id';
 
-  // Split paths inside SQLite; existing indexes need no metadata reload or
-  // destructive migration. The last component is the filename, not a folder.
+  // Split synced side-table paths inside SQLite without JSON1. Existing
+  // sources need a resync; the last component is the filename, not a folder.
   static const _folderPrefix = r'''WITH RECURSIVE
     raw_file_paths(source_id,id,path) AS (
-      SELECT t.source_id,t.id,replace(CASE WHEN s.kind='webdav' THEN t.id
-        ELSE coalesce(nullif(json_extract(t.remote_json,'$.Path'),''),
-          nullif(json_extract(t.remote_json,'$.MediaSources[0].Path'),''),
-          nullif(json_extract(t.remote_json,'$.path'),'')) END,char(92),'/')
-      FROM tracks t JOIN sources s ON s.id=t.source_id),
+      SELECT t.source_id,t.id,replace(fp.path,char(92),'/')
+      FROM tracks t LEFT JOIN track_folder_paths fp
+        ON fp.source_id=t.source_id AND fp.id=t.id),
     file_paths(source_id,id,path) AS (
       SELECT source_id,id,CASE WHEN path IS NULL OR path='' OR
         instr(lower(path),'://')>0 OR substr(path,1,1)='/' OR
@@ -171,6 +171,24 @@ class LibraryCatalog {
         ELSE substr(directory,1,length(directory)-1) END AS directory
       FROM folder_parts WHERE rest IS NULL OR instr(rest,'/')=0)
     ''';
+
+  // Hex makes the preferred portrait identity lossless, even with
+  // Unicode, quotes, separators and IDs originating from different servers.
+  static String _fromHex(String encoded) => utf8.decode([
+    for (var i = 0; i < encoded.length; i += 2)
+      int.parse(encoded.substring(i, i + 2), radix: 16),
+  ]);
+
+  static TrackRef _portraitRef(String value) {
+    final split = value.indexOf('|');
+    if (value.isEmpty || split < 1) {
+      throw const FormatException('无效艺术家代表曲目');
+    }
+    return TrackRef(
+      _fromHex(value.substring(1, split)),
+      _fromHex(value.substring(split + 1)),
+    );
+  }
 
   String _group(CatalogQuery query) => switch (query.view) {
     1 => _album,
@@ -260,16 +278,14 @@ class LibraryCatalog {
         sql.args,
       );
       final rows = await tx.rawQuery(
-        '${sql.prefix}SELECT t.*${query.view == 0 ? '' : ', $group AS catalog_key,COUNT(*) AS catalog_count, COUNT(DISTINCT t.source_id) AS catalog_sources'}${query.view == 2 ? ", MIN((CASE WHEN s.kind IN ('emby','jellyfin','plex','subsonic') THEN '0' ELSE '1' END) || json_array(t.source_id,t.id)) AS catalog_portrait_ref" : ''} ${sql.from}$groupSql ORDER BY ${_order(query)} LIMIT ? OFFSET ?',
+        '${sql.prefix}SELECT t.*${query.view == 0 ? '' : ', $group AS catalog_key,COUNT(*) AS catalog_count, COUNT(DISTINCT t.source_id) AS catalog_sources'}${query.view == 2 ? ", MIN((CASE WHEN s.kind IN ('emby','jellyfin','plex','subsonic') THEN '0' ELSE '1' END) || hex(t.source_id) || '|' || hex(t.id)) AS catalog_portrait_ref" : ''} ${sql.from}$groupSql ORDER BY ${_order(query)} LIMIT ? OFFSET ?',
         [...sql.args, limit, offset],
       );
       final portraits = <String, Track>{};
       if (query.view == 2 && rows.isNotEmpty) {
         final refs = [
           for (final row in rows)
-            TrackRef.parse(
-              (row['catalog_portrait_ref'] as String).substring(1),
-            ),
+            _portraitRef(row['catalog_portrait_ref'] as String),
         ];
         final candidates = await tx.rawQuery(
           'SELECT * FROM tracks WHERE ${List.filled(refs.length, '(source_id=? AND id=?)').join(' OR ')}',
@@ -288,8 +304,9 @@ class LibraryCatalog {
               (row) => CatalogRow(
                 row,
                 portrait: query.view == 2
-                    ? portraits[(row['catalog_portrait_ref'] as String)
-                          .substring(1)]
+                    ? portraits[_portraitRef(
+                        row['catalog_portrait_ref'] as String,
+                      ).key]
                     : null,
               ),
             )
@@ -384,11 +401,7 @@ class LibraryCatalog {
         $from AND (q.at_root=1 OR (t.source_id=q.source AND
           (f.directory IS q.parent OR (q.prefix IS NOT NULL AND
             substr(f.directory,1,length(q.prefix))=q.prefix))))),
-      entries AS (
-        SELECT *,CASE WHEN catalog_is_folder=1
-          THEN json_array(source_id,catalog_folder)
-          ELSE json_array('song',source_id,id) END AS catalog_key
-        FROM scoped)
+      entries AS (SELECT * FROM scoped)
       ''';
     final args = <Object?>[
       scope?.source,
@@ -407,19 +420,28 @@ class LibraryCatalog {
     };
     return db.db.transaction((tx) async {
       final count = await tx.rawQuery(
-        '${prefix}SELECT COUNT(DISTINCT catalog_key) AS n FROM entries',
+        '${prefix}SELECT COUNT(*) AS n FROM (SELECT 1 FROM entries GROUP BY source_id,catalog_is_folder,CASE WHEN catalog_is_folder=1 THEN catalog_folder ELSE id END)',
         args,
       );
       final rows = await tx.rawQuery(
         '''${prefix}SELECT *,COUNT(*) AS catalog_count,
         COUNT(DISTINCT source_id) AS catalog_sources,
         CASE WHEN source_kind='webdav' THEN 1 ELSE 0 END AS catalog_folder_encoded
-        FROM entries GROUP BY catalog_key ORDER BY catalog_is_folder DESC,
+        FROM entries
+        GROUP BY source_id,catalog_is_folder,
+          CASE WHEN catalog_is_folder=1 THEN catalog_folder ELSE id END
+        ORDER BY catalog_is_folder DESC,
         $order ${query.descending ? 'DESC' : 'ASC'},source_id,id LIMIT ? OFFSET ?''',
         [...args, limit, offset],
       );
       return CatalogPage(
-        rows.map(CatalogRow.new).toList(),
+        rows.map((row) {
+          // Keep the public folder key unchanged for drill-down and queues.
+          final key = row['catalog_is_folder'] == 1
+              ? jsonEncode([row['source_id'], row['catalog_folder']])
+              : jsonEncode(['song', row['source_id'], row['id']]);
+          return CatalogRow({...row, 'catalog_key': key});
+        }).toList(),
         count.single['n'] as int,
       );
     });

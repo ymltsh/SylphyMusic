@@ -712,14 +712,14 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       itemBuilder: (ctx, i) {
         if (showPlayAll && i == 0) {
           return ListTile(
-            leading: const Tooltip(
-              message: '播放全部',
-              child: Icon(Icons.play_circle),
+            leading: IconButton(
+              tooltip: '播放全部',
+              icon: const Icon(Icons.play_circle),
+              onPressed: () => _act(
+                () => app.playback.setQueue(tracks.map((t) => t.ref).toList()),
+              ),
             ),
             title: Text('${tracks.length}'),
-            onTap: () => _act(
-              () => app.playback.setQueue(tracks.map((t) => t.ref).toList()),
-            ),
           );
         }
         final track = tracks[i - (showPlayAll ? 1 : 0)];
