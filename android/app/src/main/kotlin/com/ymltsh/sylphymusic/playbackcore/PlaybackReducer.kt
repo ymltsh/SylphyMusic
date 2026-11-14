@@ -13,7 +13,13 @@ object PlaybackReducer {
                 mediaId = e.id,
                 desiredPlay = e.autoplay,
                 phase = PlaybackPhase.OPENING,
-                focus = if (e.autoplay) FocusPhase.REQUESTED else FocusPhase.NONE,
+                // A gapless logical handoff keeps the focus lease already held by
+                // this MediaSession; opening another decoder is not a new play request.
+                focus = when {
+                    !e.autoplay -> FocusPhase.NONE
+                    s.desiredPlay && s.focus == FocusPhase.HELD -> FocusPhase.HELD
+                    else -> FocusPhase.REQUESTED
+                },
                 output = OutputPhase.UNVERIFIED,
                 positionMs = e.positionMs,
                 nativePositionBaselineMs = null,

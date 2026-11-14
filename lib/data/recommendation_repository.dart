@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../core/models.dart';
 import '../core/recommendation_models.dart';
+import '../core/penpal_mailbox_models.dart';
 import 'app_db.dart';
 
 /// Only metadata and source-scoped identities are read here; no audio downloads.
@@ -406,6 +407,7 @@ class RecommendationRepository {
     String llmTag = 'local',
     String refreshPeriod = '',
     bool llmSucceeded = false,
+    PenpalMailboxNote? answeredNote,
   }) => _saveSnapshot(
     letterDetailsText: items
         .map((item) => '${item.track.title} · ${item.reason}')
@@ -419,6 +421,7 @@ class RecommendationRepository {
     llmTag: llmTag,
     refreshPeriod: refreshPeriod,
     llmSucceeded: llmSucceeded,
+    answeredNote: answeredNote,
     kind: 'daily',
     day: day,
     generation: generation,
@@ -490,6 +493,7 @@ class RecommendationRepository {
     String llmTag = 'local',
     String refreshPeriod = '',
     bool llmSucceeded = false,
+    PenpalMailboxNote? answeredNote,
     required String kind,
     required String day,
     required int generation,
@@ -520,7 +524,7 @@ class RecommendationRepository {
     if (kind == 'daily' && introduction.trim().isNotEmpty) {
       // The letter is a first-class personal record, not a diagnostic log.
       // Commit together with its recommendation snapshot.
-      await tx.insert('recommendation_letters', {
+      final letterId = await tx.insert('recommendation_letters', {
         'snapshot_id': id,
         'local_day': day,
         'generation': generation,
@@ -533,6 +537,26 @@ class RecommendationRepository {
         'card_id': cardId,
         'created_at_ms': DateTime.now().millisecondsSinceEpoch,
       });
+      if (answeredNote != null) {
+        if (letterOrigin != 'llm' || cardId != answeredNote.cardId) {
+          throw StateError('回信与当前笔友不匹配');
+        }
+        // CAS: editing or withdrawing the note while the model is writing
+        // rolls back BOTH the letter and the acknowledgement.
+        final changed = await tx.update(
+          'penpal_outbox',
+          {
+            'status': 'answered',
+            'reply_letter_id': letterId,
+            'answered_at_ms': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: "id=? AND card_id=? AND revision=? AND status='pending'",
+          whereArgs: [answeredNote.id, cardId, answeredNote.revision],
+        );
+        if (changed != 1) {
+          throw StateError('便笺已修改或撤回，本轮回信未保存，请重新生成');
+        }
+      }
     }
     // Snapshot item rows are removed in the same transaction as expired heads.
     final old = await tx.query(
@@ -636,11 +660,20 @@ class RecommendationRepository {
   }
 
   Future<void> clearLetters({String? cardId}) async {
-    await database.db.delete(
-      'recommendation_letters',
-      where: cardId == null ? null : 'card_id=?',
-      whereArgs: cardId == null ? null : [cardId],
-    );
+    await database.db.transaction((tx) async {
+      await tx.delete(
+        'recommendation_letters',
+        where: cardId == null ? null : 'card_id=?',
+        whereArgs: cardId == null ? null : [cardId],
+      );
+      // Keep sent-note history, but do not point to deleted letters.
+      await tx.rawUpdate(
+        cardId == null
+            ? 'UPDATE penpal_outbox SET reply_letter_id=NULL WHERE reply_letter_id IS NOT NULL'
+            : 'UPDATE penpal_outbox SET reply_letter_id=NULL WHERE card_id=? AND reply_letter_id IS NOT NULL',
+        cardId == null ? [] : [cardId],
+      );
+    });
   }
 
   Future<void> hideTrack(TrackRef ref) async {

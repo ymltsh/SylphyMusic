@@ -471,6 +471,7 @@ class PenpalCardStore extends ChangeNotifier {
         where: 'card_id=?',
         whereArgs: [id],
       );
+      await tx.delete('penpal_outbox', where: 'card_id=?', whereArgs: [id]);
       await tx.delete('penpal_cards', where: 'card_id=?', whereArgs: [id]);
       // Historical letters retain their original author ID.
     });

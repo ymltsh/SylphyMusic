@@ -41,6 +41,7 @@ import 'listening_history.dart';
 import '../data/recommendation_repository.dart';
 import '../data/penpal_memory_repository.dart';
 import '../data/penpal_chat_repository.dart';
+import '../data/penpal_mailbox_repository.dart';
 import '../services/penpal_chat.dart';
 import '../services/penpal_memory.dart';
 import '../services/listening_analytics.dart';
@@ -90,6 +91,7 @@ class SylphyApp extends ChangeNotifier {
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   late final recommendationRepository = RecommendationRepository(db);
+  late final penpalMailbox = PenpalMailboxRepository(db);
   late final penpalMemory = PenpalMemory(
     PenpalMemoryRepository(db),
     apiSettings,
@@ -109,6 +111,7 @@ class SylphyApp extends ChangeNotifier {
     recommendationRepository,
     diagnostics: diagnostics,
     memory: penpalMemory,
+    mailbox: penpalMailbox,
     llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
   );
   List<PlaylistModel> playlists = [];

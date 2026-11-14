@@ -1,5 +1,67 @@
 # 实施与验证记录
 
+## 2026-11-15 首次引导：念念不忘，必有回响（LLM 增强）
+
+按用户最新 README 的音乐与书信定位，欢迎页改用“念念不忘，必有回响”及音乐笔友简介；首次引导从四步扩为五步：欢迎 → 设备迁移 → 音乐来源 → 音乐笔友 / LLM 增强 → 其他 API。专页介绍角色来信、聊天与留言，复用 LlmRecommendationSettings 提供增强开关、模型连接入口（地址 / 模型 / 安全存储密钥 / 手动测试）、参与方式、等待预算、角色卡和记忆设置。说明发送范围与服务费用，保留“稍后配置，继续”；页面展示与跳过不主动请求模型，也不隐式改变开关。保存期间禁止步骤导航，沿用来源后台操作与导航分离行为。
+
+迁移全部配置或仅音乐源后均进入音乐笔友步骤确认，其他 API 编辑框刷新为迁入值，避免初始默认值覆盖迁入配置；前后导航、页码及进度更新为五步。已完成引导标记不变，不强制已有安装重新引导。普通版与 OpenList 同步代码，保留 README 既有改动，并更新快速开始、界面及迁移文档。
+
+dart format 已执行。普通版 tool/build_review.ps1 成功完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志为 build/test_logs/penpal-onboarding-build.log。无测试凭据，未运行 analyze、测试、应用启动、设备检查或真实模型调用，未提交、推送或发布；实际首次引导、迁移及配置交互由用户验收。
+
+## 2026-11-15 同版本覆盖：点赞 / 导出顺序、强调色与字号
+
+按用户明确要求覆盖上个版本：普通版保持 1.0.62+75，OpenList 保持 1.0.62-openlist.44+75。每日精选操作顺序调整为“播放 → 点赞 → 导出 → 更多”；点赞和导出图标使用主题 primary 强调色，尺寸采用 labelLarge 字号并跟随系统文字缩放。描边按钮保留可点击区域，导出忙碌图标同步缩放；来信存档原有导出按钮不变。
+
+普通版三 ABI Android、Windows 安装程序 / 便携包与对应源码，以及 OpenList arm64 APK 与对应应用 / 后端 / 前端源码重新构建并覆盖原 Release。先上传带临时名称的新附件并核对大小 / SHA-256，再替换原固定文件名；新附件确认后删除旧远端附件。OpenList 源码上传曾遇 TLS EOF，检查远端确认 APK 已上传、源码未落地后仅续传缺失附件，最终成功。两版共 10 个附件、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始 / 加速清单核对通过。正式签名保持一致。
+
+仅清单提交推送：main 为 3c3776b，feature 为 bbbde5b。更新说明注明同版本安装需手动下载覆盖，版本号 / 构建号与下载地址保持不变。新产物为普通版 build/releases/1.0.62-75-refresh-20261115/ 与特别版 build/releases/1.0.62-openlist.44-75-refresh-20261115/；原本地发布目录保留旧附件。普通版日志 build/release75-refresh-build.log、release75-refresh-publish.log、openlist-release75-refresh-publish.log、openlist-release75-refresh-resume.log、release75-refresh-manifests.log；特别版日志 build/openlist-release75-refresh-build.log、openlist-release75-refresh-prepare.log。无测试凭据，未运行 analyze、测试、应用启动或设备检查；交互由用户验收。
+
+## 2026-11-15 笔友留言与紧凑操作按钮发布 1.0.62+75
+
+用户明确要求“推送更新”后，普通版 1.0.62+75（三 ABI Android、Windows 安装程序 / 便携包及对应源码）与 OpenList 1.0.62-openlist.44+75（arm64 APK 及对应应用 / 后端 / 前端源码）已发布。包含 V20 留言、点赞留言、已撤回留言直接删除，以及每日精选导出图标和“播放”按钮文案调整。普通版 7 个与特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始及加速清单均核对通过，特别版发布状态 complete；Android 正式签名保持原证书。
+
+仅提交推送清单：main/version.json 为 2a1a206，feature/version.json 与 version-openlist.json 为 5d246f8，main/version-openlist.json 为 650ed81。源码改动继续保留工作区，实际源码随附件交付。普通版产物 build/releases/1.0.62-75/，日志 build/release75-publish.log；特别版产物 build/releases/1.0.62-openlist.44-75/，日志 build/openlist-release75-build.log、build/openlist-release75-prepare.log、build/openlist-release75-publish.log。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查，未向真实 LLM 发送数据；迁移及实际交互由用户验收。
+
+## 2026-11-15 每日精选操作按钮精简
+
+每日精选详情导出按钮改为描边图标按钮，保留“导出”提示与忙碌进度图标；“播放全部”标签改为“播放”，继续播放当前精选完整队列。来信存档导出按钮保持原样。两工作区同步，dart format 已执行。
+
+普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。日志均为 build/test_logs/daily-mix-compact-buttons-build.log。无测试凭据，未运行 analyze、测试、启动或设备检查，未提交、推送或发布，实际界面由用户验收。
+
+## 2026-11-15 已撤回留言直接删除
+
+留言历史中已撤回条目右侧新增删除按钮，点击直接删除该条记录；存储层按 card_id、id 和 status=withdrawn 限制删除范围。操作期间禁用重复点击，失败显示提示；刷新历史保留编辑框未保存草稿。同步普通版与 OpenList，不更改数据库结构。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。日志均为 build/test_logs/penpal-withdrawn-delete-build.log。无测试凭据，未运行 analyze、测试、启动或设备检查，未提交、推送或发布；实际交互由用户验收。
+
+## 2026-11-15 每日精选点赞留言按钮
+
+按用户截图，在每日精选详情“播放全部”和更多菜单之间新增描边点赞图标按钮。点击后保存包含来信日期、标题的赞赏文本到当前角色的 V20 留言箱；无待回留言时新建，有待回留言时在同一事务中追加并递增 revision，保留原文及关联，不覆盖用户手写内容。对仍待回或已回复的相同赞赏文本去重，撤回后可再次提交；合并超过 500 字时提示先编辑，不截断内容。提交期间禁用重复操作，保存结果以提示反馈，仍可从留言页编辑 / 撤回。点赞只写本机，随下次新每日来信尝试回复，不立即调用模型，不新增数据库表或版本。
+
+已同步普通版与 OpenList，dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 及内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/penpal-like-build.log。本轮无测试凭据，未运行 analyze、测试、应用启动、设备检查或真实模型请求；未提交、推送或发布。按钮实际显示与留言 / 回复效果由用户验收。
+
+## 2026-11-15 笔友留言 V20 补丁应用
+
+按用户当前“应用”请求，将 SylphyMusic-penpal-mailbox-v20-patch.zip 应用于普通版与 OpenList。原始安装器的字节摘要检查被 Windows CRLF 换行阻断；统一换行后，普通版 8 个修改文件全部符合补丁 Git blob 基线，OpenList 仅控制器保留原有适配差异。逐项唯一锚点合并 8 个源文件并加入 4 个新文件，原文件字节备份在各工作区 .private/penpal-mailbox-v20/before/，保留全部既有修改。两工作区已 dart format，更新文档索引和架构说明。
+
+新增按角色隔离的非即时留言，可编辑 / 撤回、查看最近历史与关联回信；提交只写本地，生成新每日精选时才尝试回复。数据库 v19→v20 前向迁移新增 penpal_outbox，回信存档与回复状态事务提交，revision 条件防止生成期间编辑 / 撤回后误确认。既有即时聊天、角色卡与彩蛋 JSON 未修改。详见 PENPAL_MAILBOX_V20.md。
+
+普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/penpal-mailbox-v20-build.log。本轮未使用测试凭据，未请求真实 LLM、未启动应用或访问用户数据库，未运行 analyze、测试或设备检查；未提交、推送或发布。数据库迁移、模型回复及界面操作由用户验收，编译成功不代表功能验证通过。
+
+## 2026-11-14 Media3 后台播放整合版发布 1.0.61+74
+
+用户明确要求“推送版本更新”后，普通版 1.0.61+74（三 ABI Android、Windows 安装程序 / 便携包及对应应用源码）与 OpenList 1.0.61-openlist.43+74（arm64 APK 及含对应后端 / 前端的源码）已发布。包含本轮连续焦点、独立 WakeLock、有界同曲停滞重开及原生诊断备份改动；更新文案描述改进，不宣称实机后台停播已彻底修复。普通版 7 个与特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始及加速清单核对通过，特别版发布状态 complete。Android 继续使用既有正式签名。
+
+仅提交推送版本清单：main/version.json 为 0fa3063，feature 的 version.json / version-openlist.json 为 37c7164，main/version-openlist.json 为 b78e4c0。源码改动保留在工作区，对应源码随 Release 附件提供。普通版产物 build/releases/1.0.61-74/，日志 build/release74-publish.log；特别版产物 build/releases/1.0.61-openlist.43-74/，日志 build/openlist-release74-build.log、build/openlist-release74-prepare.log 与 build/openlist-release74-publish.log。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查；实际后台 / 锁屏播放效果由用户验收。
+
+## 2026-11-14 Media3 后台 / 锁屏整合补丁应用
+
+按用户当前“应用补丁”请求，将 SylphyMusic-Media3-Integrated-Background-Patch-20261114.zip 合入普通版与 OpenList 工作区。原始 git apply --check 未通过：播放器片段的上下文重叠，媒体服务片段仅提供了不完整的 onFocusPending 行；逐段精确匹配合并，保留现有前台焦点回调及 OpenListRuntime 绑定和其他既有修改，未重置工作区。原文件备份在各工作区 .private/media3-integrated-20261114/before/。
+
+实现跨曲目复用 AudioFocus、独立焦点请求代次、独立线程续期有超时的 WakeLock、满足实际进度等前提后最多一次同曲停滞重开，以及用户开启诊断后的原生轮转日志备份与导出 / 清理。补丁附带的测试文件和验收资料已保留，仅作为可选资料；附件中的测试、远程操作等步骤不视为本次执行授权。详细说明见 ANDROID_LOCKSCREEN_PLAYBACK_PATCH_2026-11-14.md。
+
+两工作区 diagnostic_logs.dart 已 dart format。普通版 tool/build_review.ps1 成功完成三 ABI Android Release、Windows Release 与内部打包，产物 build/internal-review/；OpenList 三 ABI Android Release 编译成功，产物 build/app/outputs/flutter-apk/。两工作区日志均为 build/test_logs/media3-integrated-background-build.log。本轮未使用测试凭据，未运行 analyze、测试、应用启动或设备检查，未提交、推送或发布。编译成功不代表后台 / 锁屏稳定性已通过实机验证，实际效果由用户验收。
+
 ## 2026-11-13 文件夹灰色异常区域修复
 
 截图中的大块灰色与 Flutter Release ErrorWidget 一致。代码发现 folderTitle 对 Emby / 本地等普通目录名也调用 Uri.decodeComponent；Dart SDK 对原始中文等非 ASCII 字符及错误百分号抛出 ArgumentError，旧逻辑只捕获 FormatException，导致列表条目构建失败。变高的错误占位也使列表尾部看似有巨大留白，先前 padding / Material 调整未解决该原因。

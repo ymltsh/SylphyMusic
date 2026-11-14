@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
+
 /// Opt-in, privacy-preserving diagnostics, intentionally separate from logcat.
 ///
 /// All event names and detail keys/values are restricted to short, machine-
@@ -209,6 +211,54 @@ class DiagnosticLogs {
       final file = _file(i);
       if (await file.exists()) output.write(await file.readAsString());
     }
+    if (Platform.isAndroid) {
+      try {
+        final raw = await const MethodChannel(
+          'music.sylphy/playback_diagnostics',
+        ).invokeMethod<String>('nativeExport');
+        if (raw != null && raw.isNotEmpty) {
+          output.write(
+            '\nNative journal backup (may duplicate events above; UTC is batch delivery time):\n',
+          );
+          for (final line in const LineSplitter().convert(raw)) {
+            try {
+              final envelope = jsonDecode(line) as Map<String, dynamic>;
+              final utc = envelope['utc'];
+              if (utc is! String) continue;
+              for (final rawEvent in envelope['records'] as List) {
+                final event = Map<String, dynamic>.from(rawEvent as Map);
+                final name = event.remove('event');
+                if (name is! String || !_safeToken.hasMatch(name)) continue;
+                final safe = <String, Object>{};
+                for (final item in event.entries) {
+                  if (!_detailKeys.contains(item.key)) continue;
+                  final value = item.value;
+                  if (value is bool ||
+                      (value is int &&
+                          value >= 0 &&
+                          value <= 9007199254740991) ||
+                      (value is String && _safeToken.hasMatch(value))) {
+                    safe[item.key] = value as Object;
+                  }
+                }
+                output.writeln(
+                  jsonEncode({
+                    'utc': utc,
+                    'scope': 'native_audio_backup',
+                    'event': name,
+                    ...safe,
+                  }),
+                );
+              }
+            } catch (_) {
+              /* Corrupt entries are skipped, not exported verbatim. */
+            }
+          }
+        }
+      } catch (_) {
+        /* Native bridge unavailable: Dart log remains exportable. */
+      }
+    }
     return Uint8List.fromList(utf8.encode(output.toString()));
   });
 
@@ -216,6 +266,14 @@ class DiagnosticLogs {
     for (var i = 0; i < retainedFiles; i++) {
       final file = _file(i);
       if (await file.exists()) await file.delete();
+    }
+    if (Platform.isAndroid) {
+      try {
+        await const MethodChannel('music.sylphy/playback_diagnostics')
+            .invokeMethod<void>('nativeClear');
+      } catch (_) {
+        /* Best effort during an inactive service. */
+      }
     }
     if (enabled) {
       // Record only that a deletion happened, never the deleted contents.

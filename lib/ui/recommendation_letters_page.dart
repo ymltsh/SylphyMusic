@@ -9,6 +9,7 @@ import '../core/models.dart';
 import 'recommendation_showcase.dart';
 import 'penpal_memory_page.dart';
 import 'penpal_chat_page.dart';
+import 'penpal_mailbox_page.dart';
 
 /// Private letters from each daily recommendation generation, kept separately
 /// from diagnostic logs and independent of old recommendation snapshots.
@@ -156,14 +157,26 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
         ),
       );
 
+  Future<void> _leaveNote(RecommendationLetter letter) => Navigator.push<void>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PenpalMailboxPage(
+        app: widget.app,
+        relatedLetterKey: '${letter.day}:${letter.generation}',
+      ),
+    ),
+  );
+
   Widget _letterMore(RecommendationLetter letter) =>
       letter.cardId != _currentCard
       ? const SizedBox.shrink()
       : PopupMenuButton<String>(
           tooltip: '更多',
-          onSelected: (_) => _replyToLetter(letter),
+          onSelected: (action) =>
+              action == 'chat' ? _replyToLetter(letter) : _leaveNote(letter),
           itemBuilder: (_) => const [
             PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
+            PopupMenuItem(value: 'mailbox', child: Text('给笔友留言')),
           ],
         );
 
@@ -302,6 +315,17 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
       appBar: AppBar(
         title: Text(_showLegacy ? '旧版未归属来信' : '每日推荐文案'),
         actions: [
+          if (!_showLegacy)
+            IconButton(
+              tooltip: '给笔友留言',
+              icon: const Icon(Icons.markunread_mailbox_outlined),
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PenpalMailboxPage(app: widget.app),
+                ),
+              ),
+            ),
           PopupMenuButton<bool>(
             tooltip: '切换来信来源',
             onSelected: (legacy) {

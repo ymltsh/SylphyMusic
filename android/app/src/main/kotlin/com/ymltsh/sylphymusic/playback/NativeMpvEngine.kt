@@ -9,7 +9,8 @@ import java.util.concurrent.TimeUnit
 @androidx.annotation.Keep
 class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
                       private val failed: (Long) -> Unit,
-                      private val diagnostic: (String) -> Unit) {
+                      private val diagnostic: (String) -> Unit,
+                      private val pollHeartbeat: () -> Unit = {}) {
     companion object {
         init { System.loadLibrary("sylphy_mpv") }
         // A recreated service cannot create its context before the old one's
@@ -32,6 +33,7 @@ class NativeMpvEngine(private val observed: (Long, DoubleArray) -> Unit,
                 val generation = epoch
                 try {
                     val value = sample(handle)
+                    pollHeartbeat()
                     val records = diagnostics(handle)
                     if (records != "[]") main.post { if (!closed) diagnostic(records) }
                     main.post { if (!closed) observed(generation, value) }

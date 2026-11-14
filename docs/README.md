@@ -4,6 +4,8 @@
 
 | 文档 | 用途 |
 |---|---|
+| [笔友留言 V20](PENPAL_MAILBOX_V20.md) | 按角色保存留言、下次新来信回复、历史记录及数据库前向迁移 |
+| [Android 后台 / 锁屏整合补丁](ANDROID_LOCKSCREEN_PLAYBACK_PATCH_2026-11-14.md) | 连续音频焦点、独立 WakeLock、有界停滞恢复与原生诊断备份 |
 | [在线封面兜底](ONLINE_ARTWORK.md) | 原音源优先、在线图片匹配、缓存与元数据发送范围 |
 | [设备间快速迁移](DEVICE_TRANSFER.md) | 局域网配对、手动配置迁移范围、接收排障与使用限制 |
 | [更新与发布流程](../update.md) | 手动更新、正式 / 测试版清单、本地打包与显式 GitHub 发布 |

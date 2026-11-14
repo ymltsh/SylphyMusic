@@ -325,6 +325,7 @@ class LetterImageActions extends StatefulWidget {
     this.trackCount = 0,
     this.additionalActions = const [],
     this.trailingAction,
+    this.iconOnlyExport = false,
   });
 
   final SylphyApp app;
@@ -336,6 +337,7 @@ class LetterImageActions extends StatefulWidget {
   final int trackCount;
   final List<Widget> additionalActions;
   final Widget? trailingAction;
+  final bool iconOnlyExport;
 
   @override
   State<LetterImageActions> createState() => _LetterImageActionsState();
@@ -531,12 +533,32 @@ class _LetterImageActionsState extends State<LetterImageActions> {
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        OutlinedButton.icon(
-          onPressed: _busy || widget.content.trim().isEmpty ? null : _export,
-          icon: const Icon(Icons.ios_share_rounded),
-          label: Text(_busy ? '正在导出…' : '导出'),
-        ),
+        if (!widget.iconOnlyExport)
+          OutlinedButton.icon(
+            onPressed: _busy || widget.content.trim().isEmpty ? null : _export,
+            icon: const Icon(Icons.ios_share_rounded),
+            label: Text(_busy ? '正在导出…' : '导出'),
+          ),
         for (final action in widget.additionalActions) _guard(action),
+        if (widget.iconOnlyExport)
+          IconButton.outlined(
+            tooltip: _busy ? '正在导出…' : '导出',
+            style: IconButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              iconSize: MediaQuery.textScalerOf(
+                context,
+              ).scale(Theme.of(context).textTheme.labelLarge?.fontSize ?? 14),
+            ),
+            onPressed: _busy || widget.content.trim().isEmpty ? null : _export,
+            icon: _busy
+                ? SizedBox.square(
+                    dimension: MediaQuery.textScalerOf(context).scale(
+                      Theme.of(context).textTheme.labelLarge?.fontSize ?? 14,
+                    ),
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.ios_share_rounded),
+          ),
       ],
     );
     if (widget.trailingAction == null) return actions;

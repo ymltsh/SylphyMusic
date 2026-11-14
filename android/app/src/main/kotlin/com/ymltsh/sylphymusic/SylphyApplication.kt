@@ -17,13 +17,46 @@ import io.flutter.plugin.common.MethodChannel
 class SylphyApplication : Application() {
     companion object { const val ENGINE_ID = "sylphy_business_engine" }
     private val checkpointWriter = Executors.newSingleThreadExecutor()
+    private val nativeDiagnosticPrefs by lazy { getSharedPreferences("sylphy_native_diagnostics", MODE_PRIVATE) }
+    private val nativeDiagnosticFile by lazy { File(filesDir, "native-playback-journal.jsonl") }
+    private val nativeDiagnosticOldFile by lazy { File(filesDir, "native-playback-journal.1.jsonl") }
     private var playbackResolver: MethodChannel? = null
     private var playbackBridge: FlutterMediaControllerBridge? = null
     private var sourceReady = false
     private val waitingResolvers = mutableListOf<Runnable>()
     fun playbackUiVisible(visible: Boolean) { playbackBridge?.setUiVisible(visible) }
     fun playbackStateChanged(playWhenReady: Boolean) { if (playWhenReady) playbackBridge?.observePlayback() }
-    fun playbackDiagnostics(records: String) { if (sourceReady) playbackResolver?.invokeMethod("diagnostics",records) }
+    fun setNativeDiagnosticsEnabled(enabled: Boolean) {
+        nativeDiagnosticPrefs.edit().putBoolean("enabled", enabled).apply()
+        if (!enabled) checkpointWriter.execute {
+            nativeDiagnosticFile.delete(); nativeDiagnosticOldFile.delete()
+        }
+    }
+    fun nativeDiagnosticsEnabled(): Boolean = nativeDiagnosticPrefs.getBoolean("enabled", false)
+    private fun journalNativeDiagnostics(records: String) {
+        if (!nativeDiagnosticPrefs.getBoolean("enabled", false) || records.length > 65536) return
+        checkpointWriter.execute {
+            try {
+                // Batches contain only the bridge's allowlisted event fields.
+                val entry = JSONObject()
+                    .put("utc", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.ROOT)
+                        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date()))
+                    .put("records", org.json.JSONArray(records)).toString() + "\n"
+                if (nativeDiagnosticFile.length() + entry.length > 512 * 1024) {
+                    nativeDiagnosticOldFile.delete()
+                    nativeDiagnosticFile.renameTo(nativeDiagnosticOldFile)
+                }
+                nativeDiagnosticFile.appendText(entry)
+            } catch (_: Exception) { /* Diagnostics cannot interrupt playback. */ }
+        }
+    }
+    fun playbackDiagnostics(records: String) {
+        if (!nativeDiagnosticPrefs.getBoolean("enabled", false)) return
+        journalNativeDiagnostics(records)
+        if (sourceReady) playbackResolver?.invokeMethod("diagnostics", records)
+    }
+    // Safe from the independent wake lease thread, including when the main looper stalls.
+    fun backupPlaybackDiagnostics(records: String) { journalNativeDiagnostics(records) }
     fun playbackLeaseReleased(key: String) { playbackResolver?.invokeMethod("released", key) }
     fun savePlaybackCheckpoint(file: File, value: String) {
         checkpointWriter.execute {
@@ -93,15 +126,26 @@ class SylphyApplication : Application() {
         playbackBridge = FlutterMediaControllerBridge(this, engine)
         MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/playback_diagnostics")
             .setMethodCallHandler { call, result ->
-                if (call.method != "snapshot") {
-                    result.notImplemented()
-                } else {
-                    try {
+                when (call.method) {
+                    "snapshot" -> try {
                         result.success(mapOf("backend" to "native_mpv_media3", "engineRunning" to engine.dartExecutor.isExecutingDart))
                     } catch (error: Exception) {
                         Log.w("SylphyDiagnostics", "native_snapshot_failed type=${error.javaClass.simpleName}")
                         result.error("snapshot_unavailable", "Native status unavailable", null)
                     }
+                    "nativeExport" -> checkpointWriter.execute {
+                        val contents = try {
+                            listOf(nativeDiagnosticOldFile, nativeDiagnosticFile).joinToString("") {
+                                if (it.exists()) it.readText() else ""
+                            }
+                        } catch (_: Exception) { "" }
+                        android.os.Handler(mainLooper).post { result.success(contents) }
+                    }
+                    "nativeClear" -> checkpointWriter.execute {
+                        nativeDiagnosticOldFile.delete(); nativeDiagnosticFile.delete()
+                        android.os.Handler(mainLooper).post { result.success(null) }
+                    }
+                    else -> result.notImplemented()
                 }
             }
         installedEngine = engine

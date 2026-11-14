@@ -378,6 +378,7 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
                           if (detailed) ...[
                             const SizedBox(height: 12),
                             LetterImageActions(
+                              iconOnlyExport: true,
                               app: app,
                               day: mix.day,
                               title: mix.title,

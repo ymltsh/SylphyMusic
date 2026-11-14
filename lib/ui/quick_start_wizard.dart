@@ -5,9 +5,10 @@ import '../core/models.dart';
 import '../services/api_settings.dart';
 import '../services/device_transfer_config.dart';
 import 'device_transfer_page.dart';
+import 'llm_recommendation_settings.dart';
 import 'music_source_ui.dart';
 
-/// Welcome, device transfer, source selection, then optional public APIs.
+/// Welcome, transfer, sources, music penpal, then optional public APIs.
 class QuickStartWizard extends StatefulWidget {
   const QuickStartWizard({
     super.key,
@@ -29,7 +30,9 @@ class QuickStartWizard extends StatefulWidget {
 }
 
 class _QuickStartWizardState extends State<QuickStartWizard> {
+  static const _stepCount = 5;
   int _step = 0;
+  bool _llmBusy = false;
   bool _sourceWorking = false;
   bool _saving = false;
   late final TextEditingController _quote;
@@ -59,11 +62,10 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
       ),
     );
     if (!mounted || scope == null) return;
-    if (scope == TransferScope.all) {
-      await _complete();
-    } else {
-      _go(3); // Only sources transferred; keep the API setup step.
-    }
+    // Review penpal settings after transfer; editors reflect imported API values.
+    _quote.text = widget.app.apiSettings.quoteUrl;
+    _mirror.text = widget.app.apiSettings.githubMirror;
+    _go(3);
   });
 
   void _showError(Object error) {
@@ -173,11 +175,13 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          '快速上手  ·  ${_step + 1}/4',
+                          '快速上手  ·  ${_step + 1}/$_stepCount',
                           style: theme.textTheme.labelLarge,
                         ),
                         const SizedBox(height: 10),
-                        LinearProgressIndicator(value: (_step + 1) / 4),
+                        LinearProgressIndicator(
+                          value: (_step + 1) / _stepCount,
+                        ),
                       ],
                     ),
                   ),
@@ -188,6 +192,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                       0 => _welcome(theme),
                       1 => _transferWelcome(theme, sourceBusy),
                       2 => _sources(theme, sourceBusy),
+                      3 => _penpal(theme),
                       _ => _api(theme),
                     },
                   ),
@@ -195,7 +200,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                 if (_step > 1)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-                    child: _buttons(_saving),
+                    child: _buttons(_saving || _llmBusy),
                   ),
               ],
             ),
@@ -223,7 +228,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
             ),
             SizedBox(height: compact ? 16 : 20),
             Text(
-              '让音乐，轻盈相随',
+              '念念不忘，必有回响',
               textAlign: TextAlign.center,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontSize: compact ? 24 : 28,
@@ -235,8 +240,8 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
             SizedBox(height: compact ? 18 : 24),
             Text(
               '欢迎使用风灵音乐！\n'
-              '连接你的私人音乐库，享受纯净听歌\n'
-              '体验，离线也能自在聆听。',
+              '让喜欢的角色，与你交换关于音乐的信。\n'
+              '连接私人音乐库，让旋律与思念都有回声。',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: compact ? 13 : 14,
@@ -287,7 +292,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
                     ),
                     const Spacer(),
                     Text(
-                      '02 / 04',
+                      '02 / 05',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colors.onSurfaceVariant,
                         letterSpacing: 2,
@@ -522,13 +527,61 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
     ],
   );
 
+  Widget _penpal(ThemeData theme) => ListView(
+    key: const ValueKey('quick-start-penpal'),
+    padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+    children: [
+      Icon(
+        Icons.mark_email_unread_outlined,
+        size: 44,
+        color: theme.colorScheme.primary,
+      ),
+      const SizedBox(height: 16),
+      Text('念念不忘，必有回响', style: theme.textTheme.headlineSmall),
+      const SizedBox(height: 6),
+      Text(
+        'LLM 增强 · 音乐笔友与角色书信',
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+      const SizedBox(height: 12),
+      const Text(
+        '选择或创建一位音乐笔友，让 TA 从你的收藏中分享旋律，'
+        '用来信、聊天和留言回应，延续你们的相处。',
+      ),
+      const SizedBox(height: 12),
+      const Text(
+        '先在“模型连接”填写兼容 Chat Completions 的接口、模型与密钥，'
+        '再选择角色并开启增强。连接测试由你手动发起；现在也可以稍后配置。',
+      ),
+      const SizedBox(height: 20),
+      LlmRecommendationSettings(
+        app: widget.app,
+        disabled: _saving,
+        onBusyChanged: (busy) {
+          if (mounted) setState(() => _llmBusy = busy);
+        },
+      ),
+      const SizedBox(height: 16),
+      Text(
+        '开启后，候选音乐信息、角色提示词及按设置引用的记忆会发送至你配置的服务；'
+        '聊天和留言回复还会发送相应内容。音频文件和音源登录凭据不会发送。'
+        '服务可能收费；不启用 LLM 也能完整使用私人音乐播放器。',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
+
   Widget _api(ThemeData theme) => Form(
     key: _apiForm,
     child: ListView(
       key: const ValueKey('quick-start-api'),
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
       children: [
-        Text('API 配置', style: theme.textTheme.headlineSmall),
+        Text('其他 API 配置', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 6),
         Text('可直接使用默认配置，稍后也能在设置中修改。', style: theme.textTheme.bodyMedium),
         const SizedBox(height: 24),
@@ -586,8 +639,35 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
           Expanded(
             child: FilledButton(
               onPressed: busy ? null : () => _go(3),
-              child: const Text('下一步：API 配置'),
+              child: const Text('下一步：音乐笔友'),
             ),
+          ),
+        ],
+      );
+    }
+    if (_step == 3) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: busy ? null : () => _go(2),
+                child: const Text('上一步'),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: busy ? null : () => _go(4),
+                  child: const Text('下一步：其他 API'),
+                ),
+              ),
+            ],
+          ),
+          TextButton(
+            onPressed: busy ? null : () => _go(4),
+            child: const Text('稍后配置，继续'),
           ),
         ],
       );
@@ -599,7 +679,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
         Row(
           children: [
             OutlinedButton(
-              onPressed: busy ? null : () => _go(2),
+              onPressed: busy ? null : () => _go(3),
               child: const Text('上一步'),
             ),
             const SizedBox(width: 12),
@@ -613,7 +693,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
         ),
         TextButton(
           onPressed: busy ? null : () => _complete(),
-          child: const Text('跳过 API 配置'),
+          child: const Text('跳过其他 API，完成设置'),
         ),
       ],
     );

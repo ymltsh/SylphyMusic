@@ -62,21 +62,44 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     private var lastProgress = SystemClock.elapsedRealtime()
     private var lastCheckpoint = 0L
     private var lastPosition = -1L
+    private var lastPlaybackHeartbeat = 0L
+    private var progressedSinceOpen = false
+    private var lastNativeBuffering = false
+    private var stallReported = false
+    // One automatic same-item reopen per user intent/item. Never auto-skip or loop retries.
+    private var stallReopens = 0
     private var pausedAt = SystemClock.elapsedRealtime()
     private var currentLease: File? = null
     private var currentLeaseKey: String? = null
     private val checkpoint = File(app.noBackupFilesDir, "media3-queue.json")
     private val stream = NativeStreamAdapter()
     private val audio = app.getSystemService(AudioManager::class.java)
-    private val wakeLock = app.getSystemService(PowerManager::class.java)
-        .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sylphy:NativePlayback").apply { setReferenceCounted(false) }
-    private var wakeRenewedAt = 0L
+    // Independent of the JNI polling executor and the application Looper.
+    // A blocked native sample must not silently expire the playback WakeLock.
+    private val wakeLease = PlaybackWakeLease(app) { event ->
+        app.backupPlaybackDiagnostics(JSONArray().put(JSONObject()
+            .put("event", event)
+            .put("native_uptime_ms", SystemClock.uptimeMillis())
+            .put("elapsed_ms", SystemClock.elapsedRealtime())).toString())
+        main.post {
+            if (closed) return@post
+            trace(event)
+            if (event == "native_poll_timeout" && core.desiredPlay && core.focus == FocusPhase.HELD) {
+                fail("native_poll_timeout")
+            } else if (event == "wake_start_timeout" && core.desiredPlay && core.focus == FocusPhase.REQUESTED) {
+                fail("foreground_timeout")
+            }
+        }
+    }
+    private var lastLeaseMode = PlaybackWakeLease.Mode.OFF
+    private var focusGeneration = 0L
     private var focusRequest: AudioFocusRequest? = null
     private var focusListener: AudioManager.OnAudioFocusChangeListener? = null
     private val noisy = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) { setIntent(false) }
+        override fun onReceive(context: Context, intent: Intent) { setIntent(false, "device_noisy") }
     }
-    private val engine = NativeMpvEngine(::sample, { epoch -> if (epoch == nativeEpoch && !closed) fail("native_audio") }, app::playbackDiagnostics)
+    private val engine = NativeMpvEngine(::sample, { epoch -> if (epoch == nativeEpoch && !closed) fail("native_audio") },
+        app::playbackDiagnostics, { wakeLease.polled() })
     init {
         if (Build.VERSION.SDK_INT >= 33) app.registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("DEPRECATION") app.registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
@@ -109,13 +132,46 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         history.add(index)
         if (history.size > 300) history.removeAt(0)
     }
+    /** Emits only allowlisted field names and enum tokens. No media identity/URI/headers. */
+    fun trace(name: String, extra: JSONObject = JSONObject()) {
+        if (!app.nativeDiagnosticsEnabled()) return
+        val record = JSONObject().put("event", name)
+            .put("native_uptime_ms", SystemClock.uptimeMillis())
+            .put("elapsed_ms", SystemClock.elapsedRealtime())
+            .put("intent", core.desiredPlay)
+            .put("focus_epoch", focusGeneration)
+            .put("load", core.loadEpoch)
+            .put("state", core.focus.name.lowercase())
+            .put("session_state", core.phase.name.lowercase())
+            .put("output_state", core.output.name.lowercase())
+            .put("wake_lock", wakeLease.isHeld())
+            .put("position_ms", core.positionMs.coerceAtLeast(0L))
+            .put("progress_gap_ms", (SystemClock.elapsedRealtime() - lastProgress).coerceAtLeast(0L))
+            .put("source_kind", if (queue.getOrNull(index)?.optJSONObject("local") != null) "local" else "remote")
+            .put("attempt", stallReopens)
+            .put("interactive", app.getSystemService(PowerManager::class.java).isInteractive)
+            .put("device_idle", if (Build.VERSION.SDK_INT >= 23) app.getSystemService(PowerManager::class.java).isDeviceIdleMode else false)
+            .put("music_active", audio.isMusicActive)
+        for (key in extra.keys()) record.put(key, extra.get(key))
+        app.playbackDiagnostics(JSONArray().put(record).toString())
+        android.util.Log.i("SylphyPlayback", "event=$name focus=${core.focus} playing=${core.desiredPlay} wake=${wakeLease.isHeld()}")
+    }
     private fun notifyState() {
         if (closed) return
         engine.setPauseIntent(!core.desiredPlay || core.focus != FocusPhase.HELD)
-        val now = SystemClock.elapsedRealtime()
-        if (core.desiredPlay && core.focus == FocusPhase.HELD && core.phase != PlaybackPhase.FAILED && core.phase != PlaybackPhase.ENDED) {
-            if (!wakeLock.isHeld || now - wakeRenewedAt > 20000) { wakeLock.acquire(35000); wakeRenewedAt = now }
-        } else if (wakeLock.isHeld) wakeLock.release()
+        val mode = if (!core.desiredPlay || core.phase == PlaybackPhase.FAILED || core.phase == PlaybackPhase.ENDED) {
+            PlaybackWakeLease.Mode.OFF
+        } else when (core.focus) {
+            FocusPhase.HELD -> PlaybackWakeLease.Mode.PLAYING
+            FocusPhase.REQUESTED -> PlaybackWakeLease.Mode.STARTING
+            FocusPhase.TRANSIENT_LOSS -> PlaybackWakeLease.Mode.TRANSIENT
+            else -> PlaybackWakeLease.Mode.OFF
+        }
+        if (mode != lastLeaseMode) {
+            wakeLease.update(mode)
+            lastLeaseMode = mode
+            trace("wake_lease_state", JSONObject().put("reason", mode.name.lowercase()))
+        }
         invalidateState(); discontinuity = null
         app.playbackStateChanged(core.desiredPlay)
         pendingFocusIntent?.let { onFocusPending?.invoke(it) }
@@ -200,7 +256,12 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     fun custom(action: String, data: JSONObject) {
         when (action) {
             "declick" -> { declick=data.getBoolean("value"); engine.execute(nativeEpoch) { property("sylphy-declick",if (declick) "yes" else "no") }; notifyState(); saveCheckpoint() }
-            "audioDiagnostics" -> { val enabled=data.getBoolean("value"); engine.execute(nativeEpoch) { property("sylphy-diagnostics",if (enabled) "yes" else "no") } }
+            "audioDiagnostics" -> {
+                val enabled = data.getBoolean("value")
+                app.setNativeDiagnosticsEnabled(enabled)
+                engine.execute(nativeEpoch) { property("sylphy-diagnostics", if (enabled) "yes" else "no") }
+                if (enabled) trace("native_diagnostics_enabled")
+            }
             "queue" -> {
                 val array = data.getJSONArray("items")
                 val next = (0 until array.length()).map { array.getJSONObject(it) }.toMutableList()
@@ -236,30 +297,37 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     }
     private fun requestFocus(): Boolean {
         abandonFocus()
-        val intent = core.intentEpoch
+        val generation = focusGeneration
         val listener = AudioManager.OnAudioFocusChangeListener { change ->
             main.post {
-                if (closed || intent != core.intentEpoch || !core.desiredPlay) return@post
+                if (closed || generation != focusGeneration || !core.desiredPlay) return@post
                 when (change) {
                     AudioManager.AUDIOFOCUS_GAIN -> {
+                        trace("audio_focus_gain")
                         ducked = false
-                        event(PlaybackEvent.FocusGranted(intent)); lastProgress = SystemClock.elapsedRealtime()
+                        event(PlaybackEvent.FocusGranted(core.intentEpoch)); lastProgress = SystemClock.elapsedRealtime()
                         val epoch = ++nativeEpoch
                         engine.execute(epoch) { property("volume", (level * 100).toString()); property("pause", "no") }
                     }
                     AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                        trace("audio_focus_duck")
                         ducked = true
                         engine.execute(nativeEpoch) { property("volume", (level * 25).toString()) }
                     }
                     AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                        // Preserve the listener's intent epoch for the eventual GAIN.
+                        trace("audio_focus_transient")
+                        // The focus lease may outlive several song intent epochs.
                         core = core.copy(focus = FocusPhase.TRANSIENT_LOSS, output = OutputPhase.UNVERIFIED, nativePositionBaselineMs = null)
                         val epoch = ++nativeEpoch; engine.execute(epoch) { property("pause", "yes") }
                         main.postDelayed({
-                            if (!closed && core.intentEpoch == intent && core.focus == FocusPhase.TRANSIENT_LOSS) setIntent(false)
+                            if (!closed && generation == focusGeneration && core.focus == FocusPhase.TRANSIENT_LOSS)
+                                setIntent(false, "focus_transient_timeout")
                         }, 5 * 60 * 1000L)
                     }
-                    AudioManager.AUDIOFOCUS_LOSS -> setIntent(false)
+                    AudioManager.AUDIOFOCUS_LOSS -> {
+                        trace("audio_focus_permanent")
+                        setIntent(false, "focus_permanent")
+                    }
                 }
                 notifyState()
             }
@@ -271,10 +339,13 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
                 .setWillPauseWhenDucked(false).setAcceptsDelayedFocusGain(false).setOnAudioFocusChangeListener(listener, main).build()
             audio.requestAudioFocus(focusRequest!!)
         } else @Suppress("DEPRECATION") audio.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-        event(if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) PlaybackEvent.FocusGranted(intent) else PlaybackEvent.FocusDenied(intent))
+        event(if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) PlaybackEvent.FocusGranted(core.intentEpoch) else PlaybackEvent.FocusDenied(core.intentEpoch))
+        trace("audio_focus_request", JSONObject().put("granted", result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED))
         return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
     }
     private fun abandonFocus() {
+        // Invalidate in-flight callbacks from an abandoned request.
+        ++focusGeneration
         if (Build.VERSION.SDK_INT >= 26) focusRequest?.let { audio.abandonAudioFocusRequest(it) }
         else @Suppress("DEPRECATION") focusListener?.let { audio.abandonAudioFocus(it) }
         focusRequest = null; focusListener = null; ducked = false
@@ -282,6 +353,7 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     val pendingFocusIntent: Long? get() = if (core.desiredPlay && core.focus == FocusPhase.REQUESTED) core.intentEpoch else null
     fun foregroundReady(intent: Long) {
         if (closed || pendingFocusIntent != intent) return
+        trace("media3_foreground_ready")
         if (requestFocus()) {
             lastProgress = SystemClock.elapsedRealtime(); lastPosition = -1
             val epoch = ++nativeEpoch
@@ -289,14 +361,21 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         } else fail("focus_denied")
         notifyState()
     }
-    fun foregroundFailed(intent: Long) { if (!closed && pendingFocusIntent == intent) fail("foreground_unavailable") }
-    private fun setIntent(play: Boolean) {
+    fun foregroundFailed(intent: Long) {
+        if (!closed && pendingFocusIntent == intent) {
+            trace("media3_foreground_failed")
+            fail("foreground_unavailable")
+        }
+    }
+    private fun setIntent(play: Boolean, reason: String = "controller") {
         if (queue.isEmpty()) return
         if (play && core.desiredPlay && core.focus == FocusPhase.HELD && core.output == OutputPhase.ADVANCING) return
         val reopen = play && ((!core.desiredPlay && queue[index].optJSONObject("local") == null) ||
             SystemClock.elapsedRealtime() - pausedAt > 15 * 60 * 1000L)
         if (!play) pausedAt = SystemClock.elapsedRealtime()
+        stallReopens = 0
         event(if (play) PlaybackEvent.Play else PlaybackEvent.Pause)
+        trace("playback_intent_changed", JSONObject().put("reason", reason).put("playing", play))
         abandonFocus()
         lastProgress = SystemClock.elapsedRealtime(); lastPosition = -1
         if (play && !openPending && (reopen || !loaded || core.phase == PlaybackPhase.ENDED || core.phase == PlaybackPhase.FAILED)) {
@@ -308,15 +387,27 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         }
         notifyState(); saveCheckpoint()
     }
-    private fun open(target: Int, position: Long, play: Boolean) {
+    private fun open(target: Int, position: Long, play: Boolean, stallRecovery: Boolean = false) {
         if (target !in queue.indices) return
+        if (!stallRecovery) stallReopens = 0
         val switching = loaded || openPending
         cancelSeek()
         transition++; revision++
         index = target; loaded = false; openPending = true; pendingSeek = null
+        progressedSinceOpen = false
+        lastNativeBuffering = false
+        stallReported = false
+        val startedAt = SystemClock.elapsedRealtime()
         lastPosition = -1; lastProgress = SystemClock.elapsedRealtime()
+        val retainFocus = play && core.desiredPlay && core.focus == FocusPhase.HELD && focusListener != null
         event(PlaybackEvent.SetMedia(queue[index].getString("key"), position, play))
-        abandonFocus()
+        if (!retainFocus) {
+            abandonFocus()
+            if (play && core.focus == FocusPhase.HELD) {
+                core = core.copy(focus = FocusPhase.REQUESTED, output = OutputPhase.UNVERIFIED)
+            }
+        }
+        trace("track_open_requested", JSONObject().put("reason", if (retainFocus) "focus_retained" else "focus_needed"))
         val load = ++sourceEpoch
         val epoch = ++nativeEpoch
         // Stop the previous decoder before releasing its native cache lease.
@@ -328,9 +419,16 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
         val resolved: (JSONObject?) -> Unit = resolved@ { descriptor ->
             val lease = descriptor?.optString("lease")?.takeIf { it.isNotEmpty() }?.let(::File)
             if (closed || load != sourceEpoch) { releaseLease(lease, key); return@resolved }
-            if (descriptor == null) { fail("source_unavailable"); return@resolved }
+            if (descriptor == null) {
+                trace("source_resolved", JSONObject().put("reason", "unavailable")
+                    .put("elapsed_ms", SystemClock.elapsedRealtime() - startedAt))
+                fail("source_unavailable"); return@resolved
+            }
             try {
                 val path = descriptor.optString("file")
+                trace("source_resolved", JSONObject()
+                    .put("reason", if (path.isNotEmpty()) "local" else "remote")
+                    .put("elapsed_ms", SystemClock.elapsedRealtime() - startedAt))
                 val uri = if (path.isNotEmpty()) {
                     val file = File(path)
                     require(file.isFile && file.canRead() && file.length() == descriptor.getLong("bytes"))
@@ -385,11 +483,13 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     }
     private fun sample(epoch: Long, values: DoubleArray) {
         if (closed || epoch != nativeEpoch || queue.isEmpty()) return
+        lastNativeBuffering = values[3] != 0.0
         if (values.size > 9) declick = values[9] != 0.0
         val now = SystemClock.elapsedRealtime()
         if (pendingSeek != null) seekObserved = seekObserved || values[7] != 0.0 || values.getOrElse(8) { 0.0 } != 0.0
         if (values[5] != 0.0) { fail("native_stream"); return }
         if (values[4] != 0.0) {
+            trace("native_eof")
             if (repeat == Player.REPEAT_MODE_ONE) {
                 boundary = "repeatOne"
                 discontinuity = Player.DISCONTINUITY_REASON_AUTO_TRANSITION
@@ -401,7 +501,11 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
             }
             return
         }
-        if (values[6] != 0.0 && !loaded) { loaded = true; openPending = false; event(PlaybackEvent.NativeReady(core.loadEpoch)) }
+        if (values[6] != 0.0 && !loaded) {
+            loaded = true; openPending = false
+            event(PlaybackEvent.NativeReady(core.loadEpoch))
+            trace("native_ready")
+        }
         val duration = values[1].toLong()
         if (duration > 0 && kotlin.math.abs(queue[index].optLong("duration") - duration) > 500) {
             queue[index].put("duration", duration); revision++; rebuildPlaylist()
@@ -424,13 +528,33 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
             if (values[3] != 0.0) event(PlaybackEvent.NativeBuffering(core.loadEpoch, core.intentEpoch))
             else if (values[2] == 0.0) {
                 event(PlaybackEvent.NativePosition(core.loadEpoch, core.intentEpoch, pos))
-                if (lastPosition >= 0 && pos - lastPosition in 50..5000) lastProgress = now
+                if (lastPosition >= 0 && pos - lastPosition in 50..5000) {
+                    lastProgress = now
+                    progressedSinceOpen = true
+                    stallReported = false
+                }
             } else core = core.copy(positionMs = pos)
             lastPosition = pos
         }
         if (core.desiredPlay && core.focus == FocusPhase.HELD) {
-            if (now - lastProgress > 3000) event(PlaybackEvent.NativeStalled(core.loadEpoch, core.intentEpoch))
-            if (now - lastProgress > 30000) { fail("progress_timeout"); return }
+            val gap = now - lastProgress
+            if (gap > 3000 && !stallReported) {
+                stallReported = true
+                event(PlaybackEvent.NativeStalled(core.loadEpoch, core.intentEpoch))
+                trace("progress_stalled", JSONObject().put("progress_gap_ms", gap))
+            }
+            if (PlaybackRecoveryPolicy.shouldReopen(gap, loaded, openPending,
+                    pendingSeek != null, lastNativeBuffering, progressedSinceOpen, stallReopens)) {
+                reopenAfterStall("position_stalled")
+                return
+            }
+            if (gap > 30000) { fail("progress_timeout"); return }
+            if (now - lastPlaybackHeartbeat >= 60000) {
+                lastPlaybackHeartbeat = now
+                trace("playback_heartbeat", JSONObject()
+                    .put("native_playing", values[2] == 0.0)
+                    .put("buffering", values[3] != 0.0))
+            }
         }
         if (now - lastCheckpoint > 5000) { lastCheckpoint = now; saveCheckpoint() }
         notifyState()
@@ -442,7 +566,16 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
             completion?.set(null)
         }
     }
+    private fun reopenAfterStall(reason: String) {
+        if (closed || !core.desiredPlay || core.focus != FocusPhase.HELD || queue.isEmpty() ||
+            !loaded || openPending || pendingSeek != null || lastNativeBuffering ||
+            !progressedSinceOpen || stallReopens != 0) return
+        stallReopens = 1
+        trace("stall_reopen_requested", JSONObject().put("reason", reason))
+        open(index, core.positionMs, true, stallRecovery = true)
+    }
     private fun fail(code: String) {
+        trace("native_playback_failed", JSONObject().put("reason", code))
         cancelSeek()
         event(PlaybackEvent.NativeFailure(core.loadEpoch, core.intentEpoch, code))
         val epoch = ++nativeEpoch
@@ -526,7 +659,8 @@ class MpvMedia3Player(private val app: SylphyApplication) : SimpleBasePlayer(Loo
     override fun handleRelease(): ListenableFuture<*> {
         cancelSeek()
         saveCheckpoint(); closed = true; ++sourceEpoch; abandonFocus(); app.unregisterReceiver(noisy); stream.close()
-        if (wakeLock.isHeld) wakeLock.release()
+        trace("media_player_released")
+        wakeLease.close()
         val lease = currentLease; val key = currentLeaseKey
         currentLease = null; currentLeaseKey = null
         engine.close { releaseLease(lease, key) }

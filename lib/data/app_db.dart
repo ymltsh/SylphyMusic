@@ -67,6 +67,22 @@ class AppDb {
     'CREATE INDEX idx_penpal_events_card ON penpal_memory_events(card_id,created_at_ms DESC)',
     'CREATE INDEX idx_penpal_letters_card ON recommendation_letters(card_id,created_at_ms DESC)',
   ];
+  // A single pending, explicitly submitted letter per character.
+  static const _penpalMailboxV20Schema = <String>[
+    """CREATE TABLE penpal_outbox(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      content TEXT NOT NULL CHECK(length(content)>0 AND length(content)<=500),
+      related_letter_key TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL CHECK(status IN ('pending','answered','withdrawn')),
+      revision INTEGER NOT NULL DEFAULT 1,
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL,
+      answered_at_ms INTEGER,
+      reply_letter_id INTEGER)""",
+    "CREATE UNIQUE INDEX idx_penpal_one_pending ON penpal_outbox(card_id) WHERE status='pending'",
+    'CREATE INDEX idx_penpal_outbox_card ON penpal_outbox(card_id,created_at_ms DESC)',
+  ];
   static const _recommendationLettersTable =
       '''CREATE TABLE recommendation_letters(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,7 +242,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 19,
+      version: 20,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -377,6 +393,11 @@ class AppDb {
         if (oldVersion < 19) {
           await database.delete('penpal_memory_events', where: "card_id=''");
         }
+        if (oldVersion < 20) {
+          for (final sql in _penpalMailboxV20Schema) {
+            await database.execute(sql);
+          }
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -425,6 +446,9 @@ class AppDb {
           await d.execute(sql);
         }
         for (final sql in _characterCardsV18Schema) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalMailboxV20Schema) {
           await d.execute(sql);
         }
       },

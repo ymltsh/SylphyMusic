@@ -21,12 +21,14 @@ import org.json.JSONObject
 class SylphyMediaLibraryService : MediaLibraryService() {
     private lateinit var player: MpvMedia3Player
     private var session: MediaLibrarySession? = null
+    private var lastNotificationState: Pair<Boolean, Boolean>? = null
     override fun onCreate() {
         super.onCreate()
         setMediaNotificationProvider(DefaultMediaNotificationProvider.Builder(this)
             .setChannelId("music.sylphy.playback").setChannelName(R.string.app_name).build()
             .apply { setSmallIcon(R.drawable.ic_stat_sylphy) })
         player = MpvMedia3Player(application as SylphyApplication).also { native ->
+            native.trace("media_service_created")
             native.onFocusPending = { intent ->
                 // A second skip/seek while already buffering may not trigger
                 // another notification event. Existing Media3 foreground
@@ -108,19 +110,46 @@ class SylphyMediaLibraryService : MediaLibraryService() {
         }).setSessionActivity(activity).build()
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+    @Suppress("DEPRECATION")
+    private fun observeOwnForeground(): String = try {
+        val services = getSystemService(android.app.ActivityManager::class.java).getRunningServices(32)
+        val own = services.firstOrNull { it.service.className == SylphyMediaLibraryService::class.java.name }
+        if (own == null) "unknown" else if (own.foreground) "yes" else "no"
+    } catch (_: Exception) { "unknown" }
+
     override fun onUpdateNotificationAsync(session: MediaSession, startInForegroundRequired: Boolean): ListenableFuture<Void> {
         val intent = if (startInForegroundRequired) player.pendingFocusIntent else null
-        val updated = super.onUpdateNotificationAsync(session, startInForegroundRequired)
-        if (intent != null) updated.addListener({
+        val state = startInForegroundRequired to isPlaybackOngoing
+        val audit = state != lastNotificationState || intent != null
+        lastNotificationState = state
+        if (audit) player.trace("media3_notification_requested", org.json.JSONObject()
+            .put("fgs_requested", startInForegroundRequired).put("playing", isPlaybackOngoing))
+        val updated = try {
+            super.onUpdateNotificationAsync(session, startInForegroundRequired)
+        } catch (error: Exception) {
+            player.trace("media3_notification_failed")
+            throw error
+        }
+        updated.addListener({
             try {
                 updated.get()
-                if (isPlaybackOngoing) player.pendingFocusIntent?.let { player.foregroundReady(it) }
+                // Future completion means the Media3 request completed, NOT OS FGS confirmation.
+                if (audit) {
+                    player.trace("media3_notification_completed", org.json.JSONObject()
+                        .put("fgs_requested", startInForegroundRequired).put("playing", isPlaybackOngoing))
+                    player.trace("media3_fgs_observed", org.json.JSONObject().put("os_fgs", observeOwnForeground()))
+                }
+                if (intent != null && isPlaybackOngoing)
+                    player.pendingFocusIntent?.let { player.foregroundReady(it) }
+            } catch (_: Exception) {
+                player.trace("media3_notification_failed")
+                if (intent != null) player.foregroundFailed(intent)
             }
-            catch (_: Exception) { player.foregroundFailed(intent) }
         }, ContextCompat.getMainExecutor(this))
         return updated
     }
     override fun onDestroy() {
+        player.trace("media_service_destroyed")
         session?.release(); session = null
         player.release()
         super.onDestroy()

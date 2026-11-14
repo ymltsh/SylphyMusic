@@ -240,7 +240,7 @@ class _AboutPageState extends State<AboutPage> {
                 ),
                 const SizedBox(height: 26),
                 Text(
-                  '一段旋律，也有自己的星轨。',
+                  '每一封信，都是别人重要的思念，不存在不必送达的信件。',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: muted, letterSpacing: 1.1),

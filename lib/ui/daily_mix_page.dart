@@ -9,6 +9,7 @@ import 'playing_song_tile.dart';
 import 'recommendation_showcase.dart';
 import 'recommendation_delivery.dart';
 import 'penpal_chat_page.dart';
+import 'penpal_mailbox_page.dart';
 import 'route_player_bar.dart';
 
 /// A dated, independent queue snapshot: regeneration never edits a playing queue.
@@ -83,12 +84,57 @@ class _DailyMixPageState extends State<DailyMixPage>
     }
   }
 
+  Future<void> _like(DailyMix mix) async {
+    if (_working) return;
+    final cardId = widget.app.apiSettings.activeCardId;
+    final title = mix.title.trim().characters.take(80).toString();
+    final message = '我很喜欢你在 ${mix.day} 的来信《$title》和这次推荐的音乐，给你点个赞！';
+    setState(() => _working = true);
+    try {
+      final added = await widget.app.penpalMailbox.appendOnce(
+        cardId,
+        message,
+        relatedLetterKey: '${mix.day}:${mix.generation}',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(added ? '点赞已作为留言保存，下次新来信时会尝试回复' : '这份点赞已经收好啦'),
+          ),
+        );
+      }
+    } on FormatException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('点赞留言保存失败，请稍后重试')));
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   Future<void> _action(String action, DailyMix mix) async {
     if (_working) return;
     setState(() => _working = true);
     try {
       if (action == 'chat') {
         await _reply(mix);
+      } else if (action == 'mailbox') {
+        if (!mounted) return;
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PenpalMailboxPage(
+              app: widget.app,
+              relatedLetterKey: '${mix.day}:${mix.generation}',
+            ),
+          ),
+        );
       } else if (action == 'refresh') {
         final pending = widget.app.recommendations.daily(regenerate: true);
         setState(() {
@@ -186,7 +232,19 @@ class _DailyMixPageState extends State<DailyMixPage>
                     FilledButton.icon(
                       onPressed: _working ? null : () => unawaited(_play(mix)),
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('播放全部'),
+                      label: const Text('播放'),
+                    ),
+                    IconButton.outlined(
+                      tooltip: '点赞（作为留言）',
+                      style: IconButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        iconSize: MediaQuery.textScalerOf(context).scale(
+                          Theme.of(context).textTheme.labelLarge?.fontSize ??
+                              14,
+                        ),
+                      ),
+                      onPressed: _working ? null : () => unawaited(_like(mix)),
+                      icon: const Icon(Icons.thumb_up_outlined),
                     ),
                   ],
                   footerTrailingAction: PopupMenuButton<String>(
@@ -195,6 +253,7 @@ class _DailyMixPageState extends State<DailyMixPage>
                     onSelected: (action) => unawaited(_action(action, mix)),
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'chat', child: Text('与笔友聊天')),
+                      PopupMenuItem(value: 'mailbox', child: Text('给笔友留言')),
                       PopupMenuItem(value: 'refresh', child: Text('换一批')),
                       PopupMenuItem(value: 'save', child: Text('保存为本地歌单')),
                     ],

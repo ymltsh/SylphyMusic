@@ -57,6 +57,8 @@ flowchart TD
 
 可选 `LrcApiClient` 由控制器装配给 `LyricsStore`，仅在本地 / 服务器歌词不可用时尝试在线补充，默认关闭。URL 与开关保存在 settings，独立鉴权密钥保存在 AuthVault；请求只包含歌曲标题、艺术家和专辑，不使用音源凭据。来源停用取消匹配请求，配置切换取消过期请求，`disposeAsync()` 在销毁 API 配置前关闭客户端，再由歌词服务等待读取结束。补充结果沿用每曲 MediaAssetStore 缓存与来源生命周期，详见 [在线歌词补充](LRC_API.md)。
 
+笔友留言通过 `PenpalMailboxRepository` 按角色保存于 SQLite v20 的 `penpal_outbox`；提交只写本地，生成新每日精选时才将当前待回留言交给配置的 LLM。新来信存档与留言回复状态使用同一事务，并按留言 revision 检查并发编辑 / 撤回。留言不自动写入长期记忆，详见 [笔友留言 V20](PENPAL_MAILBOX_V20.md)。
+
 ## 身份与来源能力
 
 `TrackRef(sourceId, id)` 唯一标识媒体，持久化 key 是二元数组 JSON。`sourceId` 为本机来源 UUID，账户间隔离。专辑 / 艺术家聚合只影响浏览，不改变身份。歌单 `entry_id` 独立于 TrackRef，重复歌曲保持重复。

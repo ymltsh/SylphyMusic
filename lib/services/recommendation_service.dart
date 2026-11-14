@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 
 import '../core/models.dart';
 import '../core/recommendation_models.dart';
+import '../core/penpal_mailbox_models.dart';
 import '../data/app_db.dart';
 import '../data/recommendation_repository.dart';
+import '../data/penpal_mailbox_repository.dart';
 import 'public_music_trends.dart';
 import 'recommendation_engine.dart';
 import 'llm_recommendations.dart';
@@ -22,6 +24,7 @@ class RecommendationService {
     LlmRecommendationClient? llm,
     this.diagnostics,
     this.memory,
+    this.mailbox,
   }) : llm = llm,
        _trends = PublicMusicTrends(db);
   final DiagnosticLogs? diagnostics;
@@ -37,6 +40,7 @@ class RecommendationService {
   final RecommendationRepository repository;
   final LlmRecommendationClient? llm;
   final PenpalMemory? memory;
+  final PenpalMailboxRepository? mailbox;
   final PublicMusicTrends _trends;
   final RecommendationEngine _engine = const RecommendationEngine();
   Future<DailyMix>? _dailyInFlight;
@@ -157,7 +161,16 @@ class RecommendationService {
         hydrated.add(RecommendedTrack(full, item.reason, item.score));
       }
     }
-    final mainLetter = !await repository.hasDailyLetter(day);
+    PenpalMailboxNote? pendingNote;
+    if (mailbox != null) {
+      try {
+        pendingNote = await mailbox!.pending(activeCardId);
+      } catch (_) {
+        // A broken outbox must never prevent local recommendations.
+      }
+    }
+    final mainLetter =
+        pendingNote != null || !await repository.hasDailyLetter(day);
     var finalTracks = hydrated;
     var introduction = _localLetter(hydrated, mainLetter: mainLetter);
     var title = '写给你的今日音乐信';
@@ -204,6 +217,7 @@ class RecommendationService {
         mainLetter: mainLetter,
         penpalMemory: memoryContext,
         explicitPreferences: explicitPreferences,
+        pendingLetter: pendingNote?.content ?? '',
         onWriting: () => dailyStage.value = DailyLetterStage.writing,
         playCounts: {
           for (final candidate in candidates)
@@ -217,8 +231,11 @@ class RecommendationService {
         if (selection.title.trim().isNotEmpty) title = selection.title.trim();
         selfReflection = selection.selfReflection;
         letterTopic = selection.topic;
-        if (selection.introduction.trim().isNotEmpty) {
-          introduction = selection.introduction;
+        if (selection.introduction.trim().isNotEmpty &&
+            (pendingNote == null || selection.reply.trim().isNotEmpty)) {
+          introduction = pendingNote == null
+              ? selection.introduction
+              : '${selection.reply.trim()}\n\n${selection.introduction.trim()}';
           letterFromLlm = true;
         }
         _record('llm_applied', 'daily', count: finalTracks.length);
@@ -277,6 +294,7 @@ class RecommendationService {
       llmTag: llmTag,
       refreshPeriod: period,
       llmSucceeded: letterFromLlm,
+      answeredNote: letterFromLlm ? pendingNote : null,
     );
     if (memory != null) {
       try {

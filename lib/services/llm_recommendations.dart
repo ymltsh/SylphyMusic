@@ -18,6 +18,7 @@ class LlmSelection {
     this.title = '',
     this.selfReflection = '',
     this.topic = '',
+    this.reply = '',
   });
   final List<int> order;
   final Map<int, String> reasons;
@@ -25,6 +26,7 @@ class LlmSelection {
   final String title;
   final String selfReflection;
   final String topic;
+  final String reply;
 }
 
 /// In-memory diagnostics for an explicit connection test; never persisted.
@@ -80,6 +82,7 @@ class LlmRecommendationClient {
     Map<String, Object?> penpalMemory = const {},
     void Function()? onWriting,
     List<String> explicitPreferences = const [],
+    String pendingLetter = '',
   }) async {
     if (!enabled || options.isEmpty) return null;
     final rows = <Map<String, Object?>>[];
@@ -110,6 +113,10 @@ class LlmRecommendationClient {
         'local_hour': now.hour,
         'local_weekday': now.weekday,
         'goal': '每日精选：熟悉偏爱、相关探索、冷门宝藏兼顾',
+        if (pendingLetter.isNotEmpty &&
+            RegExp(r'推荐|想听|音乐|歌曲|曲风|钢琴|吉他|乐器|专辑|演奏|合奏|歌手')
+                .hasMatch(pendingLetter))
+          'pending_music_hint': _short(pendingLetter, 300),
         if (explicitPreferences.isNotEmpty)
           'user_explicit_opinions': explicitPreferences,
         if (settings.quote.trim().isNotEmpty &&
@@ -120,6 +127,7 @@ class LlmRecommendationClient {
       choices: rows,
       mainLetter: mainLetter,
       penpalMemory: penpalMemory,
+      pendingLetter: pendingLetter,
       onWriting: onWriting,
     );
   }
@@ -181,6 +189,7 @@ class LlmRecommendationClient {
     required List<Map<String, Object?>> choices,
     bool mainLetter = true,
     Map<String, Object?> penpalMemory = const {},
+    String pendingLetter = '',
     void Function()? onWriting,
   }) async {
     final configured = settings.llmRevision;
@@ -215,6 +224,8 @@ class LlmRecommendationClient {
         if (kind == '歌曲') 'letter_style': mainLetter ? 'main' : 'short',
         if (kind == '歌曲' && penpalMemory.isNotEmpty)
           'penpal_memory': penpalMemory,
+        if (kind == '歌曲' && pendingLetter.isNotEmpty)
+          'pending_letter': {'message': _short(pendingLetter, 500)},
       },
       choices: compact,
       phase: 'write',
@@ -223,7 +234,8 @@ class LlmRecommendationClient {
     if (stale() ||
         written == null ||
         written.reasons.isEmpty ||
-        (kind == '歌曲' && written.introduction.trim().isEmpty)) {
+        (kind == '歌曲' && written.introduction.trim().isEmpty) ||
+        (pendingLetter.isNotEmpty && written.reply.trim().isEmpty)) {
       return null;
     }
     return LlmSelection(
@@ -237,6 +249,7 @@ class LlmRecommendationClient {
       title: written.title,
       selfReflection: written.selfReflection,
       topic: written.topic,
+      reply: written.reply,
     );
   }
 
@@ -375,6 +388,7 @@ class LlmRecommendationClient {
                       '有真实的新好奇、审美判断或想继续的话题时，可选'
                       ' memory_delta:{"self_reflection":"我...","topic":"主题"}。'
                       '没有新想法就省略；不要把程序规则写成自己的感想。'
+                      "${context['pending_letter'] is Map ? '本次收到一张用户主动留下的便笺，须在 JSON 中增加非空 reply 字段，以本角色口吻用约 60~160 字自然回应；intro 继续分享音乐，不复述 reply。两段将组成同一封来信。' : ''}"
                       '专辑不需要长信，可让 intro 为空，只给明确的专辑推荐理由。'
                 : '${settings.llmSystemPrompt}\n\n'
                       '以下为应用固定约束：只允许使用候选整数 id，'
@@ -520,6 +534,13 @@ class LlmRecommendationClient {
               maxLength: context['letter_style'] == 'short' ? 180 : 480,
             )
           : '';
+      final reply =
+          phase == 'write' &&
+              kind == '歌曲' &&
+              context['pending_letter'] is Map &&
+              parsed['reply'] is String
+          ? _letter(parsed['reply'] as String, maxLength: 240)
+          : '';
       final proposedTitle = parsed['title'];
       final title = kind == '歌曲' && proposedTitle is String
           ? _short(_plain(proposedTitle).replaceAll(RegExp(r'\s+'), ' '), 26)
@@ -544,6 +565,9 @@ class LlmRecommendationClient {
         if (kind == '歌曲' && introduction.trim().isEmpty) {
           fail('empty_letter', '写信阶段没有返回有效信件正文');
         }
+        if (context['pending_letter'] is Map && reply.trim().isEmpty) {
+          fail('missing_mail_reply', '写信阶段没有回应待回便笺');
+        }
       }
       selection = LlmSelection(
         order,
@@ -552,6 +576,7 @@ class LlmRecommendationClient {
         title: title,
         selfReflection: selfReflection,
         topic: topic,
+        reply: reply,
       );
       return selection;
     } catch (exception) {
