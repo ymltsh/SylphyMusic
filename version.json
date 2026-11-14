@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.61",
-    "build": 74,
-    "name": "风灵音乐 v1.0.61",
-    "date": "2026-11-14",
-    "notes": "- 改进 Android 连续切歌时的音频焦点衔接，减少后台切歌后无法继续播放的情况。\n- 调整后台播放的唤醒保持机制；暂停、结束或播放失败时及时释放。\n- 对已正常播放后出现的进度停滞，增加最多一次同曲原位恢复尝试。\n- 开启诊断日志后，补充后台播放状态记录及原生日志备份，便于排查长时间锁屏后的异常。\n",
+    "version": "1.0.62",
+    "build": 75,
+    "name": "风灵音乐 v1.0.62",
+    "date": "2026-11-15",
+    "notes": "- 新增“给笔友留言”：按角色保存便笺，支持编辑、撤回、查看历史及对应回信。留言保存在本机，下次生成新音乐来信时交给你配置的模型尝试回复，提交后不会立即请求模型。\n- 每日精选新增点赞按钮，将赞赏保存为留言；已有待回留言时追加，保留原文，重复点击不会重复保存。\n- 已撤回的留言支持直接删除。\n- 每日精选导出按钮改为图标，“播放全部”简化为“播放”，便于紧凑显示。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.62%2B75/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.62%2B75/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.62%2B75/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.62%2B75/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.62%2B75/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.61+74"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.62+75"
   },
   "history": [
+    {
+      "version": "1.0.61",
+      "build": 74,
+      "name": "风灵音乐 v1.0.61",
+      "date": "2026-11-14",
+      "notes": "- 改进 Android 连续切歌时的音频焦点衔接，减少后台切歌后无法继续播放的情况。\n- 调整后台播放的唤醒保持机制；暂停、结束或播放失败时及时释放。\n- 对已正常播放后出现的进度停滞，增加最多一次同曲原位恢复尝试。\n- 开启诊断日志后，补充后台播放状态记录及原生日志备份，便于排查长时间锁屏后的异常。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.61%2B74/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.61+74"
+    },
     {
       "version": "1.0.60",
       "build": 73,
