@@ -1,5 +1,11 @@
 # 实施与验证记录
 
+## 2026-11-15 音乐笔友首次引导发布 1.0.63+76
+
+用户明确要求“推送更新”后，普通版 1.0.63+76（三 ABI Android、Windows 安装程序 / 便携包及对应源码）与 OpenList 1.0.63-openlist.45+76（arm64 APK 及对应应用 / 后端 / 前端源码）已发布。新增“念念不忘，必有回响（LLM 增强）”首次引导专页、音乐书信欢迎文案及迁移后的配置确认，保留稍后配置和已有引导完成状态。普通版 7 个与特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始 / 加速清单核对通过，特别版发布状态 complete；Android 正式签名保持一致。
+
+本轮仅提交推送清单：main/version.json 为 d4b3227，feature/version.json 与 version-openlist.json 为 d5499c1，main/version-openlist.json 为 ac35de3。实际源码随发布附件提供。普通版产物 build/releases/1.0.63-76/，日志 build/release76-publish.log；特别版产物 build/releases/1.0.63-openlist.45-76/，日志 build/openlist-release76-build.log、openlist-release76-prepare.log、openlist-release76-publish.log。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查，未请求真实模型；首次引导与迁移的实际交互由用户验收。
+
 ## 2026-11-15 首次引导：念念不忘，必有回响（LLM 增强）
 
 按用户最新 README 的音乐与书信定位，欢迎页改用“念念不忘，必有回响”及音乐笔友简介；首次引导从四步扩为五步：欢迎 → 设备迁移 → 音乐来源 → 音乐笔友 / LLM 增强 → 其他 API。专页介绍角色来信、聊天与留言，复用 LlmRecommendationSettings 提供增强开关、模型连接入口（地址 / 模型 / 安全存储密钥 / 手动测试）、参与方式、等待预算、角色卡和记忆设置。说明发送范围与服务费用，保留“稍后配置，继续”；页面展示与跳过不主动请求模型，也不隐式改变开关。保存期间禁止步骤导航，沿用来源后台操作与导航分离行为。
