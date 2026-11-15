@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(sylphy_mpv LANGUAGES CXX)
+add_library(sylphy_mpv SHARED mpv_bridge.cpp)
+target_compile_features(sylphy_mpv PRIVATE cxx_std_17)
+target_link_libraries(sylphy_mpv PRIVATE dl)

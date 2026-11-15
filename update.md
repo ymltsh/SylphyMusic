@@ -8,6 +8,8 @@
 | --- | --- |
 | 正式清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
 | 加速地址（默认） | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version.json |
+| OpenList 清单 | https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json |
+| OpenList 加速地址 | https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json |
 | 测试清单 | 将文件名换为 version-beta.json |
 | 发布页 | https://github.com/ymltsh/SylphyMusic/releases/latest |
 
@@ -24,6 +26,10 @@ App 启动不主动检查；用户在“设置 → 检查更新”读取清单�
 根目录 `release.py` 自动执行：
 
 更新版本 → 构建 Android / Windows → 打包 EXE / ZIP → 上传 GitHub Release → 更新版本清单 → 只提交并推送清单。
+
+发布结果核对直接集成在 `release.py`，不再创建或运行单独的 `verify-release` 脚本。上传时核对附件大小与 SHA-256；发布后核对 Release 状态、标题、正文和全部附件，正式版同时确认 Latest；清单推送后核对原始与加速入口的 latest 完整内容。仅对读取失败或清单传播延迟进行有限重试，不自动重试发布写操作。
+
+全部步骤完成后，发布脚本直接输出 `Release succeeded: <发布页>`，退出码为 0；任一步失败输出 `Release failed: <原因>`，退出码为 1。`--no-push` 仅报告 Release 发布结果，并明确提示清单未推送，不核对远程清单。核对失败可能发生在发布已完成之后，必须先检查远端状态，不能直接重复发布。OpenList 发布入口须同样复用 `release.py` 中的结果核对函数，在其清单同步后直接报告成功或失败，不另设核对脚本。
 
 编译成功即可交付；流程不运行静态分析或测试，也不因历史验证失败追加修复。功能与设备验证由用户负责。
 
@@ -77,6 +83,14 @@ flutter build windows --release
 
 Tag 如 `v1.0.1+13`，上传上述资产。Android 使用正式签名，Windows 当前未代码签名。上传失败保留草稿，不推进清单。
 
+#### Release 描述规范
+
+Release 标题和正文面向使用应用的用户，说明本版本新增了什么、修复了什么、体验有哪些变化，以及必要的使用或升级提示。使用直白的用户语言，描述可感知的行为与影响；不把实现细节或内部工作记录当作更新内容，也不将未经验证的效果写成已确认事实。普通版与 OpenList 特别版均遵守此规范，版本清单中的更新说明同步采用面向用户的文案。
+
+Release 描述不得出现开发性描述，包括编译 / 打包 / 上传过程、签名配置、静态分析 / 测试 / 设备验收的执行情况、补丁合入 / 分支同步 / 提交记录，以及“按要求完成”等内部协作措辞。这些信息仅记录在本地交付汇报、构建日志或 `docs/PROGRESS.md` 中。
+
+例如，不得写“Android 使用既有正式签名。本轮按要求完成编译、打包与发布，未运行静态分析、测试或设备验收。”；后台播放恢复的更新说明可写为“改进后台播放的异常恢复，减少歌曲加载或切换时长时间停滞的情况。”。发布前检查最终标题、正文和清单更新说明，删除开发过程描述。
+
 ### 4. 更新版本清单
 
 正式版更新 `version.json`，Beta / Beta2 更新 `version-beta.json`；旧 latest 放入 history 头部。工具仅提交并推送该清单，不提交源码、签名文件或其他改动。
@@ -88,3 +102,9 @@ Invoke-RestMethod "https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh
 ```
 
 确认 latest 是新版本、下载链接对应已上传资产即可。
+
+## OpenList 独立清单
+
+`main/version-openlist.json` 是 OpenList 独立更新入口，结构与 `version.json` 相同，保存特别版的 latest / history，仅指向特别版附件。普通版仍读取 main/version.json。OpenList 客户端正式更新读取新入口；测试更新仍使用 feature/android-openlist-lite/version-beta.json。
+
+两分支均保存 version-openlist.json。旧 feature/android-openlist-lite/version.json 继续保留，供既有安装包使用。后续发布 OpenList 时，将其更新后的 version.json 同步到两分支的 version-openlist.json，并只提交、推送对应清单；普通版发布不覆盖 OpenList 清单。新增接口本身不改变版本号或已发布附件。

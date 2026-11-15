@@ -9,7 +9,7 @@ import 'package:sylphy_music/services/app_updates.dart';
 import 'package:sylphy_music/ui/app_update_page.dart';
 
 Map<String, dynamic> release({String version = '0.3.0', int build = 3}) => {
-  'version': version,
+  'version': version.contains('-') ? version : '$version-openlist.1',
   'build': build,
   'name': '风灵音乐 $version',
   'notes': '新功能\n修复问题',
@@ -62,7 +62,7 @@ void main() {
     expect(result.available, isTrue);
     expect(
       calls.single.toString(),
-      'https://mirror.example/proxy/https://raw.githubusercontent.com/ymltsh/SylphyMusic/feature/android-openlist-lite/version.json',
+      'https://mirror.example/proxy/https://raw.githubusercontent.com/ymltsh/SylphyMusic/main/version-openlist.json',
     );
     expect(result.latest!.page.toString(), AppUpdates.releasePage);
   });

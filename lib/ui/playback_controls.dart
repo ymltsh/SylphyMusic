@@ -116,7 +116,7 @@ class PlayerControls extends StatelessWidget {
   }
 }
 
-class PlayerProgress extends StatelessWidget {
+class PlayerProgress extends StatefulWidget {
   const PlayerProgress({
     super.key,
     required this.app,
@@ -126,39 +126,97 @@ class PlayerProgress extends StatelessWidget {
   final SylphyApp app;
   final bool preview;
   final int? color;
+
+  @override
+  State<PlayerProgress> createState() => _PlayerProgressState();
+}
+
+class _PlayerProgressState extends State<PlayerProgress> {
+  double? _scrubValue;
+  String? _scrubTrackKey;
+  int _seekEpoch = 0;
+
+  @override
+  void didUpdateWidget(covariant PlayerProgress oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app != widget.app ||
+        oldWidget.preview != widget.preview ||
+        (_scrubValue != null &&
+            _scrubTrackKey != widget.app.playback.currentRef?.key)) {
+      _scrubValue = null;
+      _scrubTrackKey = null;
+      ++_seekEpoch;
+    }
+  }
+
+  void _beginSeek(double value) {
+    ++_seekEpoch;
+    _scrubTrackKey = widget.app.playback.currentRef?.key;
+    setState(() => _scrubValue = value);
+  }
+
+  Future<void> _finishSeek(double value) async {
+    final epoch = _seekEpoch;
+    final playback = widget.app.playback;
+    try {
+      if (!widget.preview && _scrubTrackKey == playback.currentRef?.key) {
+        await _act(
+          context,
+          () => playback.seek(Duration(milliseconds: value.round())),
+        );
+      }
+    } finally {
+      if (mounted && epoch == _seekEpoch) {
+        setState(() {
+          _scrubValue = null;
+          _scrubTrackKey = null;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final p = app.playback;
+    final p = widget.app.playback;
+    final preview = widget.preview;
+    final color = widget.color;
     final hasDuration = p.duration > Duration.zero;
     final max = preview
         ? (hasDuration ? p.duration.inMilliseconds : 240000)
         : math.max(1, p.duration.inMilliseconds);
-    final value = preview
+    final playbackValue = preview
         ? (hasDuration
               ? p.position.inMilliseconds.clamp(0, max).toDouble()
               : 65000.0)
         : p.position.inMilliseconds.clamp(0, max).toDouble();
+    final value = (_scrubValue ?? playbackValue).clamp(0.0, max.toDouble());
+    final canSeek = preview || hasDuration;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 2,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-          ),
-          child: Slider(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            activeColor: color == null ? null : Color(color!),
-            value: value,
-            max: max.toDouble(),
-            onChanged: preview
-                ? (_) {}
-                : p.duration <= Duration.zero
-                ? null
-                : (v) => _act(
-                    context,
-                    () => p.seek(Duration(milliseconds: v.round())),
-                  ),
+        Flexible(
+          fit: FlexFit.loose,
+          child: SizedBox(
+            height: 48,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+              ),
+              child: Slider(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                activeColor: color == null ? null : Color(color!),
+                value: value,
+                max: max.toDouble(),
+                allowedInteraction: SliderInteraction.tapAndSlide,
+                onChangeStart: canSeek ? _beginSeek : null,
+                onChanged: canSeek
+                    ? (v) => setState(() => _scrubValue = v)
+                    : null,
+                onChangeEnd: canSeek ? _finishSeek : null,
+              ),
+            ),
           ),
         ),
         Padding(
@@ -167,14 +225,16 @@ class PlayerProgress extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                preview && !hasDuration ? '1:05' : formatTime(p.position),
-                style: const TextStyle(fontSize: 12),
+                preview && !hasDuration && _scrubValue == null
+                    ? '1:05'
+                    : formatTime(Duration(milliseconds: value.round())),
+                style: const TextStyle(fontSize: 12, height: 1.2),
               ),
               if (!preview && p.buffering)
-                const Text('缓冲中', style: TextStyle(fontSize: 12)),
+                const Text('缓冲中', style: TextStyle(fontSize: 12, height: 1.2)),
               Text(
                 preview && !hasDuration ? '4:00' : formatTime(p.duration),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12, height: 1.2),
               ),
             ],
           ),

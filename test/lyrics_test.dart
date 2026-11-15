@@ -17,6 +17,40 @@ void main() {
     expect(lines.first.at.inMilliseconds, 1005);
     expect(lines[1].at.inMilliseconds, 2500);
   });
+  test('thin-space bilingual lyrics split without changing LRC timing', () {
+    final lines = parseLrc(
+      "[01:32.08]Can't believe my eyes, running around the sun\u2009"
+      '不敢相信 我追逐着太阳\n'
+      '[01:36.74]Everyone I know runs, everyone I know runs\u2009'
+      '我认识的人 皆匆匆而过',
+    );
+    expect(lines, hasLength(2));
+    expect(lines.map((line) => line.at.inMilliseconds), [92080, 96740]);
+    expect(
+      lines.first.text,
+      "Can't believe my eyes, running around the sun\n不敢相信 我追逐着太阳",
+    );
+    expect(
+      lines.last.text,
+      'Everyone I know runs, everyone I know runs\n我认识的人 皆匆匆而过',
+    );
+  });
+  test('translation separator variants are safe for monolingual lyrics', () {
+    final lines = parseLrc(
+      '[00:01]Hello\u2009world\n'
+      '[00:02]Hello world 中文\n'
+      '[00:03]Hello\u200A世界\n'
+      '[00:04]世界\u202FHello\n'
+      '[00:05]作曲： Isaac Levy\u2009Ryan Lewis',
+    );
+    expect(lines.map((line) => line.text), [
+      'Hello\u2009world',
+      'Hello world 中文',
+      'Hello\n世界',
+      '世界\nHello',
+      '作曲： Isaac Levy\u2009Ryan Lewis',
+    ]);
+  });
   test(
     'SRT hours, milliseconds, translations and instrumental gaps retain timing',
     () {

@@ -223,6 +223,8 @@ class SongInfoSheet extends StatelessWidget {
 
     const kindNames = {
       SourceKind.emby: 'Emby',
+      SourceKind.jellyfin: 'Jellyfin',
+      SourceKind.plex: 'Plex',
       SourceKind.subsonic: 'OpenSubsonic',
       SourceKind.local: '本地音乐',
       SourceKind.webdav: 'WebDAV',

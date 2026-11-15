@@ -89,6 +89,19 @@ class PlayerWidgetRegistry {
         ),
       ),
     ),
+    PlayerPart.quickActions: (context, e, data) => Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: PlayerQuickActions(
+          app: data.app,
+          track: data.track,
+          preview: data.preview,
+          onOpenLyrics: data.onOpenLyrics,
+          onOpenEditor: data.onOpenEditor,
+          onQuality: data.onQuality,
+        ),
+      ),
+    ),
     PlayerPart.controls: (context, e, data) => Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
@@ -303,17 +316,6 @@ class PlayerLayoutRenderer extends StatelessWidget {
                 rect: layout.bounds(e, size),
                 child: PlayerWidgetRegistry.build(context, e, data),
               ),
-            Positioned.fromRect(
-              rect: layout.actionBounds(size),
-              child: PlayerQuickActions(
-                app: data.app,
-                track: data.track,
-                preview: data.preview,
-                onOpenLyrics: data.onOpenLyrics,
-                onOpenEditor: data.onOpenEditor,
-                onQuality: data.onQuality,
-              ),
-            ),
           ],
         ),
       );

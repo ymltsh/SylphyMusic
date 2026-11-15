@@ -1,5 +1,6 @@
 package com.ryanheise.audioservice;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -9,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -25,11 +26,10 @@ import android.support.v4.media.RatingCompat;
 import android.support.v4.media.session.MediaControllerCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
+import android.util.Log;
 import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
-import android.view.View;
-import android.widget.RemoteViews;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ServiceCompat;
@@ -38,7 +38,6 @@ import androidx.core.app.NotificationCompat;
 import androidx.media.MediaBrowserServiceCompat;
 import androidx.media.VolumeProviderCompat;
 import androidx.media.app.NotificationCompat.MediaStyle;
-import androidx.media.app.NotificationCompat.DecoratedMediaCustomViewStyle;
 import androidx.media.utils.MediaConstants;
 
 import java.io.FileDescriptor;
@@ -51,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.flutter.embedding.engine.FlutterEngine;
+import io.flutter.plugin.common.MethodChannel;
 
 public class AudioService extends MediaBrowserServiceCompat {
     public static final String CONTENT_STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
@@ -283,10 +283,29 @@ public class AudioService extends MediaBrowserServiceCompat {
     private LruCache<String, Bitmap> artBitmapCache;
     private boolean playing = false;
     private AudioProcessingState processingState = AudioProcessingState.idle;
+    // Last native MediaSession anchor, used to detect real state transitions
+    // and seek discontinuities without reposting a notification each tick.
+    private boolean hasSessionAnchor;
+    private float sessionSpeed;
+    private long sessionPosition;
+    private long sessionUpdateTime;
     private int repeatMode;
     private int shuffleMode;
     private boolean notificationCreated;
+    // Monotonic native media transport sequence, correlated with Dart intent
+    // via the app's opt-in playback_diagnostics MethodChannel.
+    private int nativeTransportSequence = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ForegroundResumeState foregroundResume = new ForegroundResumeState();
+    private long lastForegroundDenialMs = -1;
+    private static final long FGS_RETRY_COOLDOWN_MS = 3000;
+    private static final long PROVISIONAL_FOREGROUND_MS = 20000;
+    private final Runnable provisionalForegroundTimeout = () -> {
+        if (!foregroundResume.isProvisional()) return;
+        foregroundResume.cancelProvisional();
+        Log.w("SylphyMedia", "fgs_provisional_timeout");
+        if (!playing) exitForegroundState();
+    };
     private VolumeProviderCompat volumeProvider;
 
     public AudioProcessingState getProcessingState() {
@@ -295,6 +314,45 @@ public class AudioService extends MediaBrowserServiceCompat {
 
     public boolean isPlaying() {
         return playing;
+    }
+
+    /**
+     * Native-service snapshot, not PCM evidence. Called by the long-lived
+     * Flutter engine's diagnostic channel, not by the Activity lifecycle.
+     * Never include media IDs, source URLs, notification contents or tokens.
+     */
+    public static Map<String, Object> diagnosticSnapshot(Context context) {
+        Map<String, Object> data = new HashMap<>();
+        final AudioService service = instance;
+        data.put("service_alive", service != null);
+        data.put("native_pid", android.os.Process.myPid());
+        data.put("native_uptime_ms", SystemClock.elapsedRealtime());
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (power != null) {
+            data.put("interactive", power.isInteractive());
+            if (Build.VERSION.SDK_INT >= 23) data.put("device_idle", power.isDeviceIdleMode());
+        }
+        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (audio != null) {
+            // This is system-wide audio activity, NOT proof this app outputs PCM.
+            data.put("music_active", audio.isMusicActive());
+            data.put("audio_mode", audio.getMode());
+        }
+        if (service != null) {
+            data.put("native_seq", service.nativeTransportSequence);
+            data.put("fgs_requested", service.foregroundResume.isForeground());
+            data.put("fgs_confirmed", service.foregroundResume.isOsConfirmed());
+            Boolean foreground = service.observedOwnServiceForeground();
+            data.put("os_fgs", foreground == null ? "unknown" : (foreground ? "yes" : "no"));
+            data.put("wake_lock", service.wakeLock != null && service.wakeLock.isHeld());
+            data.put("playing", service.playing);
+            data.put("session_state", service.processingState.name().toLowerCase(java.util.Locale.ROOT));
+            data.put("session_moving", service.sessionSpeed > 0f);
+            data.put("session_position_ms", Math.max(0L, Math.min(1000000000L, service.sessionPosition)));
+        } else {
+            data.put("os_fgs", "unknown");
+        }
+        return data;
     }
 
     public int getRepeatMode() {
@@ -347,22 +405,40 @@ public class AudioService extends MediaBrowserServiceCompat {
         };
 
         flutterEngine = AudioServicePlugin.getFlutterEngine(this);
+        // A media-service cold start may run without an Activity. Own the same
+        // diagnostic channel here as a fallback for a headless engine.
+        final Context diagnosticContext = getApplicationContext();
+        MethodChannel nativeDiagnosticChannel = new MethodChannel(
+                flutterEngine.getDartExecutor().getBinaryMessenger(),
+                "music.sylphy/playback_diagnostics");
+        nativeDiagnosticChannel.setMethodCallHandler((call, result) -> {
+            if ("snapshot".equals(call.method)) {
+                result.success(diagnosticSnapshot(diagnosticContext));
+            } else {
+                result.notImplemented();
+            }
+        });
         System.out.println("flutterEngine warmed up");
     }
 
     @Override
     public int onStartCommand(final Intent intent, int flags, int startId) {
+        foregroundResume.markStarted();
+        Log.i("SylphyMedia", "fgs_service_started");
         MediaButtonReceiver.handleIntent(mediaSession, intent);
         return START_NOT_STICKY;
     }
 
     public void stop() {
         deactivateMediaSession();
+        foregroundResume.markStopped();
         stopSelf();
     }
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(provisionalForegroundTimeout);
+        Log.i("SylphyMedia", "fgs_service_destroyed active=" + foregroundResume.isForeground());
         super.onDestroy();
         if (listener != null) {
             listener.onDestroy();
@@ -383,6 +459,7 @@ public class AudioService extends MediaBrowserServiceCompat {
         //     notificationManager.cancel(NOTIFICATION_ID);
         // }
         releaseWakeLock();
+        foregroundResume.markDemoted();
         instance = null;
         notificationCreated = false;
     }
@@ -518,6 +595,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     void setState(List<MediaControl> controls, long actionBits, int[] compactActionIndices, AudioProcessingState processingState, boolean playing, long position, long bufferedPosition, float speed, long updateTime, Integer errorCode, String errorMessage, int repeatMode, int shuffleMode, boolean captioningEnabled, Long queueIndex) {
+        final int oldPlatformState = getPlaybackState();
         boolean notificationChanged = false;
         if (!Arrays.equals(compactActionIndices, this.compactActionIndices)) {
             notificationChanged = true;
@@ -537,16 +615,35 @@ public class AudioService extends MediaBrowserServiceCompat {
             }
         }
         this.compactActionIndices = compactActionIndices;
-        boolean wasPlaying = this.playing;
         AudioProcessingState oldProcessingState = this.processingState;
+        boolean oldPlaying = this.playing;
+        boolean oldMoving = this.sessionSpeed > 0f;
         this.processingState = processingState;
         this.playing = playing;
+        if (oldPlaying != playing || oldProcessingState != processingState || oldMoving != (speed > 0f)) {
+            Log.i("SylphyMedia", "media_state playing=" + playing
+                    + " processing=" + processingState.name()
+                    + " speed_positive=" + (speed > 0f)
+                    + " native_seq=" + nativeTransportSequence);
+        }
         this.repeatMode = repeatMode;
         this.shuffleMode = shuffleMode;
 
+        final int platformState = getPlaybackState();
+        // A card created during opening must be re-posted at BUFFERING ->
+        // PLAYING and frozen -> advancing, but never on each ordinary tick.
+        notificationChanged |= MediaNotificationRefreshPolicy.requiresRefresh(
+                oldPlatformState, platformState, PlaybackStateCompat.STATE_PLAYING,
+                hasSessionAnchor, sessionSpeed, speed,
+                sessionPosition, sessionUpdateTime, position, updateTime);
+        hasSessionAnchor = true;
+        sessionPosition = position;
+        sessionSpeed = speed;
+        sessionUpdateTime = updateTime;
+
         PlaybackStateCompat.Builder stateBuilder = new PlaybackStateCompat.Builder()
                 .setActions(AUTO_ENABLED_ACTIONS | actionBits)
-                .setState(getPlaybackState(), position, speed, updateTime)
+                .setState(platformState, position, speed, updateTime)
                 .setBufferedPosition(bufferedPosition);
 
         for (PlaybackStateCompat.CustomAction action : this.customActions) {
@@ -573,9 +670,13 @@ public class AudioService extends MediaBrowserServiceCompat {
         mediaSession.setShuffleMode(shuffleMode);
         mediaSession.setCaptioningEnabled(captioningEnabled);
 
-        if (!wasPlaying && playing) {
-            enterPlayingState();
-        } else if (wasPlaying && !playing) {
+        // Do not equate the Dart intent with a successful Android FGS.
+        // A denied promotion must remain retryable even when playing stays true.
+        if (playing) {
+            handler.removeCallbacks(provisionalForegroundTimeout);
+            foregroundResume.confirmPlaying();
+            enterPlayingState(false, false);
+        } else if (foregroundResume.shouldExitOnPausedState()) {
             exitPlayingState();
         }
 
@@ -620,6 +721,8 @@ public class AudioService extends MediaBrowserServiceCompat {
         switch (processingState) {
         case idle: return PlaybackStateCompat.STATE_NONE;
         case loading: return PlaybackStateCompat.STATE_CONNECTING;
+        // Foreground-service eligibility is managed via the `playing` intent
+        // in setState(); a buffering decoder is NOT falsely STATE_PLAYING.
         case buffering: return PlaybackStateCompat.STATE_BUFFERING;
         case ready: return playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
         case completed: return playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
@@ -653,31 +756,14 @@ public class AudioService extends MediaBrowserServiceCompat {
         // TODO: Look at setColorized
         if (config.notificationColor != -1)
             builder.setColor(config.notificationColor);
-        // Android 10's MediaStyle tints each action using SystemUI's artwork
-        // foreground palette, which can be nearly invisible on dark covers.
-        // The decorated media style keeps SystemUI's album-art colorization,
-        // while our RemoteViews give ONLY the transport icons a white tint.
-        final boolean whiteControlsOnQ = Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
-            && nativeActions.size() == 3;
-        final MediaStyle style;
-        if (whiteControlsOnQ) {
-            RemoteViews controls = buildWhiteMediaControlsQ();
-            builder.setCustomContentView(controls);
-            builder.setCustomBigContentView(controls);
-            builder.setCustomHeadsUpContentView(controls);
-            // DecoratedMediaCustomViewStyle needs an explicit opt-in to
-            // preserve the artwork-derived background on Android 10.
-            builder.setColorized(true);
-            style = new DecoratedMediaCustomViewStyle()
-                .setMediaSession(mediaSession.getSessionToken());
-        } else {
-            for (NotificationCompat.Action action : nativeActions) {
-                builder.addAction(action);
-            }
-            style = new MediaStyle().setMediaSession(mediaSession.getSessionToken());
-            if (Build.VERSION.SDK_INT < 33)
-                style.setShowActionsInCompactView(compactActionIndices);
+        // One system MediaStyle path across API levels. Custom RemoteViews
+        // can create a second, independently cached notification surface.
+        for (NotificationCompat.Action action : nativeActions) {
+            builder.addAction(action);
         }
+        final MediaStyle style = new MediaStyle().setMediaSession(mediaSession.getSessionToken());
+        if (Build.VERSION.SDK_INT < 33)
+            style.setShowActionsInCompactView(compactActionIndices);
         if (config.androidNotificationOngoing) {
             style.setShowCancelButton(true);
             style.setCancelButtonIntent(buildMediaButtonPendingIntent(PlaybackStateCompat.ACTION_STOP));
@@ -685,35 +771,6 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
         builder.setStyle(style);
         return builder.build();
-    }
-
-    // Uses the existing action icons and PendingIntents, so play/pause, skip and
-    // headset/media-session handling are unchanged. No fixed notification color.
-    private RemoteViews buildWhiteMediaControlsQ() {
-        RemoteViews views = new RemoteViews(getPackageName(), R.layout.audio_service_media_controls_q);
-        MediaDescriptionCompat description = mediaMetadata == null
-            ? null : mediaMetadata.getDescription();
-        if (description != null) {
-            views.setTextViewText(R.id.audio_service_media_title, description.getTitle());
-            views.setTextViewText(R.id.audio_service_media_subtitle, description.getSubtitle());
-        }
-        final int[] buttonIds = {
-            R.id.audio_service_media_action_0,
-            R.id.audio_service_media_action_1,
-            R.id.audio_service_media_action_2,
-        };
-        for (int i = 0; i < buttonIds.length; i++) {
-            NotificationCompat.Action action = nativeActions.get(i);
-            views.setImageViewResource(buttonIds[i], action.getIcon());
-            views.setInt(buttonIds[i], "setColorFilter", Color.WHITE);
-            views.setContentDescription(buttonIds[i], action.title);
-            if (action.actionIntent == null) {
-                views.setViewVisibility(buttonIds[i], View.INVISIBLE);
-            } else {
-                views.setOnClickPendingIntent(buttonIds[i], action.actionIntent);
-            }
-        }
-        return views;
     }
 
     private NotificationManager getNotificationManager() {
@@ -779,14 +836,128 @@ public class AudioService extends MediaBrowserServiceCompat {
         }
     }
 
-    private void enterPlayingState() {
-        ContextCompat.startForegroundService(this, new Intent(AudioService.this, AudioService.class));
-        if (!mediaSession.isActive())
-            mediaSession.setActive(true);
+    // Run directly from the native media callback, before Dart/database/HTTP
+    // awaits consume the short user-gesture FGS-start exemption window.
+    private void prepareForegroundForMediaPlay() {
+        Log.i("SylphyMedia", "media_play_request_native");
+        enterPlayingState(!playing, true);
+    }
 
-        acquireWakeLock();
-        mediaSession.setSessionActivity(contentIntent);
-        internalStartForeground();
+    private void cancelProvisionalForeground() {
+        if (!foregroundResume.isProvisional()) return;
+        handler.removeCallbacks(provisionalForegroundTimeout);
+        foregroundResume.cancelProvisional();
+        if (!playing) exitForegroundState();
+    }
+
+    // Android may silently reject startForeground() instead of throwing.
+    // Never log 'promoted' merely because the call returned (Xiaomi log proof).
+    // getRunningServices() is deprecated for OTHER apps, but own-service state
+    // is still exposed. Missing/blocked data is UNKNOWN, not proof of success.
+    private long foregroundObservationEpoch = 0;
+
+    private Boolean observedOwnServiceForeground() {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager == null) return null;
+        try {
+            for (ActivityManager.RunningServiceInfo info : manager.getRunningServices(100)) {
+                if (info.service != null &&
+                        getPackageName().equals(info.service.getPackageName()) &&
+                        AudioService.class.getName().equals(info.service.getClassName())) {
+                    return info.foreground;
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.w("SylphyMedia", "fgs_os_query_unavailable type=" +
+                    e.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    private void observeForegroundRequest(String reason) {
+        final long epoch = ++foregroundObservationEpoch;
+        handler.postDelayed(() -> verifyForegroundRequest(epoch, reason, false), 350);
+    }
+
+    // HyperOS may report a not-yet-foreground service immediately after a
+    // successful startForeground call. One early negative result is not proof
+    // of denial: sample once more, but never poll or keep the FGS indefinitely.
+    private void verifyForegroundRequest(long epoch, String reason, boolean repeated) {
+        if (epoch != foregroundObservationEpoch || !foregroundResume.isForeground()) return;
+        Boolean observed = observedOwnServiceForeground();
+        if (observed == null) {
+            Log.w("SylphyMedia", "fgs_os_status_unknown reason=" + reason);
+        } else if (observed) {
+            foregroundResume.markOsConfirmed();
+            Log.i("SylphyMedia", "fgs_os_confirmed reason=" + reason);
+        } else if (!repeated) {
+            Log.w("SylphyMedia", "fgs_os_confirmation_pending reason=" + reason);
+            handler.postDelayed(() -> verifyForegroundRequest(epoch, reason, true), 1000);
+        } else {
+            Log.w("SylphyMedia", "fgs_os_not_foreground reason=" + reason);
+            foregroundResume.markDemoted();
+            releaseWakeLock();
+            lastForegroundDenialMs = SystemClock.elapsedRealtime();
+        }
+    }
+
+    private void enterPlayingState(boolean provisional, boolean userInitiated) {
+        if (foregroundResume.isForeground()) {
+            // Xiaomi may demote a bound service without destroying the process.
+            // On an explicit media gesture, reassert the actual FGS rather than
+            // trusting only the bookkeeping from an earlier promotion.
+            if (userInitiated) {
+                try {
+                    internalStartForeground();
+                    acquireWakeLock();
+                    Log.i("SylphyMedia", "fgs_reaffirm_requested");
+                    observeForegroundRequest("reaffirm");
+                } catch (IllegalStateException | SecurityException e) {
+                    foregroundResume.markDemoted();
+                    releaseWakeLock();
+                    lastForegroundDenialMs = SystemClock.elapsedRealtime();
+                    Log.w("SylphyMedia", "fgs_reaffirm_denied type="
+                            + e.getClass().getSimpleName());
+                    return;
+                }
+            }
+            if (provisional) {
+                foregroundResume.markProvisional();
+                handler.removeCallbacks(provisionalForegroundTimeout);
+                handler.postDelayed(provisionalForegroundTimeout, PROVISIONAL_FOREGROUND_MS);
+            }
+            return;
+        }
+        final long now = SystemClock.elapsedRealtime();
+        if (!userInitiated && lastForegroundDenialMs >= 0
+                && now - lastForegroundDenialMs < FGS_RETRY_COOLDOWN_MS) return;
+        try {
+            // The service is already running here. Do not send another
+            // startForegroundService() for every paused -> playing transition.
+            // An initially bound-only instance still needs a started lifetime.
+            if (foregroundResume.needsStart()) {
+                ContextCompat.startForegroundService(this, new Intent(this, AudioService.class));
+                foregroundResume.markStarted();
+            }
+            if (!mediaSession.isActive()) mediaSession.setActive(true);
+            mediaSession.setSessionActivity(contentIntent);
+            internalStartForeground();
+            foregroundResume.markPromoted(provisional);
+            acquireWakeLock();
+            // This only means the Java call returned. The OS can still ignore
+            // the promotion due to background restrictions.
+            Log.i("SylphyMedia", "fgs_request_submitted provisional=" + provisional);
+            observeForegroundRequest("promote");
+            if (provisional) {
+                handler.removeCallbacks(provisionalForegroundTimeout);
+                handler.postDelayed(provisionalForegroundTimeout, PROVISIONAL_FOREGROUND_MS);
+            }
+        } catch (IllegalStateException | SecurityException e) {
+            lastForegroundDenialMs = now;
+            // Do not claim success, hold a wake lock, or crash on Xiaomi/Android
+            // background-start refusal. A later eligible play may retry.
+            Log.w("SylphyMedia", "fgs_denied type=" + e.getClass().getSimpleName());
+        }
     }
 
     private void exitPlayingState() {
@@ -796,7 +967,12 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void exitForegroundState() {
-        ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+        ++foregroundObservationEpoch; // Invalidate delayed checks on a newer state.
+        if (foregroundResume.isForeground()) {
+            ServiceCompat.stopForeground(this, STOP_FOREGROUND_DETACH);
+            foregroundResume.markDemoted();
+            Log.i("SylphyMedia", "fgs_demoted");
+        }
         releaseWakeLock();
     }
 
@@ -998,25 +1174,34 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPlay() {
+            nativeTransportSequence++;
+            Log.i("SylphyMedia", "session=play seq=" + nativeTransportSequence
+                    + " uptime_ms=" + SystemClock.elapsedRealtime()
+                    + " listener=" + (listener != null));
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlay();
         }
 
         @Override
         public void onPlayFromMediaId(final String mediaId, final Bundle extras) {
+            Log.i("SylphyMedia", "session=playFromMediaId listener=" + (listener != null));
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromMediaId(mediaId, extras);
         }
 
         @Override
         public void onPlayFromSearch(final String query, final Bundle extras) {
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromSearch(query, extras);
         }
 
         @Override
         public void onPlayFromUri(final Uri uri, final Bundle extras) {
             if (listener == null) return;
+            prepareForegroundForMediaPlay();
             listener.onPlayFromUri(uri, extras);
         }
 
@@ -1030,6 +1215,7 @@ public class AudioService extends MediaBrowserServiceCompat {
             // Bluetooth/headset key-repeat ACTION_DOWNs are not distinct clicks.
             // Consume them without forwarding a new play/pause command to Dart.
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                Log.i("SylphyMedia", "session=mediaButton keyCode=" + event.getKeyCode());
                 switch (event.getKeyCode()) {
                 case KEYCODE_BYPASS_PLAY:
                     onPlay();
@@ -1061,6 +1247,10 @@ public class AudioService extends MediaBrowserServiceCompat {
                     // These are the "genuine" media button click events
                 case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
                 case KeyEvent.KEYCODE_HEADSETHOOK:
+                    if (!playing && event.getKeyCode() != KeyEvent.KEYCODE_MEDIA_PAUSE
+                            && eventToButton(event) == MediaButton.media) {
+                        prepareForegroundForMediaPlay();
+                    }
                     listener.onClick(eventToButton(event));
                     break;
                 }
@@ -1084,12 +1274,18 @@ public class AudioService extends MediaBrowserServiceCompat {
 
         @Override
         public void onPause() {
+            nativeTransportSequence++;
+            Log.i("SylphyMedia", "session=pause seq=" + nativeTransportSequence
+                    + " uptime_ms=" + SystemClock.elapsedRealtime()
+                    + " listener=" + (listener != null));
+            cancelProvisionalForeground();
             if (listener == null) return;
             listener.onPause();
         }
 
         @Override
         public void onStop() {
+            cancelProvisionalForeground();
             if (listener == null) return;
             listener.onStop();
         }

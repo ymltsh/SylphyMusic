@@ -52,6 +52,7 @@ void main() {
   late HttpClient client;
   final bytes = Uint8List.fromList(List.generate(8192, (i) => i % 251));
   final ranges = <String?>[];
+  DateTime? fakeNow;
   var version = '"v1"';
   var stallPreviewRemainder = false;
   Completer<void>? gate, requested;
@@ -65,6 +66,7 @@ void main() {
 
   setUp(() async {
     ranges.clear();
+    fakeNow = null;
     version = '"v1"';
     stallPreviewRemainder = false;
     gate = null;
@@ -120,7 +122,12 @@ void main() {
     final factory = TestFactory();
     cache = CacheManager(db, factory, Directory('${root.path}/audio'));
     await cache.initialize();
-    proxy = MediaProxy(db, cache, factory);
+    proxy = MediaProxy(
+      db,
+      cache,
+      factory,
+      clock: () => fakeNow ?? DateTime.now(),
+    );
     await proxy.start();
     ticket = proxy.ticket(track, profile);
     client = HttpClient();
@@ -215,6 +222,30 @@ void main() {
       expect(ranges, ['bytes=0-1023', 'bytes=1024-2047', 'bytes=512-2047']);
       expect(cache.preview(track.ref), isNull);
       expect(await cache.contains(track.ref), isFalse);
+    },
+  );
+
+  test(
+    'expired local ticket is rejected and classified, not upstream auth',
+    () async {
+      fakeNow = DateTime.now().add(
+        MediaProxy.ticketValidity + const Duration(seconds: 1),
+      );
+      expect((await get()).status, 403);
+      expect(proxy.failureFor(track.ref), 'local_ticket_expired');
+      expect(ranges, isEmpty);
+    },
+  );
+
+  test(
+    'expired ticket remains classifiable after another ticket is issued',
+    () async {
+      fakeNow = DateTime.now().add(
+        MediaProxy.ticketValidity + const Duration(minutes: 1),
+      );
+      proxy.ticket(track, profile); // Sweeps old ticket metadata.
+      expect((await get()).status, 403);
+      expect(proxy.failureFor(track.ref), 'local_ticket_expired');
     },
   );
 

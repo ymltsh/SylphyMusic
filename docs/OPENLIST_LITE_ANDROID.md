@@ -1,7 +1,7 @@
 # SylphyMusic OpenList Edition (Android arm64) — preview
 
 > Branch: `feature/android-openlist-lite` · Special edition:
-> `1.0.14-openlist.3+29` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
+> `1.0.27-openlist.11+40` · Base: `1f5427be7546050373a1af7e81eb51203dfe9296`
 >
 > The original archive is a **source patch** without a precompiled AAR/APK.
 > The local Windows environment has now compiled the AAR and arm64 Release APK;
@@ -136,12 +136,18 @@ OpenList v4.2.9 does not automatically provision an administrator on a fresh dat
 
 ## Separate release/update channel
 
-The edition uses `com.ymltsh.sylphymusic.openlist` and isolated local
-`version.json` / `version-beta.json` with `latest: null`. The app update client
-fetches from `feature/android-openlist-lite`, NOT `main`: a mainline APK must
-never be installed as an OpenList Edition update. Publish signed arm64 artifacts
-and update that branch's manifest under the maintainer's release authorization;
-compilation is required, while functional and device checks remain with the user.
+The edition uses `com.ymltsh.sylphymusic.openlist` and an independent update channel.
+The current release manifest is `main/version-openlist.json`; both branch workspaces
+keep the same OpenList manifest. Existing installations can continue reading
+`feature/android-openlist-lite/version.json`. Beta checks remain on the feature
+branch's `version-beta.json`. The ordinary edition reads `main/version.json`.
+
+The OpenList client accepts `-openlist.N` releases on its normal update channel
+and rejects ordinary/Beta releases there. Each OpenList publication must update
+both copies of `version-openlist.json` and the legacy feature `version.json`.
+Publish signed arm64 artifacts and corresponding source only within the user's
+release authorization; source changes and new endpoint files do not authorize
+replacing previously published APKs.
 
 ## Remote branch
 

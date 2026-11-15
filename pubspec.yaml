@@ -1,12 +1,13 @@
 name: sylphy_music
 description: 风灵音乐 / Sylphy Music - multi-source music player
 publish_to: none
-version: 1.0.14-openlist.4+30
+version: 1.0.63-openlist.45+76
 environment:
   sdk: '>=3.13.0 <4.0.0'
 dependencies:
   flutter:
     sdk: flutter
+  material_color_utilities: 0.13.0
   media_kit: ^1.2.6
   media_kit_libs_audio: ^1.0.7
   audio_service:
@@ -21,7 +22,9 @@ dependencies:
   path_provider: ^2.1.5
   flutter_secure_storage: ^11.2.0
   http: ^1.5.0
+  archive: 4.5.2
   crypto: ^3.0.6
+  cryptography: ^2.9.0
   uuid: ^4.5.1
   path: ^1.9.1
   collection: ^1.19.1
@@ -43,3 +46,9 @@ flutter:
     - assets/about.png
     - assets/launcher_icons/
     - assets/source/
+    - assets/penpal/
+    - assets/native_licenses/
+
+dependency_overrides:
+  media_kit_libs_android_audio:
+    path: third_party/media_kit_libs_android_audio

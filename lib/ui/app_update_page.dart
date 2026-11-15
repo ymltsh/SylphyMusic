@@ -85,7 +85,7 @@ class _AppUpdatePageState extends State<AppUpdatePage> {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                const Text('仅在点击时检查更新，下载后由你手动安装。'),
+                const Text('点击获取最新版本安装包'),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('测试版更新'),

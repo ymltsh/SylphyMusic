@@ -20,6 +20,7 @@ import '../services/cloud_sync.dart';
 import '../services/diagnostic_logs.dart';
 import '../services/media_proxy.dart';
 import '../services/playback.dart';
+import '../services/android_media3_playback.dart';
 import '../services/playback_sleep_timer.dart';
 import '../services/sources.dart';
 import '../services/desktop.dart';
@@ -28,7 +29,7 @@ import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lrc_api.dart';
 import '../services/lyrics_store.dart';
-import '../services/android_desktop_lyrics.dart';
+import '../services/desktop_lyrics.dart';
 import '../services/webdav_tags.dart';
 import '../services/sync_foreground.dart';
 import '../services/webdav_metadata_enricher.dart';
@@ -36,7 +37,17 @@ import '../services/library_sync.dart';
 import '../services/source_connections.dart';
 import 'models.dart';
 import 'appearance.dart';
+import 'desktop_preferences.dart';
 import 'listening_history.dart';
+import '../data/recommendation_repository.dart';
+import '../data/penpal_memory_repository.dart';
+import '../data/penpal_chat_repository.dart';
+import '../data/penpal_mailbox_repository.dart';
+import '../services/penpal_chat.dart';
+import '../services/penpal_memory.dart';
+import '../services/listening_analytics.dart';
+import '../services/recommendation_service.dart';
+import '../services/llm_recommendations.dart';
 import 'player_layout_store.dart';
 
 class SylphyApp extends ChangeNotifier {
@@ -66,9 +77,12 @@ class SylphyApp extends ChangeNotifier {
   final CacheJobs jobs;
   List<SourceProfile> sources = [];
   int catalogRevision = 0;
+  // WebDAV metadata updates must not rebuild the entire app shell.
+  final ValueNotifier<int> catalogListenable = ValueNotifier<int>(0);
   late final catalog = LibraryCatalog(db);
   late final appearance = Appearance(db);
-  late final desktopLyrics = AndroidDesktopLyrics(
+  late final desktopPreferences = DesktopPreferences(db);
+  late final desktopLyrics = DesktopLyrics(
     playback: playback,
     appearance: appearance,
     loadLyrics: loadLyrics,
@@ -77,6 +91,30 @@ class SylphyApp extends ChangeNotifier {
   late final lrcApi = LrcApiClient(apiSettings, vault);
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
+  late final recommendationRepository = RecommendationRepository(db);
+  late final penpalMailbox = PenpalMailboxRepository(db);
+  late final penpalMemory = PenpalMemory(
+    PenpalMemoryRepository(db),
+    apiSettings,
+  );
+  late final penpalChat = PenpalChatService(
+    apiSettings,
+    vault,
+    penpalMemory,
+    PenpalChatRepository(db),
+  );
+  late final listeningAnalytics = ListeningAnalytics(
+    playback,
+    recommendationRepository,
+  );
+  late final recommendations = RecommendationService(
+    db,
+    recommendationRepository,
+    diagnostics: diagnostics,
+    memory: penpalMemory,
+    mailbox: penpalMailbox,
+    llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
+  );
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};
   bool cloudFavoritesByDefault = false;
@@ -195,12 +233,9 @@ class SylphyApp extends ChangeNotifier {
     await cache.initialize();
     final proxy = MediaProxy(db, cache, factory, diagnostics: diagnostics);
     await proxy.start();
-    final playback = PlaybackCoordinator(
-      db,
-      proxy,
-      cache,
-      diagnostics: diagnostics,
-    );
+    final PlaybackCoordinator playback = Platform.isAndroid
+        ? AndroidMedia3Playback(db, proxy, cache, diagnostics: diagnostics)
+        : PlaybackCoordinator(db, proxy, cache, diagnostics: diagnostics);
     await playback.initialize();
     final cloud = PlaylistSyncService(db, factory);
     final jobs = CacheJobs(db, cache);
@@ -227,11 +262,17 @@ class SylphyApp extends ChangeNotifier {
       onHide: () => app._appForeground = false,
     );
     await app.appearance.initialize();
+    await app.desktopPreferences.initialize();
     app.apiSettings.addListener(app._apiChanged);
     await app.apiSettings.initialize();
     await app.playerLayouts.initialize();
     await app.history.initialize();
+    await app.listeningAnalytics.initialize();
     app.history.addListener(app._indexChanged);
+    // Session checkpoints are pruned on startup; cumulative stats are retained.
+    await app.recommendationRepository
+        .pruneSessions(DateTime.now())
+        .catchError((Object _) {});
     app.cloudFavoritesByDefault =
         await db.setting('favorite_location') == 'cloud';
     app.autoSyncMinutes =
@@ -376,7 +417,8 @@ class SylphyApp extends ChangeNotifier {
       _catalogRefreshTimer = null;
       if (_disposed) return;
       catalogRevision++;
-      notifyListeners();
+      // Only catalog consumers need to react to background tag enrichment.
+      catalogListenable.value = catalogRevision;
     });
   }
 
@@ -386,6 +428,7 @@ class SylphyApp extends ChangeNotifier {
     playlists = await db.playlists();
     blacklist = await db.blacklist();
     catalogRevision++;
+    catalogListenable.value = catalogRevision;
     notifyListeners();
   }
 
@@ -706,11 +749,26 @@ class SylphyApp extends ChangeNotifier {
     );
     final adapter = factory.create(candidate);
     try {
-      final secret = source.kind == SourceKind.webdav && password.isEmpty
-          ? (await vault.read(source.id, 'password') ?? '')
+      if (source.kind == SourceKind.plex &&
+          password.trim().isNotEmpty &&
+          password.trim() != await vault.read(source.id, 'token')) {
+        throw StateError('Plex 令牌可能对应其他账号；更换令牌请添加新来源');
+      }
+      final secret =
+          (source.kind == SourceKind.webdav ||
+                  source.kind == SourceKind.plex) &&
+              password.isEmpty
+          ? (await vault.read(
+                  source.id,
+                  source.kind == SourceKind.plex ? 'token' : 'password',
+                ) ??
+                '')
           : password;
       await adapter.login(secret);
-      if (source.kind == SourceKind.emby || source.kind == SourceKind.fnMusic) {
+      if (source.kind == SourceKind.emby ||
+          source.kind == SourceKind.jellyfin ||
+          source.kind == SourceKind.plex ||
+          source.kind == SourceKind.fnMusic) {
         final oldServer = await vault.read(source.id, 'serverId');
         final newServer = await vault.read(candidate.id, 'serverId');
         final oldUser = await vault.read(source.id, 'userId');
@@ -825,10 +883,12 @@ class SylphyApp extends ChangeNotifier {
     await _suspendSource(source);
     if (playback.currentRef?.sourceId == source.id) {
       await playback.pause();
-      await playback.player.stop();
+      await playback.stopCurrentOutput(sourceId: source.id);
     }
     await jobs.cancelAffected(sourceId: source.id);
     await cache.clear(sourceId: source.id);
+    await listeningAnalytics.forgetSource(source.id);
+    await history.forgetSource(source.id);
     await db.removeSourceData(source.id);
     await artwork.clearSource(source.id);
     await lyrics.clearSource(source.id);
@@ -878,6 +938,11 @@ class SylphyApp extends ChangeNotifier {
       keys.removeWhere((key) => key == track.ref.key);
     }
     await db.replacePlaylistKeys(id, keys);
+    await reload();
+  }
+
+  Future<void> movePlaylistDisplay(String id, String targetId) async {
+    await db.movePlaylistDisplay(id, targetId);
     await reload();
   }
 
@@ -956,6 +1021,14 @@ class SylphyApp extends ChangeNotifier {
       await db.removePlaylist(playlist.id);
     }
     await reload();
+  }
+
+  Future<int> enqueuePlaylist(PlaylistModel playlist) async {
+    final refs = (await db.playlistKeys(playlist.id))
+        .map(TrackRef.parse)
+        .toList();
+    await playback.enqueueAll(refs);
+    return refs.length;
   }
 
   Future<void> cachePlaylist(PlaylistModel playlist) async {
@@ -1073,6 +1146,7 @@ class SylphyApp extends ChangeNotifier {
     if (_disposed) return;
     await db.setSetting('diagnostic_logs_enabled', value.toString());
     await diagnostics.setEnabled(value);
+    await playback.setNativeDiagnostics(value);
     notifyListeners();
   }
 
@@ -1094,7 +1168,12 @@ class SylphyApp extends ChangeNotifier {
     history.removeListener(_indexChanged);
     apiSettings.removeListener(_apiChanged);
     lrcApi.dispose();
+    await penpalChat.shutdown();
+    await apiSettings.cards.shutdown();
     apiSettings.dispose();
+    await listeningAnalytics.shutdown();
+    await recommendations.shutdown();
+    await penpalMemory.shutdown();
     await history.shutdown();
     index.removeListener(_indexChanged);
     await index.shutdown();
@@ -1120,11 +1199,13 @@ class SylphyApp extends ChangeNotifier {
     await lyrics.shutdown();
     await assets.shutdown();
     await OpenListLite.shutdown();
+    await desktopPreferences.shutdown();
     await appearance.shutdown();
     await playerLayouts.shutdown();
     await diagnostics.shutdown();
     await db.close();
     await syncForeground.stop();
     syncForeground.dispose();
+    catalogListenable.dispose();
   }
 }

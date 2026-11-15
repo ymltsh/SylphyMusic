@@ -74,7 +74,7 @@ Map<String, Object?> legacyLayout({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('quick actions stay above progress in phone and desktop templates', () {
+  test('quick actions have their own frame above the default progress bar', () {
     for (final size in [
       const Size(320, 640),
       const Size(360, 800),
@@ -86,15 +86,66 @@ void main() {
           layout.elements.firstWhere((e) => e.type == PlayerPart.progress),
           size,
         );
-        final actions = layout.actionBounds(size);
+        final action = layout.elements.singleWhere(
+          (e) => e.type == PlayerPart.quickActions,
+        );
+        final actions = layout.bounds(action, size);
+        expect(layout.actionBounds(size), actions);
         expect(actions.bottom, lessThanOrEqualTo(progress.top));
         expect(actions.left, greaterThanOrEqualTo(0));
         expect(actions.right, lessThanOrEqualTo(size.width));
-        expect(actions.height, 48);
+        expect(actions.height, greaterThanOrEqualTo(48));
       }
       final empty = playerTemplate().copyWith(elements: []);
       expect(empty.actionBounds(size).bottom, lessThanOrEqualTo(size.height));
     }
+    const size = Size(360, 800);
+    final original = playerTemplate();
+    final actions = original.elements.singleWhere(
+      (e) => e.type == PlayerPart.quickActions,
+    );
+    final progress = original.elements.singleWhere(
+      (e) => e.type == PlayerPart.progress,
+    );
+    final movedProgress = original.copyWith(
+      elements: [
+        for (final e in original.elements)
+          if (e.id == progress.id)
+            e.copyWith(frame: const Rect.fromLTWH(.08, .4, .84, .08))
+          else
+            e,
+      ],
+    );
+    expect(movedProgress.bounds(actions, size), original.bounds(actions, size));
+    expect(
+      movedProgress.bounds(progress, size),
+      isNot(original.bounds(progress, size)),
+    );
+    final movedActions = original.copyWith(
+      elements: [
+        for (final e in original.elements)
+          if (e.id == actions.id)
+            e.copyWith(frame: const Rect.fromLTWH(.08, .5, .84, .075))
+          else
+            e,
+      ],
+    );
+    expect(
+      movedActions.bounds(progress, size),
+      original.bounds(progress, size),
+    );
+    expect(
+      movedActions.bounds(actions, size),
+      isNot(original.bounds(actions, size)),
+    );
+    final oldV2 = jsonDecode(original.encode()) as Map<String, dynamic>;
+    (oldV2['elements'] as List).removeWhere((e) => e['type'] == 'quickActions');
+    final upgraded = PlayerLayout.fromJson(oldV2);
+    expect(
+      upgraded.elements.where((e) => e.type == PlayerPart.quickActions).length,
+      1,
+    );
+    expect(PlayerLayout.decode(upgraded.encode()).encode(), upgraded.encode());
   });
   test('old custom lyrics frames leave room for the action strip', () {
     final layout = playerTemplate();
@@ -169,8 +220,12 @@ void main() {
   test('v1 region layouts migrate to one full canvas', () {
     final migrated = PlayerLayout.fromJson(legacyLayout());
     expect(migrated.encode(), contains('"version": 2'));
-    expect(migrated.elements.length, 5);
+    expect(migrated.elements.length, 6);
     expect(migrated.elements.where((e) => e.type == PlayerPart.queue), isEmpty);
+    expect(
+      migrated.elements.where((e) => e.type == PlayerPart.quickActions).length,
+      1,
+    );
     for (final e in migrated.elements) {
       final frame = e.frame;
       expect(frame.left, greaterThanOrEqualTo(0));

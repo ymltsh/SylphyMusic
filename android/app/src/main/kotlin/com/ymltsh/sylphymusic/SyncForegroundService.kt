@@ -8,7 +8,7 @@ import android.content.Intent
 import android.os.Build
 
 /** Only user-initiated index/tag work may start this dataSync FGS.
- * The service leases the audio_service engine and renders progress;
+ * The service leases the application business engine and renders progress;
  * network/SQLite work stays in Dart. Never auto-restart after process death.
  */
 class SyncForegroundService : LeasedDataSyncService() {

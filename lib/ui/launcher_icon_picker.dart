@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../services/launcher_icon_service.dart';
+import '../services/api_settings.dart';
 
 /// Uses installed Android aliases as the source of truth; preview is local.
 class LauncherIconPicker extends StatefulWidget {
   const LauncherIconPicker({
     super.key,
     this.service = const LauncherIconService(),
+    this.apiSettings,
   });
 
   final LauncherIconService service;
+  final ApiSettings? apiSettings;
 
   @override
   State<LauncherIconPicker> createState() => _LauncherIconPickerState();
@@ -25,20 +28,80 @@ class _IconCopy {
 
 class _LauncherIconPickerState extends State<LauncherIconPicker> {
   static const _copy = <String, _IconCopy>{
-    '微风与低音': _IconCopy('默认 · 自由之风', '风起之时，故事与旋律一起出发。', '《原神》· 微风与少年'),
+    '微风与低音': _IconCopy(
+      '默认 · 自由之风',
+      '风起之时，故事与旋律一起出发。',
+      '《Genshin Impact》· 微风与少年',
+    ),
     '高气压': _IconCopy('轻盈 · 音浪', '气压正在升高，下一阵音浪即将抵达。'),
     '春风拂面': _IconCopy('自然 · 春日', '春风有信，音符有期。'),
     '杨柳依依': _IconCopy('柔和 · 春意', '杨柳依依，旋律随风轻轻摇曳。'),
     '吹响！上低音号': _IconCopy('青春 · 合奏', '四季流转，我们的合奏仍在继续。', '《吹响！上低音号》· 季节与音符'),
-    '点阵白': _IconCopy('星舰 · 晨光', '三十三束火光，等待黎明点火。', 'Starship · 33 台猛禽发动机'),
-    '点阵黑': _IconCopy('星舰 · 夜航', '三十三台引擎，向星海齐声轰鸣。', 'Starship · 33 台猛禽发动机'),
-    '风精灵': _IconCopy('幻想 · 温柔', '有一位风精灵，悄悄住进了旋律里。', '《无职转生》· Sylphy'),
+    '点阵白': _IconCopy('星辰 · 晨光', '三十三束火光，等待黎明点火。', 'Starship · 33 台猛禽发动机'),
+    '点阵黑': _IconCopy('星辰 · 夜航', '三十三台引擎，向星海齐声轰鸣。', 'Starship · 33 台猛禽发动机'),
+    '风精灵': _IconCopy('真挚 · 温柔', '有一位风精灵，悄悄住进了旋律里。', '《Mushoku Tensei》· Sylphy'),
   };
 
   late Future<LauncherIconSelection> _selection = widget.service.load();
   String? _previewId;
   String? _changingId;
   bool _showInspiration = false;
+  bool _applyingCard = false;
+
+  Future<void> _applyCharacter(bool venti) async {
+    final name = venti ? '温迪' : '希露菲';
+    final settings = widget.apiSettings;
+    if (settings == null || _applyingCard) return;
+    setState(() => _applyingCard = true);
+    try {
+      if (!mounted) return;
+      final previousId = settings.activeCardId;
+      final selected = await settings.cards.discover(
+        venti ? 'venti' : 'sylphiette',
+      );
+      final unchanged = previousId == selected.id;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            persist: false,
+            showCloseIcon: true,
+            content: Text(
+              unchanged
+                  ? '当前已是${name}的提示词'
+                  : settings.llmEnabled
+                  ? '${name}已成为音乐笔友，新推荐将使用这张卡'
+                  : '已应用${name}提示词，开启 LLM 后用于新推荐',
+            ),
+            duration: const Duration(seconds: 8),
+            action: unchanged
+                ? null
+                : SnackBarAction(
+                    label: '撤销',
+                    onPressed: () async {
+                      // Never undo a later edit made from another settings page.
+                      if (settings.activeCardId != selected.id) return;
+                      try {
+                        await settings.cards.activate(previousId);
+                      } catch (_) {
+                        if (mounted)
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('撤销失败，请稍后重试')),
+                          );
+                      }
+                    },
+                  ),
+          ),
+        );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('角色提示词未能应用，请稍后重试')));
+    } finally {
+      if (mounted) setState(() => _applyingCard = false);
+    }
+  }
 
   String _name(String label) => label
       .replaceAll(RegExp(r'\s+'), '')
@@ -134,6 +197,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
         orElse: () => active,
       );
       final copy = _description(preview.label);
+      final isVenti = _name(preview.label) == '微风与低音';
       final isActive = preview.id == active.id;
       final colors = Theme.of(context).colorScheme;
       final textTheme = Theme.of(context).textTheme;
@@ -405,13 +469,52 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                             visualDensity: VisualDensity.compact,
                           ),
                         ),
-                        if (_showInspiration)
+                        if (_showInspiration) ...[
                           Text(
                             copy.inspiration!,
                             style: textTheme.bodySmall?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),
                           ),
+                          if ((isVenti || _name(preview.label) == '风精灵') &&
+                              widget.apiSettings != null) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              isVenti ? '温迪 · 音乐笔友' : '希露菲 · 音乐笔友',
+                              style: textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isVenti
+                                  ? '让吟游诗人的风，带来一点意外的好音乐。温迪会带着他的故事、俏皮与真心，为你选歌写信。'
+                                  : '温柔，也有自己的主意。让希露菲带着原本的故事与性格，为你选歌写信。',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              onPressed: _applyingCard
+                                  ? null
+                                  : () => _applyCharacter(isVenti),
+                              icon: const Icon(
+                                Icons.auto_fix_high_rounded,
+                                size: 16,
+                              ),
+                              label: Text(_applyingCard ? '正在应用…' : '应用为音乐笔友'),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '仅在主动选择后加入你的角色卡。内置角色卡保留原文，复制后可自定义。完整角色背景会随推荐发送给你配置的模型。',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
                     ],
                   ),
@@ -462,7 +565,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '仅更换桌面图标，不影响音乐与设置；桌面可能稍后刷新。',
+                      '上方图标按钮仅更换桌面图标；桌面可能稍后刷新。',
                       textAlign: TextAlign.center,
                       style: textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,

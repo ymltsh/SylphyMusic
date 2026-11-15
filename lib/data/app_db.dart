@@ -10,6 +10,139 @@ import '../core/models.dart';
 import '../services/embedded_tags.dart';
 
 class AppDb {
+  /// Private, durable letters, independent of snapshot pruning and diagnostics.
+  static const _penpalChatSchema = <String>[
+    """CREATE TABLE penpal_chat_messages(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      persona_key TEXT NOT NULL,
+      letter_key TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at_ms INTEGER NOT NULL)""",
+    'CREATE INDEX idx_penpal_chat_thread ON penpal_chat_messages(persona_key,letter_key,id)',
+  ];
+  static const _penpalMemorySchema = <String>[
+    '''CREATE TABLE penpal_memory_state(
+      id INTEGER PRIMARY KEY CHECK(id=1),
+      enabled INTEGER NOT NULL DEFAULT 1,
+      recall_enabled INTEGER NOT NULL DEFAULT 1,
+      soul_override TEXT NOT NULL DEFAULT '',
+      updated_at_ms INTEGER NOT NULL DEFAULT 0)''',
+    '''CREATE TABLE penpal_memory_events(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,
+      text TEXT NOT NULL,
+      source_key TEXT,
+      related_letter_key TEXT,
+      topic TEXT NOT NULL DEFAULT '',
+      created_at_ms INTEGER NOT NULL,
+      expires_at_ms INTEGER,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(kind,source_key))''',
+    'CREATE INDEX idx_penpal_events_time ON penpal_memory_events(created_at_ms DESC)',
+    'CREATE INDEX idx_penpal_events_letter ON penpal_memory_events(related_letter_key)',
+  ];
+  // v18: the default character comes from existing Prompt settings on boot.
+  // Built-in Easter eggs are not automatically inserted into this table.
+  static const _characterCardsV18Schema = <String>[
+    '''CREATE TABLE penpal_cards(
+      card_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      system_prompt TEXT NOT NULL,
+      user_prompt TEXT NOT NULL,
+      is_builtin INTEGER NOT NULL DEFAULT 0,
+      preset_id TEXT NOT NULL DEFAULT '',
+      art_prompt TEXT NOT NULL DEFAULT '',
+      art_path TEXT NOT NULL DEFAULT '',
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL)''',
+    '''CREATE TABLE penpal_card_memory_state(
+      card_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      recall_enabled INTEGER NOT NULL DEFAULT 1,
+      soul_override TEXT NOT NULL DEFAULT '',
+      updated_at_ms INTEGER NOT NULL DEFAULT 0)''',
+    "ALTER TABLE penpal_memory_events ADD COLUMN card_id TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN card_id TEXT NOT NULL DEFAULT ''",
+    'CREATE INDEX idx_penpal_events_card ON penpal_memory_events(card_id,created_at_ms DESC)',
+    'CREATE INDEX idx_penpal_letters_card ON recommendation_letters(card_id,created_at_ms DESC)',
+  ];
+  // A single pending, explicitly submitted letter per character.
+  static const _penpalMailboxV20Schema = <String>[
+    """CREATE TABLE penpal_outbox(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      content TEXT NOT NULL CHECK(length(content)>0 AND length(content)<=500),
+      related_letter_key TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL CHECK(status IN ('pending','answered','withdrawn')),
+      revision INTEGER NOT NULL DEFAULT 1,
+      created_at_ms INTEGER NOT NULL,
+      updated_at_ms INTEGER NOT NULL,
+      answered_at_ms INTEGER,
+      reply_letter_id INTEGER)""",
+    "CREATE UNIQUE INDEX idx_penpal_one_pending ON penpal_outbox(card_id) WHERE status='pending'",
+    'CREATE INDEX idx_penpal_outbox_card ON penpal_outbox(card_id,created_at_ms DESC)',
+  ];
+  static const _recommendationLettersTable =
+      '''CREATE TABLE recommendation_letters(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER,
+    local_day TEXT NOT NULL,
+    generation INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    details_text TEXT NOT NULL DEFAULT '',
+    origin TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    UNIQUE(local_day,generation))''';
+  static const _letterV13Alter = <String>[
+    "ALTER TABLE recommendation_snapshots ADD COLUMN letter_title TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN title TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE recommendation_letters ADD COLUMN cover_refs_json TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE recommendation_letters ADD COLUMN song_count INTEGER NOT NULL DEFAULT 0",
+  ];
+  static const _recommendationV14Alter = <String>[
+    "ALTER TABLE recommendation_snapshots ADD COLUMN refresh_period TEXT NOT NULL DEFAULT ''",
+    'ALTER TABLE recommendation_snapshots ADD COLUMN llm_succeeded INTEGER NOT NULL DEFAULT 0',
+  ];
+  static const _recommendationLettersIndex =
+      'CREATE INDEX idx_recommendation_letters_date ON recommendation_letters(created_at_ms DESC)';
+  static const _recommendationSchema = <String>[
+    '''CREATE TABLE listening_sessions(
+      session_id TEXT PRIMARY KEY,source_id TEXT NOT NULL,track_id TEXT NOT NULL,
+      started_at_ms INTEGER NOT NULL,updated_at_ms INTEGER NOT NULL,
+      listened_ms INTEGER NOT NULL DEFAULT 0,local_hour INTEGER NOT NULL,
+      local_weekday INTEGER NOT NULL,local_day TEXT NOT NULL,
+      qualified INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0,skipped INTEGER NOT NULL DEFAULT 0)''',
+    '''CREATE TABLE track_listen_stats(
+      source_id TEXT NOT NULL,track_id TEXT NOT NULL,
+      play_count INTEGER NOT NULL DEFAULT 0,
+      completion_count INTEGER NOT NULL DEFAULT 0,
+      skip_count INTEGER NOT NULL DEFAULT 0,
+      total_listened_ms INTEGER NOT NULL DEFAULT 0,
+      last_played_at_ms INTEGER,PRIMARY KEY(source_id,track_id))''',
+    '''CREATE TABLE recommendation_snapshots(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,
+      local_day TEXT NOT NULL,generation INTEGER NOT NULL,
+      algorithm_version INTEGER NOT NULL,seed INTEGER NOT NULL,
+      item_count INTEGER NOT NULL DEFAULT 0,created_at_ms INTEGER NOT NULL,
+      introduction TEXT NOT NULL DEFAULT '',llm_tag TEXT NOT NULL DEFAULT 'local',
+      UNIQUE(kind,local_day,generation))''',
+    '''CREATE TABLE recommendation_items(
+      snapshot_id INTEGER NOT NULL,position INTEGER NOT NULL,
+      item_kind TEXT NOT NULL,source_id TEXT NOT NULL,track_id TEXT,
+      album_key TEXT,representative_track_id TEXT,album_track_count INTEGER,
+      reason_code TEXT NOT NULL,score REAL NOT NULL,
+      PRIMARY KEY(snapshot_id,position))''',
+    '''CREATE TABLE recommendation_feedback(
+      source_id TEXT NOT NULL,track_id TEXT NOT NULL,action TEXT NOT NULL,
+      updated_at_ms INTEGER NOT NULL,PRIMARY KEY(source_id,track_id))''',
+    'CREATE INDEX idx_listening_sessions_time ON listening_sessions(started_at_ms)',
+    'CREATE INDEX idx_listening_sessions_context ON listening_sessions(local_hour,local_weekday,started_at_ms)',
+    'CREATE INDEX idx_stats_last_played ON track_listen_stats(last_played_at_ms)',
+    'CREATE INDEX idx_recommendation_items_source ON recommendation_items(source_id,track_id)',
+    'CREATE INDEX idx_recommendation_snapshot_date ON recommendation_snapshots(kind,local_day)',
+  ];
   static const _assetsTable = '''CREATE TABLE media_assets(
     source_id TEXT NOT NULL,asset_key TEXT NOT NULL,kind TEXT NOT NULL,
     version TEXT NOT NULL,relative_file TEXT NOT NULL,bytes INTEGER NOT NULL,
@@ -67,6 +200,34 @@ class AppDb {
       '''CREATE TABLE sync_intents(playlist_id TEXT PRIMARY KEY,
     before_json TEXT NOT NULL, local_json TEXT NOT NULL, desired_json TEXT NOT NULL,
     before_name TEXT NOT NULL, desired_name TEXT NOT NULL)''';
+  // SQLite JSON1-free catalog compatibility (Android 13).
+  // Directory metadata is stored separately from audio tags. Existing sources
+  // should be synced again; no old remote_json backfill is performed.
+  static String? _catalogPath(Track track, SourceKind kind) {
+    if (kind == SourceKind.webdav) return track.ref.id;
+    final media = track.remote['MediaSources'];
+    final first = media is List && media.isNotEmpty ? media.first : null;
+    final mediaPath = first is Map ? first['Path'] : null;
+    for (final value in [
+      track.remote['Path'],
+      mediaPath,
+      track.remote['path'],
+    ]) {
+      if (value is String && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static const _trackFolderPaths =
+      'CREATE TABLE IF NOT EXISTS track_folder_paths('
+      'source_id TEXT NOT NULL,id TEXT NOT NULL,path TEXT NOT NULL,'
+      'PRIMARY KEY(source_id,id))';
+  static const _indexFolderPaths =
+      'CREATE TABLE IF NOT EXISTS index_folder_paths('
+      'run_id TEXT NOT NULL,source_id TEXT NOT NULL,'
+      'id TEXT NOT NULL,path TEXT NOT NULL,'
+      'PRIMARY KEY(run_id,source_id,id))';
+
   AppDb(this.root);
   final Directory root;
   late final Database db;
@@ -81,7 +242,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 9,
+      version: 20,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -147,6 +308,96 @@ class AppDb {
           await database.execute(_assetLinks);
           await database.execute(_assetLinksIndex);
         }
+        if (oldVersion < 10) {
+          for (final sql in _recommendationSchema) {
+            await database.execute(sql);
+          }
+        } else if (oldVersion < 11) {
+          await database.execute(
+            "ALTER TABLE recommendation_snapshots ADD COLUMN introduction TEXT NOT NULL DEFAULT ''",
+          );
+          await database.execute(
+            "ALTER TABLE recommendation_snapshots ADD COLUMN llm_tag TEXT NOT NULL DEFAULT 'local'",
+          );
+        }
+        if (oldVersion < 12) {
+          await database.execute(_recommendationLettersTable);
+          await database.execute(_recommendationLettersIndex);
+          // Preserve existing nonempty daily introductions as older letters.
+          await database.execute('''
+            INSERT OR IGNORE INTO recommendation_letters(
+              snapshot_id,local_day,generation,content,origin,created_at_ms)
+            SELECT id,local_day,generation,introduction,
+                   CASE WHEN llm_tag='local' THEN 'local' ELSE 'llm' END,
+                   created_at_ms
+            FROM recommendation_snapshots
+            WHERE kind='daily' AND trim(introduction) <> ''
+          ''');
+        }
+        if (oldVersion < 13) {
+          for (final sql in _letterV13Alter) {
+            await database.execute(sql);
+          }
+          // Retain older letters and their snapshot metadata if still present.
+          await database.execute(
+            "UPDATE recommendation_letters SET title='写给你的今日音乐信' WHERE title=''",
+          );
+          await database.execute('''
+            UPDATE recommendation_letters SET song_count=COALESCE(
+              (SELECT s.item_count FROM recommendation_snapshots s
+               WHERE s.id=recommendation_letters.snapshot_id),0)
+            WHERE song_count=0
+          ''');
+        }
+        if (oldVersion < 14) {
+          for (final sql in _recommendationV14Alter) {
+            await database.execute(sql);
+          }
+          // Existing successful letters retain their AI badge after upgrade.
+          await database.execute('''
+            UPDATE recommendation_snapshots SET llm_succeeded=1
+            WHERE id IN (
+              SELECT snapshot_id FROM recommendation_letters
+              WHERE origin='llm' AND snapshot_id IS NOT NULL
+            )
+          ''');
+        }
+        if (oldVersion < 15) {
+          for (final sql in _penpalMemorySchema) {
+            await database.execute(sql);
+          }
+        }
+        if (oldVersion < 16) {
+          for (final sql in _penpalChatSchema) {
+            await database.execute(sql);
+          }
+          await database.execute("""
+            INSERT INTO penpal_chat_messages(persona_key,letter_key,role,content,created_at_ms)
+            SELECT '',related_letter_key,'user',text,created_at_ms
+            FROM penpal_memory_events WHERE kind='user_reply' AND related_letter_key IS NOT NULL
+            ORDER BY created_at_ms,id
+          """);
+        }
+        if (oldVersion < 18) {
+          for (final sql in _characterCardsV18Schema) {
+            await database.execute(sql);
+          }
+          // The previous global opt-out should survive on the original card.
+          await database.execute("""
+            INSERT OR IGNORE INTO penpal_card_memory_state(
+              card_id,enabled,recall_enabled,updated_at_ms)
+            SELECT 'primary',enabled,recall_enabled,updated_at_ms
+            FROM penpal_memory_state WHERE id=1
+          """);
+        }
+        if (oldVersion < 19) {
+          await database.delete('penpal_memory_events', where: "card_id=''");
+        }
+        if (oldVersion < 20) {
+          for (final sql in _penpalMailboxV20Schema) {
+            await database.execute(sql);
+          }
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -177,11 +428,38 @@ class AppDb {
           await d.execute(sql);
         }
         await _catalogSchema(d);
+        for (final sql in _recommendationSchema) {
+          await d.execute(sql);
+        }
+        await d.execute(_recommendationLettersTable);
+        await d.execute(_recommendationLettersIndex);
+        for (final sql in _letterV13Alter) {
+          await d.execute(sql);
+        }
+        for (final sql in _recommendationV14Alter) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalMemorySchema) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalChatSchema) {
+          await d.execute(sql);
+        }
+        for (final sql in _characterCardsV18Schema) {
+          await d.execute(sql);
+        }
+        for (final sql in _penpalMailboxV20Schema) {
+          await d.execute(sql);
+        }
       },
     );
+    // Additive, empty side tables; no schema-version bump or old-data scan.
+    await db.execute(_trackFolderPaths);
+    await db.execute(_indexFolderPaths);
     // A killed process never exposes an incomplete remote snapshot. Its staging
     // data is discarded; the next sync starts a fresh server pagination pass.
     await db.delete('index_tracks');
+    await db.delete('index_folder_paths');
     await db.insert(
       'playlists',
       const PlaylistModel(
@@ -237,6 +515,13 @@ class AppDb {
         where: 'source_id=?',
         whereArgs: [id],
       );
+      final kind = SourceKind.values.byName(source.single['kind'] as String);
+      // Replace directory information atomically with the track snapshot.
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
       final batch = tx.batch();
       for (final track in tracks) {
         batch.insert(
@@ -244,6 +529,14 @@ class AppDb {
           track.toRow(),
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
+        final path = _catalogPath(track, kind);
+        if (path != null) {
+          batch.insert('track_folder_paths', {
+            'source_id': track.ref.sourceId,
+            'id': track.ref.id,
+            'path': path,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
       await batch.commit(noResult: true);
     });
@@ -259,6 +552,15 @@ class AppDb {
       throw StateError('索引包含其他来源的歌曲');
     }
     await db.transaction((tx) async {
+      final source = await tx.query(
+        'sources',
+        columns: ['kind'],
+        where: 'id=?',
+        whereArgs: [sourceId],
+        limit: 1,
+      );
+      if (source.isEmpty) throw StateError('来源已移除');
+      final kind = SourceKind.values.byName(source.single['kind'] as String);
       final batch = tx.batch();
       for (final track in page) {
         batch.insert('index_tracks', {
@@ -266,13 +568,30 @@ class AppDb {
           ...track.toRow(),
           'resource_version': track.resourceVersion,
         });
+        final path = _catalogPath(track, kind);
+        if (path != null) {
+          batch.insert('index_folder_paths', {
+            'run_id': runId,
+            'source_id': track.ref.sourceId,
+            'id': track.ref.id,
+            'path': path,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       }
       await batch.commit(noResult: true);
     });
   }
 
-  Future<void> discardIndex(String runId) =>
-      db.delete('index_tracks', where: 'run_id=?', whereArgs: [runId]);
+  Future<void> discardIndex(String runId) async {
+    await db.transaction((tx) async {
+      await tx.delete('index_tracks', where: 'run_id=?', whereArgs: [runId]);
+      await tx.delete(
+        'index_folder_paths',
+        where: 'run_id=?',
+        whereArgs: [runId],
+      );
+    });
+  }
 
   Future<void> commitIndex(String runId, SourceProfile original) async {
     await db.transaction((tx) async {
@@ -319,6 +638,25 @@ class AppDb {
         WHERE i.run_id=?
       ''',
         [runId],
+      );
+      // Switch staged directory paths in the SAME transaction as song rows.
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [original.id],
+      );
+      await tx.rawInsert(
+        '''
+        INSERT INTO track_folder_paths(source_id,id,path)
+        SELECT source_id,id,path FROM index_folder_paths
+        WHERE run_id=? AND source_id=?
+      ''',
+        [runId, original.id],
+      );
+      await tx.delete(
+        'index_folder_paths',
+        where: 'run_id=?',
+        whereArgs: [runId],
       );
       await tx.update(
         'sources',
@@ -445,10 +783,55 @@ class AppDb {
     return a.isEmpty ? null : Track.fromRow(a.first);
   }
 
-  Future<List<PlaylistModel>> playlists() async => (await db.query(
-    'playlists',
-    orderBy: "CASE kind WHEN 'favorites' THEN 0 WHEN 'local' THEN 1 ELSE 2 END,name COLLATE NOCASE",
-  )).map(PlaylistModel.fromRow).toList();
+  Future<List<PlaylistModel>> playlists() => _orderedPlaylists(db);
+
+  Future<List<PlaylistModel>> _orderedPlaylists(
+    DatabaseExecutor executor,
+  ) async {
+    final items = (await executor.query(
+      'playlists',
+      orderBy: "CASE kind WHEN 'favorites' THEN 0 WHEN 'local' THEN 1 ELSE 2 END,name COLLATE NOCASE",
+    )).map(PlaylistModel.fromRow).toList();
+    final settings = await executor.query(
+      'settings',
+      where: 'key=?',
+      whereArgs: ['playlist_display_order'],
+      limit: 1,
+    );
+    if (settings.isEmpty) return items;
+    final Object? saved;
+    try {
+      saved = jsonDecode(settings.single['value'] as String);
+    } on FormatException {
+      return items;
+    }
+    if (saved is! List) return items;
+    final remaining = {for (final item in items) item.id: item};
+    final ordered = <PlaylistModel>[];
+    for (final id in saved) {
+      final item = remaining.remove(id);
+      if (item != null) ordered.add(item);
+    }
+    return [...ordered, ...remaining.values];
+  }
+
+  // Only local presentation settings change; playlist content and sync state
+  // stay untouched. Resolve IDs inside the transaction to tolerate refreshes.
+  Future<void> movePlaylistDisplay(String id, String targetId) async {
+    if (id == targetId) return;
+    await db.transaction((tx) async {
+      final items = await _orderedPlaylists(tx);
+      final from = items.indexWhere((item) => item.id == id);
+      final to = items.indexWhere((item) => item.id == targetId);
+      if (from < 0 || to < 0) return;
+      items.insert(to, items.removeAt(from));
+      await tx.insert('settings', {
+        'key': 'playlist_display_order',
+        'value': jsonEncode(items.map((item) => item.id).toList()),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   Future<PlaylistModel?> playlist(String id) async {
     final r = await db.query(
       'playlists',
@@ -642,8 +1025,26 @@ class AppDb {
   Future<void> removeSourceData(String id) async {
     // Never issues a remote mutation and never deletes original local audio.
     await db.transaction((tx) async {
+      for (final table in [
+        'listening_sessions',
+        'track_listen_stats',
+        'recommendation_feedback',
+        'recommendation_items',
+      ]) {
+        await tx.delete(table, where: 'source_id=?', whereArgs: [id]);
+      }
       await tx.delete('sources', where: 'id=?', whereArgs: [id]);
       await tx.delete('tracks', where: 'source_id=?', whereArgs: [id]);
+      await tx.delete(
+        'track_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
+      await tx.delete(
+        'index_folder_paths',
+        where: 'source_id=?',
+        whereArgs: [id],
+      );
       await tx.delete(
         'webdav_track_tags',
         where: 'source_id=?',

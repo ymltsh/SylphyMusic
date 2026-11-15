@@ -272,6 +272,8 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
             applicationContext = flutterPluginBinding.getApplicationContext();
         }
         if (audioHandlerInterface == null) {
+            // A new engine must not inherit the previous engine's Dart readiness.
+            flutterReady = false;
             // We don't know yet whether this is the right engine that hosts the AudioHandler,
             // but we need to register a MethodCallHandler now just in case. If we're wrong, we
             // detect and correct this when receiving the "configure" message.
@@ -294,6 +296,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         applicationContext = null;
         if (audioHandlerInterface != null
                 && audioHandlerInterface.messenger == flutterPluginBinding.getBinaryMessenger()) {
+            flutterReady = false;
             System.out.println("### destroying audio handler interface");
             audioHandlerInterface.destroy();
             audioHandlerInterface = null;
@@ -464,7 +467,6 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                     if (serviceConnectionFailed) {
                         throw new IllegalStateException("Unable to bind to AudioService. Please ensure you have declared a <service> element as described in the README.");
                     }
-                    flutterReady = true;
                     Map<?, ?> args = (Map<?, ?>)call.arguments;
                     Map<?, ?> configMap = (Map<?, ?>)args.get("config");
                     AudioServiceConfig config = new AudioServiceConfig(context.getApplicationContext());
@@ -498,8 +500,11 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
                             // so update AudioHandlerInterface to connect to it.
                             audioHandlerInterface.switchToMessenger(messenger);
                         }
-                        audioHandlerInterface.invokePendingMethods();
                     }
+                    // Only dispatch media commands after the handler messenger
+                    // has been connected to the engine that configured audio_service.
+                    flutterReady = true;
+                    audioHandlerInterface.invokePendingMethods();
                     if (mediaController != null) {
                         result.success(mapOf());
                     } else {
@@ -1008,6 +1013,12 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
 
         @UiThread
         public void invokeMethod(String method, Object arg, final Result result) {
+            if ("play".equals(method) || "pause".equals(method)
+                    || "click".equals(method) || "playFromMediaId".equals(method)
+                    || "skipToNext".equals(method) || "skipToPrevious".equals(method)) {
+                // Only method names and readiness; never song identities or URLs.
+                Log.i("SylphyMedia", "transport=" + method + " ready=" + flutterReady);
+            }
             if (flutterReady) {
                 channel.invokeMethod(method, arg, result);
             } else {
@@ -1016,6 +1027,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         }
 
         private void destroy() {
+            methodInvocationQueue.clear();
             if (silenceAudioTrack != null)
                 silenceAudioTrack.release();
         }

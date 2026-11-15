@@ -47,7 +47,11 @@ public class AudioServiceConfig {
         androidNotificationChannelName = preferences.getString(KEY_ANDROID_NOTIFICATION_CHANNEL_NAME, null);
         androidNotificationChannelDescription = preferences.getString(KEY_ANDROID_NOTIFICATION_CHANNEL_DESCRIPTION, null);
         notificationColor = preferences.getInt(KEY_NOTIFICATION_COLOR, -1);
-        androidNotificationIcon = preferences.getString(KEY_ANDROID_NOTIFICATION_ICON, "mipmap/ic_launcher");
+        androidNotificationIcon = preferences.getString(KEY_ANDROID_NOTIFICATION_ICON, "drawable/ic_stat_sylphy");
+        // Migrate the old launcher default before Dart reconnects on resumption.
+        if ("mipmap/ic_launcher".equals(androidNotificationIcon)) {
+            androidNotificationIcon = "drawable/ic_stat_sylphy";
+        }
         androidShowNotificationBadge = preferences.getBoolean(KEY_ANDROID_SHOW_NOTIFICATION_BADGE, false);
         androidNotificationClickStartsActivity = preferences.getBoolean(KEY_ANDROID_NOTIFICATION_CLICK_STARTS_ACTIVITY, true);
         androidNotificationOngoing = preferences.getBoolean(KEY_ANDROID_NOTIFICATION_ONGOING, false);

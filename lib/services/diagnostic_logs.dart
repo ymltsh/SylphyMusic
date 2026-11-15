@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
+
 /// Opt-in, privacy-preserving diagnostics, intentionally separate from logcat.
 ///
 /// All event names and detail keys/values are restricted to short, machine-
@@ -11,8 +13,8 @@ import 'dart:typed_data';
 class DiagnosticLogs {
   DiagnosticLogs(
     this.directory, {
-    this.maxFileBytes = 512 * 1024,
-    this.retainedFiles = 3,
+    this.maxFileBytes = 1024 * 1024,
+    this.retainedFiles = 4,
   }) : assert(maxFileBytes > 128),
        assert(retainedFiles >= 1);
 
@@ -22,24 +24,91 @@ class DiagnosticLogs {
   bool enabled = false;
   bool _closed = false;
   Future<void> _pending = Future<void>.value();
+  // Monotonic Dart sequence and elapsed time survive wall-clock adjustments.
+  final Stopwatch _elapsed = Stopwatch()..start();
+  int _sequence = 0;
 
   static final RegExp _safeToken = RegExp(r'^[A-Za-z][A-Za-z0-9_]{0,47}$');
   static const Set<String> _detailKeys = {
+    'log_events',
+    'filter_pts_ms',
+    'sample_rate',
+    'channels',
+    'format',
+    'declick',
+    'output_reconfigs',
+    'fade_ms',
+    'request_id',
+    'candidate_count',
+    'requested_count',
+    'result_count',
+    'response_bytes',
+    'content_chars',
+    'reason_count',
+    'invalid_ids',
+    'duplicate_ids',
+    'prompt_tokens',
+    'completion_tokens',
+    'total_tokens',
+    'finish_reason',
+    'mode',
+    'audio_mode',
     'autoplay',
     'attempt',
     'buffering',
+    'cache_hit',
+    'baseline_ms',
+    'delay_ms',
+    'delta_ms',
+    'device_idle',
+    'duration_ms',
+    'early_stalled',
+    'elapsed_ms',
+    'fgs_confirmed',
+    'fgs_requested',
+    'focus_blocked',
+    'focus_epoch',
     'gap_ms',
+    'granted',
     'http_status',
     'index',
+    'intent',
+    'interactive',
+    'load',
+    'loop_epoch',
     'manual',
+    'mpv_confirmed',
+    'music_active',
+    'native_playing',
+    'native_pid',
+    'native_seq',
+    'native_uptime_ms',
+    'nav',
+    'os_fgs',
+    'output_state',
+    'pause_age_ms',
     'playing',
+    'position_events',
+    'position_ms',
+    'progress_gap_ms',
     'queue_size',
     'rank',
+    'reason',
+    'resume_ms',
+    'reused_output',
+    'service_alive',
+    'session_moving',
+    'session_position_ms',
+    'session_state',
+    'source',
     'source_kind',
     'stage',
     'state',
     'system',
+    'trigger',
     'type',
+    'wake_lock',
+    'watchdog_position_ms',
   };
 
   File _file(int index) => File(
@@ -67,14 +136,15 @@ class DiagnosticLogs {
       final value = item.value;
       if (value is bool) {
         safeDetails[item.key] = value;
-      } else if (value is int && value >= 0 && value <= 1000000000) {
+      } else if (value is int && value >= 0 && value <= 9007199254740991) {
+        // Millisecond clocks can exceed 1e9 on long-lived Android devices.
         safeDetails[item.key] = value;
       } else if (value is String && _safeToken.hasMatch(value)) {
         safeDetails[item.key] = value;
       }
     }
     final line =
-        '${jsonEncode({'utc': DateTime.now().toUtc().toIso8601String(), 'scope': scope, 'event': event, ...safeDetails})}\n';
+        '${jsonEncode({'utc': DateTime.now().toUtc().toIso8601String(), 'seq': ++_sequence, 'uptime_ms': _elapsed.elapsedMilliseconds, 'scope': scope, 'event': event, ...safeDetails})}\n';
     // The queue preserves event order and never delays playback callbacks.
     unawaited(
       _serialize(() => _append(line)).catchError((Object _) {
@@ -134,11 +204,60 @@ class DiagnosticLogs {
     final output = StringBuffer(
       'SylphyMusic diagnostics (UTC, opt-in)\n'
       'Contains only allowlisted event names and fields. '
+      'Android snapshots describe the media service, not AudioTrack PCM counters. '
       'Does not include Android logcat or native crash dumps.\n\n',
     );
     for (var i = retainedFiles - 1; i >= 0; i--) {
       final file = _file(i);
       if (await file.exists()) output.write(await file.readAsString());
+    }
+    if (Platform.isAndroid) {
+      try {
+        final raw = await const MethodChannel(
+          'music.sylphy/playback_diagnostics',
+        ).invokeMethod<String>('nativeExport');
+        if (raw != null && raw.isNotEmpty) {
+          output.write(
+            '\nNative journal backup (may duplicate events above; UTC is batch delivery time):\n',
+          );
+          for (final line in const LineSplitter().convert(raw)) {
+            try {
+              final envelope = jsonDecode(line) as Map<String, dynamic>;
+              final utc = envelope['utc'];
+              if (utc is! String) continue;
+              for (final rawEvent in envelope['records'] as List) {
+                final event = Map<String, dynamic>.from(rawEvent as Map);
+                final name = event.remove('event');
+                if (name is! String || !_safeToken.hasMatch(name)) continue;
+                final safe = <String, Object>{};
+                for (final item in event.entries) {
+                  if (!_detailKeys.contains(item.key)) continue;
+                  final value = item.value;
+                  if (value is bool ||
+                      (value is int &&
+                          value >= 0 &&
+                          value <= 9007199254740991) ||
+                      (value is String && _safeToken.hasMatch(value))) {
+                    safe[item.key] = value as Object;
+                  }
+                }
+                output.writeln(
+                  jsonEncode({
+                    'utc': utc,
+                    'scope': 'native_audio_backup',
+                    'event': name,
+                    ...safe,
+                  }),
+                );
+              }
+            } catch (_) {
+              /* Corrupt entries are skipped, not exported verbatim. */
+            }
+          }
+        }
+      } catch (_) {
+        /* Native bridge unavailable: Dart log remains exportable. */
+      }
     }
     return Uint8List.fromList(utf8.encode(output.toString()));
   });
@@ -147,6 +266,14 @@ class DiagnosticLogs {
     for (var i = 0; i < retainedFiles; i++) {
       final file = _file(i);
       if (await file.exists()) await file.delete();
+    }
+    if (Platform.isAndroid) {
+      try {
+        await const MethodChannel('music.sylphy/playback_diagnostics')
+            .invokeMethod<void>('nativeClear');
+      } catch (_) {
+        /* Best effort during an inactive service. */
+      }
     }
     if (enabled) {
       // Record only that a deletion happened, never the deleted contents.

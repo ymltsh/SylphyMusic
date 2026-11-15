@@ -3,11 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/appearance.dart';
+import '../core/listening_history.dart';
 import '../core/models.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
 import 'playlist_page.dart';
+import 'playlist_reorder_grid.dart';
 import 'player_bar.dart';
+import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
 import 'playback_notice.dart';
 import 'capsule_toggle.dart';
@@ -16,6 +20,7 @@ import 'cover_flow.dart';
 import 'library_browser.dart';
 import 'track_lookup.dart';
 import 'track_actions.dart';
+import 'batch_selection.dart';
 import 'home_page.dart';
 import 'search_page.dart';
 import 'app_background.dart';
@@ -37,13 +42,13 @@ class SylphyShell extends StatefulWidget {
 
 class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
+  final BatchSelection _librarySelection = BatchSelection();
   int libraryView = 0;
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
   bool playerCollapsed = false;
   late bool _defaultPlayerFab;
   bool? onboarding;
-  String? sourceFilter;
   bool descending = false;
   String sort = 'name';
   static const labels = ['首页', '音乐库', '歌单', '我的'];
@@ -60,6 +65,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     app.addListener(_update);
     app.playback.addListener(_update);
+    libraryView = app.appearance.libraryCategories.first;
     playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
     app.appearance.addListener(_appearanceChanged);
     unawaited(_loadWelcome());
@@ -75,7 +81,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     app.diagnostics.record('app', 'lifecycle', details: {'state': state.name});
     if (state == AppLifecycleState.resumed) {
       unawaited(app.refreshIfStale());
-      unawaited(app.apiSettings.refreshQuote());
     }
   }
 
@@ -85,10 +90,15 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     app.removeListener(_update);
     app.playback.removeListener(_update);
     app.appearance.removeListener(_appearanceChanged);
+    _librarySelection.dispose();
     super.dispose();
   }
 
   void _appearanceChanged() {
+    if (!app.appearance.libraryCategories.contains(libraryView)) {
+      _librarySelection.clear();
+      libraryView = app.appearance.libraryCategories.first;
+    }
     if (_defaultPlayerFab != app.appearance.playerFab) {
       playerCollapsed = _defaultPlayerFab = app.appearance.playerFab;
     }
@@ -124,26 +134,36 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     });
   }
 
-  void _open(String title, Widget Function() page) {
+  void _open(String title, Widget Function() page, {bool showPlayer = true}) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AnimatedBuilder(
-          animation: Listenable.merge([app, app.appearance, app.playback]),
+          animation: Listenable.merge([
+            app,
+            app.appearance,
+            if (showPlayer) app.playback,
+          ]),
           builder: (context, _) => Scaffold(
             appBar: AppBar(title: Text(title)),
             body: SafeArea(top: false, child: page()),
-            bottomNavigationBar: RoutePlayerBar(app: app),
+            bottomNavigationBar: showPlayer ? RoutePlayerBar(app: app) : null,
           ),
         ),
       ),
     );
   }
 
-  void _library([int view = 0]) => setState(() {
-    tab = 1;
-    libraryView = view;
-  });
+  void _library([int view = 0]) {
+    _librarySelection.clear();
+    setState(() {
+      tab = 1;
+      libraryView = app.appearance.libraryCategories.contains(view)
+          ? view
+          : app.appearance.libraryCategories.first;
+    });
+  }
+
   void _favorites() {
     final favorite = app.playlists
         .where((p) => p.id == 'favorites')
@@ -189,34 +209,36 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       children: [
         if (app.busy) const LinearProgressIndicator(),
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(child: _page()),
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: wide ? 16 : 8,
-                child: IgnorePointer(
-                  ignoring: playerCollapsed,
-                  child: AnimatedSlide(
-                    offset: playerCollapsed
-                        ? const Offset(0, 1.4)
-                        : Offset.zero,
-                    duration: playerAnimation,
-                    curve: Curves.easeOutCubic,
-                    child: AnimatedOpacity(
-                      opacity: playerCollapsed ? 0 : 1,
-                      duration: playerAnimation,
-                      curve: Curves.easeOutCubic,
-                      child: wide
-                          ? SafeArea(top: false, child: _playerBar())
-                          : _playerBar(),
+          // The desktop player is docked below the content, never painted over
+          // the scrolled page. Keep the mobile overlay unchanged.
+          child: wide
+              ? _page()
+              : Stack(
+                  children: [
+                    Positioned.fill(child: _page()),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 8,
+                      child: IgnorePointer(
+                        ignoring: playerCollapsed,
+                        child: AnimatedSlide(
+                          offset: playerCollapsed
+                              ? const Offset(0, 1.4)
+                              : Offset.zero,
+                          duration: playerAnimation,
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: playerCollapsed ? 0 : 1,
+                            duration: playerAnimation,
+                            curve: Curves.easeOutCubic,
+                            child: _playerBar(),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -240,33 +262,35 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             tab == 0 ? appDisplayName() : labels[tab],
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
+          actionsPadding: const EdgeInsetsDirectional.only(end: 16),
           actions: [
-            IconButton(
-              tooltip: '搜索',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SearchPage(
-                    app: app,
-                    onAction: _trackAction,
-                    initialSource: sourceFilter,
+            SizedBox.square(
+              dimension: 48,
+              child: IconButton(
+                tooltip: '搜索',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SearchPage(app: app, onAction: _trackAction),
                   ),
                 ),
+                icon: const Icon(Icons.search),
               ),
-              icon: const Icon(Icons.search),
             ),
-            IconButton(
-              tooltip: '设置',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => SettingsPage(
-                    app: app,
-                    onSources: () => _open('音乐源管理', _sources),
+            SizedBox.square(
+              dimension: 48,
+              child: IconButton(
+                tooltip: '设置',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        SettingsPage(app: app, onSources: () => _openSources()),
                   ),
                 ),
+                icon: const Icon(Icons.settings_outlined),
               ),
-              icon: const Icon(Icons.settings_outlined),
             ),
           ],
         ),
@@ -275,11 +299,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 children: [
                   NavigationRail(
                     extended: MediaQuery.sizeOf(context).width > 1050,
+                    minExtendedWidth: 208,
+                    minWidth: 72,
                     backgroundColor: solidBackground
                         ? Colors.transparent
                         : null,
                     selectedIndex: tab,
-                    onDestinationSelected: (v) => setState(() => tab = v),
+                    onDestinationSelected: (v) {
+                      if (v != 1) _librarySelection.clear();
+                      setState(() => tab = v);
+                    },
                     destinations: List.generate(
                       labels.length,
                       (i) => NavigationRailDestination(
@@ -295,115 +324,150 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             : main,
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
         bottomNavigationBar: wide
-            ? null
-            : NavigationBar(
-                backgroundColor: dark
-                    ? scheme.surfaceContainerLow.withValues(
-                        alpha: customBackground ? .92 : 1,
-                      )
-                    : solidBackground
-                    ? Colors.transparent
-                    : customBackground
-                    ? scheme.surfaceContainer.withValues(alpha: .90)
-                    : null,
-                surfaceTintColor: dark || solidBackground
-                    ? Colors.transparent
-                    : null,
-                height: _navigationBarHeight(context),
-                maintainBottomViewPadding: true,
-                selectedIndex: tab,
-                onDestinationSelected: (v) => setState(() => tab = v),
-                destinations: List.generate(
-                  labels.length,
-                  (i) => NavigationDestination(
-                    icon: Icon(icons[i]),
-                    label: labels[i],
+            ? (playerCollapsed ? null : _desktopPlayerBar())
+            : Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  NavigationBar(
+                    elevation: 0,
+                    backgroundColor: dark
+                        ? scheme.surfaceContainerLow.withValues(
+                            alpha: customBackground ? .92 : 1,
+                          )
+                        : solidBackground
+                        ? Colors.transparent
+                        : customBackground
+                        ? scheme.surfaceContainer.withValues(alpha: .90)
+                        : null,
+                    surfaceTintColor: dark || solidBackground
+                        ? Colors.transparent
+                        : null,
+                    height: _navigationBarHeight(context),
+                    maintainBottomViewPadding: true,
+                    selectedIndex: tab,
+                    onDestinationSelected: (v) {
+                      if (v != 1) _librarySelection.clear();
+                      setState(() => tab = v);
+                    },
+                    destinations: List.generate(
+                      labels.length,
+                      (i) => NavigationDestination(
+                        icon: Icon(icons[i]),
+                        label: labels[i],
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: -6,
+                    left: 0,
+                    right: 0,
+                    height: 6,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: dark ? .18 : .07),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
       ),
     );
   }
 
-  Widget _libraryFilterBar() => Align(
-    key: const ValueKey('library-filter-bar'),
-    alignment: Alignment.centerLeft,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: CapsuleToggle<int>(
-              keyPrefix: 'library-filter',
-              selected: libraryView,
-              onChanged: (value) => setState(() => libraryView = value),
-              options: const [
-                CapsuleOption(
-                  value: 0,
-                  label: '歌曲',
-                  icon: Icons.music_note_outlined,
-                ),
-                CapsuleOption(
-                  value: 1,
-                  label: '专辑',
-                  icon: Icons.album_outlined,
-                ),
-                CapsuleOption(
-                  value: 2,
-                  label: '艺术家',
-                  icon: Icons.person_outline,
-                ),
-              ],
+  Widget _libraryFilterBar() => ListenableBuilder(
+    listenable: _librarySelection,
+    builder: (context, _) => Align(
+      key: const ValueKey('library-filter-bar'),
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: CapsuleToggle<int>(
+                keyPrefix: 'library-filter',
+                selected: libraryView,
+                onChanged: (value) {
+                  _librarySelection.clear();
+                  setState(() => libraryView = value);
+                },
+                options: [
+                  for (final category in app.appearance.libraryCategories)
+                    CapsuleOption(
+                      value: category,
+                      label: Appearance.libraryCategoryNames[category],
+                      icon: Appearance.libraryCategoryIcons[category],
+                    ),
+                ],
+              ),
             ),
-          ),
-          if (libraryView == 1)
-            IconButton(
-              key: const ValueKey('album-cover-flow-toggle'),
-              tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
-              isSelected: albumCoverFlow,
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-              onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
-              icon: const Icon(Icons.view_carousel_outlined),
-              selectedIcon: const Icon(Icons.view_list_rounded),
-            ),
-        ],
+            if (_librarySelection.active)
+              IconButton(
+                key: const ValueKey('library-batch-more'),
+                tooltip: '多选的更多操作',
+                icon: const Icon(Icons.more_vert),
+                onPressed: _librarySelection.count == 0
+                    ? null
+                    : () => unawaited(_libraryBatchActions()),
+              ),
+          ],
+        ),
       ),
     ),
-  );
-
-  Widget _sourceFilterControl() => PopupMenuButton<String>(
-    tooltip: '音乐来源',
-    icon: const Icon(Icons.filter_list),
-    onSelected: (v) => setState(() => sourceFilter = v == 'all' ? null : v),
-    itemBuilder: (ctx) => [
-      const PopupMenuItem(value: 'all', child: Text('全部来源')),
-      ...app.sources.map(
-        (s) => PopupMenuItem(value: s.id, child: Text(s.name)),
-      ),
-    ],
   );
 
   Widget _sortControls() => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      PopupMenuButton<String>(
-        tooltip: '排序',
-        icon: const Icon(Icons.sort),
-        onSelected: (v) => setState(() => sort = v),
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: 'name', child: Text('名称')),
-          PopupMenuItem(value: 'artist', child: Text('艺术家')),
-          PopupMenuItem(value: 'album', child: Text('专辑')),
-          PopupMenuItem(value: 'duration', child: Text('时长')),
-          PopupMenuItem(value: 'year', child: Text('年份')),
-        ],
+      if (libraryView == 1 && !_librarySelection.active)
+        SizedBox.square(
+          dimension: 48,
+          child: IconButton(
+            key: const ValueKey('album-cover-flow-toggle'),
+            tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
+            isSelected: albumCoverFlow,
+            onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
+            icon: const Icon(Icons.view_carousel_outlined),
+            selectedIcon: const Icon(Icons.view_list_rounded),
+          ),
+        ),
+      SizedBox.square(
+        dimension: 48,
+        child: PopupMenuButton<String>(
+          tooltip: '排序',
+          icon: const Icon(Icons.sort),
+          onSelected: (v) {
+            _librarySelection.clear();
+            setState(() => sort = v);
+          },
+          itemBuilder: (ctx) => const [
+            PopupMenuItem(value: 'name', child: Text('名称')),
+            PopupMenuItem(value: 'artist', child: Text('艺术家')),
+            PopupMenuItem(value: 'album', child: Text('专辑')),
+            PopupMenuItem(value: 'duration', child: Text('时长')),
+            PopupMenuItem(value: 'year', child: Text('年份')),
+          ],
+        ),
       ),
-      IconButton(
-        tooltip: '升序 / 降序',
-        onPressed: () => setState(() => descending = !descending),
-        icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+      SizedBox.square(
+        dimension: 48,
+        child: IconButton(
+          tooltip: '升序 / 降序',
+          onPressed: () {
+            _librarySelection.clear();
+            setState(() => descending = !descending);
+          },
+          icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+        ),
       ),
     ],
   );
@@ -414,26 +478,32 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         return HomePage(
           app: app,
           onLibrary: _library,
-          onFavorites: _favorites,
-          onDownloads: _downloads,
-          onSources: () => _open('音乐源管理', _sources),
+          onSources: () => _openSources(),
           onAction: _trackAction,
         );
       case 1:
-        return LibraryBrowser(
-          app: app,
-          query: CatalogQuery(
-            view: libraryView,
-            sourceId: sourceFilter,
-            sort: sort,
-            descending: descending,
-          ),
-          onAction: _trackAction,
-          coverFlow: libraryView == 1 && albumCoverFlow,
-          viewControls: _libraryFilterBar(),
-          songActions: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [_sourceFilterControl(), _sortControls()],
+        return ListenableBuilder(
+          listenable: _librarySelection,
+          builder: (context, _) => LibraryBrowser(
+            app: app,
+            query: CatalogQuery(
+              view: libraryView,
+              sort: sort,
+              descending: descending,
+            ),
+            onAction: _trackAction,
+            batchSelection: _librarySelection,
+            bottomPadding: libraryView == 3
+                ? (MediaQuery.sizeOf(context).width > 750 ||
+                          playerCollapsed ||
+                          app.playback.current == null
+                      ? 12
+                      : 96)
+                : null,
+            coverFlow:
+                libraryView == 1 && albumCoverFlow && !_librarySelection.active,
+            viewControls: _libraryFilterBar(),
+            songActions: _sortControls(),
           ),
         );
       case 2:
@@ -451,46 +521,177 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onFinish: _finishWelcome,
   );
 
-  Widget _personal() => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 116),
-    children: [
-      MusicSpaceCard(
-        sources: app.sources,
-        playlistCount: app.playlists.length,
-        onTap: () => _open('音乐来源', _sources),
-      ),
-      const SizedBox(height: 16),
-      ListTile(
-        leading: const Icon(Icons.favorite_outline),
-        title: const Text('我的收藏'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _favorites,
-      ),
-      ListTile(
-        leading: const Icon(Icons.queue_music),
-        title: const Text('最近播放'),
-        subtitle: const Text('最近听过的 50 首歌曲'),
-        onTap: () => _open('最近播放', () => ListeningHistoryPage(app: app)),
-      ),
-      ListTile(
-        leading: const Icon(Icons.download_outlined),
-        title: const Text('下载管理'),
-        onTap: _downloads,
-      ),
-      ListTile(
-        leading: const Icon(Icons.storage_outlined),
-        title: const Text('缓存与存储'),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => CacheStoragePage(app: app)),
+  Widget _personalShortcut(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: scheme.onPrimaryContainer,
+                      size: 23,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       ),
-      ListTile(
-        leading: const Icon(Icons.block_outlined),
-        title: const Text('歌曲黑名单'),
-        onTap: _showBlacklist,
+    );
+  }
+
+  Widget _personalHeading(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 24, 4, 12),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(fontWeight: FontWeight.w600),
+    ),
+  );
+
+  Widget _personal() => Align(
+    alignment: Alignment.topCenter,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1040),
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.sizeOf(context).width > 750 ? 32 : 116,
+        ),
+        children: [
+          MusicSpaceCard(
+            sources: app.sources,
+            playlistCount: app.playlists.length,
+            onTap: () => _openSources(),
+          ),
+          _personalHeading('我的音乐'),
+          LayoutBuilder(
+            builder: (context, size) {
+              final columns = size.maxWidth >= 760 ? 4 : 2;
+              final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: columns,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio:
+                    size.maxWidth /
+                    columns /
+                    (158 + (textScale - 1).clamp(0.0, 3.0) * 65),
+                children: [
+                  _personalShortcut(
+                    Icons.history_rounded,
+                    '最近播放',
+                    '最多 ${ListeningHistory.maxEntries} 首播放记录',
+                    () => _open('最近播放', () => ListeningHistoryPage(app: app)),
+                  ),
+                  _personalShortcut(
+                    Icons.favorite_outline,
+                    '我的收藏',
+                    '喜欢的歌曲集中收藏',
+                    _favorites,
+                  ),
+                  _personalShortcut(
+                    Icons.library_music_outlined,
+                    '全部音乐',
+                    '浏览曲库中的所有歌曲',
+                    () => _library(0),
+                  ),
+                  _personalShortcut(
+                    Icons.download_outlined,
+                    '本地下载',
+                    '查看下载与缓存任务',
+                    _downloads,
+                  ),
+                ],
+              );
+            },
+          ),
+          _personalHeading('音乐管理'),
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  leading: const Icon(Icons.storage_outlined),
+                  title: const Text('缓存与存储'),
+                  subtitle: const Text('查看空间占用，管理离线资源'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CacheStoragePage(app: app),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, indent: 62, endIndent: 18),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  leading: const Icon(Icons.block_outlined),
+                  title: const Text('歌曲黑名单'),
+                  subtitle: const Text('管理不希望在曲库中显示的歌曲'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: _showBlacklist,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-    ],
+    ),
   );
 
   Widget _tracks(
@@ -498,6 +699,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     bool showPlayAll = true,
     Future<void> Function(int)? onRemove,
     bool favorites = false,
+    List<String>? entryIds,
+    BatchSelection? batchSelection,
   }) {
     if (tracks.isEmpty) {
       return const Center(
@@ -509,62 +712,91 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       itemBuilder: (ctx, i) {
         if (showPlayAll && i == 0) {
           return ListTile(
-            leading: const Tooltip(
-              message: '播放全部',
-              child: Icon(Icons.play_circle),
+            leading: IconButton(
+              tooltip: '播放全部',
+              icon: const Icon(Icons.play_circle),
+              onPressed: () => _act(
+                () => app.playback.setQueue(tracks.map((t) => t.ref).toList()),
+              ),
             ),
             title: Text('${tracks.length}'),
-            onTap: () => _act(
-              () => app.playback.setQueue(tracks.map((t) => t.ref).toList()),
-            ),
           );
         }
         final track = tracks[i - (showPlayAll ? 1 : 0)];
-        return ListTile(
-          leading: CoverArt(app: app, track: track),
-          title: Text(
-            track.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            '${track.artist} · ${track.album} · ${_sourceName(track.ref.sourceId)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => _act(
-            () => app.playback.setQueue(
-              tracks.map((t) => t.ref).toList(),
-              start: i - (showPlayAll ? 1 : 0),
-            ),
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'remove_entry' && onRemove != null) {
-                unawaited(_act(() => onRemove(i - (showPlayAll ? 1 : 0))));
-              } else {
-                unawaited(_trackAction(v, track));
-              }
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
-              const PopupMenuItem(value: 'playlist', child: Text('添加到歌单')),
-              const PopupMenuItem(value: 'next', child: Text('下一首播放')),
-              const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列末尾')),
-              const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
-              if (onRemove != null)
-                PopupMenuItem(
-                  value: 'remove_entry',
-                  child: Text(favorites ? '从收藏移除' : '从此歌单移除'),
+        final entryKey = entryIds == null
+            ? track.ref.key
+            : entryIds[i - (showPlayAll ? 1 : 0)];
+        final selecting = batchSelection?.active == true;
+        return PlayingSongTile(
+          app: app,
+          track: track,
+          title: track.title,
+          subtitle:
+              '${track.artist} · ${track.album} · ${_sourceName(track.ref.sourceId)}',
+          selectedInBatch: selecting && batchSelection!.contains(entryKey),
+          onLongPress: batchSelection == null
+              ? null
+              : () => batchSelection.begin(entryKey),
+          onTap: selecting
+              ? () => batchSelection!.toggle(entryKey)
+              : () => _act(
+                  () => app.playback.setQueue(
+                    tracks.map((t) => t.ref).toList(),
+                    start: i - (showPlayAll ? 1 : 0),
+                  ),
                 ),
-              PopupMenuItem(
-                value: 'block',
-                child: Text(
-                  app.blacklist.contains(track.ref.key) ? '取消屏蔽' : '加入黑名单',
+          trailing: selecting
+              ? SizedBox.square(
+                  dimension: 48,
+                  child: Checkbox(
+                    value: batchSelection!.contains(entryKey),
+                    onChanged: (_) => batchSelection.toggle(entryKey),
+                  ),
+                )
+              : PopupMenuButton<String>(
+                  onSelected: (v) {
+                    if (v == 'multi_select' && batchSelection != null) {
+                      batchSelection.begin(entryKey);
+                    } else if (v == 'remove_entry' && onRemove != null) {
+                      unawaited(
+                        _act(() => onRemove(i - (showPlayAll ? 1 : 0))),
+                      );
+                    } else {
+                      unawaited(_trackAction(v, track));
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    if (batchSelection != null)
+                      const PopupMenuItem(
+                        value: 'multi_select',
+                        child: Text('多选'),
+                      ),
+                    PopupMenuItem(value: 'favorite', child: Text('收藏 / 取消收藏')),
+                    const PopupMenuItem(
+                      value: 'playlist',
+                      child: Text('添加到歌单'),
+                    ),
+                    const PopupMenuItem(value: 'next', child: Text('下一首播放')),
+                    const PopupMenuItem(
+                      value: 'enqueue',
+                      child: Text('添加到播放队列末尾'),
+                    ),
+                    const PopupMenuItem(value: 'cache', child: Text('缓存整首歌曲')),
+                    if (onRemove != null)
+                      PopupMenuItem(
+                        value: 'remove_entry',
+                        child: Text(favorites ? '从收藏移除' : '从此歌单移除'),
+                      ),
+                    PopupMenuItem(
+                      value: 'block',
+                      child: Text(
+                        app.blacklist.contains(track.ref.key)
+                            ? '取消屏蔽'
+                            : '加入黑名单',
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         );
       },
     );
@@ -579,6 +811,58 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
 
   Future<void> _trackAction(String action, Track track) =>
       _act(() => performTrackAction(context, app, action, track));
+
+  Future<void> _libraryBatchActions() async {
+    final selection = _librarySelection;
+    final query = CatalogQuery(
+      view: libraryView,
+      sort: sort,
+      descending: descending,
+    );
+    final all = selection.all;
+    final chosen = selection.selectedKeys;
+    final excluded = selection.excludedKeys;
+    final count = selection.count;
+    final success = await showBatchTrackActions(
+      context,
+      app,
+      count: count,
+      countUnit: query.countUnit,
+      resolve: () async {
+        if (query.view == 0) {
+          final refs = await app.catalog.queue(query.songs);
+          return [
+            for (final ref in refs)
+              if (all ? !excluded.contains(ref.key) : chosen.contains(ref.key))
+                ref,
+          ];
+        }
+        final kind = query.groupType;
+        if (all) {
+          final refs = await app.catalog.queue(query.songs);
+          final omitted = <String>{};
+          for (final key in excluded) {
+            final group = await app.catalog.queue(query.songsIn(kind, key));
+            omitted.addAll(group.map((ref) => ref.key));
+          }
+          return [
+            for (final ref in refs)
+              if (!omitted.contains(ref.key)) ref,
+          ];
+        }
+        final seen = <String>{};
+        final refs = <TrackRef>[];
+        for (final key in chosen) {
+          final group = await app.catalog.queue(query.songsIn(kind, key));
+          for (final ref in group) {
+            if (seen.add(ref.key)) refs.add(ref);
+          }
+        }
+        return refs;
+      },
+    );
+    if (success) selection.clear();
+  }
 
   Widget _playlists() => Column(
     children: [
@@ -660,42 +944,17 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 bottomPadding: 84,
                 emptyMessage: '还没有歌单',
               )
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 1200
-                      ? 5
-                      : constraints.maxWidth >= 900
-                      ? 4
-                      : constraints.maxWidth >= 640
-                      ? 3
-                      : 2;
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent:
-                          (constraints.maxWidth - 32 - (columns - 1) * 14) /
-                              columns +
-                          MediaQuery.textScalerOf(context).scale(14) * 2 * 1.5 +
-                          MediaQuery.textScalerOf(context).scale(12) * 2 * 1.3 +
-                          16,
-                    ),
-                    itemCount: app.playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = app.playlists[index];
-                      return PlaylistGridCard(
-                        key: ValueKey('playlist/${playlist.id}'),
-                        app: app,
-                        playlist: playlist,
-                        sourceName: _sourceName(playlist.sourceId ?? ''),
-                        onOpen: () => _playlistDetails(playlist),
-                        onAction: (value) => _playlistAction(value, playlist),
-                      );
-                    },
-                  );
-                },
+            : PlaylistReorderGrid(
+                playlists: app.playlists,
+                onMove: app.movePlaylistDisplay,
+                cardBuilder: (context, playlist) => PlaylistGridCard(
+                  key: ValueKey('playlist/${playlist.id}'),
+                  app: app,
+                  playlist: playlist,
+                  sourceName: _sourceName(playlist.sourceId ?? ''),
+                  onOpen: () => _playlistDetails(playlist),
+                  onAction: (value) => _playlistAction(value, playlist),
+                ),
               ),
       ),
     ],
@@ -765,9 +1024,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           app: app,
           id: playlist.id,
           buildTracks: (tracks) => _tracks(tracks, showPlayAll: false),
-          buildEntryTracks: (tracks, entryIds) => _tracks(
+          buildEntryTracks: (tracks, entryIds, selection) => _tracks(
             tracks,
             showPlayAll: false,
+            entryIds: entryIds,
+            batchSelection: selection,
             favorites: latest().kind == PlaylistKind.favorites,
             onRemove:
                 (latest().kind == PlaylistKind.favorites ||
@@ -901,6 +1162,18 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   }
 
   Future<void> _playlistAction(String action, PlaylistModel p) async {
+    if (action == 'enqueue') {
+      await _act(() async {
+        final count = await app.enqueuePlaylist(p);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(count == 0 ? '歌单为空，未添加歌曲' : '已将 $count 首歌曲添加到播放队列'),
+          ),
+        );
+      });
+      return;
+    }
     if (action == 'rename') {
       final name = TextEditingController(text: p.name);
       final accepted = await showDialog<bool>(
@@ -1008,6 +1281,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     }
   }
 
+  void _openSources() => _open('音乐源管理', _sources, showPlayer: false);
+
   Widget _sources() => MusicSourcesPanel(
     app: app,
     onAdd: () => _addSource(),
@@ -1015,9 +1290,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     onImportFiles: () => _act(app.importLocalFiles),
     onImportFolder: () => _act(app.importLocalFolder),
     onSelect: (source) => setState(() {
-      sourceFilter = source.id;
       tab = 1;
-      libraryView = 0;
+      libraryView = app.appearance.libraryCategories.first;
       Navigator.pop(context);
     }),
     onAction: _handleSourceAction,
@@ -1137,6 +1411,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     builder: (context, _) => PlayerBar(
       app: app,
       compact: true,
+      onCollapse: () => setState(() => playerCollapsed = true),
+    ),
+  );
+
+  Widget _desktopPlayerBar() => ListenableBuilder(
+    listenable: app.appearance,
+    builder: (context, _) => PlayerBar(
+      app: app,
+      compact: true,
+      docked: true,
       onCollapse: () => setState(() => playerCollapsed = true),
     ),
   );

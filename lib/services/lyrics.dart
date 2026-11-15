@@ -1,3 +1,32 @@
+// Some LRC providers append a translation to the original using a Unicode
+// thin-space separator instead of a second time-tagged line. Preserve the
+// timestamp and let lyric renderers style the second line as a translation.
+final _inlineTranslationSeparator = RegExp(r'[\u2009\u200A\u202F]+');
+final _lyricLetter = RegExp(r'[A-Za-z\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]');
+final _latinLyricLetters = RegExp(r'[A-Za-z]');
+final _cjkLyricLetters = RegExp(r'[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]');
+
+String _splitInlineTranslation(String text) {
+  for (final separator in _inlineTranslationSeparator.allMatches(text)) {
+    final original = text.substring(0, separator.start).trimRight();
+    final translation = text.substring(separator.end).trimLeft();
+    if (original.isEmpty || translation.isEmpty) continue;
+    // Check the scripts directly around the separator, not elsewhere in a
+    // mixed-language line (for example, composer credits with Latin names).
+    final beforeLetters = _lyricLetter.allMatches(original);
+    final afterLetter = _lyricLetter.firstMatch(translation)?.group(0);
+    if (beforeLetters.isEmpty || afterLetter == null) continue;
+    final beforeLetter = beforeLetters.last.group(0)!;
+    if ((_latinLyricLetters.hasMatch(beforeLetter) &&
+            _cjkLyricLetters.hasMatch(afterLetter)) ||
+        (_cjkLyricLetters.hasMatch(beforeLetter) &&
+            _latinLyricLetters.hasMatch(afterLetter))) {
+      return '$original\n$translation';
+    }
+  }
+  return text;
+}
+
 class LrcLine {
   const LrcLine(this.at, this.text);
   final Duration at;
@@ -21,7 +50,7 @@ List<LrcLine> parseLrc(String source) {
   for (final raw in source.split(RegExp(r'\r?\n'))) {
     final matches = time.allMatches(raw).toList();
     if (matches.isEmpty) continue;
-    final text = raw.replaceAll(time, '').trim();
+    final text = _splitInlineTranslation(raw.replaceAll(time, '').trim());
     for (final m in matches) {
       final fraction = m.group(3) ?? '';
       final milli = fraction.isEmpty

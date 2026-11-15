@@ -26,6 +26,8 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   desktop_ = std::make_unique<DesktopIntegration>(GetHandle(), flutter_controller_->engine()->messenger());
+  desktop_lyrics_ = std::make_unique<DesktopLyricsWindow>(
+      GetHandle(), flutter_controller_->engine()->messenger());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -41,6 +43,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  desktop_lyrics_ = nullptr;
   desktop_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

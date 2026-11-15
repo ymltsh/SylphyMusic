@@ -164,14 +164,17 @@ class AppUpdates {
 
   Future<UpdateCheck> check({bool beta = false}) async {
     final current = await _readVersion();
-    final file = beta ? 'version-beta.json' : 'version.json';
+    final file = beta ? 'version-beta.json' : 'version-openlist.json';
+    final manifestBase = beta
+        ? rawBase
+        : 'https://raw.githubusercontent.com/$repository/main';
     final client = _clientFactory();
     try {
       // No direct fallback: the configured gateway is used for both checking
       // and downloading releases, including in regions without GitHub access.
       final manifest = await _fetch(
         client,
-        accelerate(Uri.parse('$rawBase/$file'), mirror),
+        accelerate(Uri.parse('$manifestBase/$file'), mirror),
       ).timeout(const Duration(seconds: 12));
       if (!manifest.containsKey('latest')) {
         throw const FormatException('更新清单缺少 latest');
@@ -180,8 +183,8 @@ class AppUpdates {
       if (raw == null) return UpdateCheck(current, null);
       if (raw is! Map<String, dynamic>) throw const FormatException('更新清单格式无效');
       final latest = UpdateRelease.fromJson(raw);
-      if (!beta && latest.version.prerelease) {
-        throw const FormatException('正式版清单包含测试版');
+      if (!beta && !latest.version.version.contains('-openlist.')) {
+        throw const FormatException('OpenList 更新清单包含其他版本');
       }
       return UpdateCheck(current, latest);
     } finally {

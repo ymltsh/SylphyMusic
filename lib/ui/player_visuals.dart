@@ -17,11 +17,13 @@ class PlayerBackdrop extends StatelessWidget {
     required this.track,
     this.background = PlayerBackground.album,
     this.opacity = .65,
+    this.showAmbientBlur = true,
   });
   final SylphyApp app;
   final Track? track;
   final PlayerBackground background;
   final double opacity;
+  final bool showAmbientBlur;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +33,7 @@ class PlayerBackdrop extends StatelessWidget {
         ? Colors.white
         : scheme.surface;
     final coverBlur =
+        showAmbientBlur &&
         background == PlayerBackground.album &&
         app.appearance.ambient &&
         track != null;

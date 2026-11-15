@@ -10,6 +10,7 @@ enum PlayerPart {
   artist,
   lyrics,
   progress,
+  quickActions,
   controls,
   queue,
   favorite,
@@ -24,6 +25,7 @@ const partLabels = {
   PlayerPart.artist: '歌手 / 专辑',
   PlayerPart.lyrics: '歌词预览',
   PlayerPart.progress: '进度条',
+  PlayerPart.quickActions: '快捷操作区',
   PlayerPart.controls: '播放控制',
   PlayerPart.queue: '播放队列',
   PlayerPart.favorite: '收藏',
@@ -181,9 +183,12 @@ class PlayerLayout {
   final double backgroundOpacity;
   final PlayerBackground background;
 
-  /// v2 is the free-form canvas format. v1 files are migrated on read.
-  static const version = 2;
+  /// v3 preserves a deliberately removed quick-action row. v2 layouts still
+  /// receive the row once when migrated, but new saves never recreate it.
+  static const version = 3;
+  static const freeformVersion = 2;
   static const legacyVersion = 1;
+  static const maxElements = 33; // Former 32 plus the quick-action row.
 
   PlayerLayout copyWith({
     String? id,
@@ -221,19 +226,26 @@ class PlayerLayout {
     final json = _map(value);
     return switch (json['version']) {
       legacyVersion => _migrateLegacy(json),
+      freeformVersion => _fromV2(json, restoreLegacyActions: true),
       version => _fromV2(json),
       _ => throw const FormatException('不支持的布局版本'),
     };
   }
 
-  static PlayerLayout _fromV2(Map<String, dynamic> json) {
+  static PlayerLayout _fromV2(
+    Map<String, dynamic> json, {
+    bool restoreLegacyActions = false,
+  }) {
     final raw = json['elements'];
-    if (raw is! List || raw.length > 32) {
-      throw const FormatException('最多支持 32 个组件');
+    if (raw is! List || raw.length > maxElements) {
+      throw const FormatException('最多支持 33 个组件');
     }
     final elements = raw.map(PlayerElement.fromJson).toList();
     if (elements.map((e) => e.id).toSet().length != elements.length) {
       throw const FormatException('组件 ID 重复');
+    }
+    if (elements.where((e) => e.type == PlayerPart.quickActions).length > 1) {
+      throw const FormatException('快捷操作区只能有一个');
     }
     if (elements.any((e) => e.type == PlayerPart.controls)) {
       elements.removeWhere(
@@ -243,10 +255,50 @@ class PlayerLayout {
     return PlayerLayout(
       id: _string(json['id'], 80),
       name: _string(json['name'], 60),
-      elements: elements,
+      elements: restoreLegacyActions ? _withQuickActions(elements) : elements,
       background: _enum(PlayerBackground.values, json['background'] ?? 'album'),
       backgroundOpacity: _number(json['backgroundOpacity'] ?? .65, .1, 1),
     );
+  }
+
+  /// Older layouts had a fixed row anchored to the first visible progress bar.
+  /// Materialize that row as its own portrait/wide element on read, preserving
+  /// approximately the same position until the user moves either component.
+  static List<PlayerElement> _withQuickActions(List<PlayerElement> elements) {
+    final actions = elements.where((e) => e.type == PlayerPart.quickActions);
+    if (actions.length > 1) {
+      throw const FormatException('快捷操作区只能有一个');
+    }
+    if (actions.isNotEmpty) {
+      if (actions.first.hidden) {
+        throw const FormatException('快捷操作区不能隐藏');
+      }
+      return elements;
+    }
+    if (elements.length >= maxElements) {
+      throw const FormatException('最多支持 33 个组件');
+    }
+    final old = PlayerLayout(
+      id: 'migration',
+      name: 'migration',
+      elements: elements,
+    );
+    const portrait = Size(360, 640);
+    const wide = Size(1200, 800);
+    var id = 'quick-actions';
+    var suffix = 2;
+    while (elements.any((e) => e.id == id)) {
+      id = 'quick-actions-${suffix++}';
+    }
+    return [
+      ...elements,
+      PlayerElement(
+        id: id,
+        type: PlayerPart.quickActions,
+        frame: _normalise(old._legacyActionBounds(portrait), portrait),
+        wideFrame: _normalise(old._legacyActionBounds(wide), wide),
+      ),
+    ];
   }
 
   /// The v1 format stored every widget inside one of three vertical regions and
@@ -306,7 +358,7 @@ class PlayerLayout {
     return PlayerLayout(
       id: _string(json['id'], 80),
       name: _string(json['name'], 60),
-      elements: elements,
+      elements: _withQuickActions(elements),
       background: _enum(PlayerBackground.values, json['background'] ?? 'album'),
       backgroundOpacity: _number(json['backgroundOpacity'] ?? .65, .1, 1),
     );
@@ -341,6 +393,7 @@ class PlayerLayout {
     final minimum = switch (e.type) {
       PlayerPart.controls => Size(300, math.max(72, e.playHeight + 8)),
       PlayerPart.progress => const Size(260, 64),
+      PlayerPart.quickActions => const Size(200, 48),
       PlayerPart.lyrics => const Size(120, 78),
       PlayerPart.queue || PlayerPart.favorite => const Size(48, 48),
       _ => const Size(24, 24),
@@ -370,9 +423,15 @@ class PlayerLayout {
     return rect;
   }
 
-  /// The permanent action strip follows the first visible progress component.
-  /// A fallback keeps editing reachable in layouts without a progress bar.
+  /// No action strip is drawn after the user removes (or hides) it.
   Rect actionBounds(Size size) {
+    final actions = elements
+        .where((e) => e.type == PlayerPart.quickActions && !e.hidden)
+        .firstOrNull;
+    return actions == null ? Rect.zero : bounds(actions, size);
+  }
+
+  Rect _legacyActionBounds(Size size) {
     final progress = elements
         .where((e) => e.type == PlayerPart.progress && !e.hidden)
         .firstOrNull;
@@ -439,6 +498,16 @@ PlayerLayout playerTemplate({bool lyrics = false}) => PlayerLayout(
       wideFrame: lyrics
           ? const Rect.fromLTWH(.55, .14, .40, .56)
           : const Rect.fromLTWH(.55, .16, .40, .56),
+    ),
+    PlayerElement(
+      id: 'quick-actions',
+      type: PlayerPart.quickActions,
+      frame: lyrics
+          ? const Rect.fromLTWH(.08, .692, .84, .075)
+          : const Rect.fromLTWH(.08, .703, .84, .075),
+      wideFrame: lyrics
+          ? const Rect.fromLTWH(.09, .73, .40, .06)
+          : const Rect.fromLTWH(.07, .75, .40, .06),
     ),
     PlayerElement(
       id: 'progress',

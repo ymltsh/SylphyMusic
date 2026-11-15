@@ -1,0 +1,17 @@
+group 'com.alexmercerind.media_kit_libs_android_audio'
+version '1.0'
+buildscript {
+  repositories { google(); mavenCentral() }
+  dependencies { classpath 'com.android.tools.build:gradle:8.13.0' }
+}
+apply plugin: 'com.android.library'
+android {
+  namespace 'com.alexmercerind.media_kit_libs_android_audio'
+  compileSdkVersion 36
+  defaultConfig { minSdkVersion 24 }
+}
+def prepareRuntime = tasks.register('prepareSylphyMpv', Exec) {
+  workingDir rootProject.projectDir.parentFile
+  commandLine 'python', 'tool/prepare_android_mpv.py'
+}
+tasks.named('preBuild').configure { dependsOn prepareRuntime }
