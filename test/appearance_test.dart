@@ -26,13 +26,15 @@ void main() {
     await root.delete(recursive: true);
   });
   test(
-    'default disc rotation is off and an explicit choice survives restart',
+    'disc style and rotation default on and explicit choices survive restart',
     () async {
-      expect(appearance.discRotation, isFalse);
-      await appearance.update(rotateDisc: true);
+      expect(appearance.disc, isTrue);
+      expect(appearance.discRotation, isTrue);
+      await appearance.update(record: false, rotateDisc: false);
       final restored = Appearance(db);
       await restored.initialize();
-      expect(restored.discRotation, isTrue);
+      expect(restored.disc, isFalse);
+      expect(restored.discRotation, isFalse);
       restored.dispose();
     },
   );

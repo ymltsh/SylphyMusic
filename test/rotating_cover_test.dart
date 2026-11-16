@@ -44,9 +44,7 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('hidden, disabled and reduced-motion covers do not spin', (
-    tester,
-  ) async {
+  testWidgets('hidden and user-disabled covers do not spin', (tester) async {
     await tester.pumpWidget(view(visible: false));
     await tester.pump(const Duration(seconds: 2));
     expect(angle(tester), 0);
@@ -54,10 +52,41 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
     expect(angle(tester), greaterThan(0));
-    await tester.pumpWidget(view(reduced: true));
+    final visibleAngle = angle(tester);
+    await tester.pumpWidget(view(visible: false));
+    await tester.pump(const Duration(seconds: 2));
+    expect(angle(tester), visibleAngle);
+    await tester.pumpWidget(view());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(angle(tester), closeTo(visibleAngle + .05, .001));
+    await tester.pumpWidget(view(enabled: false));
     await tester.pump(const Duration(seconds: 2));
     expect(angle(tester), 0);
-    await tester.pumpWidget(view(enabled: false));
+  });
+  testWidgets('system-disabled animations preserve the 20-second rotation', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(
+      tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+    );
+    await tester.pumpWidget(view(reduced: true));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 5));
+    expect(angle(tester), closeTo(.25, .001));
+    await tester.pump(const Duration(seconds: 5));
+    expect(angle(tester), closeTo(.5, .001));
+    final paused = angle(tester);
+    await tester.pumpWidget(view(reduced: true, playing: false));
+    await tester.pump(const Duration(seconds: 2));
+    expect(angle(tester), paused);
+    await tester.pumpWidget(view(reduced: true));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(angle(tester), closeTo(paused + .05, .001));
+    await tester.pumpWidget(view(reduced: true, enabled: false));
     await tester.pump(const Duration(seconds: 2));
     expect(angle(tester), 0);
   });

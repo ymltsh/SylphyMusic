@@ -19,9 +19,10 @@ class _RotatingCoverState extends State<RotatingCover>
   late final motion = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 20),
+    animationBehavior: AnimationBehavior.preserve,
   );
   void _sync() {
-    final enabled = widget.enabled && !MediaQuery.disableAnimationsOf(context);
+    final enabled = widget.enabled;
     if (!enabled) {
       motion.stop();
       if (motion.value != 0) motion.value = 0;

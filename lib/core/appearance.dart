@@ -38,8 +38,8 @@ class Appearance extends ChangeNotifier {
       : File(p.join(_backgroundDirectory.path, _backgroundName!));
   String get seedHex =>
       '#${(seed.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}';
-  bool disc = false, ambient = false, glass = false;
-  bool discRotation = false;
+  bool disc = true, ambient = false, glass = false;
+  bool discRotation = true;
   bool solidBackground = true;
   bool playerFab = true;
   int _libraryCategoryMask = 15;
@@ -105,8 +105,8 @@ class Appearance extends ChangeNotifier {
     if (visibility != null && visibility.isFinite) {
       backgroundVisibility = visibility.clamp(.1, .4);
     }
-    disc = await db.setting('ui_disc') == 'true';
-    discRotation = await db.setting('ui_disc_rotation') == 'true';
+    disc = await db.setting('ui_disc') != 'false';
+    discRotation = await db.setting('ui_disc_rotation') != 'false';
     ambient = await db.setting('ui_ambient') == 'true';
     glass = await db.setting('ui_glass') == 'true';
     playerFab = await db.setting('ui_player_fab') != 'false';

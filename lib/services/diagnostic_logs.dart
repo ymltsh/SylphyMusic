@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Opt-in, privacy-preserving diagnostics, intentionally separate from logcat.
 ///
@@ -29,7 +30,63 @@ class DiagnosticLogs {
   int _sequence = 0;
 
   static final RegExp _safeToken = RegExp(r'^[A-Za-z][A-Za-z0-9_]{0,47}$');
+  // Only for allowlisted OS-build fields, not arbitrary event details.
+  // Permit localized manufacturer/model strings while rejecting control
+  // characters and obvious URLs/addresses/paths.
+  static bool _safeSystemText(String value) {
+    if (value.trim().isEmpty ||
+        value.length > 160 ||
+        value.contains('://') ||
+        value.contains('@') ||
+        value.startsWith('/') ||
+        value.contains('\\'))
+      return false;
+    return !value.runes.any((rune) => rune < 32 || rune == 127);
+  }
+
+  static const _systemTextKeys = <String>{
+    'app_version',
+    'app_build',
+    'android_release',
+    'device_brand',
+    'device_manufacturer',
+    'device_model',
+    'device_codename',
+    'device_hardware',
+    'rom_build',
+    'rom_incremental',
+    'security_patch',
+    'cpu_abi',
+  };
+  static const _systemChannel = MethodChannel(
+    'music.sylphy/system_diagnostics',
+  );
   static const Set<String> _detailKeys = {
+    'reused_count',
+    'copied_count',
+    'visited_count',
+    // Device/import environment fields are allowlisted; no user identifiers or paths.
+    'diagnostics_schema',
+    'app_version',
+    'app_build',
+    'android_sdk',
+    'android_release',
+    'device_brand',
+    'device_manufacturer',
+    'device_model',
+    'device_codename',
+    'device_hardware',
+    'rom_build',
+    'rom_incremental',
+    'security_patch',
+    'cpu_abi',
+    'target_sdk',
+    'read_audio_permission',
+    'read_audio_declared',
+    'persisted_uri_grants',
+    'system_info_status',
+    'directory_exists',
+    'os_error_code',
     'log_events',
     'filter_pts_ms',
     'sample_rate',
@@ -116,10 +173,82 @@ class DiagnosticLogs {
     'diagnostic${index == 0 ? '' : '.$index'}.jsonl',
   );
 
+  Future<Map<String, Object?>> _readEnvironment() async {
+    final info = <String, Object?>{
+      'diagnostics_schema': 2,
+      'system': Platform.operatingSystem,
+    };
+    try {
+      final app = await PackageInfo.fromPlatform().timeout(
+        const Duration(seconds: 2),
+      );
+      info['app_version'] = app.version;
+      info['app_build'] = app.buildNumber;
+    } catch (_) {
+      // The diagnostic file should still be exportable if this plugin fails.
+    }
+    if (Platform.isAndroid) {
+      try {
+        final native = await _systemChannel
+            .invokeMapMethod<String, dynamic>('snapshot')
+            .timeout(const Duration(seconds: 2));
+        if (native != null) {
+          info.addAll(native);
+          info['system_info_status'] = 'ok';
+        } else {
+          info['system_info_status'] = 'unavailable';
+        }
+      } catch (_) {
+        info['system_info_status'] = 'unavailable';
+      }
+    }
+    return info;
+  }
+
+  Future<void> _recordEnvironment() async {
+    if (_closed || !enabled) return;
+    final details = await _readEnvironment();
+    if (!_closed && enabled) {
+      record('system', 'environment', details: details);
+    }
+  }
+
+  Map<String, Object> _sanitizeDetails(
+    String scope,
+    String event,
+    Map<String, Object?> details,
+  ) {
+    final safe = <String, Object>{};
+    final systemEvent =
+        scope == 'system' &&
+        (event == 'environment' || event == 'export_environment');
+    for (final item in details.entries) {
+      if (!_detailKeys.contains(item.key)) continue;
+      final value = item.value;
+      if (value is bool) {
+        safe[item.key] = value;
+      } else if (value is int && value >= 0 && value <= 9007199254740991) {
+        safe[item.key] = value;
+      } else if (value is String &&
+          (_safeToken.hasMatch(value) ||
+              (systemEvent &&
+                  _systemTextKeys.contains(item.key) &&
+                  !value.contains('://') &&
+                  !value.contains('@') &&
+                  _safeSystemText(value)))) {
+        safe[item.key] = value;
+      }
+    }
+    return safe;
+  }
+
   Future<void> initialize({required bool enabled}) async {
     if (_closed) return;
     this.enabled = enabled;
-    if (enabled) record('diagnostics', 'session_started');
+    if (enabled) {
+      record('diagnostics', 'session_started');
+      await _recordEnvironment();
+    }
   }
 
   /// No raw free-form messages. Only allowlisted structured fields are saved.
@@ -130,19 +259,7 @@ class DiagnosticLogs {
   }) {
     if (_closed || !enabled) return;
     if (!_safeToken.hasMatch(scope) || !_safeToken.hasMatch(event)) return;
-    final safeDetails = <String, Object>{};
-    for (final item in details.entries) {
-      if (!_detailKeys.contains(item.key)) continue;
-      final value = item.value;
-      if (value is bool) {
-        safeDetails[item.key] = value;
-      } else if (value is int && value >= 0 && value <= 9007199254740991) {
-        // Millisecond clocks can exceed 1e9 on long-lived Android devices.
-        safeDetails[item.key] = value;
-      } else if (value is String && _safeToken.hasMatch(value)) {
-        safeDetails[item.key] = value;
-      }
-    }
+    final safeDetails = _sanitizeDetails(scope, event, details);
     final line =
         '${jsonEncode({'utc': DateTime.now().toUtc().toIso8601String(), 'seq': ++_sequence, 'uptime_ms': _elapsed.elapsedMilliseconds, 'scope': scope, 'event': event, ...safeDetails})}\n';
     // The queue preserves event order and never delays playback callbacks.
@@ -184,6 +301,7 @@ class DiagnosticLogs {
     if (value) {
       enabled = true;
       record('diagnostics', 'enabled');
+      await _recordEnvironment();
     } else {
       record('diagnostics', 'disabled');
       enabled = false;
@@ -207,6 +325,21 @@ class DiagnosticLogs {
       'Android snapshots describe the media service, not AudioTrack PCM counters. '
       'Does not include Android logcat or native crash dumps.\n\n',
     );
+    // Distinguish export-time OS/build from the environment at event time.
+    output.writeln('Export environment (captured at export time):');
+    output.writeln(
+      jsonEncode({
+        'utc': DateTime.now().toUtc().toIso8601String(),
+        'scope': 'system',
+        'event': 'export_environment',
+        ..._sanitizeDetails(
+          'system',
+          'export_environment',
+          await _readEnvironment(),
+        ),
+      }),
+    );
+    output.writeln();
     for (var i = retainedFiles - 1; i >= 0; i--) {
       final file = _file(i);
       if (await file.exists()) output.write(await file.readAsString());

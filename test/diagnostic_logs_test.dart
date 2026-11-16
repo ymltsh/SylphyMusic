@@ -69,6 +69,37 @@ void main() {
     },
   );
 
+  test(
+    'system context accepts versions while rejecting unsafe strings',
+    () async {
+      final logs = DiagnosticLogs(temp);
+      await logs.setEnabled(true);
+      logs.record(
+        'system',
+        'environment',
+        details: {
+          'android_sdk': 33,
+          'android_release': '13',
+          'device_brand': '小米',
+          'device_model': 'Redmi Note 12',
+          'app_version': '1.0.63',
+          'app_build': '76',
+          'read_audio_permission': false,
+          'rom_build': 'https://private.example/path',
+          'token': 'secret',
+        },
+      );
+      final exported = utf8.decode(await logs.exportBytes());
+      expect(exported, contains('"android_sdk":33'));
+      expect(exported, contains('"device_brand":"小米"'));
+      expect(exported, contains('"device_model":"Redmi Note 12"'));
+      expect(exported, contains('"app_version":"1.0.63"'));
+      expect(exported, isNot(contains('private.example')));
+      expect(exported, isNot(contains('"token"')));
+      await logs.shutdown();
+    },
+  );
+
   test('rotates old files and exports ordered chronological events', () async {
     final logs = DiagnosticLogs(temp, maxFileBytes: 220, retainedFiles: 3);
     await logs.setEnabled(true);

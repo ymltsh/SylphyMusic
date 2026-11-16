@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [Android SAF 本地文件夹](ANDROID_SAF_LOCAL_FOLDER.md) | 系统文件夹授权、私有音频 / LRC 副本、重新扫描与来源清理 |
 | [笔友留言 V20](PENPAL_MAILBOX_V20.md) | 按角色保存留言、下次新来信回复、历史记录及数据库前向迁移 |
 | [Android 后台 / 锁屏整合补丁](ANDROID_LOCKSCREEN_PLAYBACK_PATCH_2026-11-14.md) | 连续音频焦点、独立 WakeLock、有界停滞恢复与原生诊断备份 |
 | [在线封面兜底](ONLINE_ARTWORK.md) | 原音源优先、在线图片匹配、缓存与元数据发送范围 |

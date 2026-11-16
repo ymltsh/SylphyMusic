@@ -9,6 +9,8 @@ import 'package:sylphy_music/core/models.dart';
 import 'package:sylphy_music/ui/cover_art.dart';
 import 'package:sylphy_music/ui/cache_storage.dart';
 import 'package:sylphy_music/ui/lyrics_page.dart';
+import 'package:sylphy_music/ui/player_cover.dart';
+import 'package:sylphy_music/ui/rotating_cover.dart';
 
 import 'live_emby_test.dart' show MemoryVault;
 
@@ -75,6 +77,67 @@ void main() {
         .file
         .path;
   }
+
+  testWidgets(
+    'vinyl and artwork rotate together and reset when track changes',
+    (tester) async {
+      Widget view(Track current) => MaterialApp(
+        home: Center(
+          child: PlayerCover(
+            app: app,
+            track: current,
+            size: 200,
+            circle: true,
+            rotate: true,
+            playing: true,
+          ),
+        ),
+      );
+      double angle() => tester
+          .widget<RotationTransition>(find.byType(RotationTransition))
+          .turns
+          .value;
+      await tester.pumpWidget(view(track));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(angle(), closeTo(.15, .001));
+      expect(find.byType(RotatingCover), findsOneWidget);
+      final rotation = tester.widget<RotationTransition>(
+        find.byType(RotationTransition),
+      );
+      expect(rotation.child, isA<Stack>());
+      final disc = rotation.child! as Stack;
+      // Base, two grooves, clipped artwork and decorative mark share one turn.
+      expect(disc.children, hasLength(5));
+      expect(disc.children[3], isA<ClipOval>());
+      expect(disc.children[4], isA<Positioned>());
+      expect(
+        find.descendant(
+          of: find.byType(RotationTransition),
+          matching: find.byType(CoverArt),
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(
+        view(
+          const Track(
+            ref: TrackRef('s', 'next-song'),
+            title: 'next fixture',
+            artist: 'fixture',
+            album: 'fixture',
+          ),
+        ),
+      );
+      expect(angle(), 0);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(angle(), closeTo(.05, .001));
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(() => app.assets.waitForIdle());
+      expect(tester.takeException(), isNull);
+    },
+    skip: !available,
+  );
 
   testWidgets(
     'visible cover switches to a refreshed immutable file without remounting',

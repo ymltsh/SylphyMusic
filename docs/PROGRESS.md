@@ -1,5 +1,27 @@
 # 实施与验证记录
 
+## 2026-11-16 应用 Android SAF 本地文件夹补丁
+
+按用户提供的 SylphyMusic_Android_SAF.zip 应用到普通版和 OpenList 工作区，七个目标文件的锚点 / 新文件检查通过；备份放在各自 .private/saf-backup/，共享压缩包未修改。Android 通过 ACTION_OPEN_DOCUMENT_TREE 持久授权、递归枚举文件夹，将音频及同名 LRC 复制到应用私有 saf/<sourceId>/，大小和修改时间未变时复用副本。保留原始文件夹层级与显示文件名，单文件导入隔离到 file:/// 来源；零首或扫描失败不提交新索引，移除来源清理托管副本并按剩余引用释放授权。保留此前设备环境诊断、普通文件夹操作阶段 / OS 错误码日志和唱片改动，同步补丁附带测试、说明及文档索引。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/android-saf-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；SAF 授权、SD / USB、扫描复用、LRC 和播放交互由用户验收。私有副本会额外占用空间，旧 file:// 文件夹来源不自动迁移。
+
+## 2026-11-16 应用诊断环境与本地扫描日志补丁
+
+按用户提供的 apply_sylphymusic_diagnostics_fix(1).py 应用到普通版与 OpenList 工作区，五个目标文件的源码锚点检查通过。增加启用 / 启动时的诊断环境快照与导出时独立标记的当前环境，Android Application 注册系统诊断通道，记录应用版本、设备 / 系统构建、SDK、媒体读取权限及 SAF 授权数量；本地文件夹选择 / 扫描增加阶段、存在性、歌曲数量与脱敏 OS 错误码。同步脚本附带测试和诊断文档，保留既有唱片改动。修正脚本生成的 Dart 反斜杠字符串转义错误，未修改共享补丁原件。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/diagnostics-fix-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际诊断导出与文件夹扫描交互由用户验收。
+
+## 2026-11-16 黑胶唱片与旋转默认开启
+
+按用户后续要求，Appearance 的黑胶唱片样式与旋转初始值、无持久化设置时的默认值均改为开启；保留用户已保存的 false 设置。同步调整现有外观默认值测试和播放页布局文档。dart format 已执行，tool/build_review.ps1 成功完成三 ABI Android Release、Windows Release 和内部打包，产物位于 build/internal-review/，日志为 build/test_logs/disc-defaults-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布。
+
+## 2026-11-16 唱片旋转遵循应用内设置
+
+主分支移除 RotatingCover 对系统 disableAnimations 的限制，AnimationController 使用 AnimationBehavior.preserve，保持 20 秒旋转周期。唱片旋转默认关闭不变；用户开启后由应用内设置控制。PlayerCover 将同一个旋转组件移到整个唱片 Stack 外层，底盘、两层纹路、封面和装饰标记同步旋转，保留歌曲身份 Key、暂停 / 继续、TickerMode 和编辑预览静止行为，无歌曲时不旋转。
+
+按本轮要求调整旋转测试，覆盖系统禁用动画时的周期、用户关闭、暂停续转与页面隐藏续转；媒体组件测试补充整个唱片共享变换及切歌重置。同步更新播放页布局文档，dart format 已执行。tool/build_review.ps1 成功完成三 ABI Android Release、Windows Release 和内部打包，产物位于 build/internal-review/，日志为 build/test_logs/disc-rotation-build.log。本轮未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；车机动画设置与实际旋转效果由用户验收。
+
 ## 2026-11-15 音乐笔友首次引导发布 1.0.63+76
 
 用户明确要求“推送更新”后，普通版 1.0.63+76（三 ABI Android、Windows 安装程序 / 便携包及对应源码）与 OpenList 1.0.63-openlist.45+76（arm64 APK 及对应应用 / 后端 / 前端源码）已发布。新增“念念不忘，必有回响（LLM 增强）”首次引导专页、音乐书信欢迎文案及迁移后的配置确认，保留稍后配置和已有引导完成状态。普通版 7 个与特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始 / 加速清单核对通过，特别版发布状态 complete；Android 正式签名保持一致。

@@ -42,12 +42,7 @@ class PlayerCover extends StatelessWidget {
         ),
       );
     }
-    return RotatingCover(
-      key: ValueKey(current.ref.key),
-      enabled: circle && rotate && !preview,
-      playing: playing && !preview,
-      child: CoverArt(app: app, track: current, size: side, borderRadius: 0),
-    );
+    return CoverArt(app: app, track: current, size: side, borderRadius: 0);
   }
 
   @override
@@ -85,49 +80,54 @@ class PlayerCover extends StatelessWidget {
       label: '唱片封面',
       child: SizedBox.square(
         dimension: size,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xff111317),
-                boxShadow: shadowStyle,
-              ),
-            ),
-            for (final factor in const [.94, .88])
+        child: RotatingCover(
+          key: ValueKey(track?.ref.key),
+          enabled: track != null && rotate && !preview,
+          playing: playing && !preview,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
               Container(
-                width: size * factor,
-                height: size * factor,
+                width: size,
+                height: size,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: .055),
-                    width: size * .0022,
+                  color: const Color(0xff111317),
+                  boxShadow: shadowStyle,
+                ),
+              ),
+              for (final factor in const [.94, .88])
+                Container(
+                  width: size * factor,
+                  height: size * factor,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .055),
+                      width: size * .0022,
+                    ),
+                  ),
+                ),
+              ClipOval(
+                child: SizedBox.square(
+                  dimension: artSize,
+                  child: _art(context, artSize),
+                ),
+              ),
+              Positioned(
+                top: size * .08,
+                left: size * .18,
+                child: Container(
+                  width: size * .12,
+                  height: size * .018,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .14),
+                    borderRadius: BorderRadius.circular(size),
                   ),
                 ),
               ),
-            ClipOval(
-              child: SizedBox.square(
-                dimension: artSize,
-                child: _art(context, artSize),
-              ),
-            ),
-            Positioned(
-              top: size * .08,
-              left: size * .18,
-              child: Container(
-                width: size * .12,
-                height: size * .018,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(size),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

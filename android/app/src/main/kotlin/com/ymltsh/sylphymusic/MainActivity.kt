@@ -10,6 +10,7 @@ import android.util.Log
 
 class MainActivity : FlutterActivity() {
     private var letterImages: LetterImageStore? = null
+    private var localFolders: LocalFolderBridge? = null
     private val notificationRequests = mutableListOf<MethodChannel.Result>()
     private val lanRequests = mutableListOf<MethodChannel.Result>()
     private val lanPermission = "android.permission.ACCESS_LOCAL_NETWORK"
@@ -33,6 +34,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        localFolders = LocalFolderBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/notification_permission")
             .setMethodCallHandler { call, result ->
                 if (call.method != "request") {
@@ -89,6 +91,12 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        localFolders?.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 42) completeNotificationRequests()
@@ -111,6 +119,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        localFolders?.detach()
+        localFolders = null
         letterImages?.detach()
         letterImages = null
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/letter_images").setMethodCallHandler(null)

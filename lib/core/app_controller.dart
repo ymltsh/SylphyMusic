@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -24,6 +25,7 @@ import '../services/playback_sleep_timer.dart';
 import '../services/sources.dart';
 import '../services/desktop.dart';
 import '../services/local_library.dart';
+import '../services/android_local_folders.dart';
 import '../services/artwork.dart';
 import '../services/media_assets.dart';
 import '../services/lrc_api.dart';
@@ -862,6 +864,22 @@ class SylphyApp extends ChangeNotifier {
     await lyrics.clearSource(source.id);
     await vault.delete(source.id);
     await reload();
+    if (Platform.isAndroid && source.url.startsWith('content://')) {
+      // Only managed SAF copies may be removed. Never touch the user's folder.
+      try {
+        final managed = Directory(p.join(root.path, 'saf', source.id));
+        if (await managed.exists()) await managed.delete(recursive: true);
+        if (!sources.any((other) => other.url == source.url)) {
+          await AndroidLocalFolders.release(Uri.parse(source.url));
+        }
+      } catch (_) {
+        diagnostics.record(
+          'local_library',
+          'cleanup_failed',
+          details: {'reason': 'filesystem_error'},
+        );
+      }
+    }
   }
 
   Future<void> toggleBlacklist(Track ref) async {
@@ -1057,7 +1075,9 @@ class SylphyApp extends ChangeNotifier {
       allowedExtensions: ['mp3', 'flac', 'ogg', 'opus', 'wav', 'm4a', 'aac'],
     );
     if (picked.isEmpty) return;
-    var local = sources.where((s) => s.kind == SourceKind.local).firstOrNull;
+    var local = sources
+        .where((s) => s.kind == SourceKind.local && s.url == 'file:///')
+        .firstOrNull;
     local ??= const SourceProfile(
       id: 'local',
       name: '本地音乐',
@@ -1083,31 +1103,221 @@ class SylphyApp extends ChangeNotifier {
   }
 
   Future<void> importLocalFolder() async {
-    final path = await FilePicker.getDirectoryPath();
-    if (path == null) return;
-    final id = const Uuid().v4();
-    final source = SourceProfile(
-      id: id,
-      name: p.basename(path),
-      kind: SourceKind.local,
-      url: Directory(path).uri.toString(),
-      username: '',
-    );
-    await busyRun(() async {
-      final tracks = await LocalLibrary(root).scan(Directory(path), id, []);
-      await db.putSource(source);
-      await db.replaceSourceTracks(id, tracks);
-    });
+    diagnostics.record('local_library', 'folder_picker_started');
+    if (Platform.isAndroid) {
+      try {
+        final folder = await AndroidLocalFolders.pick();
+        if (folder == null) {
+          diagnostics.record('local_library', 'folder_picker_cancelled');
+          return;
+        }
+        final id = const Uuid().v4();
+        final source = SourceProfile(
+          id: id,
+          name: folder.name,
+          kind: SourceKind.local,
+          url: folder.uri.toString(),
+          username: '',
+        );
+        diagnostics.record(
+          'local_library',
+          'folder_selected',
+          details: {'stage': 'saf'},
+        );
+        try {
+          await busyRun(() async {
+            diagnostics.record(
+              'local_library',
+              'scan_started',
+              details: {'stage': 'saf'},
+            );
+            final scan = await AndroidLocalFolders.scan(
+              uri: folder.uri,
+              sourceId: id,
+              root: root,
+            );
+            diagnostics.record(
+              'local_library',
+              'scan_completed',
+              details: {
+                'stage': 'saf',
+                'result_count': scan.files.length,
+                'visited_count': scan.visitedCount,
+                'copied_count': scan.copiedCount,
+                'reused_count': scan.reusedCount,
+              },
+            );
+            if (scan.files.isEmpty) {
+              throw StateError('所选文件夹没有识别到支持的音频文件；未添加空音乐源');
+            }
+            final tracks = await scan.buildTracks(LocalLibrary(root), id, []);
+            await db.putSource(source);
+            try {
+              await db.replaceSourceTracks(id, tracks);
+            } catch (_) {
+              await db.removeSourceData(id);
+              rethrow;
+            }
+          });
+        } catch (_) {
+          final staged = Directory(p.join(root.path, 'saf', id));
+          if (await staged.exists()) {
+            try {
+              await staged.delete(recursive: true);
+            } catch (_) {}
+          }
+          if (!sources.any((entry) => entry.url == folder.uri.toString())) {
+            try {
+              await AndroidLocalFolders.release(folder.uri);
+            } catch (_) {}
+          }
+          rethrow;
+        }
+      } catch (error) {
+        _logLocalFolderError(error, 'import');
+        rethrow;
+      }
+      return;
+    }
+
+    // Windows/Linux keep direct filesystem browsing; no Android SAF URI here.
+    try {
+      final path = await FilePicker.getDirectoryPath();
+      if (path == null) {
+        diagnostics.record('local_library', 'folder_picker_cancelled');
+        return;
+      }
+      final folder = Directory(path);
+      diagnostics.record(
+        'local_library',
+        'folder_selected',
+        details: {'directory_exists': await folder.exists()},
+      );
+      final id = const Uuid().v4();
+      final source = SourceProfile(
+        id: id,
+        name: p.basename(path),
+        kind: SourceKind.local,
+        url: folder.uri.toString(),
+        username: '',
+      );
+      await busyRun(() async {
+        diagnostics.record('local_library', 'scan_started');
+        final tracks = await LocalLibrary(root).scan(folder, id, []);
+        diagnostics.record(
+          'local_library',
+          'scan_completed',
+          details: {'result_count': tracks.length},
+        );
+        if (tracks.isEmpty) {
+          throw StateError('该文件夹没有可识别的音频文件');
+        }
+        await db.putSource(source);
+        await db.replaceSourceTracks(id, tracks);
+      });
+    } catch (error) {
+      _logLocalFolderError(error, 'import');
+      rethrow;
+    }
   }
 
   Future<void> rescanLocal(SourceProfile source) async {
     if (source.url == 'file:///') return;
-    await busyRun(() async {
-      final old = await db.tracks(sourceId: source.id, includeMissing: true);
-      final tracks = await LocalLibrary(root)
-          .scan(Directory.fromUri(Uri.parse(source.url)), source.id, old);
-      await db.replaceSourceTracks(source.id, tracks);
-    });
+    if (Platform.isAndroid && source.url.startsWith('content://')) {
+      try {
+        await busyRun(() async {
+          diagnostics.record(
+            'local_library',
+            'rescan_started',
+            details: {'stage': 'saf'},
+          );
+          final old = await db.tracks(
+            sourceId: source.id,
+            includeMissing: true,
+          );
+          final scan = await AndroidLocalFolders.scan(
+            uri: Uri.parse(source.url),
+            sourceId: source.id,
+            root: root,
+          );
+          diagnostics.record(
+            'local_library',
+            'scan_completed',
+            details: {
+              'stage': 'saf',
+              'result_count': scan.files.length,
+              'visited_count': scan.visitedCount,
+              'copied_count': scan.copiedCount,
+              'reused_count': scan.reusedCount,
+            },
+          );
+          if (scan.files.isEmpty) {
+            throw StateError('文件夹扫描得到 0 首，原曲库已保留；请检查目录访问权限和文件');
+          }
+          final tracks = await scan.buildTracks(
+            LocalLibrary(root),
+            source.id,
+            old,
+          );
+          await db.replaceSourceTracks(source.id, tracks);
+        });
+      } catch (error) {
+        _logLocalFolderError(error, 'rescan');
+        rethrow;
+      }
+      return;
+    }
+    // Existing file:// sources, including desktop folders, are unchanged.
+    diagnostics.record('local_library', 'rescan_started');
+    try {
+      await busyRun(() async {
+        final old = await db.tracks(sourceId: source.id, includeMissing: true);
+        final folder = Directory.fromUri(Uri.parse(source.url));
+        diagnostics.record(
+          'local_library',
+          'folder_selected',
+          details: {'directory_exists': await folder.exists()},
+        );
+        final tracks = await LocalLibrary(root).scan(folder, source.id, old);
+        diagnostics.record(
+          'local_library',
+          'scan_completed',
+          details: {'result_count': tracks.length},
+        );
+        if (tracks.isEmpty && old.isNotEmpty) {
+          throw StateError('文件夹扫描得到 0 首，已保留原有音乐库');
+        }
+        await db.replaceSourceTracks(source.id, tracks);
+      });
+    } catch (error) {
+      _logLocalFolderError(error, 'rescan');
+      rethrow;
+    }
+  }
+
+  void _logLocalFolderError(Object error, String stage) {
+    final reason = error is PlatformException
+        ? switch (error.code) {
+            'permission_denied' => 'permission_denied',
+            'file_missing' => 'file_missing',
+            'io_error' => 'filesystem_error',
+            _ => 'provider_error',
+          }
+        : error is FileSystemException
+        ? (error.osError?.errorCode == 13
+              ? 'permission_denied'
+              : 'filesystem_error')
+        : 'scan_error';
+    final code = error is FileSystemException ? error.osError?.errorCode : null;
+    diagnostics.record(
+      'local_library',
+      'scan_failed',
+      details: {
+        'stage': stage,
+        'reason': reason,
+        if (code != null && code >= 0) 'os_error_code': code,
+      },
+    );
   }
 
   Future<void> setDiagnosticLogging(bool value) async {

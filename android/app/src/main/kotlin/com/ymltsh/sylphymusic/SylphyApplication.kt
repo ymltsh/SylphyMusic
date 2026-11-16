@@ -124,6 +124,50 @@ class SylphyApplication : Application() {
             }
         }
         playbackBridge = FlutterMediaControllerBridge(this, engine)
+        // Application-scoped, so the engine can answer after Activity recreation.
+        MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/system_diagnostics")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "snapshot") {
+                    result.notImplemented()
+                } else try {
+                    val permission = if (Build.VERSION.SDK_INT >= 33)
+                        "android.permission.READ_MEDIA_AUDIO"
+                    else "android.permission.READ_EXTERNAL_STORAGE"
+                    val declared = try {
+                        @Suppress("DEPRECATION")
+                        val info = packageManager.getPackageInfo(
+                            packageName, android.content.pm.PackageManager.GET_PERMISSIONS
+                        )
+                        info.requestedPermissions?.contains(permission) == true
+                    } catch (_: Exception) { false }
+                    val granted = if (Build.VERSION.SDK_INT >= 23)
+                        checkSelfPermission(permission) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                    else true
+                    val grants = try { contentResolver.persistedUriPermissions.size }
+                        catch (_: Exception) { 0 }
+                    result.success(mapOf(
+                        "android_sdk" to Build.VERSION.SDK_INT,
+                        "android_release" to Build.VERSION.RELEASE,
+                        "device_brand" to Build.BRAND,
+                        "device_manufacturer" to Build.MANUFACTURER,
+                        "device_model" to Build.MODEL,
+                        "device_codename" to Build.DEVICE,
+                        "device_hardware" to Build.HARDWARE,
+                        "rom_build" to Build.DISPLAY.take(160),
+                        "rom_incremental" to Build.VERSION.INCREMENTAL.take(160),
+                        "security_patch" to (if (Build.VERSION.SDK_INT >= 23)
+                            Build.VERSION.SECURITY_PATCH else "unknown"),
+                        "cpu_abi" to Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
+                        "target_sdk" to applicationInfo.targetSdkVersion,
+                        "read_audio_permission" to granted,
+                        "read_audio_declared" to declared,
+                        "persisted_uri_grants" to grants
+                    ))
+                } catch (_: Exception) {
+                    result.success(null)
+                }
+            }
         MethodChannel(engine.dartExecutor.binaryMessenger, "music.sylphy/playback_diagnostics")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
