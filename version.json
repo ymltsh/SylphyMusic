@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.63",
-    "build": 76,
-    "name": "风灵音乐 v1.0.63",
-    "date": "2026-11-15",
-    "notes": "- 首次运行新增 LLM 增强 专属配置页，可设置模型连接、选择音乐笔友，并按需启用角色书信；也可以稍后配置。\n- 更新欢迎文案，介绍音乐笔友、角色来信与私人音乐库的相遇方式。\n- 引导调整为欢迎、设备迁移、音乐来源、音乐笔友和其他 API 五步；迁移配置后可继续确认笔友设置，API 输入框同步显示迁入值。\n- 已完成引导的用户不会重新看到引导页；仍可在推荐设置中调整模型和角色。\n",
+    "version": "1.0.64",
+    "build": 77,
+    "name": "风灵音乐 v1.0.64",
+    "date": "2026-11-16",
+    "notes": "- Android 本地文件夹导入改用系统文件夹授权，可选择支持的手机、SD 卡或 USB 目录，并导入子目录中的歌曲和同名 LRC 歌词。\n- 文件夹扫描未找到歌曲或发生异常时保留原有曲库；单文件导入与文件夹来源分开管理。\n- 黑胶唱片样式和旋转默认开启，保留已保存的关闭设置；旋转不再受系统动画开关限制，黑胶外圈与封面同步旋转。\n- 暂停或页面不可见时停止旋转并保留角度，恢复后接续旋转，切换歌曲时重新开始。\n- 开启诊断日志后补充应用版本、设备与系统信息、媒体读取权限，以及文件夹扫描阶段和脱敏错误信息，方便排查导入问题。\n\n使用提示：Android 文件夹导入会将音频和 LRC 复制到应用私有存储，会额外占用空间，首次导入大型曲库可能较慢。已有 file:// 文件夹来源不自动迁移；如无法访问，请重新添加文件夹授权。移除来源仅清理应用副本，不删除原始文件。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.64%2B77/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.64%2B77/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.64%2B77/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.64%2B77/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.64%2B77/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.63+76"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.64+77"
   },
   "history": [
+    {
+      "version": "1.0.63",
+      "build": 76,
+      "name": "风灵音乐 v1.0.63",
+      "date": "2026-11-15",
+      "notes": "- 首次运行新增 LLM 增强 专属配置页，可设置模型连接、选择音乐笔友，并按需启用角色书信；也可以稍后配置。\n- 更新欢迎文案，介绍音乐笔友、角色来信与私人音乐库的相遇方式。\n- 引导调整为欢迎、设备迁移、音乐来源、音乐笔友和其他 API 五步；迁移配置后可继续确认笔友设置，API 输入框同步显示迁入值。\n- 已完成引导的用户不会重新看到引导页；仍可在推荐设置中调整模型和角色。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.63%2B76/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.63+76"
+    },
     {
       "version": "1.0.62",
       "build": 75,
