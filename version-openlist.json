@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.65-openlist.46",
-    "build": 78,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.65-openlist.46 (arm64-v8a)",
+    "version": "1.0.66-openlist.47",
+    "build": 79,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.66-openlist.47 (arm64-v8a)",
     "date": "2026-11-16",
-    "notes": "- 歌词页的播放 / 暂停按钮圆角跟随当前播放页布局设置。\n- 支持长按复制单句歌词，无时间轴的文本歌词也可逐行复制。\n- 修正黑胶唱片的旋转范围：黑胶纹路与专辑封面同步旋转，指针和投影保持静止。\n- 保留原有旋转速度、暂停续转及应用内设置行为。\n- Android 本地文件夹导入改用系统文件夹授权，可选择支持的手机、SD 卡或 USB 目录，并导入子目录中的歌曲和同名 LRC 歌词。\n- 文件夹扫描未找到歌曲或发生异常时保留原有曲库；单文件导入与文件夹来源分开管理。\n- 黑胶唱片样式和旋转默认开启，保留已保存的关闭设置；旋转不再受系统动画开关限制，黑胶外圈与封面同步旋转。\n- 暂停或页面不可见时停止旋转并保留角度，恢复后接续旋转，切换歌曲时重新开始。\n- 开启诊断日志后补充应用版本、设备与系统信息、媒体读取权限，以及文件夹扫描阶段和脱敏错误信息，方便排查导入问题。\n\n使用提示：Android 文件夹导入会将音频和 LRC 复制到应用私有存储，会额外占用空间，首次导入大型曲库可能较慢。已有 file:// 文件夹来源不自动迁移；如无法访问，请重新添加文件夹授权。移除来源仅清理应用副本，不删除原始文件。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "notes": "- Android 横屏主界面改用侧边导航，隐藏顶部标题栏，保留系统状态栏，为内容留出更多空间。\n- 横屏搜索和设置入口固定在侧栏底部；屏幕高度不足时，主要导航入口可滚动查看。\n- 在“播放器外观 → 迷你播放器”新增“横条样式”，可选自动、PC 横条或普通横条；手动选择优先于屏幕方向和宽度适配，重启后保留。\n- PC 横条在窄屏下使用紧凑布局；普通横条停靠底部时避开系统导航栏。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.65-openlist.46%2B78/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66-openlist.47%2B79/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.65-openlist.46%2B78"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.66-openlist.47%2B79"
   },
   "history": [
+    {
+      "version": "1.0.65-openlist.46",
+      "build": 78,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.65-openlist.46 (arm64-v8a)",
+      "date": "2026-11-16",
+      "notes": "- 歌词页的播放 / 暂停按钮圆角跟随当前播放页布局设置。\n- 支持长按复制单句歌词，无时间轴的文本歌词也可逐行复制。\n- 修正黑胶唱片的旋转范围：黑胶纹路与专辑封面同步旋转，指针和投影保持静止。\n- 保留原有旋转速度、暂停续转及应用内设置行为。\n- Android 本地文件夹导入改用系统文件夹授权，可选择支持的手机、SD 卡或 USB 目录，并导入子目录中的歌曲和同名 LRC 歌词。\n- 文件夹扫描未找到歌曲或发生异常时保留原有曲库；单文件导入与文件夹来源分开管理。\n- 黑胶唱片样式和旋转默认开启，保留已保存的关闭设置；旋转不再受系统动画开关限制，黑胶外圈与封面同步旋转。\n- 暂停或页面不可见时停止旋转并保留角度，恢复后接续旋转，切换歌曲时重新开始。\n- 开启诊断日志后补充应用版本、设备与系统信息、媒体读取权限，以及文件夹扫描阶段和脱敏错误信息，方便排查导入问题。\n\n使用提示：Android 文件夹导入会将音频和 LRC 复制到应用私有存储，会额外占用空间，首次导入大型曲库可能较慢。已有 file:// 文件夹来源不自动迁移；如无法访问，请重新添加文件夹授权。移除来源仅清理应用副本，不删除原始文件。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.65-openlist.46%2B78/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.65-openlist.46%2B78"
+    },
     {
       "version": "1.0.63-openlist.45",
       "build": 76,
