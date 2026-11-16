@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.66",
-    "build": 79,
-    "name": "风灵音乐 v1.0.66",
+    "version": "1.0.67",
+    "build": 80,
+    "name": "风灵音乐 v1.0.67",
     "date": "2026-11-16",
-    "notes": "- Android 横屏主界面改用侧边导航，隐藏顶部标题栏，保留系统状态栏，为内容留出更多空间。\n- 横屏搜索和设置入口固定在侧栏底部；屏幕高度不足时，主要导航入口可滚动查看。\n- 在“播放器外观 → 迷你播放器”新增“横条样式”，可选自动、PC 横条或普通横条；手动选择优先于屏幕方向和宽度适配，重启后保留。\n- PC 横条在窄屏下使用紧凑布局；普通横条停靠底部时避开系统导航栏。\n",
+    "notes": "- 修复选择“普通横条”后，Android 横屏或桌面宽屏仍显示 PC 固定底栏的问题；现在普通横条会显示为悬浮圆角矩形迷你播放器。\n- 悬浮播放器使用 PC 样式时，同样保留圆角、投影和磨砂设置。\n- 横屏侧边导航与播放器样式分别控制，切换普通横条不改变导航布局。\n- 调整悬浮播放器的底部安全区及部分页面留白，减少系统导航栏或播放器遮挡内容的情况。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67%2B80/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67%2B80/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67%2B80/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67%2B80/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67%2B80/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.66+79"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.67+80"
   },
   "history": [
+    {
+      "version": "1.0.66",
+      "build": 79,
+      "name": "风灵音乐 v1.0.66",
+      "date": "2026-11-16",
+      "notes": "- Android 横屏主界面改用侧边导航，隐藏顶部标题栏，保留系统状态栏，为内容留出更多空间。\n- 横屏搜索和设置入口固定在侧栏底部；屏幕高度不足时，主要导航入口可滚动查看。\n- 在“播放器外观 → 迷你播放器”新增“横条样式”，可选自动、PC 横条或普通横条；手动选择优先于屏幕方向和宽度适配，重启后保留。\n- PC 横条在窄屏下使用紧凑布局；普通横条停靠底部时避开系统导航栏。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.66%2B79/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.66+79"
+    },
     {
       "version": "1.0.65",
       "build": 78,
