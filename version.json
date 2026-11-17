@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.70",
-    "build": 83,
-    "name": "风灵音乐 v1.0.70",
+    "version": "1.0.71",
+    "build": 84,
+    "name": "风灵音乐 v1.0.71",
     "date": "2026-11-18",
-    "notes": "- 日记改为在生成新每日精选或专辑精选前自动整理；普通聊天和查看已有推荐不再额外发起日记整理请求。\n- 已保存的交流、给来信的回复和真实生成的音乐来信会成为待归档经历，可立即展开查看原始内容。\n- 生成新推荐前，每次最多整理三批经历，再将更新后的连续记忆用于选曲、写信及专辑推荐；整理失败保留原始记录供以后使用。\n- 统一「关于我的音乐笔友」页面，分为「日记与记忆」「状态与世界书」两个页签；移除独立角色聊天和手动写日记按钮，来信中的聊天入口保留。\n- 普通闲聊不再重复保存为另一份短期记忆；明确偏好和话题翻篇功能保留。\n\n本次升级不清空现有日记、聊天、来信、角色卡或音乐数据。日记整理仍使用已配置的 LLM 服务，存在待归档经历时，生成新推荐前最多可能增加三次模型请求及相应费用。\n",
+    "notes": "升级前请备份应用数据库及其 WAL/SHM 文件：新版本首次启动时会一次性清空旧推荐、音乐来信、聊天、留言、日记、连续记忆、推荐统计和已触发角色事件，并移除旧碎片记忆与话题状态。\n保留音乐源、曲库、歌单、收藏、黑名单、缓存、播放队列、最近播放列表、角色卡、世界书、角色场景状态、API 配置及已有记忆停用选择。源码备份无法恢复已清理的数据库。\n\n- 角色长期记忆统一使用真实交流证据、日记和可修订的连续认知，移除平行的碎片记忆和话题锁定列表。\n- 连续认知聚焦角色想法、用户确认事实、共同经历和仍未完成的明确约定；偶然闲聊随新经历自然淡出，不再形成固定的话题黑名单。\n- 打开旧信不再重复写入记忆；聊天、来信回复和新生成的模型来信作为真实证据，生成新推荐前整理日记。\n- 聊天、每日精选与专辑精选继续共用当前角色的日记上下文，保留记忆开关、角色隔离和失败回退。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的对话；每次生成新推荐前最多可能增加三次模型请求及相应费用。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.70+83"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.71+84"
   },
   "history": [
+    {
+      "version": "1.0.70",
+      "build": 83,
+      "name": "风灵音乐 v1.0.70",
+      "date": "2026-11-18",
+      "notes": "- 日记改为在生成新每日精选或专辑精选前自动整理；普通聊天和查看已有推荐不再额外发起日记整理请求。\n- 已保存的交流、给来信的回复和真实生成的音乐来信会成为待归档经历，可立即展开查看原始内容。\n- 生成新推荐前，每次最多整理三批经历，再将更新后的连续记忆用于选曲、写信及专辑推荐；整理失败保留原始记录供以后使用。\n- 统一「关于我的音乐笔友」页面，分为「日记与记忆」「状态与世界书」两个页签；移除独立角色聊天和手动写日记按钮，来信中的聊天入口保留。\n- 普通闲聊不再重复保存为另一份短期记忆；明确偏好和话题翻篇功能保留。\n\n本次升级不清空现有日记、聊天、来信、角色卡或音乐数据。日记整理仍使用已配置的 LLM 服务，存在待归档经历时，生成新推荐前最多可能增加三次模型请求及相应费用。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.70%2B83/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.70+83"
+    },
     {
       "version": "1.0.69",
       "build": 82,
