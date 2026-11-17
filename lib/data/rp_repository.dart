@@ -65,25 +65,11 @@ class RpRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
     final rows = await Future.wait([
       db.db.query(
-        'rp_memories',
-        where: 'card_id=? AND (expires_at_ms IS NULL OR expires_at_ms>?)',
-        whereArgs: [cardId, now],
-        orderBy: 'pinned DESC,importance DESC,created_at_ms DESC',
-        limit: 100,
-      ),
-      db.db.query(
         'rp_lore_entries',
         where: 'card_id=?',
         whereArgs: [cardId],
         orderBy: 'priority DESC,id DESC',
         limit: 100,
-      ),
-      db.db.query(
-        'rp_topics',
-        where: 'card_id=?',
-        whereArgs: [cardId],
-        orderBy: 'last_at_ms DESC',
-        limit: 60,
       ),
       db.db.query(
         'rp_event_instances',
@@ -106,15 +92,13 @@ class RpRepository {
 
     return RpSnapshot(
       state: state,
-      memories: rows[0].map(RpMemory.fromRow).toList(),
-      lore: rows[1]
+      lore: rows[0]
           .map(
             (row) =>
                 RpLoreEntry.fromRow(row, parseTriggers(row['triggers_json'])),
           )
           .toList(),
-      topics: rows[2].map(RpTopic.fromRow).toList(),
-      events: rows[3].map(RpEvent.fromRow).toList(),
+      events: rows[1].map(RpEvent.fromRow).toList(),
     );
   }
 
@@ -144,127 +128,19 @@ class RpRepository {
     );
   }
 
-  Future<void> remember(
-    String cardId,
-    String kind,
-    String text, {
-    String source = 'manual',
-    String conversationKey = '',
-    int importance = 2,
-    int? expiresAtMs,
-    bool pinned = false,
-  }) async {
-    final safe = text.trim();
-    if (safe.isEmpty) return;
-    final existing = await db.db.query(
-      'rp_memories',
-      columns: ['id'],
-      where: 'card_id=? AND kind=? AND content=? AND conversation_key=?',
-      whereArgs: [
-        cardId,
-        kind,
-        safe.length > 240 ? safe.substring(0, 240) : safe,
-        conversationKey,
-      ],
-      limit: 1,
-    );
-    if (existing.isNotEmpty) {
-      if (pinned) {
-        await db.db.update(
-          'rp_memories',
-          {
-            'pinned': 1,
-            'importance': importance.clamp(1, 5),
-            'source': source,
-            'expires_at_ms': null,
-          },
-          where: 'card_id=? AND id=?',
-          whereArgs: [cardId, existing.first['id']],
-        );
-      }
-      return;
-    }
-    await db.db.insert('rp_memories', {
-      'card_id': cardId,
-      'kind': kind,
-      'content': safe.length > 240 ? safe.substring(0, 240) : safe,
-      'source': source,
-      'conversation_key': conversationKey,
-      'importance': importance.clamp(1, 5),
-      'pinned': pinned ? 1 : 0,
-      'expires_at_ms': expiresAtMs,
-      'created_at_ms': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
-
+  /// Clear derived RP memory, not character identity or authored lore.
   Future<void> clearMemories(String cardId) async {
     await db.db.transaction((tx) async {
       for (final table in <String>[
-        'rp_memories',
         'rp_journal_queue',
         'rp_journal_entries',
         'rp_continuity',
+        'rp_event_instances',
+        'rp_event_rolls',
       ]) {
         await tx.delete(table, where: 'card_id=?', whereArgs: [cardId]);
       }
     });
-  }
-
-  Future<void> deleteMemory(String cardId, int id) async {
-    await db.db.delete(
-      'rp_memories',
-      where: 'card_id=? AND id=?',
-      whereArgs: [cardId, id],
-    );
-  }
-
-  Future<void> setPinned(String cardId, int id, bool pinned) async {
-    await db.db.update(
-      'rp_memories',
-      {'pinned': pinned ? 1 : 0},
-      where: 'card_id=? AND id=?',
-      whereArgs: [cardId, id],
-    );
-  }
-
-  Future<void> putTopic(
-    String cardId,
-    String key,
-    String label,
-    String status, {
-    int cooldownDays = 7,
-    String origin = 'chat',
-  }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final existing = await db.db.query(
-      'rp_topics',
-      where: 'card_id=? AND topic_key=?',
-      whereArgs: [cardId, key],
-      limit: 1,
-    );
-    final data = <String, Object?>{
-      'label': label,
-      'origin': origin,
-      'status': status,
-      'last_at_ms': now,
-      'cooldown_until_ms': status == 'cooling'
-          ? now + Duration(days: cooldownDays).inMilliseconds
-          : 0,
-    };
-    if (existing.isEmpty) {
-      await db.db.insert('rp_topics', {
-        'card_id': cardId,
-        'topic_key': key,
-        ...data,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    } else {
-      await db.db.update(
-        'rp_topics',
-        data,
-        where: 'card_id=? AND topic_key=?',
-        whereArgs: [cardId, key],
-      );
-    }
   }
 
   Future<int> addLore(
@@ -406,17 +282,6 @@ class RpRepository {
   Future<void> prune(String cardId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await db.db.transaction((tx) async {
-      await tx.delete(
-        'rp_memories',
-        where: 'card_id=? AND pinned=0 AND expires_at_ms IS NOT NULL AND expires_at_ms<?',
-        whereArgs: [cardId, now],
-      );
-      await tx.rawDelete(
-        '''DELETE FROM rp_memories WHERE card_id=? AND pinned=0 AND kind='episode' AND id NOT IN (
-        SELECT id FROM rp_memories WHERE card_id=? AND kind='episode' ORDER BY created_at_ms DESC,id DESC LIMIT 32
-      )''',
-        [cardId, cardId],
-      );
       await tx.delete(
         'rp_event_rolls',
         where: 'card_id=? AND created_at_ms<?',

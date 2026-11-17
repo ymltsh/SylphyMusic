@@ -141,13 +141,11 @@ class _RpJournalPageState extends State<RpJournalPage> {
         String? user,
         String? relationship,
         String? open,
-        String? avoid,
       }) => RpContinuity(
         self: self ?? memory.self,
         user: user ?? memory.user,
         relationship: relationship ?? memory.relationship,
         openThreads: open ?? memory.openThreads,
-        avoidRepetition: avoid ?? memory.avoidRepetition,
         revision: memory.revision,
       );
       return ListView(
@@ -214,12 +212,6 @@ class _RpJournalPageState extends State<RpJournalPage> {
                   memory.openThreads,
                   memory,
                   (v) => revised(open: v),
-                ),
-                _continuityField(
-                  '暂时不主动重提',
-                  memory.avoidRepetition,
-                  memory,
-                  (v) => revised(avoid: v),
                 ),
               ],
             ),

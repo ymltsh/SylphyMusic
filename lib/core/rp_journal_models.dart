@@ -29,7 +29,6 @@ class RpContinuity {
     this.user = '',
     this.relationship = '',
     this.openThreads = '',
-    this.avoidRepetition = '',
     this.revision = 0,
     this.invalidated = false,
   });
@@ -38,7 +37,6 @@ class RpContinuity {
   final String user;
   final String relationship;
   final String openThreads;
-  final String avoidRepetition;
   final int revision;
   final bool invalidated;
 
@@ -47,7 +45,6 @@ class RpContinuity {
     user: row['user_facts'] as String? ?? '',
     relationship: row['relationship'] as String? ?? '',
     openThreads: row['open_threads'] as String? ?? '',
-    avoidRepetition: row['avoid_repetition'] as String? ?? '',
     revision: row['revision'] as int? ?? 0,
     invalidated: row['invalidated'] == 1,
   );
@@ -57,8 +54,6 @@ class RpContinuity {
     if (user.trim().isNotEmpty) 'confirmed_user_facts': user,
     if (relationship.trim().isNotEmpty) 'relationship_history': relationship,
     if (openThreads.trim().isNotEmpty) 'unfinished_threads': openThreads,
-    if (avoidRepetition.trim().isNotEmpty)
-      'topics_not_to_proactively_repeat': avoidRepetition,
   };
 }
 

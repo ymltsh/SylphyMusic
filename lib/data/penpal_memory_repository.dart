@@ -154,16 +154,6 @@ class PenpalMemoryRepository {
       );
       // Remove all new RP memories that originated in archived letters or
       // the chats attached to them, plus letter-derived topic cooldowns.
-      await tx.delete(
-        'rp_memories',
-        where: "card_id=? AND conversation_key<>'' AND conversation_key NOT LIKE 'rp:%'",
-        whereArgs: [cardId],
-      );
-      await tx.delete(
-        'rp_topics',
-        where: 'card_id=? AND origin=?',
-        whereArgs: [cardId, 'letter'],
-      );
       // The clear-letter confirmation covers this card's attached chats.
       await tx.delete(
         'penpal_chat_messages',
@@ -177,11 +167,6 @@ class PenpalMemoryRepository {
           whereArgs: [cardId],
         );
       }
-      await tx.delete(
-        'rp_memories',
-        where: "card_id=? AND conversation_key<>'' AND conversation_key NOT LIKE 'rp:%'",
-        whereArgs: [cardId],
-      );
       // The last continuity may include letter context. Invalidate it;
       // the surviving general RP diaries can rebuild it on next use.
       final current = await tx.query(
@@ -198,7 +183,6 @@ class PenpalMemoryRepository {
             'user_facts': '',
             'relationship': '',
             'open_threads': '',
-            'avoid_repetition': '',
             'invalidated': 1,
             'revision': (current.first['revision'] as int? ?? 0) + 1,
           },

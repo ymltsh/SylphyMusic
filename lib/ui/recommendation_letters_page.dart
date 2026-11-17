@@ -181,11 +181,6 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
         );
 
   void _openLetter(RecommendationLetter letter) {
-    unawaited(
-      widget.app.penpalMemory
-          .recordOpenedLetter(letter)
-          .catchError((Object _) {}),
-    );
     final coversFuture = _coversForLetter(letter);
     Navigator.push(
       context,

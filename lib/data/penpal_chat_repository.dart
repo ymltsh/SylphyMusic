@@ -107,11 +107,6 @@ class PenpalChatRepository {
       );
       // The RP Core episode/preferences from this specific chat are private
       // derivatives and must disappear with the chat transcript.
-      await tx.delete(
-        'rp_memories',
-        where: 'card_id=? AND conversation_key=?',
-        whereArgs: [persona, letter],
-      );
       // A deleted conversation must vanish from diary evidence too.
       await tx.delete(
         'rp_journal_queue',
@@ -137,7 +132,6 @@ class PenpalChatRepository {
             'user_facts': '',
             'relationship': '',
             'open_threads': '',
-            'avoid_repetition': '',
             'revision': (continuityRows.first['revision'] as int? ?? 0) + 1,
             'invalidated': 1,
             'updated_at_ms': DateTime.now().millisecondsSinceEpoch,

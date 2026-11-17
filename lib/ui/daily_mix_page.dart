@@ -25,7 +25,6 @@ class _DailyMixPageState extends State<DailyMixPage>
     with WidgetsBindingObserver {
   late Future<DailyMix> _mix = widget.app.recommendations.daily();
   bool _working = false;
-  final Set<String> _openedLetters = {};
   int _llmRevision = -1;
   int _deliveryGeneration = 0;
 
@@ -197,18 +196,6 @@ class _DailyMixPageState extends State<DailyMixPage>
           return const Center(child: CircularProgressIndicator());
         }
         final mix = snapshot.data!;
-        if (mix.items.isNotEmpty &&
-            _openedLetters.add('${mix.day}:${mix.generation}')) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              unawaited(
-                widget.app.penpalMemory
-                    .recordOpenedDailyMix(mix)
-                    .catchError((Object _) {}),
-              );
-            }
-          });
-        }
         if (mix.items.isEmpty) {
           return const Center(
             child: Padding(

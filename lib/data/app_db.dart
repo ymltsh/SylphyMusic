@@ -84,7 +84,7 @@ class AppDb {
     'CREATE INDEX idx_penpal_outbox_card ON penpal_outbox(card_id,created_at_ms DESC)',
   ];
   // RP Core v21: per-card state, evidence-based memories and world events.
-  // RP Journal v22: additive diary and durable evidence queue.
+  // RP Journal v23: diary is durable memory, continuity is its summary.
   static const _rpJournalV22Schema = <String>[
     '''CREATE TABLE rp_journal_queue(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,7 +110,6 @@ class AppDb {
       user_facts TEXT NOT NULL DEFAULT '',
       relationship TEXT NOT NULL DEFAULT '',
       open_threads TEXT NOT NULL DEFAULT '',
-      avoid_repetition TEXT NOT NULL DEFAULT '',
       revision INTEGER NOT NULL DEFAULT 0,
       invalidated INTEGER NOT NULL DEFAULT 0,
       updated_at_ms INTEGER NOT NULL)''',
@@ -125,18 +124,6 @@ class AppDb {
       memory_enabled INTEGER NOT NULL DEFAULT 1,
       events_enabled INTEGER NOT NULL DEFAULT 1,
       updated_at_ms INTEGER NOT NULL)''',
-    '''CREATE TABLE rp_memories(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      card_id TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK(kind IN ('preference','episode','reflection','agreement','user_reply')),
-      content TEXT NOT NULL,
-      source TEXT NOT NULL,
-      conversation_key TEXT NOT NULL DEFAULT '',
-      importance INTEGER NOT NULL DEFAULT 2,
-      pinned INTEGER NOT NULL DEFAULT 0,
-      expires_at_ms INTEGER,
-      created_at_ms INTEGER NOT NULL)''',
-    'CREATE INDEX idx_rp_memories_card ON rp_memories(card_id,created_at_ms DESC)',
     '''CREATE TABLE rp_lore_entries(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id TEXT NOT NULL,
@@ -150,15 +137,6 @@ class AppDb {
       enabled INTEGER NOT NULL DEFAULT 1,
       last_triggered_ms INTEGER NOT NULL DEFAULT 0)''',
     'CREATE INDEX idx_rp_lore_card ON rp_lore_entries(card_id,kind,enabled)',
-    '''CREATE TABLE rp_topics(
-      card_id TEXT NOT NULL,
-      topic_key TEXT NOT NULL,
-      label TEXT NOT NULL,
-      origin TEXT NOT NULL DEFAULT 'chat',
-      status TEXT NOT NULL CHECK(status IN ('active','cooling','resolved')),
-      last_at_ms INTEGER NOT NULL,
-      cooldown_until_ms INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY(card_id,topic_key))''',
     '''CREATE TABLE rp_event_instances(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id TEXT NOT NULL,
@@ -334,7 +312,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 22,
+      version: 23,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -522,6 +500,44 @@ class AppDb {
           for (final sql in _rpJournalV22Schema) {
             await database.execute(sql);
           }
+        }
+        if (oldVersion < 23) {
+          // Breaking RP memory redesign. Do not import legacy fragment topics,
+          // chat transcripts, recommendation letters or old listening analytics.
+          // Source accounts, library, playlists, favorites, role cards, custom
+          // lore definitions, memory opt-out choices and recent-play IDs stay.
+          for (final table in <String>[
+            'recommendation_items',
+            'recommendation_snapshots',
+            'recommendation_letters',
+            'recommendation_feedback',
+            'listening_sessions',
+            'track_listen_stats',
+            'penpal_chat_messages',
+            'penpal_memory_events',
+            'penpal_outbox',
+            'rp_event_instances',
+            'rp_event_rolls',
+          ]) {
+            await database.delete(table);
+          }
+          for (final table in <String>[
+            'rp_memories',
+            'rp_topics',
+            'rp_journal_queue',
+            'rp_journal_entries',
+            'rp_continuity',
+          ]) {
+            await database.execute('DROP TABLE IF EXISTS $table');
+          }
+          for (final sql in _rpJournalV22Schema) {
+            await database.execute(sql);
+          }
+          await database.delete(
+            'settings',
+            where: 'key=?',
+            whereArgs: ['recommendation_public_charts_v1'],
+          );
         }
       },
       onCreate: (d, v) async {

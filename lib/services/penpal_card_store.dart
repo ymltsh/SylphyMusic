@@ -473,9 +473,7 @@ class PenpalCardStore extends ChangeNotifier {
       );
       // Remove all RP records when a character card is deleted.
       for (final table in <String>[
-        'rp_memories',
         'rp_lore_entries',
-        'rp_topics',
         'rp_event_instances',
         'rp_event_rolls',
         'rp_character_state',

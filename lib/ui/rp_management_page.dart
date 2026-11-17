@@ -127,7 +127,9 @@ class _RpManagementPageState extends State<RpManagementPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清空当前角色的 RP 记忆？'),
-        content: const Text('仅清除该角色的新 RP 记忆。世界书、角色卡、场景和聊天原文不会自动删除。此操作不可撤销。'),
+        content: const Text(
+          '清除当前角色的日记、连续认知和已发生事件；保留角色卡、世界书与场景设置。聊天原文单独管理。此操作不可撤销。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -296,78 +298,6 @@ class _RpManagementPageState extends State<RpManagementPage> {
                     ),
                   ]),
                   _section(
-                    '长期记忆与近期经历',
-                    [
-                      for (final memory in data.memories.take(50))
-                        ListTile(
-                          title: Text(
-                            memory.content,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text('${memory.kind} · ${memory.source}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  memory.pinned
-                                      ? Icons.push_pin
-                                      : Icons.push_pin_outlined,
-                                ),
-                                tooltip: memory.pinned ? '取消固定' : '固定记忆',
-                                onPressed: _busy
-                                    ? null
-                                    : () => _act(
-                                        () => widget.app.rpRuntime.repository
-                                            .setPinned(
-                                              _id,
-                                              memory.id,
-                                              !memory.pinned,
-                                            ),
-                                      ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: '删除记忆',
-                                onPressed: _busy
-                                    ? null
-                                    : () => _act(
-                                        () => widget.app.rpRuntime.repository
-                                            .deleteMemory(_id, memory.id),
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (data.memories.isEmpty)
-                        const ListTile(
-                          subtitle: Text('新的记忆从现在开始；旧推荐与聊天不会迁入这里。'),
-                        ),
-                    ],
-                    action: IconButton(
-                      icon: const Icon(Icons.add),
-                      tooltip: '记住一件事',
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              final text = await _text('手动记住', '');
-                              if (text != null && text.isNotEmpty)
-                                await _act(
-                                  () =>
-                                      widget.app.rpRuntime.repository.remember(
-                                        _id,
-                                        'preference',
-                                        text,
-                                        source: 'user_confirmed',
-                                        importance: 5,
-                                        pinned: true,
-                                      ),
-                                );
-                            },
-                    ),
-                  ),
-                  _section(
                     '世界书与随机事件',
                     [
                       for (final item in data.lore)
@@ -415,62 +345,6 @@ class _RpManagementPageState extends State<RpManagementPage> {
                         PopupMenuItem(value: 'event', child: Text('新增随机事件')),
                       ],
                       icon: const Icon(Icons.add),
-                    ),
-                  ),
-                  _section(
-                    '话题与翻篇',
-                    [
-                      for (final item in data.topics.take(30))
-                        ListTile(
-                          title: Text(item.label),
-                          subtitle: Text(item.status),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (status) => _act(
-                              () => widget.app.rpRuntime.markTopic(
-                                _id,
-                                item.label,
-                                status,
-                              ),
-                            ),
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'active',
-                                child: Text('重新开启'),
-                              ),
-                              PopupMenuItem(
-                                value: 'cooling',
-                                child: Text('暂不再提（7 天）'),
-                              ),
-                              PopupMenuItem(
-                                value: 'resolved',
-                                child: Text('已经翻篇'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (data.topics.isEmpty)
-                        const ListTile(subtitle: Text('尚无话题记录')),
-                    ],
-                    action: IconButton(
-                      icon: const Icon(Icons.add),
-                      tooltip: '标记已翻篇',
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              final text = await _text(
-                                '哪个话题已经翻篇？',
-                                '',
-                                maxLength: 28,
-                              );
-                              if (text != null && text.isNotEmpty)
-                                await _act(
-                                  () => widget.app.rpRuntime.markTopic(
-                                    _id,
-                                    text,
-                                    'resolved',
-                                  ),
-                                );
-                            },
                     ),
                   ),
                   _section('最近事件', [

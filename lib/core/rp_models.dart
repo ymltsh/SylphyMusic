@@ -31,36 +31,6 @@ class RpCharacterState {
       );
 }
 
-class RpMemory {
-  const RpMemory({
-    required this.id,
-    required this.kind,
-    required this.content,
-    required this.source,
-    required this.importance,
-    required this.pinned,
-    required this.createdAtMs,
-  });
-
-  final int id;
-  final String kind;
-  final String content;
-  final String source;
-  final int importance;
-  final bool pinned;
-  final int createdAtMs;
-
-  factory RpMemory.fromRow(Map<String, Object?> row) => RpMemory(
-    id: row['id'] as int,
-    kind: row['kind'] as String,
-    content: row['content'] as String,
-    source: row['source'] as String? ?? '',
-    importance: row['importance'] as int? ?? 1,
-    pinned: row['pinned'] == 1,
-    createdAtMs: row['created_at_ms'] as int,
-  );
-}
-
 class RpLoreEntry {
   const RpLoreEntry({
     required this.id,
@@ -101,29 +71,6 @@ class RpLoreEntry {
       );
 }
 
-class RpTopic {
-  const RpTopic({
-    required this.key,
-    required this.label,
-    required this.status,
-    required this.lastAtMs,
-    required this.cooldownUntilMs,
-  });
-  final String key;
-  final String label;
-  final String status;
-  final int lastAtMs;
-  final int cooldownUntilMs;
-
-  factory RpTopic.fromRow(Map<String, Object?> row) => RpTopic(
-    key: row['topic_key'] as String,
-    label: row['label'] as String,
-    status: row['status'] as String,
-    lastAtMs: row['last_at_ms'] as int,
-    cooldownUntilMs: row['cooldown_until_ms'] as int? ?? 0,
-  );
-}
-
 class RpEvent {
   const RpEvent({
     required this.id,
@@ -150,14 +97,10 @@ class RpEvent {
 class RpSnapshot {
   const RpSnapshot({
     required this.state,
-    required this.memories,
     required this.lore,
-    required this.topics,
     required this.events,
   });
   final RpCharacterState state;
-  final List<RpMemory> memories;
   final List<RpLoreEntry> lore;
-  final List<RpTopic> topics;
   final List<RpEvent> events;
 }

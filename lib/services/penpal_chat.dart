@@ -170,7 +170,7 @@ class PenpalChatService {
                 '现在与用户自然交谈，保持当前角色卡的身份、性格和独立判断。'
                 '可以谈音乐，也能自由聊别的事；自然回应，不输出推荐 JSON。'
                 'RP 状态是虚构叙事，不可伪称用户现实中和你共同经历了事件。'
-                '已结束或冷却话题不得由你主动重开，除非本轮用户主动提及。'
+                '旧事会自然淡出，但用户主动回忆时，应忠实依据已保存的日记回应。'
                 '用户真实说过的话和已有互动才是共同回忆；角色的原作背景自然属于角色自身。'
                 '角色日记与连续记忆属于已整理的经历；它们不要求主动复述旧话题。'
                 '用户询问过去时优先依据日记回答，没有记录就明确说明。'
@@ -218,16 +218,6 @@ class PenpalChatService {
           assistant: answer,
           stillValid: valid,
         );
-        try {
-          await rpRuntime.recordTurn(
-            persona,
-            messages.last.content,
-            answer,
-            conversationKey: letter,
-          );
-        } catch (_) {
-          // Roleplay memory is best-effort; a successful chat remains saved.
-        }
         // Evidence was saved transactionally; do not run a second LLM here.
       }
       check();

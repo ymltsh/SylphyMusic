@@ -231,7 +231,6 @@ class RecommendationService {
       // Legacy chat memories were purged in v21. Use the unified RP runtime
       // for state, conditional world lore, episodic recall and topic cooldown.
       Map<String, Object?> memoryContext = const {};
-      List<String> explicitPreferences = const [];
       var rpReady = rpRuntime != null && journal != null && memory != null;
       if (rpReady) {
         try {
@@ -243,14 +242,6 @@ class RecommendationService {
             currentMessage: pendingNote?.content ?? '',
             checkEvents: true,
           );
-          if (memoryContext['rp_recall_allowed'] == true) {
-            final rpState = await rpRuntime!.snapshot(activeCardId);
-            explicitPreferences = rpState.memories
-                .where((entry) => entry.kind == 'preference')
-                .take(8)
-                .map((entry) => entry.content)
-                .toList();
-          }
         } catch (_) {
           // An unavailable RP context produces a local recommendation,
           // never a memoryless AI letter marked as a successful RP result.
@@ -263,7 +254,6 @@ class RecommendationService {
               now: now,
               mainLetter: mainLetter,
               penpalMemory: memoryContext,
-              explicitPreferences: explicitPreferences,
               pendingLetter: pendingNote?.content ?? '',
               onWriting: () => dailyStage.value = DailyLetterStage.writing,
               playCounts: {
@@ -344,19 +334,6 @@ class RecommendationService {
       llmSucceeded: letterFromLlm,
       answeredNote: letterFromLlm ? pendingNote : null,
     );
-    if (rpRuntime != null) {
-      try {
-        await rpRuntime!.recordLetter(
-          activeCardId,
-          title: title,
-          day: day,
-          generation: generation,
-          topic: letterFromLlm ? letterTopic : '',
-        );
-      } catch (_) {
-        // The recommendation and letter have already been committed.
-      }
-    }
     if (letterFromLlm && journal != null) {
       try {
         await journal!.repository.enqueueLetter(
