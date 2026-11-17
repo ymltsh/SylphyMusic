@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.67-openlist.48",
-    "build": 80,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.67-openlist.48 (arm64-v8a)",
-    "date": "2026-11-16",
-    "notes": "- 修复选择“普通横条”后，Android 横屏或桌面宽屏仍显示 PC 固定底栏的问题；现在普通横条会显示为悬浮圆角矩形迷你播放器。\n- 悬浮播放器使用 PC 样式时，同样保留圆角、投影和磨砂设置。\n- 横屏侧边导航与播放器样式分别控制，切换普通横条不改变导航布局。\n- 调整悬浮播放器的底部安全区及部分页面留白，减少系统导航栏或播放器遮挡内容的情况。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "version": "1.0.68-openlist.49",
+    "build": 81,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.68-openlist.49 (arm64-v8a)",
+    "date": "2026-11-18",
+    "notes": "- 新增角色状态与世界书管理，可直接与角色聊天，无需先生成音乐来信；支持管理长期记忆、近期经历、随机事件和已翻篇的话题。\n- 聊天与音乐来信使用统一的角色上下文，将明确偏好与临时闲聊分开，减少无关旧话题反复进入新来信的情况。\n- 播放页封面可逐组件选择圆角、黑胶或沉浸样式；沉浸封面默认顶部半屏、向下渐隐，可自由调整位置、尺寸和渐隐方向。\n- 播放画布延伸至顶部透明状态栏；播放键新增透明颜色，完整歌词页同步使用播放页设置的播放键颜色。\n- 迷你播放器悬浮按钮固定为圆形唱片，不受播放页封面样式影响，播放时旋转、暂停时保持角度。\n\n升级前请备份应用数据库：本次升级会清空旧推荐、音乐来信、笔友聊天、记忆、留言及推荐统计。音乐源、曲库、歌单、收藏、缓存、角色卡、配置和最近播放列表保留。旧版播放页布局不再读取，需要重新布置。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67-openlist.48%2B80/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68-openlist.49%2B81/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.67-openlist.48%2B80"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.68-openlist.49%2B81"
   },
   "history": [
+    {
+      "version": "1.0.67-openlist.48",
+      "build": 80,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.67-openlist.48 (arm64-v8a)",
+      "date": "2026-11-16",
+      "notes": "- 修复选择“普通横条”后，Android 横屏或桌面宽屏仍显示 PC 固定底栏的问题；现在普通横条会显示为悬浮圆角矩形迷你播放器。\n- 悬浮播放器使用 PC 样式时，同样保留圆角、投影和磨砂设置。\n- 横屏侧边导航与播放器样式分别控制，切换普通横条不改变导航布局。\n- 调整悬浮播放器的底部安全区及部分页面留白，减少系统导航栏或播放器遮挡内容的情况。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.67-openlist.48%2B80/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.67-openlist.48%2B80"
+    },
     {
       "version": "1.0.66-openlist.47",
       "build": 79,
