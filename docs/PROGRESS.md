@@ -1,5 +1,9 @@
 # 实施与验证记录
 
+## 2026-11-18 RP Journal 与统一上下文发布 1.0.69+82
+
+前轮用户“应用，推送更新”已完成：普通版 1.0.69+82 和 OpenList 1.0.69-openlist.50+82 均已发布，包含日记 v22 与统一上下文增量。普通版 7 个、特别版 3 个附件的大小 / SHA-256、发布标题 / 正文 / 状态及原始 / 加速清单均核对通过。特别版上一轮在清单传播核对时收到新任务，已通过现有发布入口的 --finish-verification 完成只读远端核对，publish-state 更新为 complete，未重复发布。构建产物与日志分别位于 build/releases/1.0.69-82/、build/release82-publish.log 和 OpenList 工作区 build/releases/1.0.69-openlist.50-82/、build/openlist-release82-build.log、openlist-release82-prepare.log、openlist-release82-publish.log、openlist-release82-finish.log。未运行测试或实际应用，未迁移用户数据库。
+
 ## 2026-11-18 RP Journal v22 同步到 OpenList
 
 按用户“open list 和 main 保持同步”要求，将本轮 RP Journal v22 与编译修正同步到 OpenList，保留特别版专属服务与已有工作区改动。相关 14 个源码文件中 13 个与 main 完全一致，应用控制器差异仅为 OpenList 专属集成。OpenList arm64 Android Release 编译成功，产物位于 ../sylphy_music_feature/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk，日志 build/test_logs/rp-journal-v22-sync-build.log（位于 OpenList 工作区）。根目录 AGENTS.md 记录今后通用功能与修正默认同步两工作区的用户约定，保留各自版本 / 清单，发布仍按用户授权。本轮未运行 analyze、测试或应用，未迁移实际数据库，未提交、推送或发布。

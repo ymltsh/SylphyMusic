@@ -62,6 +62,33 @@ class RpJournalService {
     };
   }
 
+  /// New recommendations are the one lifecycle boundary for LLM diary work.
+  /// Cached recommendation reads and ordinary chat never spend diary tokens.
+  /// Up to three small batches prevent unbounded API calls on large backlogs.
+  /// Failed consolidation leaves actual evidence in the durable queue and in
+  /// the next RP prompt; no fabricated continuity is written.
+  Future<void> prepareForRecommendation(String cardId) async {
+    if (_closed || !settings.llmEnabled || settings.activeCardId != cardId) {
+      return;
+    }
+    for (var batch = 0; batch < 3; batch++) {
+      final pending = await repository.pending(cardId, limit: 1);
+      final before = await repository.continuity(cardId);
+      if (pending.isEmpty && !before.invalidated) return;
+      // A single digest consumes up to eight pieces of evidence from one
+      // conversation; the next iteration handles another thread, if any.
+      try {
+        await maybeConsolidate(cardId, force: true);
+      } catch (_) {
+        return; // Leave the evidence untouched for the next recommendation.
+      }
+      final after = await repository.continuity(cardId);
+      if (after.revision == before.revision) {
+        return; // Offline/invalid response, or another request was already running.
+      }
+    }
+  }
+
   /// Digests only if a meaningful batch exists. The oldest conversation's
   /// evidence is kept together, so deleting that conversation is traceable.
   Future<void> maybeConsolidate(

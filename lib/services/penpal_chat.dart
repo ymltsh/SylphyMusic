@@ -115,13 +115,7 @@ class PenpalChatService {
     if (!settings.llmEnabled) throw StateError('请在推荐设置开启 LLM，并在 API 设置配置连接');
     check();
     final state = await memory.snapshot();
-    // New conversations consolidate pending evidence from previous threads.
-    // Failure is non-fatal: recent undigested turns remain in the context.
-    if (state.enabled && state.recallEnabled) {
-      try {
-        await journal.maybeConsolidate(persona, nextConversation: letter);
-      } catch (_) {}
-    }
+    // Conversations save evidence; recommendation generation organizes it.
     // Keep the same RP context policy used by selection and writing.
     // Failed retrieval must not silently produce an amnesiac AI answer.
     final context = await RpPromptContext.build(
@@ -234,9 +228,7 @@ class PenpalChatService {
         } catch (_) {
           // Roleplay memory is best-effort; a successful chat remains saved.
         }
-        // The queued evidence is already committed. Digest only at a
-        // meaningful boundary; do not delay the user's chat response.
-        unawaited(journal.maybeConsolidate(persona).catchError((Object _) {}));
+        // Evidence was saved transactionally; do not run a second LLM here.
       }
       check();
       return answer;

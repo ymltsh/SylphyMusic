@@ -170,3 +170,5 @@ LLM 服务可能收费，手动换新推荐或聊天也可能消耗额度。不�
 © 2026 Sylphy Music · <a href="https://sylphy.ymltsh.com/">官网</a> · <a href="https://github.com/ymltsh/SylphyMusic">GitHub</a> · <a href="LICENSE">MIT License</a></sub></p>
 
 聊天、每日精选与专辑精选现共用当前角色的连续记忆、日记和允许引用的上下文；已有推荐结果保留，手动换新或下一时段生成才使用新逻辑。详见 [RP 统一上下文 V22](docs/RP_SHARED_CONTEXT_V22.md)。
+
+「关于我的音乐笔友」统一展示日记、连续记忆、角色状态与世界书；来信聊天保存的经历可立即查看，生成新推荐前自动整理日记。详见 [RP 日记生命周期 V23](docs/RP_JOURNAL_LIFECYCLE_V23.md)。

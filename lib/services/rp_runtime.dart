@@ -158,7 +158,6 @@ class RpRuntime {
     if (content.isEmpty) return;
     final state = await repository.ensureState(cardId);
     if (!state.memoryEnabled) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
     final wantsEnd = RegExp(r'翻篇|换个话题|不要再提|别再提|不想再聊|就聊到这').hasMatch(content);
     if (wantsEnd) {
       final history = await repository.snapshot(cardId);
@@ -184,17 +183,9 @@ class RpRuntime {
         conversationKey: conversationKey,
         importance: 4,
       );
-    } else {
-      await repository.remember(
-        cardId,
-        'episode',
-        content,
-        source: 'user_chat',
-        conversationKey: conversationKey,
-        importance: 1,
-        expiresAtMs: now + const Duration(days: 7).inMilliseconds,
-      );
     }
+    // Genuine dialogue is already saved as journal evidence; do not duplicate
+    // each ordinary utterance as another unrelated RP episode memory.
     final requestTopic = RegExp(r'(?:聊聊|谈谈|说说|关于)([^，。！？]{2,16})')
         .firstMatch(content);
     if (requestTopic != null && !wantsEnd) {

@@ -64,13 +64,44 @@ class RpJournalRepository {
     final results = await Future.wait([
       continuity(cardId),
       recentDiaries(cardId, limit: 80),
-      pending(cardId, limit: 1000),
+      recentPending(cardId, limit: 12),
     ]);
+    final countRows = await db.db.rawQuery(
+      'SELECT COUNT(*) AS amount FROM rp_journal_queue '
+      'WHERE card_id=? AND digested_at_ms IS NULL',
+      [cardId],
+    );
     return RpJournalSnapshot(
       continuity: results[0] as RpContinuity,
       entries: results[1] as List<RpJournalEntry>,
-      pending: (results[2] as List<RpJournalTurn>).length,
+      pending: (countRows.first['amount'] as int?) ?? 0,
+      drafts: results[2] as List<RpJournalTurn>,
     );
+  }
+
+  /// Store a user note/reply as real unpolished diary evidence.
+  Future<void> enqueueUserReply(
+    String cardId,
+    String conversationKey,
+    String text,
+  ) async {
+    final content = text.trim();
+    if (content.isEmpty) return;
+    final role = await db.db.query(
+      'rp_character_state',
+      columns: ['memory_enabled'],
+      where: 'card_id=?',
+      whereArgs: [cardId],
+      limit: 1,
+    );
+    if (role.isNotEmpty && role.first['memory_enabled'] == 0) return;
+    await db.db.insert('rp_journal_queue', {
+      'card_id': cardId,
+      'conversation_key': 'letter:$conversationKey',
+      'user_text': content.length > 1200 ? content.substring(0, 1200) : content,
+      'assistant_text': '',
+      'occurred_at_ms': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 
   Future<void> enqueueLetter(

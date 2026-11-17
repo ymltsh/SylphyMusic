@@ -47,6 +47,25 @@ class RecommendationService {
   final PenpalMemory? memory;
   final RpRuntime? rpRuntime;
   final RpJournalService? journal;
+
+  /// Called only after a cached snapshot has been ruled out.
+  Future<void> _prepareJournalForRecommendation(String cardId) async {
+    if (_closed ||
+        llm?.enabled != true ||
+        journal == null ||
+        memory == null ||
+        memory!.personaKey != cardId)
+      return;
+    try {
+      final state = await memory!.snapshot();
+      if (!state.enabled || !state.recallEnabled) return;
+      await journal!.prepareForRecommendation(cardId);
+    } catch (_) {
+      // Never block a recommendation because diary processing failed.
+      // Pending evidence remains available to the shared RP context.
+    }
+  }
+
   final PenpalMailboxRepository? mailbox;
   final PublicMusicTrends _trends;
   final RecommendationEngine _engine = const RecommendationEngine();
@@ -129,6 +148,7 @@ class RecommendationService {
         );
       }
     }
+    await _prepareJournalForRecommendation(activeCardId);
     dailyStage.value = DailyLetterStage.selecting;
     final generation = await repository.nextDailyGeneration(
       day,
@@ -415,6 +435,7 @@ class RecommendationService {
         return ready;
       }
     }
+    await _prepareJournalForRecommendation(memory?.personaKey ?? 'primary');
     final generation = (previous?.generation ?? -1) + 1;
     final seed = stableSeed('albums:$day:$generation:v1');
     final candidates = await repository.albumCandidates();

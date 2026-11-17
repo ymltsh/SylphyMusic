@@ -2,15 +2,17 @@ import '../core/penpal_models.dart';
 import '../core/recommendation_models.dart';
 import '../data/penpal_memory_repository.dart';
 import 'api_settings.dart';
+import 'rp_journal_service.dart';
 import 'rp_runtime.dart';
 
 /// A compact, card-scoped penpal memory. Persona follows the active card.
 /// Truth checks stay in application logic, not in autobiographical notes.
 class PenpalMemory {
-  PenpalMemory(this.repository, this.settings, {this.rpRuntime});
+  PenpalMemory(this.repository, this.settings, {this.rpRuntime, this.journal});
   final PenpalMemoryRepository repository;
   final ApiSettings settings;
   final RpRuntime? rpRuntime;
+  final RpJournalService? journal;
   bool _closed = false;
   int revision = 0;
 
@@ -140,6 +142,17 @@ class PenpalMemory {
     // Explicit user replies now belong to the RP Core, not legacy memory.
     if (rpRuntime != null) {
       await rpRuntime!.recordUserReply(author, '$day:$generation', value);
+      // An explicit letter response is part of the user's genuine history,
+      // even when no separate chat window was opened.
+      try {
+        await journal?.repository.enqueueUserReply(
+          author,
+          '$day:$generation',
+          value,
+        );
+      } catch (_) {
+        // Do not fail an already saved response because diary is unavailable.
+      }
     }
   }
 

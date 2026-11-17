@@ -91,9 +91,14 @@ class RpJournalSnapshot {
     required this.continuity,
     required this.entries,
     required this.pending,
+    required this.drafts,
   });
 
   final RpContinuity continuity;
   final List<RpJournalEntry> entries;
   final int pending;
+
+  /// Actual saved dialogue or a real generated letter, visible immediately.
+  /// The LLM later organizes this evidence into a polished diary entry.
+  final List<RpJournalTurn> drafts;
 }

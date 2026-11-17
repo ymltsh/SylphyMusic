@@ -108,6 +108,7 @@ class SylphyApp extends ChangeNotifier {
     PenpalMemoryRepository(db),
     apiSettings,
     rpRuntime: rpRuntime,
+    journal: rpJournal,
   );
   late final penpalChat = PenpalChatService(
     apiSettings,

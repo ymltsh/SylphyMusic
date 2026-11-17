@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/rp_models.dart';
-import 'penpal_chat_page.dart';
 import 'rp_journal_page.dart';
 
 /// Character-scoped RP controls. No network calls or generated autobiography.
@@ -163,361 +162,360 @@ class _RpManagementPageState extends State<RpManagementPage> {
       );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('RP 角色状态与世界书')),
-    body: FutureBuilder<RpSnapshot>(
-      future: _load,
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Center(
-            child: TextButton(
-              onPressed: () => setState(() => _load = _read()),
-              child: const Text('读取失败，点击重试'),
-            ),
-          );
-        }
-        if (!snap.hasData)
-          return const Center(child: CircularProgressIndicator());
-        final data = snap.data!;
-        final state = data.state;
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text(
-                '角色卡规定身份；这里维护当前场景、真正值得记住的事与可触发的世界事件。'
-                '随机事件只会在前台交互时检查，不会在后台持续运行。',
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PenpalChatPage(
-                    app: widget.app,
-                    letterKey: 'rp:general',
-                    letterTitle: '和笔友聊聊',
-                    letterContext: '',
-                  ),
-                ),
-              ),
-              icon: const Icon(Icons.forum_outlined),
-              label: const Text('和角色聊天（不依赖音乐来信）'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.menu_book_outlined),
-              label: const Text('角色日记与连续记忆'),
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => RpJournalPage(app: widget.app),
-                ),
-              ),
-            ),
-            _section('角色当前状态', [
-              ListTile(
-                title: const Text('当前场景'),
-                subtitle: Text(state.scene),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: _busy
-                    ? null
-                    : () async {
-                        final text = await _text('当前场景', state.scene);
-                        if (text != null && text.isNotEmpty)
-                          await _act(
-                            () => widget.app.rpRuntime.repository.updateState(
-                              _id,
-                              scene: text,
-                            ),
-                          );
-                      },
-              ),
-              ListTile(
-                title: const Text('正在做什么'),
-                subtitle: Text(state.activity),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: _busy
-                    ? null
-                    : () async {
-                        final text = await _text('角色当前活动', state.activity);
-                        if (text != null && text.isNotEmpty)
-                          await _act(
-                            () => widget.app.rpRuntime.repository.updateState(
-                              _id,
-                              activity: text,
-                            ),
-                          );
-                      },
-              ),
-              ListTile(
-                title: const Text('当前目标'),
-                subtitle: Text(state.goal),
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: _busy
-                    ? null
-                    : () async {
-                        final text = await _text('角色当前目标', state.goal);
-                        if (text != null && text.isNotEmpty)
-                          await _act(
-                            () => widget.app.rpRuntime.repository.updateState(
-                              _id,
-                              goal: text,
-                            ),
-                          );
-                      },
-              ),
-              ListTile(
-                title: const Text('叙事精力'),
-                subtitle: Text('${state.energy} / 100（角色演绎状态）'),
-                trailing: PopupMenuButton<int>(
-                  tooltip: '调整叙事精力',
-                  onSelected: (value) => _act(
-                    () => widget.app.rpRuntime.repository.updateState(
-                      _id,
-                      energy: value,
-                    ),
-                  ),
-                  itemBuilder: (_) => [
-                    for (final n in [20, 40, 60, 80, 100])
-                      PopupMenuItem(value: n, child: Text('$n / 100')),
-                  ],
-                ),
-              ),
-              SwitchListTile(
-                title: const Text('使用 RP 记忆'),
-                subtitle: const Text('关闭时不记录或召回 RP 记忆；单独保存的聊天记录仍由聊天页面管理'),
-                value: state.memoryEnabled,
-                onChanged: _busy
-                    ? null
-                    : (v) => _act(
-                        () => widget.app.rpRuntime.repository.updateState(
-                          _id,
-                          memoryEnabled: v,
-                        ),
-                      ),
-              ),
-              SwitchListTile(
-                title: const Text('随机世界事件'),
-                subtitle: const Text('仅前台交互触发，每个本地自然日最多抽取一次'),
-                value: state.eventsEnabled,
-                onChanged: _busy
-                    ? null
-                    : (v) => _act(
-                        () => widget.app.rpRuntime.repository.updateState(
-                          _id,
-                          eventsEnabled: v,
-                        ),
-                      ),
-              ),
-            ]),
-            _section(
-              '长期记忆与近期经历',
-              [
-                for (final memory in data.memories.take(50))
-                  ListTile(
-                    title: Text(
-                      memory.content,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text('${memory.kind} · ${memory.source}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            memory.pinned
-                                ? Icons.push_pin
-                                : Icons.push_pin_outlined,
-                          ),
-                          tooltip: memory.pinned ? '取消固定' : '固定记忆',
-                          onPressed: _busy
-                              ? null
-                              : () => _act(
-                                  () =>
-                                      widget.app.rpRuntime.repository.setPinned(
-                                        _id,
-                                        memory.id,
-                                        !memory.pinned,
-                                      ),
-                                ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          tooltip: '删除记忆',
-                          onPressed: _busy
-                              ? null
-                              : () => _act(
-                                  () => widget.app.rpRuntime.repository
-                                      .deleteMemory(_id, memory.id),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (data.memories.isEmpty)
-                  const ListTile(subtitle: Text('新的记忆从现在开始；旧推荐与聊天不会迁入这里。')),
-              ],
-              action: IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: '记住一件事',
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final text = await _text('手动记住', '');
-                        if (text != null && text.isNotEmpty)
-                          await _act(
-                            () => widget.app.rpRuntime.repository.remember(
-                              _id,
-                              'preference',
-                              text,
-                              source: 'user_confirmed',
-                              importance: 5,
-                              pinned: true,
-                            ),
-                          );
-                      },
-              ),
-            ),
-            _section(
-              '世界书与随机事件',
-              [
-                for (final item in data.lore)
-                  ListTile(
-                    title: Text(
-                      '${item.kind == 'event' ? '🎲 ' : '📖 '}${item.title}',
-                    ),
-                    subtitle: Text(
-                      '${item.content}\n${item.triggers.isEmpty ? '随机事件' : '触发：${item.triggers.join('、')}'}',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    isThreeLine: true,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Switch(
-                          value: item.enabled,
-                          onChanged: _busy
-                              ? null
-                              : (v) => _act(
-                                  () => widget.app.rpRuntime.repository
-                                      .enableLore(_id, item.id, v),
-                                ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          tooltip: '删除条目',
-                          onPressed: _busy
-                              ? null
-                              : () => _act(
-                                  () => widget.app.rpRuntime.repository
-                                      .removeLore(_id, item.id),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-              action: PopupMenuButton<String>(
-                tooltip: '新增世界书或事件',
-                onSelected: _addLore,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'lore', child: Text('新增世界设定')),
-                  PopupMenuItem(value: 'event', child: Text('新增随机事件')),
-                ],
-                icon: const Icon(Icons.add),
-              ),
-            ),
-            _section(
-              '话题与翻篇',
-              [
-                for (final item in data.topics.take(30))
-                  ListTile(
-                    title: Text(item.label),
-                    subtitle: Text(item.status),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (status) => _act(
-                        () => widget.app.rpRuntime.markTopic(
-                          _id,
-                          item.label,
-                          status,
-                        ),
-                      ),
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'active', child: Text('重新开启')),
-                        PopupMenuItem(
-                          value: 'cooling',
-                          child: Text('暂不再提（7 天）'),
-                        ),
-                        PopupMenuItem(value: 'resolved', child: Text('已经翻篇')),
-                      ],
-                    ),
-                  ),
-                if (data.topics.isEmpty)
-                  const ListTile(subtitle: Text('尚无话题记录')),
-              ],
-              action: IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: '标记已翻篇',
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final text = await _text(
-                          '哪个话题已经翻篇？',
-                          '',
-                          maxLength: 28,
-                        );
-                        if (text != null && text.isNotEmpty)
-                          await _act(
-                            () => widget.app.rpRuntime.markTopic(
-                              _id,
-                              text,
-                              'resolved',
-                            ),
-                          );
-                      },
-              ),
-            ),
-            _section('最近事件', [
-              for (final event in data.events.take(12))
-                ListTile(
-                  title: Text(event.title),
-                  subtitle: Text(
-                    '${event.status} · ${event.description}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: event.status == 'active'
-                      ? IconButton(
-                          icon: const Icon(Icons.check_circle_outline),
-                          tooltip: '结束事件',
-                          onPressed: _busy
-                              ? null
-                              : () => _act(
-                                  () => widget.app.rpRuntime.repository
-                                      .resolveEvent(_id, event.id),
-                                ),
-                        )
-                      : null,
-                ),
-              if (data.events.isEmpty) const ListTile(subtitle: Text('暂未触发事件')),
-            ]),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('用户资料、角色状态与情节都仅保存在本机；开启 LLM 后，被选中的上下文会发送到你配置的模型服务。'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _clearAllMemory,
-              icon: const Icon(Icons.delete_forever_outlined),
-              label: const Text('清空此角色的 RP 记忆'),
-            ),
-            if (_busy) const LinearProgressIndicator(),
+  Widget build(BuildContext context) => DefaultTabController(
+    length: 2,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('关于我的音乐笔友'),
+        bottom: const TabBar(
+          tabs: [
+            Tab(text: '日记与记忆'),
+            Tab(text: '状态与世界书'),
           ],
-        );
-      },
+        ),
+      ),
+      body: TabBarView(
+        children: [
+          RpJournalPage(app: widget.app, embedded: true),
+          FutureBuilder<RpSnapshot>(
+            future: _load,
+            builder: (context, snap) {
+              if (snap.hasError) {
+                return Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => _load = _read()),
+                    child: const Text('读取失败，点击重试'),
+                  ),
+                );
+              }
+              if (!snap.hasData)
+                return const Center(child: CircularProgressIndicator());
+              final data = snap.data!;
+              final state = data.state;
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '这里管理角色背景、当前状态和虚构世界事件。'
+                      '真实交流只在来信中进行；所有经历与连续记忆统一在前一页签查看。',
+                    ),
+                  ),
+                  _section('角色当前状态', [
+                    ListTile(
+                      title: const Text('当前场景'),
+                      subtitle: Text(state.scene),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: _busy
+                          ? null
+                          : () async {
+                              final text = await _text('当前场景', state.scene);
+                              if (text != null && text.isNotEmpty)
+                                await _act(
+                                  () => widget.app.rpRuntime.repository
+                                      .updateState(_id, scene: text),
+                                );
+                            },
+                    ),
+                    ListTile(
+                      title: const Text('正在做什么'),
+                      subtitle: Text(state.activity),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: _busy
+                          ? null
+                          : () async {
+                              final text = await _text(
+                                '角色当前活动',
+                                state.activity,
+                              );
+                              if (text != null && text.isNotEmpty)
+                                await _act(
+                                  () => widget.app.rpRuntime.repository
+                                      .updateState(_id, activity: text),
+                                );
+                            },
+                    ),
+                    ListTile(
+                      title: const Text('当前目标'),
+                      subtitle: Text(state.goal),
+                      trailing: const Icon(Icons.edit_outlined),
+                      onTap: _busy
+                          ? null
+                          : () async {
+                              final text = await _text('角色当前目标', state.goal);
+                              if (text != null && text.isNotEmpty)
+                                await _act(
+                                  () => widget.app.rpRuntime.repository
+                                      .updateState(_id, goal: text),
+                                );
+                            },
+                    ),
+                    ListTile(
+                      title: const Text('叙事精力'),
+                      subtitle: Text('${state.energy} / 100（角色演绎状态）'),
+                      trailing: PopupMenuButton<int>(
+                        tooltip: '调整叙事精力',
+                        onSelected: (value) => _act(
+                          () => widget.app.rpRuntime.repository.updateState(
+                            _id,
+                            energy: value,
+                          ),
+                        ),
+                        itemBuilder: (_) => [
+                          for (final n in [20, 40, 60, 80, 100])
+                            PopupMenuItem(value: n, child: Text('$n / 100')),
+                        ],
+                      ),
+                    ),
+                    SwitchListTile(
+                      title: const Text('使用 RP 记忆'),
+                      subtitle: const Text('关闭时不记录或召回 RP 记忆；单独保存的聊天记录仍由聊天页面管理'),
+                      value: state.memoryEnabled,
+                      onChanged: _busy
+                          ? null
+                          : (v) => _act(
+                              () => widget.app.rpRuntime.repository.updateState(
+                                _id,
+                                memoryEnabled: v,
+                              ),
+                            ),
+                    ),
+                    SwitchListTile(
+                      title: const Text('随机世界事件'),
+                      subtitle: const Text('仅前台交互触发，每个本地自然日最多抽取一次'),
+                      value: state.eventsEnabled,
+                      onChanged: _busy
+                          ? null
+                          : (v) => _act(
+                              () => widget.app.rpRuntime.repository.updateState(
+                                _id,
+                                eventsEnabled: v,
+                              ),
+                            ),
+                    ),
+                  ]),
+                  _section(
+                    '长期记忆与近期经历',
+                    [
+                      for (final memory in data.memories.take(50))
+                        ListTile(
+                          title: Text(
+                            memory.content,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text('${memory.kind} · ${memory.source}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  memory.pinned
+                                      ? Icons.push_pin
+                                      : Icons.push_pin_outlined,
+                                ),
+                                tooltip: memory.pinned ? '取消固定' : '固定记忆',
+                                onPressed: _busy
+                                    ? null
+                                    : () => _act(
+                                        () => widget.app.rpRuntime.repository
+                                            .setPinned(
+                                              _id,
+                                              memory.id,
+                                              !memory.pinned,
+                                            ),
+                                      ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: '删除记忆',
+                                onPressed: _busy
+                                    ? null
+                                    : () => _act(
+                                        () => widget.app.rpRuntime.repository
+                                            .deleteMemory(_id, memory.id),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (data.memories.isEmpty)
+                        const ListTile(
+                          subtitle: Text('新的记忆从现在开始；旧推荐与聊天不会迁入这里。'),
+                        ),
+                    ],
+                    action: IconButton(
+                      icon: const Icon(Icons.add),
+                      tooltip: '记住一件事',
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final text = await _text('手动记住', '');
+                              if (text != null && text.isNotEmpty)
+                                await _act(
+                                  () =>
+                                      widget.app.rpRuntime.repository.remember(
+                                        _id,
+                                        'preference',
+                                        text,
+                                        source: 'user_confirmed',
+                                        importance: 5,
+                                        pinned: true,
+                                      ),
+                                );
+                            },
+                    ),
+                  ),
+                  _section(
+                    '世界书与随机事件',
+                    [
+                      for (final item in data.lore)
+                        ListTile(
+                          title: Text(
+                            '${item.kind == 'event' ? '🎲 ' : '📖 '}${item.title}',
+                          ),
+                          subtitle: Text(
+                            '${item.content}\n${item.triggers.isEmpty ? '随机事件' : '触发：${item.triggers.join('、')}'}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Switch(
+                                value: item.enabled,
+                                onChanged: _busy
+                                    ? null
+                                    : (v) => _act(
+                                        () => widget.app.rpRuntime.repository
+                                            .enableLore(_id, item.id, v),
+                                      ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: '删除条目',
+                                onPressed: _busy
+                                    ? null
+                                    : () => _act(
+                                        () => widget.app.rpRuntime.repository
+                                            .removeLore(_id, item.id),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                    action: PopupMenuButton<String>(
+                      tooltip: '新增世界书或事件',
+                      onSelected: _addLore,
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'lore', child: Text('新增世界设定')),
+                        PopupMenuItem(value: 'event', child: Text('新增随机事件')),
+                      ],
+                      icon: const Icon(Icons.add),
+                    ),
+                  ),
+                  _section(
+                    '话题与翻篇',
+                    [
+                      for (final item in data.topics.take(30))
+                        ListTile(
+                          title: Text(item.label),
+                          subtitle: Text(item.status),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (status) => _act(
+                              () => widget.app.rpRuntime.markTopic(
+                                _id,
+                                item.label,
+                                status,
+                              ),
+                            ),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'active',
+                                child: Text('重新开启'),
+                              ),
+                              PopupMenuItem(
+                                value: 'cooling',
+                                child: Text('暂不再提（7 天）'),
+                              ),
+                              PopupMenuItem(
+                                value: 'resolved',
+                                child: Text('已经翻篇'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (data.topics.isEmpty)
+                        const ListTile(subtitle: Text('尚无话题记录')),
+                    ],
+                    action: IconButton(
+                      icon: const Icon(Icons.add),
+                      tooltip: '标记已翻篇',
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final text = await _text(
+                                '哪个话题已经翻篇？',
+                                '',
+                                maxLength: 28,
+                              );
+                              if (text != null && text.isNotEmpty)
+                                await _act(
+                                  () => widget.app.rpRuntime.markTopic(
+                                    _id,
+                                    text,
+                                    'resolved',
+                                  ),
+                                );
+                            },
+                    ),
+                  ),
+                  _section('最近事件', [
+                    for (final event in data.events.take(12))
+                      ListTile(
+                        title: Text(event.title),
+                        subtitle: Text(
+                          '${event.status} · ${event.description}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: event.status == 'active'
+                            ? IconButton(
+                                icon: const Icon(Icons.check_circle_outline),
+                                tooltip: '结束事件',
+                                onPressed: _busy
+                                    ? null
+                                    : () => _act(
+                                        () => widget.app.rpRuntime.repository
+                                            .resolveEvent(_id, event.id),
+                                      ),
+                              )
+                            : null,
+                      ),
+                    if (data.events.isEmpty)
+                      const ListTile(subtitle: Text('暂未触发事件')),
+                  ]),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      '用户资料、角色状态与情节都仅保存在本机；开启 LLM 后，被选中的上下文会发送到你配置的模型服务。',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _clearAllMemory,
+                    icon: const Icon(Icons.delete_forever_outlined),
+                    label: const Text('清空此角色的 RP 记忆'),
+                  ),
+                  if (_busy) const LinearProgressIndicator(),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
     ),
   );
 }

@@ -143,6 +143,10 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 
 `RpPromptContext.build` 为聊天、每日精选和专辑精选构建角色隔离的统一上下文，包含允许引用的角色状态、世界书、连续记忆、日记、待整理问答及话题冷却，遵循记忆与召回开关。每日和专辑的挑选 / 写作两阶段传入同一份上下文；读取失败时推荐回退本地，聊天显示错误。数据库保持 v22，不清空快照，连接测试继续仅用合成资料。详见 [RP 统一上下文 V22](RP_SHARED_CONTEXT_V22.md)。
 
+## RP 日记生命周期 V23 增量
+
+日记整理改由新推荐生成前触发，复用快照与普通聊天不调用整理模型；保存问答及来信回复进入证据队列，移除普通聊天的重复短期 episode。单次推荐最多整理三批，失败保留证据。管理页合并为「关于我的音乐笔友」双页签，原始待归档经历即时可查看，移除独立聊天和手动整理入口。SQLite 保持 v22，已有数据及统一上下文策略保留；前述 v22 整理时机以此为准。详见 [RP 日记生命周期 V23](RP_JOURNAL_LIFECYCLE_V23.md)。
+
 ## 封面与歌词资源
 
 原音源封面缺失后，ArtworkStore 可自动在线补充艺术家头像 / 专辑封面，默认启用；独立 OnlineArtworkProvider 仅发送艺术家 / 专辑名，经 TheAudioDB、MusicBrainz / Cover Art Archive 匹配，沿用 MediaAssetStore 完整校验与缓存。在线查询具备来源取消与退出关闭边界，不携带音源凭据，不替代认证错误。详见 [在线封面兜底](ONLINE_ARTWORK.md)。
