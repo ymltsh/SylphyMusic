@@ -125,6 +125,13 @@ class PenpalMemoryRepository {
         where: 'persona_key=?',
         whereArgs: [cardId],
       );
+      for (final table in <String>[
+        'rp_journal_queue',
+        'rp_journal_entries',
+        'rp_continuity',
+      ]) {
+        await tx.delete(table, where: 'card_id=?', whereArgs: [cardId]);
+      }
       // Clear the optional persona note, but preserve memory opt-out choices.
       await tx.update(
         'penpal_card_memory_state',
@@ -149,8 +156,8 @@ class PenpalMemoryRepository {
       // the chats attached to them, plus letter-derived topic cooldowns.
       await tx.delete(
         'rp_memories',
-        where: "card_id=? AND conversation_key<>'' AND conversation_key<>?",
-        whereArgs: [cardId, 'rp:general'],
+        where: "card_id=? AND conversation_key<>'' AND conversation_key NOT LIKE 'rp:%'",
+        whereArgs: [cardId],
       );
       await tx.delete(
         'rp_topics',
@@ -160,9 +167,45 @@ class PenpalMemoryRepository {
       // The clear-letter confirmation covers this card's attached chats.
       await tx.delete(
         'penpal_chat_messages',
-        where: 'persona_key=? AND letter_key<>?',
-        whereArgs: [cardId, 'rp:general'],
+        where: "persona_key=? AND letter_key NOT LIKE 'rp:%'",
+        whereArgs: [cardId],
       );
+      for (final table in <String>['rp_journal_queue', 'rp_journal_entries']) {
+        await tx.delete(
+          table,
+          where: "card_id=? AND conversation_key NOT LIKE 'rp:%'",
+          whereArgs: [cardId],
+        );
+      }
+      await tx.delete(
+        'rp_memories',
+        where: "card_id=? AND conversation_key<>'' AND conversation_key NOT LIKE 'rp:%'",
+        whereArgs: [cardId],
+      );
+      // The last continuity may include letter context. Invalidate it;
+      // the surviving general RP diaries can rebuild it on next use.
+      final current = await tx.query(
+        'rp_continuity',
+        columns: ['revision'],
+        where: 'card_id=?',
+        whereArgs: [cardId],
+      );
+      if (current.isNotEmpty) {
+        await tx.update(
+          'rp_continuity',
+          {
+            'self_note': '',
+            'user_facts': '',
+            'relationship': '',
+            'open_threads': '',
+            'avoid_repetition': '',
+            'invalidated': 1,
+            'revision': (current.first['revision'] as int? ?? 0) + 1,
+          },
+          where: 'card_id=?',
+          whereArgs: [cardId],
+        );
+      }
     });
   }
 

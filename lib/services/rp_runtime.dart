@@ -72,22 +72,7 @@ class RpRuntime {
                       now - memory.createdAtMs <
                           const Duration(days: 3).inMilliseconds;
                 }
-                if (memory.kind == 'episode') {
-                  // Do not broadcast unrelated small talk into every new letter.
-                  // Cross-thread recall requires overlapping concrete phrasing.
-                  if (input.length < 3) return false;
-                  final lower = memory.content.toLowerCase();
-                  var related = false;
-                  for (var i = 0; i <= input.length - 3 && i < 80; i++) {
-                    final part = input.substring(i, i + 3);
-                    if (RegExp(r'^[\u4e00-\u9fff]{3}$').hasMatch(part) &&
-                        lower.contains(part)) {
-                      related = true;
-                      break;
-                    }
-                  }
-                  return related;
-                }
+                if (memory.kind == 'episode') return memory.pinned;
                 return memory.pinned || memory.importance >= 3;
               })
               .take(6)

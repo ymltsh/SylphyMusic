@@ -13,6 +13,8 @@ import 'recommendation_engine.dart';
 import 'llm_recommendations.dart';
 import 'penpal_memory.dart';
 import 'rp_runtime.dart';
+import 'rp_journal_service.dart';
+import 'rp_prompt_context.dart';
 import 'diagnostic_logs.dart';
 
 enum DailyLetterStage { inviting, selecting, writing, sealing }
@@ -26,6 +28,7 @@ class RecommendationService {
     this.diagnostics,
     this.memory,
     this.rpRuntime,
+    this.journal,
     this.mailbox,
   }) : llm = llm,
        _trends = PublicMusicTrends(db);
@@ -43,6 +46,7 @@ class RecommendationService {
   final LlmRecommendationClient? llm;
   final PenpalMemory? memory;
   final RpRuntime? rpRuntime;
+  final RpJournalService? journal;
   final PenpalMailboxRepository? mailbox;
   final PublicMusicTrends _trends;
   final RecommendationEngine _engine = const RecommendationEngine();
@@ -208,15 +212,19 @@ class RecommendationService {
       // for state, conditional world lore, episodic recall and topic cooldown.
       Map<String, Object?> memoryContext = const {};
       List<String> explicitPreferences = const [];
-      if (rpRuntime != null) {
+      var rpReady = rpRuntime != null && journal != null && memory != null;
+      if (rpReady) {
         try {
-          memoryContext = await rpRuntime!.context(
-            activeCardId,
+          memoryContext = await RpPromptContext.build(
+            cardId: activeCardId,
+            memory: memory!,
+            runtime: rpRuntime!,
+            journal: journal!,
             currentMessage: pendingNote?.content ?? '',
             checkEvents: true,
           );
-          final rpState = await rpRuntime!.snapshot(activeCardId);
-          if (rpState.state.memoryEnabled) {
+          if (memoryContext['rp_recall_allowed'] == true) {
+            final rpState = await rpRuntime!.snapshot(activeCardId);
             explicitPreferences = rpState.memories
                 .where((entry) => entry.kind == 'preference')
                 .take(8)
@@ -224,24 +232,28 @@ class RecommendationService {
                 .toList();
           }
         } catch (_) {
-          // RP is optional: failure must not interrupt local recommendations.
+          // An unavailable RP context produces a local recommendation,
+          // never a memoryless AI letter marked as a successful RP result.
+          rpReady = false;
         }
       }
-      final selection = await llm!.daily(
-        options,
-        now: now,
-        mainLetter: mainLetter,
-        penpalMemory: memoryContext,
-        explicitPreferences: explicitPreferences,
-        pendingLetter: pendingNote?.content ?? '',
-        onWriting: () => dailyStage.value = DailyLetterStage.writing,
-        playCounts: {
-          for (final candidate in candidates)
-            candidate.track.ref.key: candidate.plays,
-        },
-        favorites: favorites,
-        publicTrends: trends,
-      );
+      final selection = rpReady
+          ? await llm!.daily(
+              options,
+              now: now,
+              mainLetter: mainLetter,
+              penpalMemory: memoryContext,
+              explicitPreferences: explicitPreferences,
+              pendingLetter: pendingNote?.content ?? '',
+              onWriting: () => dailyStage.value = DailyLetterStage.writing,
+              playCounts: {
+                for (final candidate in candidates)
+                  candidate.track.ref.key: candidate.plays,
+              },
+              favorites: favorites,
+              publicTrends: trends,
+            )
+          : null;
       if (selection != null) {
         finalTracks = _mergeDailySelection(hydrated, options, selection);
         if (selection.title.trim().isNotEmpty) title = selection.title.trim();
@@ -323,6 +335,18 @@ class RecommendationService {
         );
       } catch (_) {
         // The recommendation and letter have already been committed.
+      }
+    }
+    if (letterFromLlm && journal != null) {
+      try {
+        await journal!.repository.enqueueLetter(
+          activeCardId,
+          '$day:$generation',
+          title,
+          introduction,
+        );
+      } catch (_) {
+        // A recommendation remains committed even if diary enqueue fails.
       }
     }
     _record('generation_completed', 'daily', count: finalTracks.length);
@@ -465,7 +489,28 @@ class RecommendationService {
           );
         }
       }
-      final selection = await llm!.albums(options, now: DateTime.now());
+      Map<String, Object?> albumRpContext = const {};
+      var rpReady = rpRuntime != null && journal != null && memory != null;
+      if (rpReady) {
+        try {
+          albumRpContext = await RpPromptContext.build(
+            cardId: memory!.personaKey,
+            memory: memory!,
+            runtime: rpRuntime!,
+            journal: journal!,
+            checkEvents: false,
+          );
+        } catch (_) {
+          rpReady = false;
+        }
+      }
+      final selection = rpReady
+          ? await llm!.albums(
+              options,
+              now: DateTime.now(),
+              rpContext: albumRpContext,
+            )
+          : null;
       if (selection != null) {
         finalAlbums = _mergeAlbumSelection(hydrated, options, selection);
         _record('llm_applied', 'albums', count: finalAlbums.length);

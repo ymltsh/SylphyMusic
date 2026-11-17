@@ -198,7 +198,16 @@ class RpRepository {
   }
 
   Future<void> clearMemories(String cardId) async {
-    await db.db.delete('rp_memories', where: 'card_id=?', whereArgs: [cardId]);
+    await db.db.transaction((tx) async {
+      for (final table in <String>[
+        'rp_memories',
+        'rp_journal_queue',
+        'rp_journal_entries',
+        'rp_continuity',
+      ]) {
+        await tx.delete(table, where: 'card_id=?', whereArgs: [cardId]);
+      }
+    });
   }
 
   Future<void> deleteMemory(String cardId, int id) async {

@@ -45,6 +45,8 @@ import '../data/penpal_memory_repository.dart';
 import '../data/penpal_chat_repository.dart';
 import '../data/rp_repository.dart';
 import '../services/rp_runtime.dart';
+import '../data/rp_journal_repository.dart';
+import '../services/rp_journal_service.dart';
 import '../data/penpal_mailbox_repository.dart';
 import '../services/penpal_chat.dart';
 import '../services/penpal_memory.dart';
@@ -95,6 +97,11 @@ class SylphyApp extends ChangeNotifier {
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
   late final rpRuntime = RpRuntime(RpRepository(db));
+  late final rpJournal = RpJournalService(
+    RpJournalRepository(db),
+    apiSettings,
+    vault,
+  );
   late final recommendationRepository = RecommendationRepository(db);
   late final penpalMailbox = PenpalMailboxRepository(db);
   late final penpalMemory = PenpalMemory(
@@ -108,6 +115,7 @@ class SylphyApp extends ChangeNotifier {
     penpalMemory,
     PenpalChatRepository(db),
     rpRuntime: rpRuntime,
+    journal: rpJournal,
   );
   late final listeningAnalytics = ListeningAnalytics(
     playback,
@@ -119,6 +127,7 @@ class SylphyApp extends ChangeNotifier {
     diagnostics: diagnostics,
     memory: penpalMemory,
     rpRuntime: rpRuntime,
+    journal: rpJournal,
     mailbox: penpalMailbox,
     llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
   );
@@ -1353,6 +1362,7 @@ class SylphyApp extends ChangeNotifier {
     apiSettings.removeListener(_apiChanged);
     lrcApi.dispose();
     await penpalChat.shutdown();
+    await rpJournal.shutdown();
     await apiSettings.cards.shutdown();
     apiSettings.dispose();
     await listeningAnalytics.shutdown();

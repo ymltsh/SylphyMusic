@@ -4,6 +4,8 @@
 
 | 文档 | 用途 |
 |---|---|
+| [RP 统一上下文 V22](RP_SHARED_CONTEXT_V22.md) | 聊天、每日精选与专辑精选共用角色记忆及失败回退 |
+| [RP Journal V22](RP_JOURNAL_V22.md) | 日记整理、连续记忆、对话证据队列与 v21 增量迁移 |
 | [RP Core V21](RP_CORE_V21.md) | 独立角色聊天、状态、结构化记忆、世界书、话题冷却与破坏性数据迁移 |
 | [Android SAF 本地文件夹](ANDROID_SAF_LOCAL_FOLDER.md) | 系统文件夹授权、私有音频 / LRC 副本、重新扫描与来源清理 |
 | [笔友留言 V20](PENPAL_MAILBOX_V20.md) | 按角色保存留言、下次新来信回复、历史记录及数据库前向迁移 |

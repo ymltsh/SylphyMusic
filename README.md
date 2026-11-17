@@ -43,6 +43,8 @@
 
 角色与记忆管理入口现提供独立聊天、角色状态、结构化记忆、世界书和轻量随机事件，无需先生成音乐来信。详见 [RP Core V21](docs/RP_CORE_V21.md)。升级到数据库 v21 会清空旧推荐、来信、笔友聊天、记忆、留言与推荐统计；保留音乐库、歌单、收藏、角色卡及配置，首次启动升级前请备份实际数据库。
 
+v22 新增「角色日记与连续记忆」，可从 RP 管理页查看和编辑。已保存的对话会按批次、会话或日期边界使用现有 LLM 服务整理为日记，也可手动整理；整理可能产生额外模型费用。v21 升级至 v22 保留已有数据，详见 [RP Journal V22](docs/RP_JOURNAL_V22.md)。
+
 来信、角色卡与聊天基础操作见[音乐笔友与来信存档](docs/PENPAL_RECOMMENDATIONS.md)、[角色卡](docs/CHARACTER_CARDS_V18.md)和[与笔友聊天](docs/PENPAL_CHAT.md)。
 
 
@@ -166,3 +168,5 @@ LLM 服务可能收费，手动换新推荐或聊天也可能消耗额度。不�
 
 <p align="center"><sub>音乐与书信交织的浪漫，至死不渝。<br>
 © 2026 Sylphy Music · <a href="https://sylphy.ymltsh.com/">官网</a> · <a href="https://github.com/ymltsh/SylphyMusic">GitHub</a> · <a href="LICENSE">MIT License</a></sub></p>
+
+聊天、每日精选与专辑精选现共用当前角色的连续记忆、日记和允许引用的上下文；已有推荐结果保留，手动换新或下一时段生成才使用新逻辑。详见 [RP 统一上下文 V22](docs/RP_SHARED_CONTEXT_V22.md)。

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/rp_models.dart';
 import 'penpal_chat_page.dart';
+import 'rp_journal_page.dart';
 
 /// Character-scoped RP controls. No network calls or generated autobiography.
 class RpManagementPage extends StatefulWidget {
@@ -205,6 +206,16 @@ class _RpManagementPageState extends State<RpManagementPage> {
               label: const Text('和角色聊天（不依赖音乐来信）'),
             ),
             const SizedBox(height: 12),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.menu_book_outlined),
+              label: const Text('角色日记与连续记忆'),
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RpJournalPage(app: widget.app),
+                ),
+              ),
+            ),
             _section('角色当前状态', [
               ListTile(
                 title: const Text('当前场景'),

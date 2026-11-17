@@ -56,6 +56,27 @@ class PenpalChatRepository {
       });
       // New RP Core classifies the saved turn after transaction commit.
       // Do NOT automatically pin every chat utterance as a long-term fact.
+      // Durable, cross-session journal evidence; atomic with saved chat.
+      final rpState = await tx.query(
+        'rp_character_state',
+        columns: ['memory_enabled'],
+        where: 'card_id=?',
+        whereArgs: [persona],
+        limit: 1,
+      );
+      if (rpState.isEmpty || rpState.first['memory_enabled'] != 0) {
+        final userText = user.length > 1200 ? user.substring(0, 1200) : user;
+        final replyText = assistant.length > 1200
+            ? assistant.substring(0, 1200)
+            : assistant;
+        await tx.insert('rp_journal_queue', {
+          'card_id': persona,
+          'conversation_key': letter,
+          'user_text': userText,
+          'assistant_text': replyText,
+          'occurred_at_ms': now,
+        });
+      }
     });
   }
 
@@ -91,6 +112,40 @@ class PenpalChatRepository {
         where: 'card_id=? AND conversation_key=?',
         whereArgs: [persona, letter],
       );
+      // A deleted conversation must vanish from diary evidence too.
+      await tx.delete(
+        'rp_journal_queue',
+        where: 'card_id=? AND conversation_key=?',
+        whereArgs: [persona, letter],
+      );
+      await tx.delete(
+        'rp_journal_entries',
+        where: 'card_id=? AND conversation_key=?',
+        whereArgs: [persona, letter],
+      );
+      final continuityRows = await tx.query(
+        'rp_continuity',
+        columns: ['revision'],
+        where: 'card_id=?',
+        whereArgs: [persona],
+      );
+      if (continuityRows.isNotEmpty) {
+        await tx.update(
+          'rp_continuity',
+          {
+            'self_note': '',
+            'user_facts': '',
+            'relationship': '',
+            'open_threads': '',
+            'avoid_repetition': '',
+            'revision': (continuityRows.first['revision'] as int? ?? 0) + 1,
+            'invalidated': 1,
+            'updated_at_ms': DateTime.now().millisecondsSinceEpoch,
+          },
+          where: 'card_id=?',
+          whereArgs: [persona],
+        );
+      }
     });
   }
 }

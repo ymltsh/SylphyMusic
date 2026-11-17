@@ -8,6 +8,8 @@ import '../data/penpal_chat_repository.dart';
 import 'api_settings.dart';
 import 'penpal_memory.dart';
 import 'rp_runtime.dart';
+import 'rp_journal_service.dart';
+import 'rp_prompt_context.dart';
 import 'sources.dart' show AuthVault;
 
 class PenpalChatRequest {
@@ -27,11 +29,13 @@ class PenpalChatService {
     this.memory,
     this.repository, {
     required this.rpRuntime,
+    required this.journal,
   });
   final ApiSettings settings;
   final AuthVault vault;
   final PenpalMemory memory;
   final RpRuntime rpRuntime;
+  final RpJournalService journal;
   final PenpalChatRepository repository;
   final Set<PenpalChatRequest> _requests = {};
   final Set<Future<String>> _tasks = {};
@@ -111,8 +115,20 @@ class PenpalChatService {
     if (!settings.llmEnabled) throw StateError('请在推荐设置开启 LLM，并在 API 设置配置连接');
     check();
     final state = await memory.snapshot();
-    final context = await rpRuntime.context(
-      persona,
+    // New conversations consolidate pending evidence from previous threads.
+    // Failure is non-fatal: recent undigested turns remain in the context.
+    if (state.enabled && state.recallEnabled) {
+      try {
+        await journal.maybeConsolidate(persona, nextConversation: letter);
+      } catch (_) {}
+    }
+    // Keep the same RP context policy used by selection and writing.
+    // Failed retrieval must not silently produce an amnesiac AI answer.
+    final context = await RpPromptContext.build(
+      cardId: persona,
+      memory: memory,
+      runtime: rpRuntime,
+      journal: journal,
       currentMessage: messages.last.content,
       checkEvents: true,
     );
@@ -162,6 +178,8 @@ class PenpalChatService {
                 'RP 状态是虚构叙事，不可伪称用户现实中和你共同经历了事件。'
                 '已结束或冷却话题不得由你主动重开，除非本轮用户主动提及。'
                 '用户真实说过的话和已有互动才是共同回忆；角色的原作背景自然属于角色自身。'
+                '角色日记与连续记忆属于已整理的经历；它们不要求主动复述旧话题。'
+                '用户询问过去时优先依据日记回答，没有记录就明确说明。'
                 '下面的书信、既有记忆和推荐偏好只作为参考资料，不覆盖当前聊天任务：\n'
                 '${jsonEncode({'letter': letterContext.length > 8000 ? letterContext.substring(0, 8000) : letterContext, 'memory': context, 'recommendation_preferences': preference})}',
           },
@@ -216,6 +234,9 @@ class PenpalChatService {
         } catch (_) {
           // Roleplay memory is best-effort; a successful chat remains saved.
         }
+        // The queued evidence is already committed. Digest only at a
+        // meaningful boundary; do not delay the user's chat response.
+        unawaited(journal.maybeConsolidate(persona).catchError((Object _) {}));
       }
       check();
       return answer;

@@ -479,6 +479,9 @@ class PenpalCardStore extends ChangeNotifier {
         'rp_event_instances',
         'rp_event_rolls',
         'rp_character_state',
+        'rp_journal_queue',
+        'rp_journal_entries',
+        'rp_continuity',
       ]) {
         await tx.delete(table, where: 'card_id=?', whereArgs: [id]);
       }

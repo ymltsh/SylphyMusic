@@ -1,5 +1,17 @@
 # 实施与验证记录
 
+## 2026-11-18 RP Journal v22 同步到 OpenList
+
+按用户“open list 和 main 保持同步”要求，将本轮 RP Journal v22 与编译修正同步到 OpenList，保留特别版专属服务与已有工作区改动。相关 14 个源码文件中 13 个与 main 完全一致，应用控制器差异仅为 OpenList 专属集成。OpenList arm64 Android Release 编译成功，产物位于 ../sylphy_music_feature/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk，日志 build/test_logs/rp-journal-v22-sync-build.log（位于 OpenList 工作区）。根目录 AGENTS.md 记录今后通用功能与修正默认同步两工作区的用户约定，保留各自版本 / 清单，发布仍按用户授权。本轮未运行 analyze、测试或应用，未迁移实际数据库，未提交、推送或发布。
+
+## 2026-11-18 应用 RP Journal v22 补丁
+
+按用户“应用”要求，将 SylphyMusic-RP-Journal-v22-patch.zip 应用于普通版 main 工作区。补丁原清理锚点未包含已应用的 v21 独立 RP 聊天保护，适配安装器后全部 10 个既有文件及 5 个新文件校验通过；原文件备份 .private/rp-journal-v22-before-20261118-024422/。新增原始对话证据队列、角色日记与五项连续记忆、按批量 / 跨会话 / 跨日 / 手动触发的 LLM 整理及管理页；聊天与来信接入日记上下文，清理来源撤回派生记忆，清理音乐来信继续保留独立 RP 聊天。修正补丁新增清理代码的同作用域 rows 重名编译错误，同步 README、架构和文档索引。
+
+SQLite v21→v22 为增量建表，不清空已有 v21 聊天、记忆、角色卡、推荐或音乐数据；更早数据库仍会经过已有 v21 清理迁移。本次未启动应用、打开或迁移实际用户数据库，也未调用 LLM；使用日记整理时会将部分保存对话发送到用户配置的模型服务，可能产生额外费用。
+
+dart format 已执行，修正后 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包，产物 build/internal-review/，成功日志 build/test_logs/rp-journal-v22-build-fixed.log，首次编译失败日志 build/test_logs/rp-journal-v22-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；OpenList 本轮未修改。编译成功不代表迁移、日记整理或功能验收通过，实际功能由用户验证。
+
 ## 2026-11-18 RP Core v21 与封面布局更新发布 1.0.68+81
 
 按用户“同步到 openlist，推送更新”要求，RP Core v21 已同步到 OpenList 工作区并保留专属服务与已有修改。普通版 1.0.68+81（三 ABI Android、Windows 安装程序 / 便携包与对应源码）和 OpenList 1.0.68-openlist.49+81（arm64 APK 与对应应用 / 后端 / 前端源码）均已发布。包括角色独立聊天、状态 / 世界书 / 结构化记忆 / 话题冷却，封面 v4 三样式、半屏向下渐隐默认值、顶部状态栏沉浸、透明播放键与歌词页颜色跟随、圆形唱片悬浮按钮。发布说明已明确提示旧推荐 / 来信 / 聊天 / 记忆 / 留言 / 推荐统计清空，以及旧播放布局需重新布置。
