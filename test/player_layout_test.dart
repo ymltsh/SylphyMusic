@@ -8,70 +8,6 @@ import 'package:sylphy_music/core/player_layout_store.dart';
 import 'package:sylphy_music/data/app_db.dart';
 import 'package:sylphy_music/ui/player_layout/layout_editing.dart';
 
-Map<String, Object?> legacyLayout({
-  double topFraction = .48,
-  double middleFraction = .2,
-}) => {
-  'version': 1,
-  'id': 'legacy',
-  'name': '旧布局',
-  'topFraction': topFraction,
-  'middleFraction': middleFraction,
-  'background': 'album',
-  'backgroundOpacity': .65,
-  'elements': [
-    {
-      'id': 'cover',
-      'type': 'cover',
-      'region': 'top',
-      'frame': {'x': .1, 'y': .1, 'width': .8, 'height': .8},
-      'props': {
-        'circle': true,
-        'rotate': true,
-        'radius': 28,
-        'fontSize': 22,
-        'opacity': 1,
-        'align': 'center',
-      },
-    },
-    {
-      'id': 'title',
-      'type': 'title',
-      'region': 'middle',
-      'frame': {'x': .06, 'y': 0, 'width': .88, 'height': .48},
-      'props': {'fontSize': 22, 'opacity': 1, 'align': 'center'},
-    },
-    {
-      'id': 'lyrics',
-      'type': 'lyrics',
-      'region': 'middle',
-      'frame': {'x': .02, 'y': .02, 'width': .96, 'height': .96},
-      'props': {'fontSize': 24, 'opacity': 1, 'align': 'center'},
-    },
-    {
-      'id': 'progress',
-      'type': 'progress',
-      'region': 'bottom',
-      'frame': {'x': .08, 'y': .02, 'width': .84, 'height': .4},
-      'props': {'fontSize': 22, 'opacity': 1, 'align': 'center'},
-    },
-    {
-      'id': 'controls',
-      'type': 'controls',
-      'region': 'bottom',
-      'frame': {'x': .08, 'y': .5, 'width': .84, 'height': .44},
-      'props': {'playHeight': 80, 'controlSpacing': 20, 'align': 'center'},
-    },
-    {
-      'id': 'queue',
-      'type': 'queue',
-      'region': 'bottom',
-      'frame': {'x': .4, 'y': .8, 'width': .2, 'height': .2},
-      'props': {'align': 'center'},
-    },
-  ],
-};
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test('quick actions have their own frame above the default progress bar', () {
@@ -138,14 +74,16 @@ void main() {
       movedActions.bounds(actions, size),
       isNot(original.bounds(actions, size)),
     );
-    final oldV2 = jsonDecode(original.encode()) as Map<String, dynamic>;
-    (oldV2['elements'] as List).removeWhere((e) => e['type'] == 'quickActions');
-    final upgraded = PlayerLayout.fromJson(oldV2);
-    expect(
-      upgraded.elements.where((e) => e.type == PlayerPart.quickActions).length,
-      1,
+    final withoutActions = original.copyWith(
+      elements: original.elements
+          .where((e) => e.type != PlayerPart.quickActions)
+          .toList(),
     );
-    expect(PlayerLayout.decode(upgraded.encode()).encode(), upgraded.encode());
+    final restored = PlayerLayout.decode(withoutActions.encode());
+    expect(
+      restored.elements.any((e) => e.type == PlayerPart.quickActions),
+      isFalse,
+    );
   });
   test('old custom lyrics frames leave room for the action strip', () {
     final layout = playerTemplate();
@@ -167,7 +105,7 @@ void main() {
       lessThan(custom.actionBounds(size).top),
     );
   });
-  test('v2 templates round-trip and controls retain their props', () {
+  test('v4 templates round-trip and controls retain their props', () {
     final base = playerTemplate();
     final custom = base.copyWith(
       elements: [
@@ -213,55 +151,16 @@ void main() {
     expect(restored.elements.any((e) => e.type == PlayerPart.lyrics), isTrue);
     expect(
       PlayerLayout.fromJson(jsonDecode(base.encode())).toJson()['version'],
-      2,
+      4,
     );
   });
 
-  test('v1 region layouts migrate to one full canvas', () {
-    final migrated = PlayerLayout.fromJson(legacyLayout());
-    expect(migrated.encode(), contains('"version": 2'));
-    expect(migrated.elements.length, 6);
-    expect(migrated.elements.where((e) => e.type == PlayerPart.queue), isEmpty);
-    expect(
-      migrated.elements.where((e) => e.type == PlayerPart.quickActions).length,
-      1,
-    );
-    for (final e in migrated.elements) {
-      final frame = e.frame;
-      expect(frame.left, greaterThanOrEqualTo(0));
-      expect(frame.top, greaterThanOrEqualTo(0));
-      expect(frame.right, lessThanOrEqualTo(1.000001));
-      expect(frame.bottom, lessThanOrEqualTo(1.000001));
-      expect(e.wideFrame, isNotNull);
+  test('legacy layout versions are explicitly rejected', () {
+    final json = jsonDecode(playerTemplate().encode()) as Map<String, dynamic>;
+    for (final version in [1, 2, 3]) {
+      json['version'] = version;
+      expect(() => PlayerLayout.fromJson(json), throwsFormatException);
     }
-    final controls = migrated.elements.firstWhere(
-      (e) => e.type == PlayerPart.controls,
-    );
-    expect(controls.playHeight, 80);
-    expect(controls.controlSpacing, 20);
-    // Old per-widget circle/rotate flags no longer live on layout elements.
-    expect(migrated.toJson()['elements'].toString(), isNot(contains('circle')));
-    expect(migrated.toJson()['elements'].toString(), isNot(contains('rotate')));
-  });
-
-  test('legacy defaults and missing props remain readable', () {
-    final json = legacyLayout();
-    final raw = (json['elements'] as List).cast<Map<String, Object?>>();
-    for (final e in raw) {
-      (e['props'] as Map).remove('playHeight');
-      (e['props'] as Map).remove('controlSpacing');
-    }
-    final controls = PlayerLayout.fromJson(json).elements
-        .firstWhere((e) => e.type == PlayerPart.controls);
-    expect(controls.playHeight, 64);
-    expect(controls.controlSpacing, 12);
-  });
-
-  test('legacy invalid region fractions are rejected', () {
-    expect(
-      () => PlayerLayout.fromJson(legacyLayout(topFraction: .7)),
-      throwsFormatException,
-    );
   });
 
   test('full canvas bounds stay inside portrait and wide screens', () {
@@ -302,7 +201,7 @@ void main() {
     expect(restored.bounds(restored.elements.first, wide), isNot(wideBounds));
   });
 
-  test('lyrics default color mode round-trips and reads older layouts', () {
+  test('lyrics default color mode round-trips with missing optional props', () {
     final layout = playerTemplate();
     final lyrics = layout.elements.firstWhere(
       (e) => e.type == PlayerPart.lyrics,
@@ -351,7 +250,7 @@ void main() {
   });
 
   test(
-    'malformed v2 files, future versions and duplicate components are rejected',
+    'malformed v4 files, future versions and duplicate components are rejected',
     () {
       final layout = playerTemplate();
       for (final mutation in <void Function(Map<String, dynamic>)>[
@@ -520,25 +419,13 @@ void main() {
         expect(store.active!.name, '歌词优先');
       },
     );
-    test('v1 container payload is upgraded on read', () async {
-      await db.setSetting(
-        PlayerLayoutStore.settingsKey,
-        jsonEncode({
-          'version': 1,
-          'activeId': 'legacy',
-          'templates': [legacyLayout()],
-        }),
-      );
+    test('pre-v4 layout settings are deliberately ignored', () async {
+      await db.setSetting('player_layouts_v1', '{"version":2}');
       final restored = PlayerLayoutStore(db);
       await restored.initialize();
-      expect(restored.active!.name, '旧布局');
-      expect(restored.active!.encode(), contains('"version": 2'));
-      await restored.select(restored.active!.id);
-      final saved = jsonDecode(
-        await db.setting(PlayerLayoutStore.settingsKey) ?? '{}',
-      ) as Map<String, dynamic>;
-      expect(saved['version'], 2);
-      expect(saved['templates'][0]['version'], 2);
+      expect(restored.active, isNull);
+      expect(restored.templates, isEmpty);
+      expect(await db.setting(PlayerLayoutStore.settingsKey), isNull);
       await restored.shutdown();
     });
     test('bad saved data falls back without overwriting bytes', () async {

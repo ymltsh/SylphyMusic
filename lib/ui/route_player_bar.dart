@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/player_layout.dart';
 import 'player_bar.dart';
 import 'player_cover.dart';
 
@@ -66,8 +67,7 @@ class _RoutePlayerFabState extends State<RoutePlayerFab> {
                 app: app,
                 track: track,
                 size: 48,
-                circle: app.appearance.disc,
-                radius: 16,
+                style: PlayerCoverStyle.vinyl,
                 rotate: true,
                 playing: app.playback.playing,
               ),

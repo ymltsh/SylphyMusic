@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import '../core/player_layout.dart';
+import '../core/player_layout_store.dart';
 import 'api_settings.dart';
 
 const _bundleVersion = 1;
@@ -36,7 +37,7 @@ const transferConfigKeys = <String>{
   'ui_desktop_lyric_color_mode',
   'ui_desktop_lyric_fixed_color',
   'ui_desktop_lyrics_font_size',
-  'player_layouts_v1',
+  PlayerLayoutStore.settingsKey,
 };
 
 enum TransferScope { sources, all }
@@ -379,12 +380,12 @@ class DeviceTransferConfig {
             throw const FormatException('迷你播放器横条样式无效');
           }
           break;
-        case 'player_layouts_v1':
+        case PlayerLayoutStore.settingsKey:
           final layout = jsonDecode(value);
           if (layout is! Map ||
               layout['templates'] is! List ||
               (layout['templates'] as List).length > 20 ||
-              ![1, 2].contains(layout['version'])) {
+              layout['version'] != PlayerLayoutStore.storageVersion) {
             throw const FormatException('播放器布局版本不兼容');
           }
           for (final template in layout['templates'] as List) {

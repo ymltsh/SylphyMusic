@@ -228,26 +228,26 @@ void main() {
         }
         expect(app.sleepTimer.active, isFalse);
         expect(app.playback.playing, isFalse);
-        await app.appearance.update(record: true);
         await tester.pumpAndSettle();
         expect(find.bySemanticsLabel('唱片封面'), findsOneWidget);
         await edit();
         expect(find.bySemanticsLabel('唱片封面'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('edit-cover')));
         await tester.pumpAndSettle();
-        final rotation = find.byKey(const ValueKey('editor-disc-rotation'));
+        final rotation = find.byKey(const ValueKey('editor-cover-rotation'));
         await revealEditorControl(rotation);
         await tester.tap(rotation);
         await tester.pumpAndSettle();
-        expect(app.appearance.discRotation, isTrue);
-        expect(await app.db.setting('ui_disc_rotation'), 'true');
+        expect(
+          tester.widget<PlayerCover>(find.byType(PlayerCover)).rotate,
+          isFalse,
+        );
+        await tester.tap(rotation);
+        await tester.pumpAndSettle();
         expect(
           tester.widget<PlayerCover>(find.byType(PlayerCover)).rotate,
           isTrue,
         );
-        await tester.tap(rotation);
-        await tester.pumpAndSettle();
-        expect(app.appearance.discRotation, isFalse);
         await capture('editor-mobile');
         final ref = app.playback.current!.ref;
         final position = app.playback.position;
@@ -336,7 +336,6 @@ void main() {
               .lineHeight,
           chosenLineHeight,
         );
-        expect(app.appearance.disc, isTrue);
         expect(find.bySemanticsLabel('唱片封面'), findsOneWidget);
         expect(
           app.playerLayouts.active!.elements.first.frame,
@@ -423,13 +422,12 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('edit-cover')));
         await tester.pumpAndSettle();
-        final discSwitch = find.byKey(const ValueKey('editor-disc'));
-        await revealEditorControl(discSwitch);
-        await tester.tap(discSwitch);
+        final rounded = find.byKey(const ValueKey('editor-cover-rounded'));
+        await revealEditorControl(rounded);
+        await tester.tap(rounded);
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('关闭编辑器'));
+        await tester.tap(find.byTooltip('保存并应用'));
         await tester.pumpAndSettle();
-        expect(app.appearance.disc, isFalse);
         expect(find.bySemanticsLabel('专辑封面'), findsOneWidget);
         await tester.tap(find.byTooltip('播放'));
         for (var i = 0; i < 100 && !app.playback.playing; i++) {

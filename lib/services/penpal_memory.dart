@@ -2,13 +2,15 @@ import '../core/penpal_models.dart';
 import '../core/recommendation_models.dart';
 import '../data/penpal_memory_repository.dart';
 import 'api_settings.dart';
+import 'rp_runtime.dart';
 
 /// A compact, card-scoped penpal memory. Persona follows the active card.
 /// Truth checks stay in application logic, not in autobiographical notes.
 class PenpalMemory {
-  PenpalMemory(this.repository, this.settings);
+  PenpalMemory(this.repository, this.settings, {this.rpRuntime});
   final PenpalMemoryRepository repository;
   final ApiSettings settings;
+  final RpRuntime? rpRuntime;
   bool _closed = false;
   int revision = 0;
 
@@ -135,13 +137,10 @@ class PenpalMemory {
     if (value.isEmpty) throw const FormatException('不能保存空回复');
     final author = await repository.authoredCardForLetter('$day:$generation');
     if (author == null || author != personaKey) throw StateError('这封信不属于当前角色');
-    await repository.insert(
-      cardId: author,
-      kind: 'user_reply',
-      text: value,
-      relatedLetterKey: '$day:$generation',
-      pinned: true,
-    );
+    // Explicit user replies now belong to the RP Core, not legacy memory.
+    if (rpRuntime != null) {
+      await rpRuntime!.recordUserReply(author, '$day:$generation', value);
+    }
   }
 
   List<String> _preferences(PenpalMemorySnapshot state) => state.entries

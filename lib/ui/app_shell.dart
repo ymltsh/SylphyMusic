@@ -6,6 +6,7 @@ import '../core/app_controller.dart';
 import '../core/appearance.dart';
 import '../core/listening_history.dart';
 import '../core/models.dart';
+import '../core/player_layout.dart';
 import 'cache_tasks.dart';
 import 'cache_storage.dart';
 import 'playlist_page.dart';
@@ -1494,8 +1495,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               app: app,
               track: track,
               size: 48,
-              circle: app.appearance.disc,
-              radius: 16,
+              style: PlayerCoverStyle.vinyl,
               rotate: true,
               playing: player.playing,
             ),

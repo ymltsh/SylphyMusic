@@ -1,5 +1,51 @@
 # 实施与验证记录
 
+## 2026-11-18 RP Core v21 与封面布局更新发布 1.0.68+81
+
+按用户“同步到 openlist，推送更新”要求，RP Core v21 已同步到 OpenList 工作区并保留专属服务与已有修改。普通版 1.0.68+81（三 ABI Android、Windows 安装程序 / 便携包与对应源码）和 OpenList 1.0.68-openlist.49+81（arm64 APK 与对应应用 / 后端 / 前端源码）均已发布。包括角色独立聊天、状态 / 世界书 / 结构化记忆 / 话题冷却，封面 v4 三样式、半屏向下渐隐默认值、顶部状态栏沉浸、透明播放键与歌词页颜色跟随、圆形唱片悬浮按钮。发布说明已明确提示旧推荐 / 来信 / 聊天 / 记忆 / 留言 / 推荐统计清空，以及旧播放布局需重新布置。
+
+普通版 7 个、特别版 3 个远端附件大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest 和两分支全部原始 / 加速清单核对通过。正式 APK 签名与既有证书一致，源码附件包含 RP 新文件；OpenList 源码保留后端与前端来源。仅提交推送版本清单：main/version.json 为 194da1a，feature 两清单为 980bade，main/version-openlist.json 为 d1b125c，源码修改继续保留在工作区。
+
+普通版产物 build/releases/1.0.68-81/，日志 build/release81-publish.log；特别版产物 build/releases/1.0.68-openlist.49-81/，日志 build/openlist-release81-build.log、openlist-release81-prepare.log、openlist-release81-publish.log。未使用测试凭据，未运行 analyze、测试、应用启动或设备检查，未打开或迁移实际用户数据库，功能与迁移由用户验收。
+
+## 2026-11-18 应用 RP Core v21 补丁
+
+按用户“应用”要求，将 SylphyMusic-RP-Core-v21-patch.zip 应用于普通版 main 工作区，保留已有封面与播放器修改。安装器全部源码锚点检查通过，15 个源码 / 文档路径已应用；原文件备份位于 .private/rp-v21-before-20261118-015454/。新增按角色隔离的 RP 状态、结构化记忆、世界书、前台轻量事件和话题生命周期；聊天 / 来信接入统一上下文，原记忆管理入口改为 RP 管理页并提供独立聊天。同步架构、文档索引和 README。OpenList 工作区本轮未修改。
+
+数据库升至 v21：首次成功升级时清空旧推荐快照、来信、反馈、聊天、记忆、留言与推荐统计，并创建 RP 表；音乐源、曲库、歌单、收藏、缓存、角色卡、配置及最近播放身份保留。此次未启动应用、未打开或迁移实际用户数据库；代码备份不能恢复数据库，安装后首次启动前需另备份实际 SQLite 及 WAL / SHM 文件。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包，产物 build/internal-review/，日志 build/test_logs/rp-core-v21-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；编译成功不代表迁移或功能验证通过，实际功能由用户验收。
+
+## 2026-11-18 歌词页播放键跟随播放布局颜色
+
+按用户要求，完整歌词页读取当前播放布局中第一个可见播放控制组件的颜色并传入共用 PlayerControls，支持主题、预设色及透明，与已有圆角继承共用同一组件选择逻辑。布局保存或切换时沿用已有 playerLayouts 监听刷新；没有可见播放控制组件时使用主题默认颜色。同步布局说明。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包，产物更新至 build/internal-review/，日志 build/test_logs/lyrics-play-button-color-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际显示由用户验收。
+
+## 2026-11-18 迷你播放器悬浮按钮固定圆形唱片
+
+根据用户反馈，主界面折叠播放器与子页面 RoutePlayerFab 均显式使用 PlayerCoverStyle.vinyl 并启用旋转，不再落入圆角封面的默认值，也不依赖播放页布局样式或旋转设置。播放时旋转、暂停时保持角度；横条和歌词页缩略图保持原有圆角显示。同步外观与布局说明。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包，产物更新至 build/internal-review/，日志 build/test_logs/mini-player-fab-vinyl-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际显示由用户验收。
+
+## 2026-11-18 播放键增加透明颜色
+
+根据用户编辑器截图标注，在「播放控制」颜色列表增加「透明」选项，以现有 color 属性保存透明色，无需更改布局版本。播放 / 暂停键移除填充背景，图标使用主题 onSurface 前景色，保留按钮大小、点击区域和交互反馈；编辑预览与实际播放共用实现，其他组件颜色选项保持原样。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 及内部打包，产物更新至 build/internal-review/，日志 build/test_logs/transparent-play-button-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际显示由用户验收。
+
+## 2026-11-18 修正状态栏沉浸与封面默认尺寸
+
+根据用户截图反馈，播放画布取消顶部 SafeArea 避让，使封面可绘制到透明状态栏下；关闭状态栏系统对比度遮罩，保留侧边和底部安全区，编辑器同步实际画布尺寸。切换沉浸封面样式时，横竖画布均默认顶部对齐、宽度 100%、高度 50%、向下渐隐；组件构造与缺省 JSON 渐隐方向也统一为向下。已有保存布局不覆盖，可在编辑器调整或切换样式后使用新默认值。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包，产物更新至 build/internal-review/，日志 build/test_logs/cover-style-v4-status-bar-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际状态栏和封面显示由用户验收。
+
+## 2026-11-18 应用封面组件 v4 升级补丁
+
+按用户“应用”要求，将 SylphyMusic_Cover_Styles_v4_Upgrade.zip 应用于基线匹配的 main 工作区。封面元素独立保存圆角 / 黑胶 / 沉浸样式、黑胶旋转及渐隐参数；沉浸样式首次切换铺满横竖画布，之后可自由移动和缩放。迷你播放器与歌词页使用圆角缩略图，移除全局唱片开关。布局 JSON 升至 v4，设置改用 player_layouts_v2 / 容器版本 3，旧布局保留但不读取，用户需重新布置。补齐补丁遗漏的设备迁移白名单和容器版本校验，并同步使用说明。OpenList 特性工作区未修改。
+
+dart format 已执行，tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包，产物位于 build/internal-review/，日志为 build/test_logs/cover-style-v4-build.log。沿用补丁附带的测试源码调整，未运行 analyze、测试、应用启动或设备检查；未使用测试凭据，未提交、推送或发布。编译成功不代表功能或设备验收通过，封面视觉与布局交互由用户验证。
+
 ## 2026-11-16 普通悬浮横条修正发布 1.0.67+80
 
 按用户“推送”要求，普通版 1.0.67+80（三 ABI Android、Windows 安装程序 / 便携包与对应源码）和 OpenList 1.0.67-openlist.48+80（arm64 APK 与对应应用 / 后端 / 前端源码）均已发布。修正普通横条在横屏 / 宽屏仍显示 PC 固定底栏的问题，悬浮 PC 样式保留圆角 / 投影 / 磨砂，导航与播放器摆放分别判断，并调整底部安全区与部分页面留白。普通版 7 个、特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest 及两分支全部原始 / 加速清单核对通过，特别版状态 complete；Android 正式签名保持一致。

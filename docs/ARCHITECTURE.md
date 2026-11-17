@@ -131,6 +131,10 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 - 删除来源：停止匹配工作，清除本机管理数据与凭据，不删除服务器音乐；与云歌单远程删除操作区分。
 - 退出：依次关闭索引、来源验证、缓存任务、播放、代理、音频缓存、封面、歌词与媒体资源存储，最后关闭 SQLite。新增后台资源加入同一关闭链路。
 
+## RP Core V21
+
+`RpRepository` 按角色卡 ID 管理角色状态、结构化记忆、条件世界书、随机事件和话题冷却。`RpRuntime` 为聊天与来信提供统一有界上下文，仅在前台调用时处理事件，不创建定时器或常驻任务；异步工作沿用聊天与推荐服务的退出等待边界。原记忆管理入口转入 `RpManagementPage`，可直接打开 `rp:general` 独立聊天。清空音乐来信保留独立聊天，清空某个聊天删除其派生记忆，删除角色清除该角色 RP 数据。旧聊天自动固定为偏好的行为和旧写信记忆上下文由 v21 实现替代，下文 V15 / V16 描述作为历史设计记录。详见 [RP Core V21](RP_CORE_V21.md)。
+
 ## 封面与歌词资源
 
 原音源封面缺失后，ArtworkStore 可自动在线补充艺术家头像 / 专辑封面，默认启用；独立 OnlineArtworkProvider 仅发送艺术家 / 专辑名，经 TheAudioDB、MusicBrainz / Cover Art Archive 匹配，沿用 MediaAssetStore 完整校验与缓存。在线查询具备来源取消与退出关闭边界，不携带音源凭据，不替代认证错误。详见 [在线封面兜底](ONLINE_ARTWORK.md)。
@@ -139,7 +143,7 @@ Navidrome / OpenSubsonic 红心通过 `getStarred2`、`star` / `unstar` 维护�
 
 ## 持久化
 
-应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **16**，迁移由 `AppDb.open()` 负责。
+应用根目录是系统应用支持目录下的 `sylphy_music/`，测试可注入独立根目录。SQLite 当前版本 **21**，迁移由 `AppDb.open()` 负责。v21 在升级事务中清空旧推荐、来信、聊天、留言、记忆及推荐统计，新建 RP 表；保留角色卡、音源、曲库、歌单、收藏、缓存和最近播放身份。首次启动升级前应备份实际数据库，详见 [RP Core V21](RP_CORE_V21.md)。
 
 | 表 / 位置 | 内容 |
 |---|---|
@@ -177,7 +181,7 @@ Android 使用标准 FlutterActivity、应用级业务引擎与独立 MediaLibra
 
 `Appearance` 在既有 settings 表存储主题模式、全局封面 / 唱片形状与旋转、完整歌词字号、迷你歌词字号、纯色背景、播放页封面模糊开关和实验性磨砂选项。`ListeningHistory` 监听播放器已经开始的播放，按 TrackRef 保存最近 1000 首去重身份，串行写入 settings；恢复暂停队列不生成历史。读取历史时忽略已删除或停用来源，移除监听并等待待写任务后再关闭数据库。两者由 SylphyApp 装配和释放，不改变数据库版本或来源协议。
 
-`HomePage` 展示按日缓存的单曲精选和独立专辑精选，SQL 有界候选检索后仅解析最终条目；历史页面最多解析 1000 个身份；不为首页加载完整曲库。迷你播放器与全屏播放页复用同一 PlaybackCoordinator。默认播放页与自定义模板统一为一份全画布 `PlayerLayout`：绝对坐标、可选独立宽屏坐标，没有封面 / 歌词 / 控制区域；`PlayerLayoutRenderer` 与编辑器共用同一组件注册表和实际窗口比例。`PlayerCover` 统一方形封面与黑胶唱片，形状和旋转来自全局 `Appearance`；RotatingCover 仅在可见、播放中且允许动画时旋转，不改变播放内核。完整歌词只有一个 `LyricsPage`，由播放页右向左滑动、歌词预览或菜单打开；`PlayerScene` 同时提供播放页内迷你歌词区的直接缩放手柄。布局 v1 的 JSON 在读取时迁移到 v2，settings key 不变；按钮圆角 / 宽度等仍作为布局属性保存。具体界面范围与保留项见 [UI_REFRESH](UI_REFRESH.md)、[播放页布局编辑器](PLAYER_LAYOUT_EDITOR.md)。
+`HomePage` 展示按日缓存的单曲精选和独立专辑精选，SQL 有界候选检索后仅解析最终条目；历史页面最多解析 1000 个身份；不为首页加载完整曲库。迷你播放器与全屏播放页复用同一 PlaybackCoordinator。默认播放页与自定义模板统一为一份全画布 `PlayerLayout`：绝对坐标、可选独立宽屏坐标，没有封面 / 歌词 / 控制区域；`PlayerLayoutRenderer` 与编辑器共用同一组件注册表和实际窗口比例。`PlayerCover` 支持逐组件圆角、黑胶、沉浸三样式；位置与渲染顺序仍由 `PlayerLayout` 自由画布控制，沉浸样式采用组件内部 ShaderMask 渐隐与矩形边界，不接管背景或歌词。黑胶旋转由组件配置决定，RotatingCover 不改变播放内核。完整歌词只有一个 `LyricsPage`，由播放页右向左滑动、歌词预览或菜单打开；`PlayerScene` 同时提供播放页内迷你歌词区的直接缩放手柄。布局 v1 的 JSON 在读取时迁移到 v2，settings key 不变；按钮圆角 / 宽度等仍作为布局属性保存。具体界面范围与保留项见 [UI_REFRESH](UI_REFRESH.md)、[播放页布局编辑器](PLAYER_LAYOUT_EDITOR.md)。
 
 
 搜索使用独立 `SearchPage`，通过 CatalogQuery 复用 SQL 查询和曲目操作。主界面右上角进入搜索，原同步全部来源入口迁至音乐源管理。`LibraryBrowser` 的歌曲视图使用固定行高的虚拟列表，按可见位置加载每批 100 行，缓存最多六批并淘汰最久未用批次；查询或 catalogRevision 变化后递增请求代次，丢弃旧代次异步结果。歌曲、聚合专辑和艺术家均使用虚拟连续列表，不显示分页栏；播放全部和点播继续按完整查询获取身份队列，不限于已加载的元数据批次。

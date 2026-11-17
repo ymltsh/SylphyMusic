@@ -104,8 +104,8 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     }
   }
 
-  /// Matches the area used by the real player at this window size: safe area,
-  /// and the 1200 dp content cap. Playback has no top bar.
+  /// Matches playback: the canvas reaches behind the status bar, retaining
+  /// side/bottom safe insets and the 1200 dp content cap.
   Size _playerCanvas(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
     final padding = MediaQuery.paddingOf(context);
@@ -114,7 +114,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
         1200,
         math.max(280, screen.width - padding.left - padding.right),
       ),
-      math.max(320, screen.height - padding.top - padding.bottom),
+      math.max(320, screen.height - padding.bottom),
     );
   }
 
@@ -240,7 +240,9 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     final before = gestureFrame;
     if (e.locked || before == null) return;
     gestureDelta += delta / scale;
-    final square = e.type == PlayerPart.cover;
+    final square =
+        e.type == PlayerPart.cover &&
+        e.coverStyle != PlayerCoverStyle.immersive;
     final proposed = resize
         ? Rect.fromLTWH(
             before.left,
@@ -343,12 +345,12 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           decoration: BoxDecoration(
                             shape:
                                 e.type == PlayerPart.cover &&
-                                    widget.app.appearance.disc
+                                    e.coverStyle == PlayerCoverStyle.vinyl
                                 ? BoxShape.circle
                                 : BoxShape.rectangle,
                             borderRadius:
                                 e.type == PlayerPart.cover &&
-                                    !widget.app.appearance.disc
+                                    e.coverStyle == PlayerCoverStyle.rounded
                                 ? BorderRadius.circular(e.radius)
                                 : null,
                             border: Border.all(
@@ -592,6 +594,48 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
               child: Column(
                 children: [
                   if (e.type == PlayerPart.cover) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final style in const {
+                          PlayerCoverStyle.rounded: '圆角封面',
+                          PlayerCoverStyle.vinyl: '黑胶唱片',
+                          PlayerCoverStyle.immersive: '沉浸封面',
+                        }.entries)
+                          _pill(
+                            key: ValueKey('editor-cover-${style.key.name}'),
+                            label: Text(style.value),
+                            selected: e.coverStyle == style.key,
+                            onSelected: (_) {
+                              if (e.coverStyle == style.key) return;
+                              const initial = Rect.fromLTWH(0, 0, 1, .5);
+                              // Immersive is still a normal movable element;
+                              // the top half is only its initial frame.
+                              draft.update(
+                                e.copyWith(
+                                  coverStyle: style.key,
+                                  frame: style.key == PlayerCoverStyle.immersive
+                                      ? initial
+                                      : null,
+                                  wideFrame:
+                                      style.key == PlayerCoverStyle.immersive
+                                      ? initial
+                                      : null,
+                                  coverFadeDirection:
+                                      style.key == PlayerCoverStyle.immersive
+                                      ? CoverFadeDirection.bottom
+                                      : null,
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (e.type == PlayerPart.cover &&
+                      e.coverStyle != PlayerCoverStyle.immersive) ...[
                     _slider(
                       '大小',
                       draft.value.bounds(e, canvas).width,
@@ -614,35 +658,15 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                         );
                       },
                     ),
-                    SwitchListTile(
-                      key: const ValueKey('editor-disc'),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('唱片样式'),
-                      subtitle: const Text('关闭时显示专辑封面'),
-                      value: widget.app.appearance.disc,
-                      onChanged: saving
-                          ? null
-                          : (value) => _run(
-                              () => widget.app.appearance.update(record: value),
-                            ),
-                    ),
-                    SwitchListTile(
-                      key: const ValueKey('editor-disc-rotation'),
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('唱片旋转'),
-                      value: widget.app.appearance.discRotation,
-                      onChanged: saving || !widget.app.appearance.disc
-                          ? null
-                          : (value) => _run(
-                              () => widget.app.appearance.update(
-                                rotateDisc: value,
-                              ),
-                            ),
-                    ),
-                    const Text(
-                      '封面样式与旋转自动保存，同步用于播放页、歌词页和迷你播放器。',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    if (e.coverStyle == PlayerCoverStyle.vinyl)
+                      SwitchListTile(
+                        key: const ValueKey('editor-cover-rotation'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('唱片旋转'),
+                        value: e.coverRotation,
+                        onChanged: (v) =>
+                            draft.update(e.copyWith(coverRotation: v)),
+                      ),
                   ] else ...[
                     _slider(
                       '宽度',
@@ -677,6 +701,35 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           ),
                         ),
                       ),
+                    ),
+                  ],
+                  if (e.type == PlayerPart.cover &&
+                      e.coverStyle == PlayerCoverStyle.immersive) ...[
+                    _slider(
+                      '渐隐起点',
+                      e.coverFadeStart,
+                      0,
+                      .95,
+                      (v) => draft.update(e.copyWith(coverFadeStart: v)),
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final direction in const {
+                          CoverFadeDirection.right: '向右渐隐',
+                          CoverFadeDirection.left: '向左渐隐',
+                          CoverFadeDirection.bottom: '向下渐隐',
+                          CoverFadeDirection.top: '向上渐隐',
+                        }.entries)
+                          _pill(
+                            label: Text(direction.value),
+                            selected: e.coverFadeDirection == direction.key,
+                            onSelected: (_) => draft.update(
+                              e.copyWith(coverFadeDirection: direction.key),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                   if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
@@ -763,7 +816,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                   if (e.type == PlayerPart.decoration ||
                       e.type == PlayerPart.controls ||
                       (e.type == PlayerPart.cover &&
-                          !widget.app.appearance.disc))
+                          e.coverStyle == PlayerCoverStyle.rounded))
                     _slider(
                       '圆角',
                       e.radius,
@@ -816,6 +869,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           ),
                         for (final c in <int?>[
                           null,
+                          if (e.type == PlayerPart.controls) 0x00000000,
                           0xffffffff,
                           0xff82c7e4,
                           0xffe8bca3,
@@ -824,6 +878,8 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           _pill(
                             label: c == null
                                 ? const Text('主题')
+                                : c == 0x00000000
+                                ? const Text('透明')
                                 : Icon(Icons.circle, color: Color(c), size: 18),
                             selected: c == null
                                 ? e.color == null &&

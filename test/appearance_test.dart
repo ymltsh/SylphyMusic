@@ -26,19 +26,6 @@ void main() {
     await root.delete(recursive: true);
   });
   test(
-    'disc style and rotation default on and explicit choices survive restart',
-    () async {
-      expect(appearance.disc, isTrue);
-      expect(appearance.discRotation, isTrue);
-      await appearance.update(record: false, rotateDisc: false);
-      final restored = Appearance(db);
-      await restored.initialize();
-      expect(restored.disc, isFalse);
-      expect(restored.discRotation, isFalse);
-      restored.dispose();
-    },
-  );
-  test(
     'default accent is exactly #5094B2 and custom values survive reload',
     () async {
       expect(appearance.seedHex, '#5094B2');

@@ -471,6 +471,17 @@ class PenpalCardStore extends ChangeNotifier {
         where: 'card_id=?',
         whereArgs: [id],
       );
+      // Remove all RP records when a character card is deleted.
+      for (final table in <String>[
+        'rp_memories',
+        'rp_lore_entries',
+        'rp_topics',
+        'rp_event_instances',
+        'rp_event_rolls',
+        'rp_character_state',
+      ]) {
+        await tx.delete(table, where: 'card_id=?', whereArgs: [id]);
+      }
       await tx.delete('penpal_outbox', where: 'card_id=?', whereArgs: [id]);
       await tx.delete('penpal_cards', where: 'card_id=?', whereArgs: [id]);
       // Historical letters retain their original author ID.

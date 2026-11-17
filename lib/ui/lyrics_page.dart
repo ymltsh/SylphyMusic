@@ -39,14 +39,12 @@ class _LyricsPageState extends State<LyricsPage> {
   bool busy = false;
   bool _leaving = false;
 
-  double get _playButtonRadius =>
+  PlayerElement? get _playControls =>
       (widget.app.playerLayouts.active ?? playerTemplate()).elements
           .where(
             (element) => element.type == PlayerPart.controls && !element.hidden,
           )
-          .firstOrNull
-          ?.radius ??
-      24;
+          .firstOrNull;
 
   @override
   void initState() {
@@ -207,7 +205,6 @@ class _LyricsPageState extends State<LyricsPage> {
                               app: widget.app,
                               track: widget.track,
                               size: 40,
-                              circle: widget.app.appearance.disc,
                               radius: 10,
                               shadow: false,
                             ),
@@ -285,7 +282,8 @@ class _LyricsPageState extends State<LyricsPage> {
                                   height: 72,
                                   child: PlayerControls(
                                     app: widget.app,
-                                    radius: _playButtonRadius,
+                                    radius: _playControls?.radius ?? 24,
+                                    color: _playControls?.color,
                                   ),
                                 ),
                               ],

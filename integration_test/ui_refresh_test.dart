@@ -570,16 +570,10 @@ void main() {
         await tester.pumpAndSettle();
         await app.appearance.update(solid: true);
         await openSetting('播放器外观');
-        await tester.tap(find.widgetWithText(SwitchListTile, '唱片播放样式'));
-        await tester.pumpAndSettle();
-        expect(app.appearance.disc, isTrue);
-        await tester.tap(find.widgetWithText(SwitchListTile, '唱片旋转'));
-        await tester.pumpAndSettle();
-        expect(app.appearance.discRotation, isTrue);
+        expect(find.text('专辑封面样式'), findsOneWidget);
         await capture('settings-player-mobile');
         await tester.pageBack();
         await tester.pumpAndSettle();
-        await app.appearance.update(record: false, rotateDisc: false);
         await openSetting('下载与缓存');
         await tester.tap(find.text('缓存预算'));
         await tester.pumpAndSettle();
@@ -751,15 +745,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(NavigationRail), findsOneWidget);
         await capture('home-desktop');
-        await app.appearance.update(
-          theme: ThemeMode.dark,
-          record: true,
-          frost: true,
-        );
+        await app.appearance.update(theme: ThemeMode.dark, frost: true);
         final restored = Appearance(app.db);
         await restored.initialize();
         expect(restored.mode, ThemeMode.dark);
-        expect(restored.disc, isTrue);
         expect(restored.glass, isTrue);
         restored.dispose();
         tester.view.physicalSize = const Size(360, 800);
@@ -841,11 +830,11 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('edit-cover')));
         await tester.pumpAndSettle();
-        final discSwitch = find.byKey(const ValueKey('editor-disc'));
-        await revealEditorControl(discSwitch);
-        await tester.tap(discSwitch);
+        final rounded = find.byKey(const ValueKey('editor-cover-rounded'));
+        await revealEditorControl(rounded);
+        await tester.tap(rounded);
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('关闭编辑器'));
+        await tester.tap(find.byTooltip('保存并应用'));
         await tester.pump(const Duration(milliseconds: 500));
         expect(find.bySemanticsLabel('专辑封面'), findsOneWidget);
         await waitFor(find.textContaining('暂无歌词'));

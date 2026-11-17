@@ -12,6 +12,7 @@ import 'public_music_trends.dart';
 import 'recommendation_engine.dart';
 import 'llm_recommendations.dart';
 import 'penpal_memory.dart';
+import 'rp_runtime.dart';
 import 'diagnostic_logs.dart';
 
 enum DailyLetterStage { inviting, selecting, writing, sealing }
@@ -24,6 +25,7 @@ class RecommendationService {
     LlmRecommendationClient? llm,
     this.diagnostics,
     this.memory,
+    this.rpRuntime,
     this.mailbox,
   }) : llm = llm,
        _trends = PublicMusicTrends(db);
@@ -40,6 +42,7 @@ class RecommendationService {
   final RecommendationRepository repository;
   final LlmRecommendationClient? llm;
   final PenpalMemory? memory;
+  final RpRuntime? rpRuntime;
   final PenpalMailboxRepository? mailbox;
   final PublicMusicTrends _trends;
   final RecommendationEngine _engine = const RecommendationEngine();
@@ -201,14 +204,27 @@ class RecommendationService {
           options.add(RecommendedTrack(full, '曲库中的更多发现', .18));
         }
       }
+      // Legacy chat memories were purged in v21. Use the unified RP runtime
+      // for state, conditional world lore, episodic recall and topic cooldown.
       Map<String, Object?> memoryContext = const {};
       List<String> explicitPreferences = const [];
-      if (memory != null) {
+      if (rpRuntime != null) {
         try {
-          memoryContext = await memory!.writeContext();
-          explicitPreferences = await memory!.explicitPreferences();
+          memoryContext = await rpRuntime!.context(
+            activeCardId,
+            currentMessage: pendingNote?.content ?? '',
+            checkEvents: true,
+          );
+          final rpState = await rpRuntime!.snapshot(activeCardId);
+          if (rpState.state.memoryEnabled) {
+            explicitPreferences = rpState.memories
+                .where((entry) => entry.kind == 'preference')
+                .take(8)
+                .map((entry) => entry.content)
+                .toList();
+          }
         } catch (_) {
-          // Memory is optional: it must never interrupt music recommendations.
+          // RP is optional: failure must not interrupt local recommendations.
         }
       }
       final selection = await llm!.daily(
@@ -296,19 +312,17 @@ class RecommendationService {
       llmSucceeded: letterFromLlm,
       answeredNote: letterFromLlm ? pendingNote : null,
     );
-    if (memory != null) {
+    if (rpRuntime != null) {
       try {
-        await memory!.recordGeneratedLetter(
+        await rpRuntime!.recordLetter(
+          activeCardId,
+          title: title,
           day: day,
           generation: generation,
-          title: title,
-          mainLetter: mainLetter,
-          expectedPersonaKey: activeCardId,
-          reflection: letterFromLlm ? selfReflection : '',
           topic: letterFromLlm ? letterTopic : '',
         );
       } catch (_) {
-        // The letter has already been committed. Never fail it for memory.
+        // The recommendation and letter have already been committed.
       }
     }
     _record('generation_completed', 'daily', count: finalTracks.length);

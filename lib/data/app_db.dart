@@ -83,6 +83,67 @@ class AppDb {
     "CREATE UNIQUE INDEX idx_penpal_one_pending ON penpal_outbox(card_id) WHERE status='pending'",
     'CREATE INDEX idx_penpal_outbox_card ON penpal_outbox(card_id,created_at_ms DESC)',
   ];
+  // RP Core v21: per-card state, evidence-based memories and world events.
+  static const _rpV21Schema = <String>[
+    '''CREATE TABLE rp_character_state(
+      card_id TEXT PRIMARY KEY,
+      scene TEXT NOT NULL DEFAULT '自由场景',
+      activity TEXT NOT NULL DEFAULT '',
+      goal TEXT NOT NULL DEFAULT '',
+      energy INTEGER NOT NULL DEFAULT 65 CHECK(energy BETWEEN 0 AND 100),
+      memory_enabled INTEGER NOT NULL DEFAULT 1,
+      events_enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at_ms INTEGER NOT NULL)''',
+    '''CREATE TABLE rp_memories(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('preference','episode','reflection','agreement','user_reply')),
+      content TEXT NOT NULL,
+      source TEXT NOT NULL,
+      conversation_key TEXT NOT NULL DEFAULT '',
+      importance INTEGER NOT NULL DEFAULT 2,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      expires_at_ms INTEGER,
+      created_at_ms INTEGER NOT NULL)''',
+    'CREATE INDEX idx_rp_memories_card ON rp_memories(card_id,created_at_ms DESC)',
+    '''CREATE TABLE rp_lore_entries(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('lore','event')),
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      triggers_json TEXT NOT NULL DEFAULT '[]',
+      priority INTEGER NOT NULL DEFAULT 50,
+      chance INTEGER NOT NULL DEFAULT 30,
+      cooldown_hours INTEGER NOT NULL DEFAULT 72,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      last_triggered_ms INTEGER NOT NULL DEFAULT 0)''',
+    'CREATE INDEX idx_rp_lore_card ON rp_lore_entries(card_id,kind,enabled)',
+    '''CREATE TABLE rp_topics(
+      card_id TEXT NOT NULL,
+      topic_key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      origin TEXT NOT NULL DEFAULT 'chat',
+      status TEXT NOT NULL CHECK(status IN ('active','cooling','resolved')),
+      last_at_ms INTEGER NOT NULL,
+      cooldown_until_ms INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY(card_id,topic_key))''',
+    '''CREATE TABLE rp_event_instances(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id TEXT NOT NULL,
+      lore_id INTEGER,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('active','resolved')),
+      started_at_ms INTEGER NOT NULL,
+      ended_at_ms INTEGER)''',
+    'CREATE INDEX idx_rp_event_card ON rp_event_instances(card_id,started_at_ms DESC)',
+    '''CREATE TABLE rp_event_rolls(
+      card_id TEXT NOT NULL,
+      local_day TEXT NOT NULL,
+      created_at_ms INTEGER NOT NULL,
+      PRIMARY KEY(card_id,local_day))''',
+  ];
   static const _recommendationLettersTable =
       '''CREATE TABLE recommendation_letters(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -242,7 +303,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 20,
+      version: 21,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -398,6 +459,34 @@ class AppDb {
             await database.execute(sql);
           }
         }
+        if (oldVersion < 21) {
+          // Explicit v21 breaking change: discard ALL pre-RP recommendation
+          // and penpal interaction data. Not music tracks, favorites,
+          // playlists, source credentials, recent playing IDs or role cards.
+          for (final table in <String>[
+            'recommendation_items',
+            'recommendation_snapshots',
+            'recommendation_letters',
+            'recommendation_feedback',
+            'listening_sessions',
+            'track_listen_stats',
+            'penpal_chat_messages',
+            'penpal_memory_events',
+            'penpal_outbox',
+            'penpal_memory_state',
+            'penpal_card_memory_state',
+          ]) {
+            await database.delete(table);
+          }
+          await database.delete(
+            'settings',
+            where: 'key=?',
+            whereArgs: ['recommendation_public_charts_v1'],
+          );
+          for (final sql in _rpV21Schema) {
+            await database.execute(sql);
+          }
+        }
       },
       onCreate: (d, v) async {
         for (final sql in <String>[
@@ -449,6 +538,9 @@ class AppDb {
           await d.execute(sql);
         }
         for (final sql in _penpalMailboxV20Schema) {
+          await d.execute(sql);
+        }
+        for (final sql in _rpV21Schema) {
           await d.execute(sql);
         }
       },

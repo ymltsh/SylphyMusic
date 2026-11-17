@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 import 'package:sylphy_music/core/app_controller.dart';
 import 'package:sylphy_music/core/models.dart';
+import 'package:sylphy_music/core/player_layout.dart';
 import 'package:sylphy_music/ui/cover_art.dart';
 import 'package:sylphy_music/ui/cache_storage.dart';
 import 'package:sylphy_music/ui/lyrics_page.dart';
@@ -87,7 +88,7 @@ void main() {
             app: app,
             track: current,
             size: 200,
-            circle: true,
+            style: PlayerCoverStyle.vinyl,
             rotate: true,
             playing: true,
           ),

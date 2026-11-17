@@ -40,8 +40,7 @@ class Appearance extends ChangeNotifier {
       : File(p.join(_backgroundDirectory.path, _backgroundName!));
   String get seedHex =>
       '#${(seed.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0').toUpperCase()}';
-  bool disc = true, ambient = false, glass = false;
-  bool discRotation = true;
+  bool ambient = false, glass = false;
   bool solidBackground = true;
   bool playerFab = true;
   MiniPlayerBarStyle miniPlayerBarStyle = MiniPlayerBarStyle.automatic;
@@ -108,8 +107,6 @@ class Appearance extends ChangeNotifier {
     if (visibility != null && visibility.isFinite) {
       backgroundVisibility = visibility.clamp(.1, .4);
     }
-    disc = await db.setting('ui_disc') != 'false';
-    discRotation = await db.setting('ui_disc_rotation') != 'false';
     ambient = await db.setting('ui_ambient') == 'true';
     glass = await db.setting('ui_glass') == 'true';
     playerFab = await db.setting('ui_player_fab') != 'false';
@@ -189,10 +186,8 @@ class Appearance extends ChangeNotifier {
     ThemeMode? theme,
     Color? color,
     double? visibility,
-    bool? record,
     bool? background,
     bool? frost,
-    bool? rotateDisc,
     bool? solid,
     bool? playerFab,
     MiniPlayerBarStyle? miniPlayerBarStyle,
@@ -231,10 +226,6 @@ class Appearance extends ChangeNotifier {
       await db.setSetting('ui_background_visibility', '$visibility');
     }
     if (theme != null) await db.setSetting('ui_theme', theme.name);
-    if (record != null) await db.setSetting('ui_disc', '$record');
-    if (rotateDisc != null) {
-      await db.setSetting('ui_disc_rotation', '$rotateDisc');
-    }
     if (background != null) await db.setSetting('ui_ambient', '$background');
     if (frost != null) await db.setSetting('ui_glass', '$frost');
     if (solid != null) await db.setSetting('ui_background_solid', '$solid');
@@ -280,8 +271,6 @@ class Appearance extends ChangeNotifier {
         : Color(0xff000000 | (color.toARGB32() & 0xffffff));
     backgroundVisibility = visibility ?? backgroundVisibility;
     mode = theme ?? mode;
-    disc = record ?? disc;
-    discRotation = rotateDisc ?? discRotation;
     ambient = background ?? ambient;
     glass = frost ?? glass;
     solidBackground = solid ?? solidBackground;

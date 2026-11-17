@@ -19,6 +19,12 @@ enum PlayerPart {
 
 enum PlayerBackground { album, gradient, solid }
 
+/// The shape and rendering of an individual cover element, not a global switch.
+enum PlayerCoverStyle { rounded, vinyl, immersive }
+
+/// The edge where an immersive cover fades into the canvas behind it.
+enum CoverFadeDirection { right, left, bottom, top }
+
 const partLabels = {
   PlayerPart.cover: '专辑封面',
   PlayerPart.title: '歌曲标题',
@@ -50,13 +56,16 @@ class PlayerElement {
     this.align = 'center',
     this.color,
     this.lyricFollowSystemColor = true,
+    this.coverStyle = PlayerCoverStyle.vinyl,
+    this.coverRotation = true,
+    this.coverFadeStart = .5,
+    this.coverFadeDirection = CoverFadeDirection.bottom,
   });
   final String id;
   final PlayerPart type;
 
-  /// Position and size on the portrait canvas. Cut-out covers are rendered as
-  /// a centred square inside this frame so the visible disc can never disagree
-  /// with the selection rectangle.
+  /// Normalized free-canvas rectangle. Rounded and vinyl covers are square;
+  /// immersive covers use the entire rectangle without aspect-ratio clamping.
   final Rect frame;
   final Rect? wideFrame;
   final bool locked, hidden;
@@ -68,6 +77,10 @@ class PlayerElement {
   /// Only the lyrics preview uses this flag. It selects system black/white
   /// instead of the usual theme accent when no explicit color is set.
   final bool lyricFollowSystemColor;
+  final PlayerCoverStyle coverStyle;
+  final bool coverRotation;
+  final double coverFadeStart;
+  final CoverFadeDirection coverFadeDirection;
 
   PlayerElement copyWith({
     Rect? frame,
@@ -85,6 +98,10 @@ class PlayerElement {
     int? color,
     bool clearColor = false,
     bool? lyricFollowSystemColor,
+    PlayerCoverStyle? coverStyle,
+    bool? coverRotation,
+    double? coverFadeStart,
+    CoverFadeDirection? coverFadeDirection,
   }) => PlayerElement(
     id: id,
     type: type,
@@ -103,6 +120,10 @@ class PlayerElement {
     color: clearColor ? null : color ?? this.color,
     lyricFollowSystemColor:
         lyricFollowSystemColor ?? this.lyricFollowSystemColor,
+    coverStyle: coverStyle ?? this.coverStyle,
+    coverRotation: coverRotation ?? this.coverRotation,
+    coverFadeStart: coverFadeStart ?? this.coverFadeStart,
+    coverFadeDirection: coverFadeDirection ?? this.coverFadeDirection,
   );
 
   Map<String, Object?> toJson() => {
@@ -124,6 +145,11 @@ class PlayerElement {
       if (color != null) 'color': color,
       if (type == PlayerPart.lyrics)
         'lyricFollowSystemColor': lyricFollowSystemColor,
+      if (type == PlayerPart.cover) 'coverStyle': coverStyle.name,
+      if (type == PlayerPart.cover) 'coverRotation': coverRotation,
+      if (type == PlayerPart.cover) 'coverFadeStart': coverFadeStart,
+      if (type == PlayerPart.cover)
+        'coverFadeDirection': coverFadeDirection.name,
     },
   };
 
@@ -166,6 +192,17 @@ class PlayerElement {
         'lyricFollowSystemColor',
         defaultValue: true,
       ),
+      // New v4 layouts do not read legacy circle/rotate switches.
+      coverStyle: _enum(
+        PlayerCoverStyle.values,
+        props['coverStyle'] ?? 'vinyl',
+      ),
+      coverRotation: flag('coverRotation', defaultValue: true),
+      coverFadeStart: _number(props['coverFadeStart'] ?? .5, 0, .95),
+      coverFadeDirection: _enum(
+        CoverFadeDirection.values,
+        props['coverFadeDirection'] ?? 'bottom',
+      ),
     );
   }
 }
@@ -183,11 +220,8 @@ class PlayerLayout {
   final double backgroundOpacity;
   final PlayerBackground background;
 
-  /// v3 preserves a deliberately removed quick-action row. v2 layouts still
-  /// receive the row once when migrated, but new saves never recreate it.
-  static const version = 3;
-  static const freeformVersion = 2;
-  static const legacyVersion = 1;
+  /// Breaking layout format: former templates must be recreated by the user.
+  static const version = 4;
   static const maxElements = 33; // Former 32 plus the quick-action row.
 
   PlayerLayout copyWith({
@@ -224,18 +258,9 @@ class PlayerLayout {
 
   static PlayerLayout fromJson(Object? value) {
     final json = _map(value);
-    return switch (json['version']) {
-      legacyVersion => _migrateLegacy(json),
-      freeformVersion => _fromV2(json, restoreLegacyActions: true),
-      version => _fromV2(json),
-      _ => throw const FormatException('不支持的布局版本'),
-    };
-  }
-
-  static PlayerLayout _fromV2(
-    Map<String, dynamic> json, {
-    bool restoreLegacyActions = false,
-  }) {
+    if (json['version'] != version) {
+      throw const FormatException('只支持新版 v4 播放页布局');
+    }
     final raw = json['elements'];
     if (raw is! List || raw.length > maxElements) {
       throw const FormatException('最多支持 33 个组件');
@@ -255,110 +280,7 @@ class PlayerLayout {
     return PlayerLayout(
       id: _string(json['id'], 80),
       name: _string(json['name'], 60),
-      elements: restoreLegacyActions ? _withQuickActions(elements) : elements,
-      background: _enum(PlayerBackground.values, json['background'] ?? 'album'),
-      backgroundOpacity: _number(json['backgroundOpacity'] ?? .65, .1, 1),
-    );
-  }
-
-  /// Older layouts had a fixed row anchored to the first visible progress bar.
-  /// Materialize that row as its own portrait/wide element on read, preserving
-  /// approximately the same position until the user moves either component.
-  static List<PlayerElement> _withQuickActions(List<PlayerElement> elements) {
-    final actions = elements.where((e) => e.type == PlayerPart.quickActions);
-    if (actions.length > 1) {
-      throw const FormatException('快捷操作区只能有一个');
-    }
-    if (actions.isNotEmpty) {
-      if (actions.first.hidden) {
-        throw const FormatException('快捷操作区不能隐藏');
-      }
-      return elements;
-    }
-    if (elements.length >= maxElements) {
-      throw const FormatException('最多支持 33 个组件');
-    }
-    final old = PlayerLayout(
-      id: 'migration',
-      name: 'migration',
       elements: elements,
-    );
-    const portrait = Size(360, 640);
-    const wide = Size(1200, 800);
-    var id = 'quick-actions';
-    var suffix = 2;
-    while (elements.any((e) => e.id == id)) {
-      id = 'quick-actions-${suffix++}';
-    }
-    return [
-      ...elements,
-      PlayerElement(
-        id: id,
-        type: PlayerPart.quickActions,
-        frame: _normalise(old._legacyActionBounds(portrait), portrait),
-        wideFrame: _normalise(old._legacyActionBounds(wide), wide),
-      ),
-    ];
-  }
-
-  /// The v1 format stored every widget inside one of three vertical regions and
-  /// used a second region set for wide screens. This recovers the exact
-  /// on-screen rectangle at the reference sizes before normalising it to the
-  /// free canvas. The old per-widget circle / rotate flags are intentionally
-  /// dropped: record shape and rotation are now one global playback preference.
-  static PlayerLayout _migrateLegacy(Map<String, dynamic> json) {
-    final top = _number(json['topFraction'] ?? .48, .15, .65);
-    final middle = _number(json['middleFraction'] ?? .2, .1, .6);
-    if (top + middle > .8) {
-      throw const FormatException('旧布局区域比例无效');
-    }
-    final raw = json['elements'];
-    if (raw is! List || raw.length > 32) {
-      throw const FormatException('最多支持 32 个组件');
-    }
-    final legacy = raw.map(_LegacyElement.fromJson).toList();
-    if (legacy.map((e) => e.id).toSet().length != legacy.length) {
-      throw const FormatException('组件 ID 重复');
-    }
-    if (legacy.any((e) => e.type == PlayerPart.controls)) {
-      legacy.removeWhere(
-        (e) =>
-            e.id == 'queue' &&
-            e.type == PlayerPart.queue &&
-            e.region == _LegacyRegion.bottom,
-      );
-    }
-    final portrait = const Size(360, 640);
-    final wide = const Size(1200, 800);
-    final elements = <PlayerElement>[
-      for (final e in legacy)
-        PlayerElement(
-          id: e.id,
-          type: e.type,
-          frame: _normalise(
-            _legacyBounds(e, portrait, top, middle, legacy),
-            portrait,
-          ),
-          wideFrame: _normalise(
-            _legacyBounds(e, wide, top, middle, legacy),
-            wide,
-          ),
-          locked: e.locked,
-          hidden: e.hidden,
-          fontSize: e.fontSize,
-          opacity: e.opacity,
-          radius: e.radius,
-          playWidth: e.playWidth,
-          playHeight: e.playHeight,
-          controlSpacing: e.controlSpacing,
-          align: e.align,
-          color: e.color,
-        ),
-    ];
-    return PlayerLayout(
-      id: _string(json['id'], 80),
-      name: _string(json['name'], 60),
-      elements: _withQuickActions(elements),
       background: _enum(PlayerBackground.values, json['background'] ?? 'album'),
       backgroundOpacity: _number(json['backgroundOpacity'] ?? .65, .1, 1),
     );
@@ -381,9 +303,9 @@ class PlayerLayout {
 
   Rect bounds(PlayerElement e, Size size) {
     final raw = rawBounds(e, size);
-    if (e.type == PlayerPart.cover) {
-      // A record is always circular. Its displayed square is the source of
-      // truth for selection, resizing and hit testing.
+    if (e.type == PlayerPart.cover &&
+        e.coverStyle != PlayerCoverStyle.immersive) {
+      // Vinyl and rounded covers keep their square selection/resize bounds.
       var side = math.min(raw.width, raw.height);
       side = math.max(48.0, side).clamp(0.0, math.min(size.width, size.height));
       final left = (raw.center.dx - side / 2).clamp(0.0, size.width - side);
@@ -430,31 +352,11 @@ class PlayerLayout {
         .firstOrNull;
     return actions == null ? Rect.zero : bounds(actions, size);
   }
-
-  Rect _legacyActionBounds(Size size) {
-    final progress = elements
-        .where((e) => e.type == PlayerPart.progress && !e.hidden)
-        .firstOrNull;
-    final anchor = progress == null
-        ? Rect.fromLTWH(16, size.height - 16, math.max(0, size.width - 32), 0)
-        : bounds(progress, size);
-    final width = math.min(480.0, anchor.width);
-    final height = math.min(48.0, size.height);
-    return Rect.fromLTWH(
-      (anchor.center.dx - width / 2).clamp(
-        0.0,
-        math.max(0, size.width - width),
-      ),
-      (anchor.top - height - 8).clamp(0.0, math.max(0, size.height - height)),
-      width,
-      height,
-    );
-  }
 }
 
 PlayerLayout playerTemplate({bool lyrics = false}) => PlayerLayout(
   id: lyrics ? 'builtin-lyrics' : 'builtin-cover',
-  name: lyrics ? '歌词优先' : '沉浸封面',
+  name: lyrics ? '歌词优先' : '唱片播放',
   elements: [
     PlayerElement(
       id: 'cover',
@@ -532,13 +434,6 @@ PlayerLayout playerTemplate({bool lyrics = false}) => PlayerLayout(
   ],
 );
 
-Rect _normalise(Rect pixels, Size size) => Rect.fromLTWH(
-  (pixels.left / size.width).clamp(0.0, 1.0),
-  (pixels.top / size.height).clamp(0.0, 1.0),
-  (pixels.width / size.width).clamp(0.0, 1.0),
-  (pixels.height / size.height).clamp(0.0, 1.0),
-);
-
 Map<String, dynamic> _map(Object? value) {
   if (value is! Map<String, dynamic>) throw const FormatException('无效布局对象');
   return value;
@@ -582,217 +477,3 @@ Rect _readFrame(Object? value) {
 
 // ---------------------------------------------------------------------------
 // v1 migration helpers
-
-enum _LegacyRegion { top, middle, bottom }
-
-class _LegacyElement {
-  const _LegacyElement({
-    required this.id,
-    required this.type,
-    required this.region,
-    required this.frame,
-    required this.wideFrame,
-    required this.wideRegion,
-    required this.locked,
-    required this.hidden,
-    required this.fontSize,
-    required this.opacity,
-    required this.radius,
-    required this.playWidth,
-    required this.playHeight,
-    required this.controlSpacing,
-    required this.align,
-    required this.color,
-  });
-  final String id;
-  final PlayerPart type;
-  final _LegacyRegion region;
-  final Rect frame;
-  final Rect? wideFrame;
-  final _LegacyRegion? wideRegion;
-  final bool locked, hidden;
-  final double fontSize, opacity, radius, playWidth, playHeight, controlSpacing;
-  final String align;
-  final int? color;
-
-  static _LegacyElement fromJson(Object? value) {
-    final json = _map(value);
-    final props = _map(json['props'] ?? const <String, dynamic>{});
-    final align = props['align'] ?? 'center';
-    if (!['left', 'center', 'right'].contains(align)) {
-      throw const FormatException('不支持的对齐方式');
-    }
-    final color = props['color'];
-    if (color != null && (color is! int || color < 0 || color > 0xffffffff)) {
-      throw const FormatException('无效颜色');
-    }
-    bool flag(String key) {
-      final v = props[key] ?? false;
-      if (v is! bool) throw const FormatException('无效属性');
-      return v;
-    }
-
-    return _LegacyElement(
-      id: _string(json['id'], 80),
-      type: _enum(PlayerPart.values, json['type']),
-      region: _legacyEnum(_LegacyRegion.values, json['region']),
-      frame: _readFrame(json['frame']),
-      wideFrame: json['wideFrame'] == null
-          ? null
-          : _readFrame(json['wideFrame']),
-      wideRegion: json['wideRegion'] == null
-          ? null
-          : _legacyEnum(_LegacyRegion.values, json['wideRegion']),
-      locked: flag('locked'),
-      hidden: flag('hidden'),
-      fontSize: _number(props['fontSize'] ?? 22, 12, 40),
-      opacity: _number(props['opacity'] ?? 1, .1, 1),
-      radius: _number(props['radius'] ?? 24, 0, 64),
-      playWidth: _number(props['playWidth'] ?? 64, 56, 96),
-      playHeight: _number(props['playHeight'] ?? 64, 48, 96),
-      controlSpacing: _number(props['controlSpacing'] ?? 12, 0, 32),
-      align: align as String,
-      color: color as int?,
-    );
-  }
-}
-
-T _legacyEnum<T extends Enum>(List<T> values, Object? v) => values.firstWhere(
-  (e) => e.name == v,
-  orElse: () => throw const FormatException('不支持的组件或样式'),
-);
-
-Rect _legacyBounds(
-  _LegacyElement e,
-  Size size,
-  double topFraction,
-  double middleFraction,
-  List<_LegacyElement> elements,
-) {
-  final regions = _legacyRegions(size, topFraction, middleFraction, elements);
-  final region = _legacyRegionFor(e, size);
-  final area = regions[region]!;
-  final frame = _legacyFrameFor(e, size, regions, area);
-  final minimum = switch (e.type) {
-    PlayerPart.controls => Size(300, math.max(72, e.playHeight + 8)),
-    PlayerPart.progress => const Size(260, 70),
-    PlayerPart.queue || PlayerPart.favorite => const Size(48, 48),
-    PlayerPart.lyrics => const Size(120, 140),
-    PlayerPart.cover => const Size(48, 48),
-    _ => const Size(24, 24),
-  };
-  final width = math
-      .max(minimum.width, frame.width * area.width)
-      .clamp(0.0, area.width);
-  final height = math
-      .max(minimum.height, frame.height * area.height)
-      .clamp(0.0, area.height);
-  return Rect.fromLTWH(
-    area.left + (frame.left * area.width).clamp(0.0, area.width - width),
-    area.top + (frame.top * area.height).clamp(0.0, area.height - height),
-    width,
-    height,
-  );
-}
-
-Map<_LegacyRegion, Rect> _legacyRegions(
-  Size size,
-  double topFraction,
-  double middleFraction,
-  List<_LegacyElement> elements,
-) {
-  final controlsHeight = elements
-      .where((e) => e.type == PlayerPart.controls && !e.hidden)
-      .fold(0.0, (height, e) => math.max(height, e.playHeight + 96));
-  if (size.width > 850) {
-    final width = math.min(size.width, 1200.0);
-    final inset = (size.width - width) / 2;
-    final left = width * .46;
-    final controls = math.max(176.0, controlsHeight);
-    return {
-      _LegacyRegion.top: Rect.fromLTWH(inset, 0, left, size.height - controls),
-      _LegacyRegion.middle: Rect.fromLTWH(
-        inset + left + 24,
-        0,
-        width - left - 24,
-        size.height,
-      ),
-      _LegacyRegion.bottom: Rect.fromLTWH(
-        inset,
-        size.height - controls,
-        left,
-        controls,
-      ),
-    };
-  }
-  final bottomHeight = math
-      .max(size.height * (1 - topFraction - middleFraction), controlsHeight)
-      .clamp(0.0, size.height * .55);
-  final topHeight =
-      (size.height - bottomHeight) *
-      topFraction /
-      (topFraction + middleFraction);
-  return {
-    _LegacyRegion.top: Rect.fromLTWH(0, 0, size.width, topHeight),
-    _LegacyRegion.middle: Rect.fromLTWH(
-      0,
-      topHeight,
-      size.width,
-      size.height - bottomHeight - topHeight,
-    ),
-    _LegacyRegion.bottom: Rect.fromLTWH(
-      0,
-      size.height - bottomHeight,
-      size.width,
-      bottomHeight,
-    ),
-  };
-}
-
-_LegacyRegion _legacyRegionFor(_LegacyElement e, Size size) {
-  if (size.width <= 850) return e.region;
-  return e.wideRegion ??
-      (e.region != _LegacyRegion.bottom &&
-              (e.type == PlayerPart.title || e.type == PlayerPart.artist)
-          ? _LegacyRegion.top
-          : e.region);
-}
-
-Rect _legacyFrameFor(
-  _LegacyElement e,
-  Size size,
-  Map<_LegacyRegion, Rect> regions,
-  Rect area,
-) {
-  if (size.width <= 850) return e.frame;
-  if (e.wideFrame != null) return e.wideFrame!;
-  final side = math.min(area.width * .76, area.height - 128);
-  final start = (area.height - side - 104) / 2;
-  return switch (e.type) {
-    PlayerPart.cover when e.region == _LegacyRegion.top => Rect.fromLTWH(
-      .12,
-      start / area.height,
-      .76,
-      side / area.height,
-    ),
-    PlayerPart.title when e.region != _LegacyRegion.bottom => Rect.fromLTWH(
-      .06,
-      (start + side + 24) / area.height,
-      .88,
-      48 / area.height,
-    ),
-    PlayerPart.artist when e.region != _LegacyRegion.bottom => Rect.fromLTWH(
-      .06,
-      (start + side + 80) / area.height,
-      .88,
-      24 / area.height,
-    ),
-    PlayerPart.lyrics when e.region == _LegacyRegion.middle =>
-      const Rect.fromLTWH(.02, .02, .96, .96),
-    PlayerPart.progress when e.region == _LegacyRegion.bottom =>
-      const Rect.fromLTWH(.08, .02, .84, .4),
-    PlayerPart.controls when e.region == _LegacyRegion.bottom =>
-      const Rect.fromLTWH(.08, .5, .84, .44),
-    _ => e.frame,
-  };
-}

@@ -49,6 +49,7 @@ class _AppSystemBarsState extends State<AppSystemBars>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
+        systemStatusBarContrastEnforced: false,
         statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
         statusBarBrightness: dark ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: Colors.transparent,

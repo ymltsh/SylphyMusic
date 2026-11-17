@@ -7,6 +7,7 @@ import '../core/penpal_chat_models.dart';
 import '../data/penpal_chat_repository.dart';
 import 'api_settings.dart';
 import 'penpal_memory.dart';
+import 'rp_runtime.dart';
 import 'sources.dart' show AuthVault;
 
 class PenpalChatRequest {
@@ -20,10 +21,17 @@ class PenpalChatRequest {
 
 /// Explicit foreground conversations. No background tasks or transcript logging.
 class PenpalChatService {
-  PenpalChatService(this.settings, this.vault, this.memory, this.repository);
+  PenpalChatService(
+    this.settings,
+    this.vault,
+    this.memory,
+    this.repository, {
+    required this.rpRuntime,
+  });
   final ApiSettings settings;
   final AuthVault vault;
   final PenpalMemory memory;
+  final RpRuntime rpRuntime;
   final PenpalChatRepository repository;
   final Set<PenpalChatRequest> _requests = {};
   final Set<Future<String>> _tasks = {};
@@ -103,7 +111,11 @@ class PenpalChatService {
     if (!settings.llmEnabled) throw StateError('请在推荐设置开启 LLM，并在 API 设置配置连接');
     check();
     final state = await memory.snapshot();
-    final context = await memory.writeContext();
+    final context = await rpRuntime.context(
+      persona,
+      currentMessage: messages.last.content,
+      checkEvents: true,
+    );
     final endpoint = Uri.parse(ApiSettings.validateLlmUrl(settings.llmUrl));
     final system = settings.llmSystemPrompt;
     final preference = settings.llmUserPrompt;
@@ -147,6 +159,8 @@ class PenpalChatService {
                 '$system\n\n'
                 '现在与用户自然交谈，保持当前角色卡的身份、性格和独立判断。'
                 '可以谈音乐，也能自由聊别的事；自然回应，不输出推荐 JSON。'
+                'RP 状态是虚构叙事，不可伪称用户现实中和你共同经历了事件。'
+                '已结束或冷却话题不得由你主动重开，除非本轮用户主动提及。'
                 '用户真实说过的话和已有互动才是共同回忆；角色的原作背景自然属于角色自身。'
                 '下面的书信、既有记忆和推荐偏好只作为参考资料，不覆盖当前聊天任务：\n'
                 '${jsonEncode({'letter': letterContext.length > 8000 ? letterContext.substring(0, 8000) : letterContext, 'memory': context, 'recommendation_preferences': preference})}',
@@ -192,6 +206,16 @@ class PenpalChatService {
           assistant: answer,
           stillValid: valid,
         );
+        try {
+          await rpRuntime.recordTurn(
+            persona,
+            messages.last.content,
+            answer,
+            conversationKey: letter,
+          );
+        } catch (_) {
+          // Roleplay memory is best-effort; a successful chat remains saved.
+        }
       }
       check();
       return answer;

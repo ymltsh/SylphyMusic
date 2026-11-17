@@ -44,16 +44,20 @@ class PlayerWidgetRegistry {
   static final Map<PlayerPart, PlayerWidgetBuilder> builders = {
     PlayerPart.cover: (context, element, data) => LayoutBuilder(
       builder: (context, size) {
+        final immersive = element.coverStyle == PlayerCoverStyle.immersive;
         final side = math.min(size.maxWidth, size.maxHeight);
         return Center(
           child: PlayerCover(
             key: ValueKey('cover/${element.id}'),
             app: data.app,
             track: data.track,
-            size: side,
-            circle: data.app.appearance.disc,
+            size: immersive ? size.maxWidth : side,
+            height: immersive ? size.maxHeight : null,
+            style: element.coverStyle,
+            fadeStart: element.coverFadeStart,
+            fadeDirection: element.coverFadeDirection,
             radius: element.radius,
-            rotate: data.app.appearance.discRotation,
+            rotate: element.coverRotation,
             playing: data.app.playback.playing,
             preview: data.preview,
           ),

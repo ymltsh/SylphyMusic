@@ -1,20 +1,26 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
+import '../core/player_layout.dart';
 import 'cover_art.dart';
 import 'rotating_cover.dart';
 
 /// The single artwork renderer for the full player, the editor preview, the
-/// lyrics page and the collapsed mini player. Shape and rotation are global
-/// playback preferences, so every record on screen uses the same vocabulary.
+/// lyrics page and the collapsed mini player. Full-player elements provide
+/// their own style and rotation; compact thumbnails default to rounded covers.
 class PlayerCover extends StatelessWidget {
   const PlayerCover({
     super.key,
     required this.app,
     required this.track,
     required this.size,
-    required this.circle,
+    this.height,
+    this.style = PlayerCoverStyle.rounded,
+    this.fadeStart = .5,
+    this.fadeDirection = CoverFadeDirection.bottom,
     this.radius = 24,
     this.rotate = false,
     this.playing = false,
@@ -24,7 +30,10 @@ class PlayerCover extends StatelessWidget {
   final SylphyApp app;
   final Track? track;
   final double size;
-  final bool circle;
+  final double? height;
+  final PlayerCoverStyle style;
+  final double fadeStart;
+  final CoverFadeDirection fadeDirection;
   final double radius;
   final bool rotate, playing, preview, shadow;
 
@@ -56,7 +65,55 @@ class PlayerCover extends StatelessWidget {
             ),
           ]
         : const <BoxShadow>[];
-    if (!circle) {
+    if (style == PlayerCoverStyle.immersive) {
+      final h = height ?? size;
+      final side = math.max(size, h);
+      final (begin, end) = switch (fadeDirection) {
+        CoverFadeDirection.right => (
+          Alignment.centerLeft,
+          Alignment.centerRight,
+        ),
+        CoverFadeDirection.left => (
+          Alignment.centerRight,
+          Alignment.centerLeft,
+        ),
+        CoverFadeDirection.bottom => (
+          Alignment.topCenter,
+          Alignment.bottomCenter,
+        ),
+        CoverFadeDirection.top => (Alignment.bottomCenter, Alignment.topCenter),
+      };
+      return Semantics(
+        container: true,
+        label: '沉浸封面',
+        child: SizedBox(
+          width: size,
+          height: h,
+          child: ClipRect(
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => LinearGradient(
+                begin: begin,
+                end: end,
+                colors: const [Colors.white, Colors.white, Colors.transparent],
+                stops: [0, fadeStart, 1],
+              ).createShader(rect),
+              child: SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox.square(
+                    dimension: side,
+                    child: _art(context, side),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (style == PlayerCoverStyle.rounded) {
       return Semantics(
         container: true,
         label: '专辑封面',

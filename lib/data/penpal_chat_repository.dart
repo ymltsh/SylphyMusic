@@ -33,8 +33,9 @@ class PenpalChatRepository {
     await database.db.transaction((tx) async {
       if (!stillValid()) throw StateError('聊天已停止，请重新发送');
       final state = await tx.query(
-        'penpal_memory_state',
-        where: 'id=1',
+        'penpal_card_memory_state',
+        where: 'card_id=?',
+        whereArgs: [persona],
         limit: 1,
       );
       if (state.isNotEmpty && state.first['enabled'] == 0) return;
@@ -53,17 +54,8 @@ class PenpalChatRepository {
         'content': assistant,
         'created_at_ms': now,
       });
-      // Only the user's own words become personalization evidence.
-      await tx.insert('penpal_memory_events', {
-        'card_id': persona,
-        'kind': 'chat_preference',
-        'text': user,
-        'source_key': 'chat:$id',
-        'related_letter_key': letter,
-        'topic': '',
-        'created_at_ms': now,
-        'pinned': 1,
-      });
+      // New RP Core classifies the saved turn after transaction commit.
+      // Do NOT automatically pin every chat utterance as a long-term fact.
     });
   }
 
@@ -90,6 +82,13 @@ class PenpalChatRepository {
       await tx.delete(
         'penpal_memory_events',
         where: "kind='user_reply' AND card_id=? AND related_letter_key=?",
+        whereArgs: [persona, letter],
+      );
+      // The RP Core episode/preferences from this specific chat are private
+      // derivatives and must disappear with the chat transcript.
+      await tx.delete(
+        'rp_memories',
+        where: 'card_id=? AND conversation_key=?',
         whereArgs: [persona, letter],
       );
     });

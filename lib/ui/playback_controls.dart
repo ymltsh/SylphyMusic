@@ -36,6 +36,7 @@ class PlayerControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = app.playback;
     final enabled = preview || p.snapshot.tracks.isNotEmpty;
+    final transparent = color != null && Color(color!).a == 0;
     VoidCallback? action(Future<void> Function() task) => !enabled
         ? null
         : preview
@@ -77,7 +78,12 @@ class PlayerControls extends StatelessWidget {
                     backgroundColor: color == null
                         ? Theme.of(context).colorScheme.primary
                         : Color(color!),
-                    foregroundColor: color == null
+                    disabledBackgroundColor: transparent
+                        ? Colors.transparent
+                        : null,
+                    foregroundColor: transparent
+                        ? Theme.of(context).colorScheme.onSurface
+                        : color == null
                         ? Theme.of(context).colorScheme.onPrimary
                         : ThemeData.estimateBrightnessForColor(Color(color!)) ==
                               Brightness.dark

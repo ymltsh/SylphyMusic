@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [RP Core V21](RP_CORE_V21.md) | 独立角色聊天、状态、结构化记忆、世界书、话题冷却与破坏性数据迁移 |
 | [Android SAF 本地文件夹](ANDROID_SAF_LOCAL_FOLDER.md) | 系统文件夹授权、私有音频 / LRC 副本、重新扫描与来源清理 |
 | [笔友留言 V20](PENPAL_MAILBOX_V20.md) | 按角色保存留言、下次新来信回复、历史记录及数据库前向迁移 |
 | [Android 后台 / 锁屏整合补丁](ANDROID_LOCKSCREEN_PLAYBACK_PATCH_2026-11-14.md) | 连续音频焦点、独立 WakeLock、有界停滞恢复与原生诊断备份 |
@@ -47,7 +48,7 @@
 | [RECOMMENDATION_V1](RECOMMENDATION_V1.md) | 每日精选、专辑推荐、数据统计和热榜缓存 |
 | [UI_REFRESH](UI_REFRESH.md) | 本轮导航、首次引导、首页、播放器与外观调整范围 |
 | [COVER_FLOW](COVER_FLOW.md) | 专辑 / 歌单封面流、分批数据接入与会话内视图切换 |
-| [PLAYER_LAYOUT_EDITOR](PLAYER_LAYOUT_EDITOR.md) | 播放页全画布组件、9 / 16 宫格编辑、统一封面与歌词页、模板与迁移 |
+| [PLAYER_LAYOUT_EDITOR](PLAYER_LAYOUT_EDITOR.md) | 播放页全画布组件、圆角 / 黑胶 / 沉浸封面、v4 模板与旧版边界 |
 | [DIAGNOSTIC_LOGGING](DIAGNOSTIC_LOGGING.md) | 用户主动启用的诊断日志、导出 / 分享与隐私边界 |
 | [Android 完整缓存快速 AO 恢复 V4](ANDROID_CACHED_EARLY_AO_RECOVERY_V4.md) | 双样本停滞判定、复用本地输出快速重载与原有兜底 |
 | [单曲循环 / 后台稳定性 V3](REPEATONE_BACKGROUND_STABILITY_V3.md) | 循环回绕进度基准修正与 2 秒 / 3 秒纯诊断采样；[分析](REPEATONE_BACKGROUND_STABILITY_V3_ANALYSIS.md) |

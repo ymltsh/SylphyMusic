@@ -320,6 +320,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                             0,
                           ),
                           child: SafeArea(
+                            top: false,
                             child: GestureDetector(
                               behavior: HitTestBehavior.translucent,
                               onHorizontalDragStart: _onHorizontalDragStart,

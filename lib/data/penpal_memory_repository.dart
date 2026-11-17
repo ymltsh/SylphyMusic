@@ -145,11 +145,23 @@ class PenpalMemoryRepository {
         where: 'card_id=? AND related_letter_key IS NOT NULL',
         whereArgs: [cardId],
       );
+      // Remove all new RP memories that originated in archived letters or
+      // the chats attached to them, plus letter-derived topic cooldowns.
+      await tx.delete(
+        'rp_memories',
+        where: "card_id=? AND conversation_key<>'' AND conversation_key<>?",
+        whereArgs: [cardId, 'rp:general'],
+      );
+      await tx.delete(
+        'rp_topics',
+        where: 'card_id=? AND origin=?',
+        whereArgs: [cardId, 'letter'],
+      );
       // The clear-letter confirmation covers this card's attached chats.
       await tx.delete(
         'penpal_chat_messages',
-        where: 'persona_key=?',
-        whereArgs: [cardId],
+        where: 'persona_key=? AND letter_key<>?',
+        whereArgs: [cardId, 'rp:general'],
       );
     });
   }

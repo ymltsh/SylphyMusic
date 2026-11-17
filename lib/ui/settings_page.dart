@@ -296,19 +296,9 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     ]),
     _group('全屏播放页', [
-      SwitchListTile(
-        title: const Text('唱片播放样式'),
-        subtitle: const Text('将封面显示为黑胶唱片'),
-        value: app.appearance.disc,
-        onChanged: (v) => _act(() => app.appearance.update(record: v)),
-      ),
-      SwitchListTile(
-        title: const Text('唱片旋转'),
-        subtitle: const Text('播放时旋转黑胶唱片'),
-        value: app.appearance.discRotation,
-        onChanged: app.appearance.disc
-            ? (v) => _act(() => app.appearance.update(rotateDisc: v))
-            : null,
+      const ListTile(
+        title: Text('专辑封面样式'),
+        subtitle: Text('圆角、黑胶和沉浸封面均可在播放页编辑器中逐组件设置'),
       ),
       SwitchListTile(
         title: const Text('封面模糊背景'),

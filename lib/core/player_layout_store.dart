@@ -12,10 +12,9 @@ class PlayerLayoutStore extends ChangeNotifier {
   PlayerLayoutStore(this.db);
   final AppDb db;
 
-  /// Kept for compatibility with installations created before the free-form
-  /// canvas. The payload itself is versioned and upgraded on read.
-  static const settingsKey = 'player_layouts_v1';
-  static const storageVersion = 2;
+  // New key deliberately ignores all previous player layout data.
+  static const settingsKey = 'player_layouts_v2';
+  static const storageVersion = 3;
   List<PlayerLayout> _templates = [];
   List<PlayerLayout> get templates => List.unmodifiable(_templates);
   String? _activeId;
@@ -30,7 +29,7 @@ class PlayerLayoutStore extends ChangeNotifier {
     if (text == null) return;
     try {
       final json = jsonDecode(text) as Map<String, dynamic>;
-      if ((json['version'] != 1 && json['version'] != storageVersion) ||
+      if (json['version'] != storageVersion ||
           json['templates'] is! List ||
           (json['templates'] as List).length > 20) {
         throw const FormatException('布局设置版本不支持');
