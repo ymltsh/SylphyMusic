@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.68",
-    "build": 81,
-    "name": "风灵音乐 v1.0.68",
+    "version": "1.0.69",
+    "build": 82,
+    "name": "风灵音乐 v1.0.69",
     "date": "2026-11-18",
-    "notes": "- 新增角色状态与世界书管理，可直接与角色聊天，无需先生成音乐来信；支持管理长期记忆、近期经历、随机事件和已翻篇的话题。\n- 聊天与音乐来信使用统一的角色上下文，将明确偏好与临时闲聊分开，减少无关旧话题反复进入新来信的情况。\n- 播放页封面可逐组件选择圆角、黑胶或沉浸样式；沉浸封面默认顶部半屏、向下渐隐，可自由调整位置、尺寸和渐隐方向。\n- 播放画布延伸至顶部透明状态栏；播放键新增透明颜色，完整歌词页同步使用播放页设置的播放键颜色。\n- 迷你播放器悬浮按钮固定为圆形唱片，不受播放页封面样式影响，播放时旋转、暂停时保持角度。\n\n升级前请备份应用数据库：本次升级会清空旧推荐、音乐来信、笔友聊天、记忆、留言及推荐统计。音乐源、曲库、歌单、收藏、缓存、角色卡、配置和最近播放列表保留。旧版播放页布局不再读取，需要重新布置。\n",
+    "notes": "- 新增「角色日记与连续记忆」：将已保存的真实问答按批次、跨会话或跨日整理为日记，也可手动整理、查看、编辑和删除。\n- 聊天、每日精选和专辑精选共用当前角色的记忆上下文；选曲与写信、选辑与推荐理由均可参考连续记忆、近期日记及少量待整理问答。\n- 关闭记忆或历史引用后，对应私人记忆不再用于上述功能；切换角色时分别读取各自记录。\n- 推荐无法读取角色上下文时回退本地推荐；聊天会提示失败，避免悄悄忽略已有记忆。\n- 删除来源聊天或日记时撤回相关连续记忆；清理音乐来信保留独立角色聊天。\n\n从 1.0.68 升级会保留已有聊天、记忆、来信和音乐数据。更早版本仍包含此前的旧推荐与聊天资料清理，以及播放页布局重设，请在升级前备份应用数据库。\n日记整理复用已配置的 LLM 服务，会发送部分保存的对话，可能产生额外模型费用。已有推荐结果继续保留，手动换新或下一时段生成时才使用新的上下文。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.69%2B82/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.69%2B82/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.69%2B82/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.69%2B82/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.69%2B82/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.68+81"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.69+82"
   },
   "history": [
+    {
+      "version": "1.0.68",
+      "build": 81,
+      "name": "风灵音乐 v1.0.68",
+      "date": "2026-11-18",
+      "notes": "- 新增角色状态与世界书管理，可直接与角色聊天，无需先生成音乐来信；支持管理长期记忆、近期经历、随机事件和已翻篇的话题。\n- 聊天与音乐来信使用统一的角色上下文，将明确偏好与临时闲聊分开，减少无关旧话题反复进入新来信的情况。\n- 播放页封面可逐组件选择圆角、黑胶或沉浸样式；沉浸封面默认顶部半屏、向下渐隐，可自由调整位置、尺寸和渐隐方向。\n- 播放画布延伸至顶部透明状态栏；播放键新增透明颜色，完整歌词页同步使用播放页设置的播放键颜色。\n- 迷你播放器悬浮按钮固定为圆形唱片，不受播放页封面样式影响，播放时旋转、暂停时保持角度。\n\n升级前请备份应用数据库：本次升级会清空旧推荐、音乐来信、笔友聊天、记忆、留言及推荐统计。音乐源、曲库、歌单、收藏、缓存、角色卡、配置和最近播放列表保留。旧版播放页布局不再读取，需要重新布置。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.68%2B81/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.68+81"
+    },
     {
       "version": "1.0.67",
       "build": 80,
