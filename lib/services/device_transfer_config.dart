@@ -26,6 +26,7 @@ const transferConfigKeys = <String>{
   'api_llm_system_prompt',
   'api_llm_user_prompt',
   'ui_theme',
+  'ui_mini_player_bar_style',
   'ui_seed',
   'ui_background_visibility',
   'ui_lyrics_font_size',
@@ -371,6 +372,11 @@ class DeviceTransferConfig {
         case 'ui_theme':
           if (!['system', 'light', 'dark'].contains(value)) {
             throw const FormatException('主题模式无效');
+          }
+          break;
+        case 'ui_mini_player_bar_style':
+          if (!['automatic', 'pc', 'standard'].contains(value)) {
+            throw const FormatException('迷你播放器横条样式无效');
           }
           break;
         case 'player_layouts_v1':

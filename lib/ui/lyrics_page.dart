@@ -39,6 +39,15 @@ class _LyricsPageState extends State<LyricsPage> {
   bool busy = false;
   bool _leaving = false;
 
+  double get _playButtonRadius =>
+      (widget.app.playerLayouts.active ?? playerTemplate()).elements
+          .where(
+            (element) => element.type == PlayerPart.controls && !element.hidden,
+          )
+          .firstOrNull
+          ?.radius ??
+      24;
+
   @override
   void initState() {
     super.initState();
@@ -157,7 +166,11 @@ class _LyricsPageState extends State<LyricsPage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([widget.app.playback, widget.app.appearance]),
+    animation: Listenable.merge([
+      widget.app.playback,
+      widget.app.appearance,
+      widget.app.playerLayouts,
+    ]),
     builder: (context, _) => Theme(
       data: widget.theme,
       child: Builder(
@@ -270,7 +283,10 @@ class _LyricsPageState extends State<LyricsPage> {
                                 PlayerProgress(app: widget.app),
                                 SizedBox(
                                   height: 72,
-                                  child: PlayerControls(app: widget.app),
+                                  child: PlayerControls(
+                                    app: widget.app,
+                                    radius: _playButtonRadius,
+                                  ),
                                 ),
                               ],
                             ),

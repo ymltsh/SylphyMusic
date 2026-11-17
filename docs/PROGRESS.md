@@ -1,5 +1,49 @@
 # 实施与验证记录
 
+## 2026-11-16 普通悬浮横条修正发布 1.0.67+80
+
+按用户“推送”要求，普通版 1.0.67+80（三 ABI Android、Windows 安装程序 / 便携包与对应源码）和 OpenList 1.0.67-openlist.48+80（arm64 APK 与对应应用 / 后端 / 前端源码）均已发布。修正普通横条在横屏 / 宽屏仍显示 PC 固定底栏的问题，悬浮 PC 样式保留圆角 / 投影 / 磨砂，导航与播放器摆放分别判断，并调整底部安全区与部分页面留白。普通版 7 个、特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest 及两分支全部原始 / 加速清单核对通过，特别版状态 complete；Android 正式签名保持一致。
+
+仅提交推送清单：main/version.json 为 98bb6bd，feature 两清单为 8ba717e，main/version-openlist.json 为 1e2db11。实际源码随发布附件提供，保留工作区源码改动。普通版产物 build/releases/1.0.67-80/、日志 build/release80-publish.log；特别版产物 build/releases/1.0.67-openlist.48-80/，日志 build/openlist-release80-build.log、openlist-release80-prepare.log、openlist-release80-publish.log。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查，实际悬浮播放器显示由用户验收。
+
+## 2026-11-16 修正普通横条在横屏仍显示 PC 底栏
+
+用户反馈两种选择都显示 PC 横条。定位到 AppShell 仍按宽屏 / Android 横屏强制创建 docked PlayerBar，绕过普通悬浮样式。将侧边导航与播放器停靠条件分离：普通横条在横屏 / 桌面宽屏也使用悬浮圆角播放器，不再同时创建 PC 固定底栏；自动与 PC 的停靠行为保留。悬浮播放器补充底部 SafeArea，并按实际停靠状态更新文件夹和个人页底部留白。同步两工作区、设置提示及横屏说明。
+
+dart format 已执行，普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 与内部打包（build/internal-review/），OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/normal-floating-bar-layout-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际切换效果由用户安装新本地包验收。
+
+## 2026-11-16 横条样式限定为悬浮圆角迷你播放器
+
+按用户澄清，横条样式仅影响浮在底部导航栏上方的圆角矩形迷你播放器；固定底部 PC 播放栏始终沿用其原有布局，不再受手动选择影响。普通 / PC 悬浮样式共用圆角、投影和磨砂包装，保留原设置值和自动适配选项。同步两个工作区的 PlayerBar、设置提示及横屏说明，保留其他改动。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/floating-mini-player-style-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际悬浮样式由用户验收。
+
+## 2026-11-16 横屏导航与横条样式发布 1.0.66+79
+
+按用户“推送更新”要求，普通版 1.0.66+79（三 ABI Android、Windows 安装程序 / 便携包与对应源码）及 OpenList 1.0.66-openlist.47+79（arm64 APK 与对应应用 / 后端 / 前端源码）均已发布。包含 Android 横屏侧边导航、固定搜索 / 设置入口、低高度导航滚动，以及迷你播放器自动 / PC 横条 / 普通横条选择和持久化。普通版 7 个、特别版 3 个附件的远端大小 / SHA-256、Release 标题 / 正文 / 状态、普通版 Latest、两分支全部原始 / 加速清单核对通过，特别版发布状态 complete；Android 正式签名保持一致。
+
+仅提交推送清单：main/version.json 为 95e2057，feature 两清单为 0157415，main/version-openlist.json 为 5c826be。实际源码随发布附件提供，保留工作区源码改动。普通版产物 build/releases/1.0.66-79/、日志 build/release79-publish.log；特别版产物 build/releases/1.0.66-openlist.47-79/，日志 build/openlist-release79-build.log、openlist-release79-prepare.log、openlist-release79-publish.log。本轮无测试凭据，未运行 analyze、测试、应用启动或设备检查，横屏与横条切换交互由用户验收。
+
+## 2026-11-16 迷你播放器横条样式手动选择
+
+播放器外观 → 迷你播放器新增“横条样式”：自动 / PC 横条 / 普通横条。默认自动保留原屏幕适配行为，手动选择优先于方向和宽度判断；通过 Appearance 保存 ui_mini_player_bar_style，重启恢复，非法旧值回退自动。主界面和子页面共用 PlayerBar 选择逻辑，PC 样式继续使用既有窄屏紧凑布局；普通横条在底部停靠时补充 SafeArea。设置不改变横条 / 悬浮按钮的默认显示方式。加入手动设备迁移白名单及枚举校验，同步两工作区和横屏说明文档，保留已有改动。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/mini-player-bar-style-build.log。未新增或运行测试，未运行 analyze、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；实际布局切换与设备交互由用户验收。
+
+## 2026-11-16 应用 Android 横屏界面优化补丁
+
+按用户提供的 SylphyMusic_Android_横屏界面优化补丁.zip 应用到普通版与 OpenList 工作区，git apply --check 均通过，保留既有改动。Android 横屏主界面隐藏全局 AppBar 和标题，保留系统状态栏并通过 SafeArea 避开顶部 / 左右切口；宽度不足 750 dp 仍使用侧边导航，主要入口在高度不足时可滚动，搜索与设置固定在侧栏底部。Android 竖屏与桌面保留原导航结构，新增 LandscapeNavigationRail 与补丁附带测试，同步横屏说明文档。
+
+dart format 已执行。普通版 tool/build_review.ps1 完成三 ABI Android Release、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志均为 build/test_logs/android-landscape-build.log。未运行 analyze、测试、应用启动或设备检查，未使用测试凭据，未提交、推送或发布；横屏布局、低高度导航滚动和系统切口效果由用户验收。
+
+## 2026-11-16 歌词交互与静止指针发布 1.0.65+78
+
+歌词页播放 / 暂停按钮读取当前播放页布局中可见播放控制的圆角，并监听布局设置更新；完整时间轴歌词支持长按复制当前句（含同时间翻译），纯文本歌词支持按行长按复制，空白间奏不复制。剪贴板完成后给出提示，不记录歌词内容。两个工作区均将投影和指针移至固定外层，只旋转黑胶底盘、纹路和封面，不改变控制器、速度或用户设置；同步调整既有媒体组件测试和播放页文档。
+
+本轮推送更新先完成普通版 1.0.64+77（清单 f351fef）；用户随后补充静止指针与歌词交互需求后，停止尚未上传的普通版 78 构建，纳入改动重新编译。最终普通版 1.0.65+78（三 ABI Android、Windows 安装程序 / 便携包与对应源码）和 OpenList 1.0.65-openlist.46+78（arm64 APK 与应用 / 后端 / 前端源码）均已发布。普通版 7 个、特别版 3 个附件的大小 / SHA-256、发布标题 / 正文 / 状态、普通版 Latest 和两分支全部原始 / 加速清单核对通过，特别版状态 complete，Android 正式签名一致。
+
+仅提交推送清单：普通版 version.json 为 394b4c4，特别版两清单为 8ee6a4d，main/version-openlist.json 为 3733cc7。当前源码改动保留工作区，实际构建源码随发布附件提供。普通版产物 build/releases/1.0.65-78/、日志 build/release78-publish.log；特别版产物 build/releases/1.0.65-openlist.46-78/，日志 build/openlist-release78-build.log、openlist-release78-prepare.log、openlist-release78-publish.log。dart format 已执行，无测试凭据，未运行 analyze、测试、应用启动或设备检查，交互由用户验收。
+
 ## 2026-11-16 应用 Android SAF 本地文件夹补丁
 
 按用户提供的 SylphyMusic_Android_SAF.zip 应用到普通版和 OpenList 工作区，七个目标文件的锚点 / 新文件检查通过；备份放在各自 .private/saf-backup/，共享压缩包未修改。Android 通过 ACTION_OPEN_DOCUMENT_TREE 持久授权、递归枚举文件夹，将音频及同名 LRC 复制到应用私有 saf/<sourceId>/，大小和修改时间未变时复用副本。保留原始文件夹层级与显示文件名，单文件导入隔离到 file:/// 来源；零首或扫描失败不提交新索引，移除来源清理托管副本并按剩余引用释放授权。保留此前设备环境诊断、普通文件夹操作阶段 / OS 错误码日志和唱片改动，同步补丁附带测试、说明及文档索引。

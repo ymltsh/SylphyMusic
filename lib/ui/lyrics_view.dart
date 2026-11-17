@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 
 import '../services/lyrics.dart';
 
@@ -60,6 +61,23 @@ class _LyricsViewState extends State<LyricsView> {
   double edge = 0;
   bool pending = false;
   String? geometryKey;
+
+  Future<void> _copyLine(String text) async {
+    final value = text.trim();
+    if (value.isEmpty) return;
+    try {
+      await Clipboard.setData(ClipboardData(text: value));
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)
+            ?.showSnackBar(const SnackBar(content: Text('已复制歌词')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)
+            ?.showSnackBar(const SnackBar(content: Text('复制失败，请重试')));
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -209,10 +227,21 @@ class _LyricsViewState extends State<LyricsView> {
           child: lines.isEmpty
               ? SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(28, 24, 28, 48),
-                  child: SelectableText(
-                    widget.text.trim(),
-                    style: style,
-                    textAlign: widget.textAlign,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final line in widget.text.trim().split('\n'))
+                        InkWell(
+                          onLongPress: line.trim().isEmpty
+                              ? null
+                              : () => _copyLine(line),
+                          child: Text(
+                            line,
+                            style: style,
+                            textAlign: widget.textAlign,
+                          ),
+                        ),
+                    ],
                   ),
                 )
               : LayoutBuilder(
@@ -292,6 +321,9 @@ class _LyricsViewState extends State<LyricsView> {
                                     label: line.text.isEmpty ? '间奏' : null,
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(16),
+                                      onLongPress: line.text.trim().isEmpty
+                                          ? null
+                                          : () => _copyLine(line.text),
                                       onTap: widget.onSeek == null
                                           ? null
                                           : () {

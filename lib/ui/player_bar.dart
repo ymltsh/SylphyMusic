@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/appearance.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
 import 'wide_mini_player.dart';
@@ -68,23 +69,61 @@ class PlayerBar extends StatelessWidget {
     }
   }
 
+  Widget _floatingBar(BuildContext context, Widget bar) {
+    final track = app.playback.current;
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: .18),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: app.appearance.glass
+                ? BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                    child: bar,
+                  )
+                : bar,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final player = app.playback, track = app.playback.current;
     final scheme = Theme.of(context).colorScheme;
     final enabled = player.snapshot.tracks.isNotEmpty;
     final size = MediaQuery.sizeOf(context);
-    if (compact &&
-        (docked ||
-            ((Platform.isWindows || size.width > size.height) &&
+    final usePcBar =
+        docked ||
+        switch (app.appearance.miniPlayerBarStyle) {
+          MiniPlayerBarStyle.automatic =>
+            (Platform.isWindows || size.width > size.height) &&
                 size.width >= 600 &&
-                !immersive))) {
-      return WideMiniPlayer(
+                !immersive,
+          MiniPlayerBarStyle.pc => true,
+          MiniPlayerBarStyle.standard => false,
+        };
+    if (compact && usePcBar) {
+      final bar = WideMiniPlayer(
         app: app,
         onOpen: () => Navigator.of(context).push(_nowPlayingRoute(app)),
         onQueue: () => showQueue(context),
         onCollapse: onCollapse,
       );
+      return docked ? bar : _floatingBar(context, bar);
     }
     if (compact) {
       final bar = Material(
@@ -174,48 +213,7 @@ class PlayerBar extends StatelessWidget {
           ),
         ),
       );
-      if (docked) {
-        return Stack(
-          children: [
-            if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
-            // A one-pixel divider replaces the floating shadow/rounded glass
-            // effect in the dedicated desktop footer.
-            ColoredBox(
-              color: scheme.outlineVariant,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: bar,
-              ),
-            ),
-          ],
-        );
-      }
-      return Stack(
-        children: [
-          if (track != null) _NowPlayingCoverWarmup(app: app, track: track),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.shadow.withValues(alpha: .18),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: app.appearance.glass
-                  ? BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                      child: bar,
-                    )
-                  : bar,
-            ),
-          ),
-        ],
-      );
+      return _floatingBar(context, bar);
     }
     final controls = Row(
       mainAxisSize: MainAxisSize.min,

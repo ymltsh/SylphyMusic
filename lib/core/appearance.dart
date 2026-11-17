@@ -14,6 +14,8 @@ import '../data/app_db.dart';
 /// system/fixed; album colour is only used on the in-app full-lyrics page.
 enum LyricColorMode { album, system, fixed }
 
+enum MiniPlayerBarStyle { automatic, pc, standard }
+
 class Appearance extends ChangeNotifier {
   Appearance(this.db);
   final AppDb db;
@@ -42,6 +44,7 @@ class Appearance extends ChangeNotifier {
   bool discRotation = true;
   bool solidBackground = true;
   bool playerFab = true;
+  MiniPlayerBarStyle miniPlayerBarStyle = MiniPlayerBarStyle.automatic;
   int _libraryCategoryMask = 15;
   static const libraryCategoryNames = ['歌曲', '专辑', '艺术家', '文件夹'];
   static const libraryCategoryIcons = [
@@ -110,6 +113,11 @@ class Appearance extends ChangeNotifier {
     ambient = await db.setting('ui_ambient') == 'true';
     glass = await db.setting('ui_glass') == 'true';
     playerFab = await db.setting('ui_player_fab') != 'false';
+    final storedBarStyle = await db.setting('ui_mini_player_bar_style');
+    miniPlayerBarStyle = MiniPlayerBarStyle.values.firstWhere(
+      (style) => style.name == storedBarStyle,
+      orElse: () => MiniPlayerBarStyle.automatic,
+    );
     final categories = int.tryParse(
       await db.setting('ui_library_categories') ?? '',
     );
@@ -187,6 +195,7 @@ class Appearance extends ChangeNotifier {
     bool? rotateDisc,
     bool? solid,
     bool? playerFab,
+    MiniPlayerBarStyle? miniPlayerBarStyle,
     double? lyricFont,
     double? miniLyricFont,
     LyricColorMode? lyricPageColorMode,
@@ -230,6 +239,9 @@ class Appearance extends ChangeNotifier {
     if (frost != null) await db.setSetting('ui_glass', '$frost');
     if (solid != null) await db.setSetting('ui_background_solid', '$solid');
     if (playerFab != null) await db.setSetting('ui_player_fab', '$playerFab');
+    if (miniPlayerBarStyle != null) {
+      await db.setSetting('ui_mini_player_bar_style', miniPlayerBarStyle.name);
+    }
     if (lyricFont != null) {
       await db.setSetting('ui_lyrics_font_size', '$lyricFont');
     }
@@ -274,6 +286,7 @@ class Appearance extends ChangeNotifier {
     glass = frost ?? glass;
     solidBackground = solid ?? solidBackground;
     this.playerFab = playerFab ?? this.playerFab;
+    this.miniPlayerBarStyle = miniPlayerBarStyle ?? this.miniPlayerBarStyle;
     lyricFontSize = lyricFont ?? lyricFontSize;
     miniLyricFontSize = miniLyricFont ?? miniLyricFontSize;
     this.lyricPageColorMode = lyricPageColorMode ?? this.lyricPageColorMode;

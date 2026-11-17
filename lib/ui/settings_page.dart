@@ -269,6 +269,31 @@ class _SettingsPageState extends State<SettingsPage> {
         value: app.appearance.glass,
         onChanged: (v) => _act(() => app.appearance.update(frost: v)),
       ),
+      ListTile(
+        key: const ValueKey('mini-player-bar-style'),
+        title: const Text('横条样式'),
+        subtitle: const Text('普通横条使用悬浮圆角样式，横屏也可使用'),
+        trailing: DropdownButton<MiniPlayerBarStyle>(
+          value: app.appearance.miniPlayerBarStyle,
+          underline: const SizedBox(),
+          items: const [
+            DropdownMenuItem(
+              value: MiniPlayerBarStyle.automatic,
+              child: Text('自动'),
+            ),
+            DropdownMenuItem(
+              value: MiniPlayerBarStyle.pc,
+              child: Text('PC 横条'),
+            ),
+            DropdownMenuItem(
+              value: MiniPlayerBarStyle.standard,
+              child: Text('普通横条'),
+            ),
+          ],
+          onChanged: (value) =>
+              _act(() => app.appearance.update(miniPlayerBarStyle: value)),
+        ),
+      ),
     ]),
     _group('全屏播放页', [
       SwitchListTile(

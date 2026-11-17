@@ -107,10 +107,40 @@ void main() {
       );
       expect(rotation.child, isA<Stack>());
       final disc = rotation.child! as Stack;
-      // Base, two grooves, clipped artwork and decorative mark share one turn.
-      expect(disc.children, hasLength(5));
+      // Only the base, two grooves and clipped artwork share the turn.
+      expect(disc.children, hasLength(4));
       expect(disc.children[3], isA<ClipOval>());
-      expect(disc.children[4], isA<Positioned>());
+      expect(
+        find.descendant(
+          of: find.byType(RotationTransition),
+          matching: find.byType(Positioned),
+        ),
+        findsNothing,
+      );
+      final pointer = find.descendant(
+        of: find.byType(PlayerCover),
+        matching: find.byType(Positioned),
+      );
+      expect(pointer, findsOneWidget);
+      final pointerBounds = tester.getRect(pointer);
+      final shadows = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.decoration is BoxDecoration &&
+            ((widget.decoration! as BoxDecoration).boxShadow?.isNotEmpty ??
+                false),
+      );
+      expect(
+        find.ancestor(of: find.byType(RotatingCover), matching: shadows),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(RotationTransition), matching: shadows),
+        findsNothing,
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(angle(), closeTo(.2, .001));
+      expect(tester.getRect(pointer), pointerBounds);
       expect(
         find.descendant(
           of: find.byType(RotationTransition),

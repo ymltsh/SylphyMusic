@@ -29,6 +29,7 @@ import 'player_cover.dart';
 import 'settings_page.dart';
 import 'music_sources_panel.dart';
 import 'music_space_card.dart';
+import 'landscape_navigation_rail.dart';
 import 'music_source_connection_page.dart';
 import 'quick_start_wizard.dart';
 import '../data/library_catalog.dart';
@@ -59,6 +60,16 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     Icons.person_outline,
   ];
   SylphyApp get app => widget.app;
+
+  bool _usesDockedPlayer(BuildContext context) {
+    final sideNavigation =
+        MediaQuery.sizeOf(context).width > 750 ||
+        (Theme.of(context).platform == TargetPlatform.android &&
+            MediaQuery.orientationOf(context) == Orientation.landscape);
+    return sideNavigation &&
+        app.appearance.miniPlayerBarStyle != MiniPlayerBarStyle.standard;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -176,6 +187,24 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     MaterialPageRoute(builder: (_) => CacheTasksPage(app: app)),
   );
 
+  void _openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchPage(app: app, onAction: _trackAction),
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsPage(app: app, onSources: _openSources),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PlaybackNotice(
@@ -201,7 +230,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (onboarding!) return _welcome();
-    final wide = MediaQuery.sizeOf(context).width > 750;
+    // Do not waste vertical space on a second header in Android landscape.
+    // Desktop and portrait layouts retain their existing app bars.
+    final androidLandscape =
+        Theme.of(context).platform == TargetPlatform.android &&
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final wide = androidLandscape || MediaQuery.sizeOf(context).width > 750;
+    final dockPlayer = _usesDockedPlayer(context);
     final playerAnimation = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 260);
@@ -209,9 +244,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
       children: [
         if (app.busy) const LinearProgressIndicator(),
         Expanded(
-          // The desktop player is docked below the content, never painted over
-          // the scrolled page. Keep the mobile overlay unchanged.
-          child: wide
+          // Navigation width does not force the user's normal floating bar
+          // into the dedicated PC footer.
+          child: dockPlayer
               ? _page()
               : Stack(
                   children: [
@@ -232,7 +267,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                             opacity: playerCollapsed ? 0 : 1,
                             duration: playerAnimation,
                             curve: Curves.easeOutCubic,
-                            child: _playerBar(),
+                            child: SafeArea(top: false, child: _playerBar()),
                           ),
                         ),
                       ),
@@ -247,84 +282,97 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         app.appearance.backgroundFile != null && !solidBackground;
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final railDestinations = List.generate(
+      labels.length,
+      (i) => NavigationRailDestination(
+        icon: Icon(icons[i]),
+        label: Text(labels[i]),
+      ),
+    );
+    void selectRailDestination(int value) {
+      if (value != 1) _librarySelection.clear();
+      setState(() => tab = value);
+    }
+
     return AppBackground(
       appearance: app.appearance,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: solidBackground
-              ? Colors.transparent
-              : customBackground
-              ? scheme.surface.withValues(alpha: .90)
-              : null,
-          surfaceTintColor: solidBackground ? Colors.transparent : null,
-          title: Text(
-            tab == 0 ? appDisplayName() : labels[tab],
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          actionsPadding: const EdgeInsetsDirectional.only(end: 16),
-          actions: [
-            SizedBox.square(
-              dimension: 48,
-              child: IconButton(
-                tooltip: '搜索',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SearchPage(app: app, onAction: _trackAction),
-                  ),
+        appBar: androidLandscape
+            ? null
+            : AppBar(
+                backgroundColor: solidBackground
+                    ? Colors.transparent
+                    : customBackground
+                    ? scheme.surface.withValues(alpha: .90)
+                    : null,
+                surfaceTintColor: solidBackground ? Colors.transparent : null,
+                title: Text(
+                  tab == 0 ? appDisplayName() : labels[tab],
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                icon: const Icon(Icons.search),
-              ),
-            ),
-            SizedBox.square(
-              dimension: 48,
-              child: IconButton(
-                tooltip: '设置',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        SettingsPage(app: app, onSources: () => _openSources()),
-                  ),
-                ),
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ),
-          ],
-        ),
-        body: wide
-            ? Row(
-                children: [
-                  NavigationRail(
-                    extended: MediaQuery.sizeOf(context).width > 1050,
-                    minExtendedWidth: 208,
-                    minWidth: 72,
-                    backgroundColor: solidBackground
-                        ? Colors.transparent
-                        : null,
-                    selectedIndex: tab,
-                    onDestinationSelected: (v) {
-                      if (v != 1) _librarySelection.clear();
-                      setState(() => tab = v);
-                    },
-                    destinations: List.generate(
-                      labels.length,
-                      (i) => NavigationRailDestination(
-                        icon: Icon(icons[i]),
-                        label: Text(labels[i]),
-                      ),
+                actionsPadding: const EdgeInsetsDirectional.only(end: 16),
+                actions: [
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton(
+                      tooltip: '搜索',
+                      onPressed: _openSearch,
+                      icon: const Icon(Icons.search),
                     ),
                   ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: main),
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton(
+                      tooltip: '设置',
+                      onPressed: _openSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                    ),
+                  ),
                 ],
+              ),
+        body: wide
+            ? SafeArea(
+                // With no AppBar, reserve only the real system cutout/status
+                // insets. The background still paints behind the status bar.
+                top: androidLandscape,
+                left: androidLandscape,
+                right: androidLandscape,
+                bottom: false,
+                child: Row(
+                  children: [
+                    if (androidLandscape)
+                      LandscapeNavigationRail(
+                        backgroundColor: solidBackground
+                            ? Colors.transparent
+                            : null,
+                        selectedIndex: tab,
+                        onDestinationSelected: selectRailDestination,
+                        destinations: railDestinations,
+                        onSearch: _openSearch,
+                        onSettings: _openSettings,
+                      )
+                    else
+                      NavigationRail(
+                        extended: MediaQuery.sizeOf(context).width > 1050,
+                        minExtendedWidth: 208,
+                        minWidth: 72,
+                        backgroundColor: solidBackground
+                            ? Colors.transparent
+                            : null,
+                        selectedIndex: tab,
+                        onDestinationSelected: selectRailDestination,
+                        destinations: railDestinations,
+                      ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: main),
+                  ],
+                ),
               )
             : main,
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
         bottomNavigationBar: wide
-            ? (playerCollapsed ? null : _desktopPlayerBar())
+            ? (dockPlayer && !playerCollapsed ? _desktopPlayerBar() : null)
             : Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -494,7 +542,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             onAction: _trackAction,
             batchSelection: _librarySelection,
             bottomPadding: libraryView == 3
-                ? (MediaQuery.sizeOf(context).width > 750 ||
+                ? (_usesDockedPlayer(context) ||
                           playerCollapsed ||
                           app.playback.current == null
                       ? 12
@@ -600,7 +648,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           20,
           16,
           20,
-          MediaQuery.sizeOf(context).width > 750 ? 32 : 116,
+          _usesDockedPlayer(context) || playerCollapsed ? 32 : 116,
         ),
         children: [
           MusicSpaceCard(
