@@ -4,6 +4,7 @@
 
 | 文档 | 用途 |
 |---|---|
+| [日记优先记忆 V24](RP_JOURNAL_FIRST_V24.md) | 单一路径、四项连续认知、移除话题锁及一次性历史重置 |
 | [RP 日记生命周期 V23](RP_JOURNAL_LIFECYCLE_V23.md) | 新推荐前整理、原始经历草稿、统一笔友管理页 |
 | [RP 统一上下文 V22](RP_SHARED_CONTEXT_V22.md) | 聊天、每日精选与专辑精选共用角色记忆及失败回退 |
 | [RP Journal V22](RP_JOURNAL_V22.md) | 日记整理、连续记忆、对话证据队列与 v21 增量迁移 |

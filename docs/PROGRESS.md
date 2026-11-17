@@ -1,5 +1,9 @@
 # 实施与验证记录
 
+## 2026-11-18 日记生命周期发布 1.0.70+83 核对完成
+
+前轮已按用户要求同步应用 v23 日记生命周期并发布普通版 1.0.70+83 与 OpenList 1.0.70-openlist.51+83。普通版 Android 三 ABI / Windows 编译、安装程序 / 便携包 / 源码打包及特别版 arm64 编译和源码打包均完成，正式签名一致；两版 7 / 3 个附件的大小、摘要、发布状态、标题 / 正文及全部原始 / 加速更新清单核对通过。特别版上轮在清单核对中收到新任务，本轮用原发布脚本 --finish-verification 完成读取核对，publish-state 为 complete，未重复发布。产物 build/releases/1.0.70-83/ 和 OpenList 工作区 build/releases/1.0.70-openlist.51-83/；日志 build/release83-publish.log、OpenList 工作区 build/openlist-release83-build.log、openlist-release83-prepare.log、openlist-release83-publish.log、openlist-release83-finish.log。仅提交推送版本清单，未运行测试或应用，未迁移用户数据库。
+
 ## 2026-11-18 RP Journal 与统一上下文发布 1.0.69+82
 
 前轮用户“应用，推送更新”已完成：普通版 1.0.69+82 和 OpenList 1.0.69-openlist.50+82 均已发布，包含日记 v22 与统一上下文增量。普通版 7 个、特别版 3 个附件的大小 / SHA-256、发布标题 / 正文 / 状态及原始 / 加速清单均核对通过。特别版上一轮在清单传播核对时收到新任务，已通过现有发布入口的 --finish-verification 完成只读远端核对，publish-state 更新为 complete，未重复发布。构建产物与日志分别位于 build/releases/1.0.69-82/、build/release82-publish.log 和 OpenList 工作区 build/releases/1.0.69-openlist.50-82/、build/openlist-release82-build.log、openlist-release82-prepare.log、openlist-release82-publish.log、openlist-release82-finish.log。未运行测试或实际应用，未迁移用户数据库。
