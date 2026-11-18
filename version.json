@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.71",
-    "build": 84,
-    "name": "风灵音乐 v1.0.71",
+    "version": "1.0.72",
+    "build": 85,
+    "name": "风灵音乐 v1.0.72",
     "date": "2026-11-18",
-    "notes": "升级前请备份应用数据库及其 WAL/SHM 文件：新版本首次启动时会一次性清空旧推荐、音乐来信、聊天、留言、日记、连续记忆、推荐统计和已触发角色事件，并移除旧碎片记忆与话题状态。\n保留音乐源、曲库、歌单、收藏、黑名单、缓存、播放队列、最近播放列表、角色卡、世界书、角色场景状态、API 配置及已有记忆停用选择。源码备份无法恢复已清理的数据库。\n\n- 角色长期记忆统一使用真实交流证据、日记和可修订的连续认知，移除平行的碎片记忆和话题锁定列表。\n- 连续认知聚焦角色想法、用户确认事实、共同经历和仍未完成的明确约定；偶然闲聊随新经历自然淡出，不再形成固定的话题黑名单。\n- 打开旧信不再重复写入记忆；聊天、来信回复和新生成的模型来信作为真实证据，生成新推荐前整理日记。\n- 聊天、每日精选与专辑精选继续共用当前角色的日记上下文，保留记忆开关、角色隔离和失败回退。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的对话；每次生成新推荐前最多可能增加三次模型请求及相应费用。\n",
+    "notes": "升级前请备份应用数据库及 WAL/SHM：新版本首次启动会清空旧待整理经历、旧日记和连续记忆摘要，重新建立分层记忆。已有聊天、留言、来信、推荐快照、角色卡、世界书及音乐数据保留；旧聊天不会自动补入新日记。\n\n- 长期记忆分为日记、周记、月记三层，取代独立的连续记忆摘要；同一天的新互动合并为一篇日记，成熟日记归纳成周记，四本成熟周记进一步归纳成月记。\n- 只有真实聊天、来信回复和用户留言产生新记忆素材；无人回复的自动推荐信和打开来信不会新增记忆。\n- 仅在生成新推荐前按需整理，每次最多三次；复用推荐不额外请求模型。整理失败保留原始记录，成功保存上层摘要后才移除被压缩的下层记忆。\n- 管理页分组展示日记、周记、月记及整理状态；聊天和推荐使用各层有界上下文，保留的完整月记仍可在本地阅读。\n- 删除来源聊天或撤回已整理留言时撤回派生摘要，下一次推荐前从剩余证据重建，避免继续引用已删除内容。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的交流。分层整理或删除后的重建可能增加模型请求及费用。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.71+84"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.72+85"
   },
   "history": [
+    {
+      "version": "1.0.71",
+      "build": 84,
+      "name": "风灵音乐 v1.0.71",
+      "date": "2026-11-18",
+      "notes": "升级前请备份应用数据库及其 WAL/SHM 文件：新版本首次启动时会一次性清空旧推荐、音乐来信、聊天、留言、日记、连续记忆、推荐统计和已触发角色事件，并移除旧碎片记忆与话题状态。\n保留音乐源、曲库、歌单、收藏、黑名单、缓存、播放队列、最近播放列表、角色卡、世界书、角色场景状态、API 配置及已有记忆停用选择。源码备份无法恢复已清理的数据库。\n\n- 角色长期记忆统一使用真实交流证据、日记和可修订的连续认知，移除平行的碎片记忆和话题锁定列表。\n- 连续认知聚焦角色想法、用户确认事实、共同经历和仍未完成的明确约定；偶然闲聊随新经历自然淡出，不再形成固定的话题黑名单。\n- 打开旧信不再重复写入记忆；聊天、来信回复和新生成的模型来信作为真实证据，生成新推荐前整理日记。\n- 聊天、每日精选与专辑精选继续共用当前角色的日记上下文，保留记忆开关、角色隔离和失败回退。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的对话；每次生成新推荐前最多可能增加三次模型请求及相应费用。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.71%2B84/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.71+84"
+    },
     {
       "version": "1.0.70",
       "build": 83,
