@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.74",
-    "build": 87,
-    "name": "风灵音乐 v1.0.74",
+    "version": "1.0.75",
+    "build": 88,
+    "name": "风灵音乐 v1.0.75",
     "date": "2026-11-18",
-    "notes": "- 播放页自定义“快捷操作区”新增按钮间距调节，也可保留自动均分；空间不足时自动收紧间距。\n- 自定义进度条新增波浪、分段样式，并支持粗细调节；波浪可调整振幅和波长。在布局编辑器中选中组件后调整，点击“保存并应用”保留设置，已有布局继续沿用原样式。\n- 专辑和歌单分别记住 Cover Flow / 列表（网格）的最后选择，重新进入或重启后继续使用。\n- 调整横屏卡片比例优化下的首页两栏布局，统一每日精选与专辑精选的间距和内容区高度，保留方形专辑封面。\n",
+    "notes": "- 优化窄长横屏下的首页卡片比例：每日精选与专辑精选在保持对齐的同时，按可用高度调整显示大小，避免单张专辑封面把页面撑得过高。\n- 专辑列数随可用宽度和高度调整，封面保持方形；每日精选的封面组、标题和摘要采用更紧凑的预览，点击仍可查看完整来信。\n- 开启“横屏卡片比例优化”时，顶部欢迎区改为文字与探索按钮横向排列，减少纵向占用。\n- 保留大字号下的可读性和页面滚动；关闭优化或使用竖屏时沿用原布局。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.74+87"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.75+88"
   },
   "history": [
+    {
+      "version": "1.0.74",
+      "build": 87,
+      "name": "风灵音乐 v1.0.74",
+      "date": "2026-11-18",
+      "notes": "- 播放页自定义“快捷操作区”新增按钮间距调节，也可保留自动均分；空间不足时自动收紧间距。\n- 自定义进度条新增波浪、分段样式，并支持粗细调节；波浪可调整振幅和波长。在布局编辑器中选中组件后调整，点击“保存并应用”保留设置，已有布局继续沿用原样式。\n- 专辑和歌单分别记住 Cover Flow / 列表（网格）的最后选择，重新进入或重启后继续使用。\n- 调整横屏卡片比例优化下的首页两栏布局，统一每日精选与专辑精选的间距和内容区高度，保留方形专辑封面。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74%2B87/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.74+87"
+    },
     {
       "version": "1.0.73",
       "build": 86,
