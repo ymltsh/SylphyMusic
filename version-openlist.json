@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.73-openlist.54",
-    "build": 86,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.73-openlist.54 (arm64-v8a)",
+    "version": "1.0.74-openlist.55",
+    "build": 87,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.74-openlist.55 (arm64-v8a)",
     "date": "2026-11-18",
-    "notes": "- 新增“横屏卡片比例优化”，可在“设置 → 横屏与 PC → 横屏页面布局”开启，默认关闭。\n- 开启后，在宽度足够的横向窗口中收紧首页和“我的”页面卡片，首页每日精选与专辑精选并排显示，音乐库分组使用两列卡片，歌单网格显示更多列。\n- 竖屏与关闭开关时保留原布局，Cover Flow 保持原样。\n- 调整 Android 横屏刘海区域的窗口适配，允许页面背景延伸至屏幕短边；具体显示仍受设备系统设置影响。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+    "notes": "- 播放页自定义“快捷操作区”新增按钮间距调节，也可保留自动均分；空间不足时自动收紧间距。\n- 自定义进度条新增波浪、分段样式，并支持粗细调节；波浪可调整振幅和波长。在布局编辑器中选中组件后调整，点击“保存并应用”保留设置，已有布局继续沿用原样式。\n- 专辑和歌单分别记住 Cover Flow / 列表（网格）的最后选择，重新进入或重启后继续使用。\n- 调整横屏卡片比例优化下的首页两栏布局，统一每日精选与专辑精选的间距和内容区高度，保留方形专辑封面。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73-openlist.54%2B86/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.74-openlist.55%2B87/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.73-openlist.54%2B86"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.74-openlist.55%2B87"
   },
   "history": [
+    {
+      "version": "1.0.73-openlist.54",
+      "build": 86,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.73-openlist.54 (arm64-v8a)",
+      "date": "2026-11-18",
+      "notes": "- 新增“横屏卡片比例优化”，可在“设置 → 横屏与 PC → 横屏页面布局”开启，默认关闭。\n- 开启后，在宽度足够的横向窗口中收紧首页和“我的”页面卡片，首页每日精选与专辑精选并排显示，音乐库分组使用两列卡片，歌单网格显示更多列。\n- 竖屏与关闭开关时保留原布局，Cover Flow 保持原样。\n- 调整 Android 横屏刘海区域的窗口适配，允许页面背景延伸至屏幕短边；具体显示仍受设备系统设置影响。\n\n仅适用于 Android arm64-v8a。可与普通版共存，应用数据各自独立。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73-openlist.54%2B86/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.73-openlist.54%2B86"
+    },
     {
       "version": "1.0.72-openlist.53",
       "build": 85,
