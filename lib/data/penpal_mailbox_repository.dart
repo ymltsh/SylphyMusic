@@ -1,3 +1,5 @@
+import 'package:sqflite/sqflite.dart';
+
 import '../core/penpal_mailbox_models.dart';
 import 'app_db.dart';
 
@@ -55,8 +57,9 @@ class PenpalMailboxRepository {
         limit: 1,
       );
       final now = DateTime.now().millisecondsSinceEpoch;
+      late final int noteId;
       if (rows.isEmpty) {
-        await tx.insert('penpal_outbox', {
+        noteId = await tx.insert('penpal_outbox', {
           'card_id': cardId,
           'content': normalized,
           'related_letter_key': relatedLetterKey,
@@ -67,6 +70,7 @@ class PenpalMailboxRepository {
         });
       } else {
         final previous = rows.single;
+        noteId = previous['id'] as int;
         await tx.update(
           'penpal_outbox',
           {
@@ -81,6 +85,7 @@ class PenpalMailboxRepository {
           whereArgs: [previous['id'], cardId],
         );
       }
+      await _replacePendingEvidence(tx, cardId, noteId, normalized, now);
     });
   }
 
@@ -112,8 +117,9 @@ class PenpalMailboxRepository {
         limit: 1,
       );
       final now = DateTime.now().millisecondsSinceEpoch;
+      late final int noteId;
       if (rows.isEmpty) {
-        await tx.insert('penpal_outbox', {
+        noteId = await tx.insert('penpal_outbox', {
           'card_id': cardId,
           'content': message,
           'related_letter_key': relatedLetterKey,
@@ -124,6 +130,7 @@ class PenpalMailboxRepository {
         });
       } else {
         final previous = rows.single;
+        noteId = previous['id'] as int;
         final combined = '${previous['content']}\n\n$message';
         if (combined.length > 500) {
           throw const FormatException('待回留言已接近 500 字，请先到“给笔友留言”编辑后再点赞');
@@ -139,6 +146,20 @@ class PenpalMailboxRepository {
           whereArgs: [previous['id'], cardId],
         );
       }
+      final current = await tx.query(
+        'penpal_outbox',
+        columns: ['content'],
+        where: 'id=?',
+        whereArgs: [noteId],
+        limit: 1,
+      );
+      await _replacePendingEvidence(
+        tx,
+        cardId,
+        noteId,
+        current.single['content'] as String,
+        now,
+      );
       return true;
     });
   }
@@ -150,11 +171,97 @@ class PenpalMailboxRepository {
   );
 
   Future<void> withdraw(String cardId, int noteId) async {
-    await database.db.rawUpdate(
-      "UPDATE penpal_outbox SET status='withdrawn', "
-      'revision=revision+1, updated_at_ms=? '
-      "WHERE card_id=? AND id=? AND status='pending'",
-      [DateTime.now().millisecondsSinceEpoch, cardId, noteId],
+    await database.db.transaction((tx) async {
+      final updated = await tx.rawUpdate(
+        "UPDATE penpal_outbox SET status='withdrawn', "
+        'revision=revision+1, updated_at_ms=? '
+        "WHERE card_id=? AND id=? AND status='pending'",
+        [DateTime.now().millisecondsSinceEpoch, cardId, noteId],
+      );
+      if (updated > 0) await _removeEvidence(tx, cardId, noteId);
+    });
+  }
+
+  Future<void> _replacePendingEvidence(
+    Transaction tx,
+    String cardId,
+    int noteId,
+    String content,
+    int now,
+  ) async {
+    final key = 'mailbox:$noteId';
+    final prior = await tx.query(
+      'rp_journal_queue',
+      columns: ['digested_at_ms'],
+      where: 'card_id=? AND conversation_key=?',
+      whereArgs: [cardId, key],
+    );
+    await tx.delete(
+      'rp_journal_queue',
+      where: 'card_id=? AND conversation_key=?',
+      whereArgs: [cardId, key],
+    );
+    if (prior.any((r) => r['digested_at_ms'] != null)) {
+      await _invalidateSummaries(tx, cardId);
+    }
+    final state = await tx.query(
+      'rp_character_state',
+      columns: ['memory_enabled'],
+      where: 'card_id=?',
+      whereArgs: [cardId],
+      limit: 1,
+    );
+    if (state.isNotEmpty && state.single['memory_enabled'] == 0) return;
+    await tx.insert('rp_journal_queue', {
+      'card_id': cardId,
+      'conversation_key': key,
+      'user_text': content,
+      'assistant_text': '',
+      'occurred_at_ms': now,
+      'local_day': _mailboxLocalDay(now),
+    });
+  }
+
+  static String _mailboxLocalDay(int ms) {
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _removeEvidence(
+    Transaction tx,
+    String cardId,
+    int noteId,
+  ) async {
+    final key = 'mailbox:$noteId';
+    final prior = await tx.query(
+      'rp_journal_queue',
+      columns: ['digested_at_ms'],
+      where: 'card_id=? AND conversation_key=?',
+      whereArgs: [cardId, key],
+    );
+    await tx.delete(
+      'rp_journal_queue',
+      where: 'card_id=? AND conversation_key=?',
+      whereArgs: [cardId, key],
+    );
+    if (prior.any((r) => r['digested_at_ms'] != null)) {
+      await _invalidateSummaries(tx, cardId);
+    }
+  }
+
+  Future<void> _invalidateSummaries(Transaction tx, String cardId) async {
+    await tx.delete(
+      'rp_journal_entries',
+      where: 'card_id=?',
+      whereArgs: [cardId],
+    );
+    await tx.update(
+      'rp_journal_queue',
+      {'digested_at_ms': null},
+      where: 'card_id=?',
+      whereArgs: [cardId],
     );
   }
 }

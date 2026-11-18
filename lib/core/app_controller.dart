@@ -101,6 +101,7 @@ class SylphyApp extends ChangeNotifier {
     RpJournalRepository(db),
     apiSettings,
     vault,
+    diagnostics: diagnostics,
   );
   late final recommendationRepository = RecommendationRepository(db);
   late final penpalMailbox = PenpalMailboxRepository(db);

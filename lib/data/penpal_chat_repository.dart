@@ -75,6 +75,7 @@ class PenpalChatRepository {
           'user_text': userText,
           'assistant_text': replyText,
           'occurred_at_ms': now,
+          'local_day': _rpLocalDay(now),
         });
       }
     });
@@ -105,9 +106,7 @@ class PenpalChatRepository {
         where: "kind='user_reply' AND card_id=? AND related_letter_key=?",
         whereArgs: [persona, letter],
       );
-      // The RP Core episode/preferences from this specific chat are private
-      // derivatives and must disappear with the chat transcript.
-      // A deleted conversation must vanish from diary evidence too.
+      // No rolled-up summary may continue quoting this deleted conversation.
       await tx.delete(
         'rp_journal_queue',
         where: 'card_id=? AND conversation_key=?',
@@ -115,31 +114,23 @@ class PenpalChatRepository {
       );
       await tx.delete(
         'rp_journal_entries',
-        where: 'card_id=? AND conversation_key=?',
-        whereArgs: [persona, letter],
-      );
-      final continuityRows = await tx.query(
-        'rp_continuity',
-        columns: ['revision'],
         where: 'card_id=?',
         whereArgs: [persona],
       );
-      if (continuityRows.isNotEmpty) {
-        await tx.update(
-          'rp_continuity',
-          {
-            'self_note': '',
-            'user_facts': '',
-            'relationship': '',
-            'open_threads': '',
-            'revision': (continuityRows.first['revision'] as int? ?? 0) + 1,
-            'invalidated': 1,
-            'updated_at_ms': DateTime.now().millisecondsSinceEpoch,
-          },
-          where: 'card_id=?',
-          whereArgs: [persona],
-        );
-      }
+      // Rebuild surviving memories from their still-retained real evidence.
+      await tx.update(
+        'rp_journal_queue',
+        {'digested_at_ms': null},
+        where: 'card_id=?',
+        whereArgs: [persona],
+      );
     });
   }
+}
+
+String _rpLocalDay(int ms) {
+  final date = DateTime.fromMillisecondsSinceEpoch(ms);
+  return '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }

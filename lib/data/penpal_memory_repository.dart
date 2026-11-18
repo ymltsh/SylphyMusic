@@ -125,11 +125,7 @@ class PenpalMemoryRepository {
         where: 'persona_key=?',
         whereArgs: [cardId],
       );
-      for (final table in <String>[
-        'rp_journal_queue',
-        'rp_journal_entries',
-        'rp_continuity',
-      ]) {
+      for (final table in <String>['rp_journal_queue', 'rp_journal_entries']) {
         await tx.delete(table, where: 'card_id=?', whereArgs: [cardId]);
       }
       // Clear the optional persona note, but preserve memory opt-out choices.
@@ -160,36 +156,25 @@ class PenpalMemoryRepository {
         where: "persona_key=? AND letter_key NOT LIKE 'rp:%'",
         whereArgs: [cardId],
       );
-      for (final table in <String>['rp_journal_queue', 'rp_journal_entries']) {
-        await tx.delete(
-          table,
-          where: "card_id=? AND conversation_key NOT LIKE 'rp:%'",
-          whereArgs: [cardId],
-        );
-      }
-      // The last continuity may include letter context. Invalidate it;
-      // the surviving general RP diaries can rebuild it on next use.
-      final current = await tx.query(
-        'rp_continuity',
-        columns: ['revision'],
+      // Letter-related chats have been deleted above. Any summary may
+      // contain their text, so revoke all derived layers and rebuild from
+      // surviving evidence at the next recommendation boundary.
+      await tx.delete(
+        'rp_journal_queue',
+        where: "card_id=? AND conversation_key NOT LIKE 'rp:%'",
+        whereArgs: [cardId],
+      );
+      await tx.delete(
+        'rp_journal_entries',
         where: 'card_id=?',
         whereArgs: [cardId],
       );
-      if (current.isNotEmpty) {
-        await tx.update(
-          'rp_continuity',
-          {
-            'self_note': '',
-            'user_facts': '',
-            'relationship': '',
-            'open_threads': '',
-            'invalidated': 1,
-            'revision': (current.first['revision'] as int? ?? 0) + 1,
-          },
-          where: 'card_id=?',
-          whereArgs: [cardId],
-        );
-      }
+      await tx.update(
+        'rp_journal_queue',
+        {'digested_at_ms': null},
+        where: 'card_id=?',
+        whereArgs: [cardId],
+      );
     });
   }
 

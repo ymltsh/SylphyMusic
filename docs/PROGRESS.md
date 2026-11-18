@@ -1,5 +1,9 @@
 # 实施与验证记录
 
+## 2026-11-18 日记优先记忆发布 1.0.71+84 核对完成
+
+前轮用户要求应用 v24 并推送更新已完成：普通版 1.0.71+84 和 OpenList 1.0.71-openlist.52+84 均已发布。普通版三 ABI Android / Windows 与特别版 arm64 编译、正式签名和源码附件核对完成，7 / 3 个远端附件的大小 / SHA-256、发布状态 / 标题 / 正文、普通版 Latest 与两分支全部原始 / 加速更新清单核对通过。特别版上轮清单核对中收到新任务，本轮通过原入口 --finish-verification 完成远端读取，publish-state 为 complete，未重复发布。产物 build/releases/1.0.71-84/ 与 OpenList 工作区 build/releases/1.0.71-openlist.52-84/，日志 build/release84-publish.log、OpenList 工作区 build/openlist-release84-build.log、openlist-release84-prepare.log、openlist-release84-publish.log、openlist-release84-finish.log。发布说明已提示一次性历史重置；未启动应用、调用真实模型或迁移用户数据库，仅提交推送版本清单。
+
 ## 2026-11-18 日记生命周期发布 1.0.70+83 核对完成
 
 前轮已按用户要求同步应用 v23 日记生命周期并发布普通版 1.0.70+83 与 OpenList 1.0.70-openlist.51+83。普通版 Android 三 ABI / Windows 编译、安装程序 / 便携包 / 源码打包及特别版 arm64 编译和源码打包均完成，正式签名一致；两版 7 / 3 个附件的大小、摘要、发布状态、标题 / 正文及全部原始 / 加速更新清单核对通过。特别版上轮在清单核对中收到新任务，本轮用原发布脚本 --finish-verification 完成读取核对，publish-state 为 complete，未重复发布。产物 build/releases/1.0.70-83/ 和 OpenList 工作区 build/releases/1.0.70-openlist.51-83/；日志 build/release83-publish.log、OpenList 工作区 build/openlist-release83-build.log、openlist-release83-prepare.log、openlist-release83-publish.log、openlist-release83-finish.log。仅提交推送版本清单，未运行测试或应用，未迁移用户数据库。
@@ -2211,3 +2215,10 @@ dart format 已执行；tool/build_review.ps1 成功完成 Android 三 ABI Relea
 仅提交推送清单：main/version.json 为 f349a8e，feature 两清单为 1431de2，main/version-openlist.json 为 d4066db。应用源码改动保留工作区并随 Release 附件交付。普通版产物 build/releases/1.0.60-73/、日志 build/release73-publish.log；特别版产物 build/releases/1.0.60-openlist.42-73/，日志 build/openlist-release73-build.log 与 build/openlist-release73-publish.log。
 
 未运行 analyze、测试、启动或设备检查；编译成功不代表 Android 13 实机效果验证通过。升级提示已写入发布说明及更新清单：已有来源需重新同步 / 扫描恢复目录，保留歌曲数据，无需清除数据或卸载。
+
+
+## 2026-11-18 Android 横屏刘海区域补丁
+
+按用户要求，将 SylphyMusic_Android_Cutout_Patch.zip 同步应用到 main 与 feature/android-openlist-lite。四套 Android 主题 XML（浅色 / 深色、常规 / v29）的 LaunchTheme 和 NormalTheme 均添加 android:windowLayoutInDisplayCutoutMode=shortEdges，每个工作区八处配置。补丁检查与应用成功，保留原有未提交改动、OpenList 专属集成及各自版本号和更新清单。
+
+两工作区均完成 flutter build apk --release --split-per-abi，三 ABI APK 位于各自 build/app/outputs/flutter-apk/，日志为 build/test_logs/android-cutout-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，横屏刘海适配效果由用户实机验收；未提交、推送或发布。

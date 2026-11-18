@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/rp_journal_models.dart';
 
-/// Read, edit, and delete a character's own journal and continuity.
+/// Unified, read-only overview of all three long-term memory densities.
+/// A user can inspect and delete a single summary; the LLM never runs here.
 class RpJournalPage extends StatefulWidget {
   const RpJournalPage({super.key, required this.app, this.embedded = false});
   final SylphyApp app;
@@ -24,6 +25,7 @@ class _RpJournalPageState extends State<RpJournalPage> {
   void initState() {
     super.initState();
     widget.app.apiSettings.addListener(_onCardChanged);
+    widget.app.rpJournal.addListener(_onJournalChanged);
   }
 
   void _onCardChanged() {
@@ -35,126 +37,141 @@ class _RpJournalPageState extends State<RpJournalPage> {
     });
   }
 
+  void _onJournalChanged() {
+    if (mounted) setState(() => _load = _read());
+  }
+
   @override
   void dispose() {
     widget.app.apiSettings.removeListener(_onCardChanged);
+    widget.app.rpJournal.removeListener(_onJournalChanged);
     super.dispose();
   }
 
-  Future<void> _act(Future<void> Function() operation) async {
+  Future<void> _delete(RpJournalEntry entry) async {
     if (_busy) return;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除这份记忆？'),
+        content: const Text('这份归纳不会再发送给 LLM；已合并的下级记忆不能自动还原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      await operation();
+      await widget.app.rpJournal.repository.deleteEntry(_card, entry.id);
       if (mounted) setState(() => _load = _read());
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('操作未完成，请稍后再试')));
+            .showSnackBar(const SnackBar(content: Text('删除未完成，请稍后再试')));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<String?> _editText(String heading, String initial) async {
-    final controller = TextEditingController(text: initial);
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(heading),
-          content: TextField(
-            controller: controller,
-            minLines: 3,
-            maxLines: 8,
-            maxLength: 300,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
-  }
-
-  Widget _continuityField(
+  Widget _tier(
     String title,
-    String value,
-    RpContinuity current,
-    RpContinuity Function(String) change,
-  ) => ListTile(
-    title: Text(title),
-    subtitle: Text(
-      value.isEmpty ? '尚无记录' : value,
-      maxLines: 5,
-      overflow: TextOverflow.ellipsis,
-    ),
-    trailing: const Icon(Icons.edit_outlined),
-    onTap: _busy
-        ? null
-        : () async {
-            final next = await _editText(title, value);
-            if (next == null || !mounted) return;
-            await _act(
-              () => widget.app.rpJournal.repository.updateContinuity(
-                _card,
-                change(next),
+    String description,
+    String level,
+    RpJournalSnapshot state,
+  ) {
+    final entries = state.ofLevel(level).toList();
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(description),
+            trailing: Text('${entries.length}'),
+          ),
+          for (final entry in entries)
+            ExpansionTile(
+              key: ValueKey('${entry.level}:${entry.id}'),
+              title: Text(
+                entry.startDay == entry.endDay
+                    ? entry.startDay
+                    : '${entry.startDay} — ${entry.endDay}',
               ),
-            );
-          },
-  );
+              subtitle: Text(
+                entry.text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: SelectableText(entry.text),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : () => _delete(entry),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('删除这份记忆'),
+                  ),
+                ),
+              ],
+            ),
+          if (entries.isEmpty) const ListTile(subtitle: Text('还没有形成这一层记忆')),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => widget.embedded
-      ? _journalContent()
+      ? _content()
       : Scaffold(
           appBar: AppBar(title: const Text('关于我的音乐笔友')),
-          body: _journalContent(),
+          body: _content(),
         );
 
-  Widget _journalContent() => FutureBuilder<RpJournalSnapshot>(
+  Widget _content() => FutureBuilder<RpJournalSnapshot>(
     future: _load,
     builder: (context, snapshot) {
-      if (snapshot.hasError)
+      if (snapshot.hasError) {
         return Center(
           child: TextButton(
             onPressed: () => setState(() => _load = _read()),
             child: const Text('读取失败，点击重试'),
           ),
         );
-      if (!snapshot.hasData)
+      }
+      if (!snapshot.hasData) {
         return const Center(child: CircularProgressIndicator());
+      }
       final state = snapshot.data!;
-      final memory = state.continuity;
-      RpContinuity revised({
-        String? self,
-        String? user,
-        String? relationship,
-        String? open,
-      }) => RpContinuity(
-        self: self ?? memory.self,
-        user: user ?? memory.user,
-        relationship: relationship ?? memory.relationship,
-        openThreads: open ?? memory.openThreads,
-        revision: memory.revision,
-      );
+      final progress = widget.app.rpJournal.progress(_card);
+      final stateText = switch (progress.phase) {
+        'working' => '正在整理经历与历史记忆…',
+        'failed' => '上轮整理未完成，原始互动仍已保存',
+        'done' => '本轮完成 ${progress.processed} 次记忆整理',
+        _ => '下一轮新推荐前，按实际需要自动整理',
+      };
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            '日记记录真实发生的交流与来信；下一轮新推荐开始前，'
-            '模型会自动整理尚未归档的经历，并更新连续记忆。'
-            '单纯查看已有推荐不会触发额外请求。',
+            '日记、周记、月记均属于长期记忆。互动先成为日记；'
+            '至少 7 天后按周浓缩，每 4 本周记归纳为月记。'
+            '旧经历不是被禁止提起，而是随时间减少细节。'
+            '纯自动生成且无人回应的来信不会重复写进记忆。',
           ),
           const SizedBox(height: 12),
           Card(
@@ -162,80 +179,31 @@ class _RpJournalPageState extends State<RpJournalPage> {
               children: [
                 ListTile(
                   leading: const Icon(Icons.auto_stories_outlined),
-                  title: const Text('日记整理状态'),
-                  subtitle: Text(
-                    state.pending == 0
-                        ? '所有已保存的经历均已归档'
-                        : '还有 ${state.pending} 段原始经历；下一次生成新推荐前自动整理',
-                  ),
+                  title: const Text('记忆整理状态'),
+                  subtitle: Text('$stateText\n待整理互动 ${state.pending} 段'),
                 ),
-                if (memory.invalidated)
-                  const ListTile(
-                    title: Text('连续记忆已撤回'),
-                    subtitle: Text('有来源对话或日记被删除，等待依据剩余记录重新整理。'),
-                  ),
-                if (_busy) const LinearProgressIndicator(),
+                if (progress.phase == 'working')
+                  const LinearProgressIndicator(),
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          _tier('日记', '同一天合并一篇，保留最近交流的细节', 'day', state),
+          const SizedBox(height: 8),
+          _tier('周记', '日记经过至少七天后归纳，保留主要变化', 'week', state),
+          const SizedBox(height: 8),
+          _tier('月记', '四本周记归纳，保留更加稳定的认知', 'month', state),
           const SizedBox(height: 8),
           Card(
             child: Column(
               children: [
                 const ListTile(
-                  title: Text(
-                    '连续记忆',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text('默认跨会话生效；点击可纠正模型整理的内容'),
+                  title: Text('尚未整理的真实交流'),
+                  subtitle: Text('仍可用于下一次聊天与推荐，但不是已归档的长期记忆'),
                 ),
-                _continuityField(
-                  '角色自己的想法',
-                  memory.self,
-                  memory,
-                  (v) => revised(self: v),
-                ),
-                _continuityField(
-                  '关于用户（有证据的事实）',
-                  memory.user,
-                  memory,
-                  (v) => revised(user: v),
-                ),
-                _continuityField(
-                  '共同经历与关系',
-                  memory.relationship,
-                  memory,
-                  (v) => revised(relationship: v),
-                ),
-                _continuityField(
-                  '未完成的约定',
-                  memory.openThreads,
-                  memory,
-                  (v) => revised(open: v),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: Column(
-              children: [
-                const ListTile(
-                  title: Text(
-                    '角色日记',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                // Raw evidence is visible immediately, rather than only
-                // incrementing an invisible 'pending' counter.
                 for (final turn in state.drafts.reversed)
                   ExpansionTile(
-                    leading: const Icon(Icons.description_outlined),
-                    title: Text(
-                      turn.user.isNotEmpty
-                          ? '刚刚聊过的一件事 · 待归档'
-                          : '最近写出的一封信 · 待归档',
-                    ),
+                    title: Text(turn.day),
                     subtitle: Text(
                       turn.user.isNotEmpty ? turn.user : turn.assistant,
                       maxLines: 2,
@@ -245,43 +213,15 @@ class _RpJournalPageState extends State<RpJournalPage> {
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: SelectableText(
-                          turn.user.isNotEmpty
-                              ? '你：${turn.user}\n\n笔友：${turn.assistant}'
-                              : turn.assistant,
+                          turn.user.isEmpty
+                              ? turn.assistant
+                              : '你：${turn.user}\n\n笔友：${turn.assistant}',
                         ),
                       ),
                     ],
                   ),
-                for (final entry in state.entries)
-                  ExpansionTile(
-                    title: Text(entry.day),
-                    subtitle: Text(
-                      entry.text,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: SelectableText(entry.text),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('删除此篇并撤回连续记忆'),
-                          onPressed: _busy
-                              ? null
-                              : () => _act(
-                                  () => widget.app.rpJournal.repository
-                                      .deleteEntry(_card, entry.id),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                if (state.entries.isEmpty && state.drafts.isEmpty)
-                  const ListTile(subtitle: Text('暂时没有日记。从来信里的交流开始，经历会自动记录。')),
+                if (state.drafts.isEmpty)
+                  const ListTile(subtitle: Text('目前没有待整理的交流')),
               ],
             ),
           ),

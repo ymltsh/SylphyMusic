@@ -334,18 +334,8 @@ class RecommendationService {
       llmSucceeded: letterFromLlm,
       answeredNote: letterFromLlm ? pendingNote : null,
     );
-    if (letterFromLlm && journal != null) {
-      try {
-        await journal!.repository.enqueueLetter(
-          activeCardId,
-          '$day:$generation',
-          title,
-          introduction,
-        );
-      } catch (_) {
-        // A recommendation remains committed even if diary enqueue fails.
-      }
-    }
+    // Only actual user interaction is RP memory evidence. Generated letters
+    // without a reply must not recursively teach the character its own words.
     _record('generation_completed', 'daily', count: finalTracks.length);
     return DailyMix(
       day,

@@ -1,62 +1,43 @@
-/// An evidence-backed, character-scoped diary entry.
+/// A long-term RP memory unit. Day/week/month differ in density, not status.
 class RpJournalEntry {
   const RpJournalEntry({
     required this.id,
-    required this.day,
-    required this.conversationKey,
+    required this.level,
+    required this.periodKey,
+    required this.startDay,
+    required this.endDay,
     required this.text,
-    required this.createdAtMs,
+    required this.revision,
+    required this.sourceCount,
+    required this.updatedAtMs,
   });
 
   final int id;
-  final String day;
-  final String conversationKey;
+  final String level; // day, week, month
+  final String periodKey;
+  final String startDay;
+  final String endDay;
   final String text;
-  final int createdAtMs;
+  final int revision;
+  final int sourceCount;
+  final int updatedAtMs;
+
+  String get day => startDay;
 
   factory RpJournalEntry.fromRow(Map<String, Object?> row) => RpJournalEntry(
     id: row['id'] as int,
-    day: row['local_day'] as String,
-    conversationKey: row['conversation_key'] as String,
+    level: row['level'] as String,
+    periodKey: row['period_key'] as String,
+    startDay: row['start_day'] as String,
+    endDay: row['end_day'] as String,
     text: row['body'] as String,
-    createdAtMs: row['created_at_ms'] as int,
-  );
-}
-
-class RpContinuity {
-  const RpContinuity({
-    this.self = '',
-    this.user = '',
-    this.relationship = '',
-    this.openThreads = '',
-    this.revision = 0,
-    this.invalidated = false,
-  });
-
-  final String self;
-  final String user;
-  final String relationship;
-  final String openThreads;
-  final int revision;
-  final bool invalidated;
-
-  factory RpContinuity.fromRow(Map<String, Object?> row) => RpContinuity(
-    self: row['self_note'] as String? ?? '',
-    user: row['user_facts'] as String? ?? '',
-    relationship: row['relationship'] as String? ?? '',
-    openThreads: row['open_threads'] as String? ?? '',
     revision: row['revision'] as int? ?? 0,
-    invalidated: row['invalidated'] == 1,
+    sourceCount: row['source_count'] as int? ?? 0,
+    updatedAtMs: row['updated_at_ms'] as int,
   );
-
-  Map<String, String> asContext() => {
-    if (self.trim().isNotEmpty) 'role_self_view': self,
-    if (user.trim().isNotEmpty) 'confirmed_user_facts': user,
-    if (relationship.trim().isNotEmpty) 'relationship_history': relationship,
-    if (openThreads.trim().isNotEmpty) 'unfinished_threads': openThreads,
-  };
 }
 
+/// Raw, auditable interaction evidence. Not itself a long-term memory unit.
 class RpJournalTurn {
   const RpJournalTurn({
     required this.id,
@@ -64,13 +45,22 @@ class RpJournalTurn {
     required this.user,
     required this.assistant,
     required this.occurredAtMs,
+    required this.localDay,
   });
-
   final int id;
   final String conversationKey;
   final String user;
   final String assistant;
   final int occurredAtMs;
+  final String localDay;
+
+  String get day {
+    if (localDay.isNotEmpty) return localDay;
+    final date = DateTime.fromMillisecondsSinceEpoch(occurredAtMs);
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
 
   factory RpJournalTurn.fromRow(Map<String, Object?> row) => RpJournalTurn(
     id: row['id'] as int,
@@ -78,22 +68,20 @@ class RpJournalTurn {
     user: row['user_text'] as String,
     assistant: row['assistant_text'] as String,
     occurredAtMs: row['occurred_at_ms'] as int,
+    localDay: row['local_day'] as String? ?? '',
   );
 }
 
 class RpJournalSnapshot {
   const RpJournalSnapshot({
-    required this.continuity,
     required this.entries,
     required this.pending,
     required this.drafts,
   });
-
-  final RpContinuity continuity;
   final List<RpJournalEntry> entries;
   final int pending;
-
-  /// Actual saved dialogue or a real generated letter, visible immediately.
-  /// The LLM later organizes this evidence into a polished diary entry.
   final List<RpJournalTurn> drafts;
+
+  Iterable<RpJournalEntry> ofLevel(String level) =>
+      entries.where((item) => item.level == level);
 }

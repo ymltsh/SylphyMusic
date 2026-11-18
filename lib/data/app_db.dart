@@ -84,8 +84,9 @@ class AppDb {
     'CREATE INDEX idx_penpal_outbox_card ON penpal_outbox(card_id,created_at_ms DESC)',
   ];
   // RP Core v21: per-card state, evidence-based memories and world events.
-  // RP Journal v23: diary is durable memory, continuity is its summary.
-  static const _rpJournalV22Schema = <String>[
+  // RP Core v25: three densities of the same long-term memory.
+  // Raw interaction evidence is stored separately, never as a fourth tier.
+  static const _rpLayeredV24Schema = <String>[
     '''CREATE TABLE rp_journal_queue(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id TEXT NOT NULL,
@@ -93,26 +94,26 @@ class AppDb {
       user_text TEXT NOT NULL,
       assistant_text TEXT NOT NULL,
       occurred_at_ms INTEGER NOT NULL,
+      local_day TEXT NOT NULL DEFAULT '',
       digested_at_ms INTEGER)''',
-    'CREATE INDEX idx_rp_journal_queue_pending ON rp_journal_queue(card_id,digested_at_ms,id)',
-    'CREATE INDEX idx_rp_journal_queue_thread ON rp_journal_queue(card_id,conversation_key)',
+    'CREATE INDEX idx_rp_journal_queue_pending '
+        'ON rp_journal_queue(card_id,digested_at_ms,id)',
+    'CREATE INDEX idx_rp_journal_queue_thread '
+        'ON rp_journal_queue(card_id,conversation_key)',
     '''CREATE TABLE rp_journal_entries(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id TEXT NOT NULL,
-      local_day TEXT NOT NULL,
-      conversation_key TEXT NOT NULL,
+      level TEXT NOT NULL CHECK(level IN ('day','week','month')),
+      period_key TEXT NOT NULL,
+      start_day TEXT NOT NULL,
+      end_day TEXT NOT NULL,
       body TEXT NOT NULL,
-      created_at_ms INTEGER NOT NULL)''',
-    'CREATE INDEX idx_rp_journal_entries_date ON rp_journal_entries(card_id,created_at_ms DESC)',
-    '''CREATE TABLE rp_continuity(
-      card_id TEXT PRIMARY KEY,
-      self_note TEXT NOT NULL DEFAULT '',
-      user_facts TEXT NOT NULL DEFAULT '',
-      relationship TEXT NOT NULL DEFAULT '',
-      open_threads TEXT NOT NULL DEFAULT '',
       revision INTEGER NOT NULL DEFAULT 0,
-      invalidated INTEGER NOT NULL DEFAULT 0,
-      updated_at_ms INTEGER NOT NULL)''',
+      source_count INTEGER NOT NULL DEFAULT 0,
+      updated_at_ms INTEGER NOT NULL,
+      UNIQUE(card_id,level,period_key))''',
+    'CREATE INDEX idx_rp_journal_entries_date '
+        'ON rp_journal_entries(card_id,level,start_day DESC)',
   ];
   static const _rpV21Schema = <String>[
     '''CREATE TABLE rp_character_state(
@@ -312,7 +313,7 @@ class AppDb {
     await root.create(recursive: true);
     db = await openDatabase(
       p.join(root.path, 'sylphy.sqlite'),
-      version: 23,
+      version: 24,
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await database.execute(
@@ -497,7 +498,7 @@ class AppDb {
           }
         }
         if (oldVersion < 22) {
-          for (final sql in _rpJournalV22Schema) {
+          for (final sql in _rpLayeredV24Schema) {
             await database.execute(sql);
           }
         }
@@ -530,7 +531,7 @@ class AppDb {
           ]) {
             await database.execute('DROP TABLE IF EXISTS $table');
           }
-          for (final sql in _rpJournalV22Schema) {
+          for (final sql in _rpLayeredV24Schema) {
             await database.execute(sql);
           }
           await database.delete(
@@ -538,6 +539,21 @@ class AppDb {
             where: 'key=?',
             whereArgs: ['recommendation_public_charts_v1'],
           );
+        }
+        if (oldVersion < 24) {
+          // Deliberately incompatible RP-memory redesign. Previous diary,
+          // continuity and queued evidence are reset exactly once. Do not
+          // delete music assets, role cards, chats or authored worldbooks.
+          for (final table in <String>[
+            'rp_journal_queue',
+            'rp_journal_entries',
+            'rp_continuity',
+          ]) {
+            await database.execute('DROP TABLE IF EXISTS $table');
+          }
+          for (final sql in _rpLayeredV24Schema) {
+            await database.execute(sql);
+          }
         }
       },
       onCreate: (d, v) async {
@@ -595,7 +611,7 @@ class AppDb {
         for (final sql in _rpV21Schema) {
           await d.execute(sql);
         }
-        for (final sql in _rpJournalV22Schema) {
+        for (final sql in _rpLayeredV24Schema) {
           await d.execute(sql);
         }
       },

@@ -134,7 +134,6 @@ class RpRepository {
       for (final table in <String>[
         'rp_journal_queue',
         'rp_journal_entries',
-        'rp_continuity',
         'rp_event_instances',
         'rp_event_rolls',
       ]) {
