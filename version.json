@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.72",
-    "build": 85,
-    "name": "风灵音乐 v1.0.72",
+    "version": "1.0.73",
+    "build": 86,
+    "name": "风灵音乐 v1.0.73",
     "date": "2026-11-18",
-    "notes": "升级前请备份应用数据库及 WAL/SHM：新版本首次启动会清空旧待整理经历、旧日记和连续记忆摘要，重新建立分层记忆。已有聊天、留言、来信、推荐快照、角色卡、世界书及音乐数据保留；旧聊天不会自动补入新日记。\n\n- 长期记忆分为日记、周记、月记三层，取代独立的连续记忆摘要；同一天的新互动合并为一篇日记，成熟日记归纳成周记，四本成熟周记进一步归纳成月记。\n- 只有真实聊天、来信回复和用户留言产生新记忆素材；无人回复的自动推荐信和打开来信不会新增记忆。\n- 仅在生成新推荐前按需整理，每次最多三次；复用推荐不额外请求模型。整理失败保留原始记录，成功保存上层摘要后才移除被压缩的下层记忆。\n- 管理页分组展示日记、周记、月记及整理状态；聊天和推荐使用各层有界上下文，保留的完整月记仍可在本地阅读。\n- 删除来源聊天或撤回已整理留言时撤回派生摘要，下一次推荐前从剩余证据重建，避免继续引用已删除内容。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的交流。分层整理或删除后的重建可能增加模型请求及费用。\n",
+    "notes": "- 新增“横屏卡片比例优化”，可在“设置 → 横屏与 PC → 横屏页面布局”开启，默认关闭。\n- 开启后，在宽度足够的横向窗口中收紧首页和“我的”页面卡片，首页每日精选与专辑精选并排显示，音乐库分组使用两列卡片，歌单网格显示更多列。\n- 竖屏与关闭开关时保留原布局，Cover Flow 保持原样。\n- 调整 Android 横屏刘海区域的窗口适配，允许页面背景延伸至屏幕短边；具体显示仍受设备系统设置影响。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73%2B86/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73%2B86/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73%2B86/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73%2B86/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.73%2B86/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.72+85"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.73+86"
   },
   "history": [
+    {
+      "version": "1.0.72",
+      "build": 85,
+      "name": "风灵音乐 v1.0.72",
+      "date": "2026-11-18",
+      "notes": "升级前请备份应用数据库及 WAL/SHM：新版本首次启动会清空旧待整理经历、旧日记和连续记忆摘要，重新建立分层记忆。已有聊天、留言、来信、推荐快照、角色卡、世界书及音乐数据保留；旧聊天不会自动补入新日记。\n\n- 长期记忆分为日记、周记、月记三层，取代独立的连续记忆摘要；同一天的新互动合并为一篇日记，成熟日记归纳成周记，四本成熟周记进一步归纳成月记。\n- 只有真实聊天、来信回复和用户留言产生新记忆素材；无人回复的自动推荐信和打开来信不会新增记忆。\n- 仅在生成新推荐前按需整理，每次最多三次；复用推荐不额外请求模型。整理失败保留原始记录，成功保存上层摘要后才移除被压缩的下层记忆。\n- 管理页分组展示日记、周记、月记及整理状态；聊天和推荐使用各层有界上下文，保留的完整月记仍可在本地阅读。\n- 删除来源聊天或撤回已整理留言时撤回派生摘要，下一次推荐前从剩余证据重建，避免继续引用已删除内容。\n\n日记整理使用已配置的 LLM 服务，会发送部分保存的交流。分层整理或删除后的重建可能增加模型请求及费用。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.72%2B85/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.72+85"
+    },
     {
       "version": "1.0.71",
       "build": 84,
