@@ -63,6 +63,21 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
               builder: (context, _) => ListView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                 children: [
+                  _group('横屏页面布局', [
+                    SwitchListTile(
+                      key: const ValueKey('compact-wide-page-cards'),
+                      title: const Text('横屏卡片比例优化'),
+                      subtitle: const Text(
+                        '优化首页、音乐库、歌单和我的页面的功能卡片比例；'
+                        '仅在足够宽的横向窗口生效，竖屏保持原布局。默认关闭。',
+                      ),
+                      value: prefs.compactPageCards,
+                      onChanged: _busy
+                          ? null
+                          : (value) =>
+                                _act(() => prefs.update(compactCards: value)),
+                    ),
+                  ]),
                   _group('横屏迷你播放器', [
                     const Padding(
                       padding: EdgeInsets.all(16),

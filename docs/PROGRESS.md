@@ -2222,3 +2222,58 @@ dart format 已执行；tool/build_review.ps1 成功完成 Android 三 ABI Relea
 按用户要求，将 SylphyMusic_Android_Cutout_Patch.zip 同步应用到 main 与 feature/android-openlist-lite。四套 Android 主题 XML（浅色 / 深色、常规 / v29）的 LaunchTheme 和 NormalTheme 均添加 android:windowLayoutInDisplayCutoutMode=shortEdges，每个工作区八处配置。补丁检查与应用成功，保留原有未提交改动、OpenList 专属集成及各自版本号和更新清单。
 
 两工作区均完成 flutter build apk --release --split-per-abi，三 ABI APK 位于各自 build/app/outputs/flutter-apk/，日志为 build/test_logs/android-cutout-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，横屏刘海适配效果由用户实机验收；未提交、推送或发布。
+
+
+## 2026-11-18 横屏与 PC 卡片比例可选补丁
+
+按用户要求，将 SylphyMusic_Wide_Card_Ratio_OptIn_PatchKit.zip 应用到 main 与 feature/android-openlist-lite。附件生成器在 Windows 文本管道中自动转换换行导致 git apply --check 失败，本地 .private 副本改为 UTF-8 字节输入 / 输出后，两工作区所有源码锚点和补丁检查通过。应用七个现有源码文件及新增比例辅助函数，保留附件两个可选测试文件但未执行；保留工作区已有修改、Android 刘海适配、OpenList 专属集成、各自版本号与更新清单。
+
+新增默认关闭的“设置 → 横屏与 PC → 横屏页面布局 → 横屏卡片比例优化”，窗口宽至少 700 且宽大于高时按容器宽度优化首页、音乐库、歌单和我的卡片。使用现有 settings 表保存 desktop_compact_page_cards，无 schema 迁移。使用说明更新于 docs/DESKTOP_LANDSCAPE.md，修改文件已 dart format。
+
+普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 与内部打包，产物 build/internal-review/；OpenList 三 ABI Android Release 编译成功，产物 build/app/outputs/flutter-apk/。两工作区日志均为 build/test_logs/wide-card-build.log。本轮无测试凭据，未运行 analyze、测试、启动或设备检查；交互及缩放效果由用户验收。未提交、推送或发布。
+
+
+## 2026-11-18 横屏卡片比例与 Android 刘海适配发布
+
+按用户“推送更新”授权，普通版 1.0.73+86（三 ABI Android、Windows 安装程序 / 便携包、对应源码）与 OpenList 1.0.73-openlist.54+86（arm64 APK、含后端 / 前端的对应源码）已发布。新增默认关闭的横屏卡片比例优化，并包含 Android 短边刘海区域适配。七个普通版、三个特别版附件大小和 SHA-256、Release 标题 / 正文 / 状态及普通版 Latest 均核对通过，Android 正式签名一致；OpenList libgojni.so 与上一版摘要一致。
+
+仅提交推送更新清单：main/version.json 为 31f961f，feature/version.json 与 version-openlist.json 为 6c5fb64，main/version-openlist.json 为 b70ab19。源码保留工作区并随 Release 附件交付。OpenList 旧分支加速清单首次核对未通过，发布已完成后仅执行 --finish-verification 只读核对，全部原始 / 加速入口最终通过，publish-state.json 为 complete；未重复发布。
+
+普通版产物 build/releases/1.0.73-86/，日志 build/release86-publish.log；特别版产物 build/releases/1.0.73-openlist.54-86/，日志 build/openlist-release86-build.log、build/openlist-release86-prepare.log、build/openlist-release86-publish.log 与 build/openlist-release86-finish.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，功能与实机效果由用户验收。
+
+
+## 2026-11-18 首页横屏两栏视觉对齐
+
+按用户截图反馈，同步调整两个分支首页的每日精选与专辑精选：标题下间距统一为 8，内容区共用高度；根据实际内容宽度和文字缩放选专辑列数，保持方形封面，专辑文字靠底。每日精选仅在该并排模式填满分配高度，收紧内边距、标题及摘要行数，操作区靠底。其他展示模式保留原尺寸行为。
+
+四个源码文件已 dart format。普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 和内部打包，产物 build/internal-review/；OpenList 三 ABI Android Release 编译成功，产物 build/app/outputs/flutter-apk/。两工作区日志 build/test_logs/wide-card-alignment-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查；编译成功不代表截图效果或文字缩放验收通过。本次视觉调整未提交、推送或发布。
+
+
+## 2026-11-18 专辑与歌单 Cover Flow 选择持久化
+
+按用户要求，两分支专辑 Cover Flow / 列表和歌单 Cover Flow / 网格分别保存最后选择，重新进入或重启后恢复。Appearance 初始化读取现有 settings 表的 ui_album_cover_flow、ui_playlist_cover_flow，切换通过串行队列写入成功后通知界面，失败显示现有错误提示；退出排空设置队列后关闭数据库。多选临时列表不写入偏好。无数据库 schema 迁移，初始默认仍为列表 / 网格。
+
+四个源码文件已 dart format。普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志为 build/test_logs/cover-flow-preference-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，实际保存 / 恢复交互由用户验收。未提交、推送或发布。
+
+
+## 2026-11-18 自定义快捷区间距与进度条样式
+
+两分支同步新增：播放页布局编辑器的快捷操作区支持自动均分或 0–64 dp 按钮间距；手动模式居中排列，保留 48 dp 按钮区域，空间不足收紧间距，极窄时可横向滚动。进度条提供经典、波浪、分段样式，粗细 1–8 dp；波浪振幅 0–8 dp、波长 12–64 dp。复用原 Slider 的拖动、跳转、键盘及无障碍行为，只替换轨道绘制，无额外动画计时器。
+
+属性随布局保存、复制及导入导出，编辑预览与正常播放使用同一渲染；布局维持 v4，缺省值兼容原自动均分与经典细进度条，无数据库迁移或旧布局清空。六个共用源码文件已 dart format，说明更新于 docs/PLAYER_LAYOUT_EDITOR.md。
+
+普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 和内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志 build/test_logs/player-style-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，实际视觉与拖动效果由用户验收。未提交、推送或发布。
+
+
+## 2026-11-18 播放页组件样式与视图记忆发布
+
+用户授权发布的普通版 1.0.74+87（三 ABI Android、Windows 安装程序 / 便携包及源码）与 OpenList 1.0.74-openlist.55+87（arm64 APK、含后端 / 前端的源码）已完成发布。七个普通版和三个特别版附件大小 / SHA-256、Release 状态 / 标题 / 正文、普通版 Latest，以及两分支所有原始 / 加速更新入口均核对通过，特别版 publish-state.json 为 complete。正式签名一致，OpenList libgojni.so 与上一版摘要一致。
+
+仅推送清单：main/version.json 为 2b40039，feature/version.json 与 version-openlist.json 为 acdfaa1，main/version-openlist.json 为 602f639。应用源码保留工作区并随 Release 附件提供。产物为普通版 build/releases/1.0.74-87/、特别版 build/releases/1.0.74-openlist.55-87/；日志为普通版 build/release87-publish.log、特别版 build/openlist-release87-build.log、build/openlist-release87-prepare.log 和 build/openlist-release87-publish.log。未使用测试凭据，未运行 analyze、测试、启动或设备检查。
+
+
+## 2026-11-18 窄长横屏首页比例修正
+
+根据用户实机截图，修正上一轮仅用专辑宽度决定两栏等高造成的单列封面过大。开启横屏卡片比例优化时，按内容区实际高度的约 48% 分配推荐区高度，标准字号限制为 164–220 dp，大字号增加最低高度；以高度预算反推专辑列数与封面尺寸，封面保持方形、上下边界继续对齐。每日精选压缩为单行标题和摘要，封面组按高度缩小；欢迎区改为文字与探索按钮横向排列。关闭优化与竖屏保持旧布局，窗口极矮或大字号时保留纵向滚动。
+
+两个分支已同步，四个源码文件已 dart format。普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 与内部打包，产物 build/internal-review/；OpenList 三 ABI Android Release 编译成功，产物 build/app/outputs/flutter-apk/。日志均为 build/test_logs/short-landscape-cards-build.log。未使用测试凭据，未运行 analyze、测试、启动或设备检查，窄长屏显示效果由用户验收。本次修正未提交、推送或发布，不在已发布的 1.0.74+87 / 1.0.74-openlist.55+87 内。

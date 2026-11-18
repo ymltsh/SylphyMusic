@@ -8,8 +8,10 @@ class PlaylistReorderGrid extends StatefulWidget {
     required this.playlists,
     required this.cardBuilder,
     required this.onMove,
+    this.compact = false,
   });
 
+  final bool compact;
   final List<PlaylistModel> playlists;
   final Widget Function(BuildContext, PlaylistModel) cardBuilder;
   final Future<void> Function(String id, String targetId) onMove;
@@ -54,7 +56,9 @@ class _PlaylistReorderGridState extends State<PlaylistReorderGrid> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 1200
+      final columns = widget.compact && constraints.maxWidth >= 620
+          ? ((constraints.maxWidth - 32) / 148).floor().clamp(3, 8).toInt()
+          : constraints.maxWidth >= 1200
           ? 5
           : constraints.maxWidth >= 900
           ? 4

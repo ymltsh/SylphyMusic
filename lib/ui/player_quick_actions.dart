@@ -11,6 +11,7 @@ class PlayerQuickActions extends StatelessWidget {
     required this.app,
     this.track,
     this.preview = false,
+    this.spacing,
     this.onOpenLyrics,
     this.onOpenEditor,
     this.onQuality,
@@ -18,6 +19,7 @@ class PlayerQuickActions extends StatelessWidget {
   final SylphyApp app;
   final Track? track;
   final bool preview;
+  final double? spacing;
   final VoidCallback? onOpenLyrics, onOpenEditor, onQuality;
 
   Future<void> _toggleDesktopLyrics(BuildContext context) async {
@@ -81,94 +83,126 @@ class PlayerQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: Listenable.merge([app.sleepTimer, app.appearance, app]),
-    builder: (context, _) => Row(
-      key: const ValueKey('player-quick-actions'),
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
+    builder: (context, _) => _layout([
+      IconButton(
+        tooltip: '睡眠定时',
+        isSelected: !preview && app.sleepTimer.active,
+        onPressed: preview ? () {} : () => _timerSheet(context),
+        icon: const Icon(Icons.timer_outlined),
+        selectedIcon: const Icon(Icons.timer),
+      ),
+      IconButton(
+        tooltip: '歌词页',
+        onPressed: preview ? () {} : onOpenLyrics,
+        icon: const Icon(Icons.lyrics_outlined),
+      ),
+      if (preview || track == null)
         IconButton(
-          tooltip: '睡眠定时',
-          isSelected: !preview && app.sleepTimer.active,
-          onPressed: preview ? () {} : () => _timerSheet(context),
-          icon: const Icon(Icons.timer_outlined),
-          selectedIcon: const Icon(Icons.timer),
-        ),
+          tooltip: '收藏',
+          onPressed: () {},
+          icon: const Icon(Icons.favorite_border_rounded),
+        )
+      else
+        PlayerFavorite(app: app, track: track!),
+      if (preview)
         IconButton(
-          tooltip: '歌词页',
-          onPressed: preview ? () {} : onOpenLyrics,
-          icon: const Icon(Icons.lyrics_outlined),
-        ),
-        if (preview || track == null)
-          IconButton(
-            tooltip: '收藏',
-            onPressed: () {},
-            icon: const Icon(Icons.favorite_border_rounded),
-          )
-        else
-          PlayerFavorite(app: app, track: track!),
-        if (preview)
-          IconButton(
-            tooltip: '更多',
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert),
-          )
-        else
-          PopupMenuButton<String>(
-            tooltip: '更多',
-            onSelected: (value) async {
-              if (value == 'edit') {
-                onOpenEditor?.call();
-              } else if (value == 'desktopLyrics') {
-                await _toggleDesktopLyrics(context);
-              } else if (value == 'quality') {
-                onQuality?.call();
-              } else {
-                final selectedTrack = track;
-                if (selectedTrack == null) return;
-                try {
-                  await performTrackAction(context, app, value, selectedTrack);
-                } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('操作失败，请重试')));
-                  }
+          tooltip: '更多',
+          onPressed: () {},
+          icon: const Icon(Icons.more_vert),
+        )
+      else
+        PopupMenuButton<String>(
+          tooltip: '更多',
+          onSelected: (value) async {
+            if (value == 'edit') {
+              onOpenEditor?.call();
+            } else if (value == 'desktopLyrics') {
+              await _toggleDesktopLyrics(context);
+            } else if (value == 'quality') {
+              onQuality?.call();
+            } else {
+              final selectedTrack = track;
+              if (selectedTrack == null) return;
+              try {
+                await performTrackAction(context, app, value, selectedTrack);
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(const SnackBar(content: Text('操作失败，请重试')));
                 }
               }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'quality', child: Text('歌曲信息')),
-              if (track != null) ...[
-                const PopupMenuItem(value: 'playlist', child: Text('加入歌单')),
-                PopupMenuItem(
-                  value: 'block',
-                  child: Text(
-                    app.blacklist.contains(track!.ref.key) ? '取消屏蔽' : '加入歌曲黑名单',
+            }
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'quality', child: Text('歌曲信息')),
+            if (track != null) ...[
+              const PopupMenuItem(value: 'playlist', child: Text('加入歌单')),
+              PopupMenuItem(
+                value: 'block',
+                child: Text(
+                  app.blacklist.contains(track!.ref.key) ? '取消屏蔽' : '加入歌曲黑名单',
+                ),
+              ),
+            ],
+            if (app.desktopLyrics.supported)
+              PopupMenuItem<String>(
+                value: 'desktopLyrics',
+                child: Semantics(
+                  checked: app.appearance.desktopLyricsEnabled,
+                  child: Row(
+                    children: [
+                      const Expanded(child: Text('显示桌面歌词')),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 24,
+                        child: app.appearance.desktopLyricsEnabled
+                            ? const Icon(Icons.check, size: 24)
+                            : null,
+                      ),
+                    ],
                   ),
                 ),
+              ),
+            const PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
+          ],
+        ),
+    ]),
+  );
+
+  Widget _layout(List<Widget> actions) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (spacing == null) {
+        return Row(
+          key: const ValueKey('player-quick-actions'),
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: actions,
+        );
+      }
+      final available = constraints.maxWidth.isFinite
+          ? constraints.maxWidth
+          : 480.0;
+      final gap = spacing!.clamp(
+        0.0,
+        ((available - actions.length * 48) / (actions.length - 1)).clamp(
+          0.0,
+          64.0,
+        ),
+      );
+      return Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            key: const ValueKey('player-quick-actions'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) SizedBox(width: gap),
+                SizedBox(width: 48, height: 48, child: actions[i]),
               ],
-              if (app.desktopLyrics.supported)
-                PopupMenuItem<String>(
-                  value: 'desktopLyrics',
-                  child: Semantics(
-                    checked: app.appearance.desktopLyricsEnabled,
-                    child: Row(
-                      children: [
-                        const Expanded(child: Text('显示桌面歌词')),
-                        const SizedBox(width: 16),
-                        SizedBox(
-                          width: 24,
-                          child: app.appearance.desktopLyricsEnabled
-                              ? const Icon(Icons.check, size: 24)
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const PopupMenuItem(value: 'edit', child: Text('编辑播放页')),
             ],
           ),
-      ],
-    ),
+        ),
+      );
+    },
   );
 }

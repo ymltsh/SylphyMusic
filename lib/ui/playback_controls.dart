@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import '../core/player_layout.dart';
+import 'player_progress_track.dart';
 import 'playback_mode_button.dart';
 import 'player_bar.dart';
 
@@ -128,10 +130,16 @@ class PlayerProgress extends StatefulWidget {
     required this.app,
     this.preview = false,
     this.color,
+    this.style = PlayerProgressStyle.classic,
+    this.thickness = 2,
+    this.waveAmplitude = 4,
+    this.waveLength = 24,
   });
   final SylphyApp app;
   final bool preview;
   final int? color;
+  final PlayerProgressStyle style;
+  final double thickness, waveAmplitude, waveLength;
 
   @override
   State<PlayerProgress> createState() => _PlayerProgressState();
@@ -206,7 +214,14 @@ class _PlayerProgressState extends State<PlayerProgress> {
             height: 48,
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                trackHeight: 2,
+                trackHeight: widget.thickness,
+                trackShape: widget.style == PlayerProgressStyle.classic
+                    ? const RoundedRectSliderTrackShape()
+                    : PlayerProgressTrackShape(
+                        style: widget.style,
+                        amplitude: widget.waveAmplitude,
+                        waveLength: widget.waveLength,
+                      ),
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
               ),

@@ -32,6 +32,9 @@ class Appearance extends ChangeNotifier {
   double backgroundVisibility = .24;
   bool _closed = false;
   Future<void> _backgroundWork = Future.value();
+  Future<void> _coverFlowWork = Future.value();
+  bool albumCoverFlow = false;
+  bool playlistCoverFlow = false;
   static final _managedName = RegExp(r'^background-[0-9a-f-]+\.png$');
   Directory get _backgroundDirectory =>
       Directory(p.join(db.root.path, 'appearance'));
@@ -82,7 +85,28 @@ class Appearance extends ChangeNotifier {
       ? '大'
       : '标准';
 
+  Future<void> toggleCoverFlow({required bool playlist}) {
+    if (_closed) return Future.value();
+    final operation = _coverFlowWork.then((_) async {
+      final next = !(playlist ? playlistCoverFlow : albumCoverFlow);
+      await db.setSetting(
+        playlist ? 'ui_playlist_cover_flow' : 'ui_album_cover_flow',
+        '$next',
+      );
+      if (playlist) {
+        playlistCoverFlow = next;
+      } else {
+        albumCoverFlow = next;
+      }
+      if (!_closed) notifyListeners();
+    });
+    _coverFlowWork = operation.catchError((Object _) {});
+    return operation;
+  }
+
   Future<void> initialize() async {
+    albumCoverFlow = await db.setting('ui_album_cover_flow') == 'true';
+    playlistCoverFlow = await db.setting('ui_playlist_cover_flow') == 'true';
     final savedMode = await db.setting('ui_theme');
     mode = ThemeMode.values.firstWhere(
       (v) => v.name == savedMode,
@@ -386,6 +410,7 @@ class Appearance extends ChangeNotifier {
   Future<void> shutdown() async {
     _closed = true;
     await _backgroundWork;
+    await _coverFlowWork;
     dispose();
   }
 }

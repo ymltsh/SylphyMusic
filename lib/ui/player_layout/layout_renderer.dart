@@ -87,6 +87,10 @@ class PlayerWidgetRegistry {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: PlayerProgress(
+          style: e.progressStyle,
+          thickness: e.progressThickness,
+          waveAmplitude: e.waveAmplitude,
+          waveLength: e.waveLength,
           app: data.app,
           preview: data.preview,
           color: e.color,
@@ -97,6 +101,7 @@ class PlayerWidgetRegistry {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: PlayerQuickActions(
+          spacing: e.quickActionSpacing,
           app: data.app,
           track: data.track,
           preview: data.preview,

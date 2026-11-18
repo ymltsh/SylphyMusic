@@ -11,6 +11,7 @@ import 'cover_flow.dart';
 import 'cover_art.dart';
 import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
+import 'wide_card_ratio.dart';
 
 class LibraryBrowser extends StatefulWidget {
   const LibraryBrowser({
@@ -609,28 +610,76 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                       : 84,
                   emptyMessage: emptyMessage,
                 )
-              : RawScrollbar(
-                  controller: _scrollController,
-                  thumbVisibility: true,
-                  interactive: true,
-                  thickness: 5,
-                  radius: const Radius.circular(8),
-                  thumbColor: Theme.of(context).colorScheme.onSurfaceVariant
-                      .withValues(alpha: .38),
-                  child: ListView.builder(
-                    key: ValueKey('${widget.query.signature}:$generation'),
-                    controller: _scrollController,
-                    cacheExtent: 0,
-                    clipBehavior: Clip.hardEdge,
-                    padding: EdgeInsets.only(
-                      bottom:
-                          widget.bottomPadding ??
-                          (MediaQuery.sizeOf(context).width > 750 ? 24 : 96),
-                    ),
-                    itemExtent: widget.query.view == 0 ? _rowExtent : null,
-                    itemCount: result.total,
-                    itemBuilder: (_, i) => _virtualRow(i),
-                  ),
+              : LayoutBuilder(
+                  builder: (context, viewport) {
+                    final compactGrid =
+                        useWideCardRatio(
+                          context,
+                          widget.app.desktopPreferences.compactPageCards,
+                        ) &&
+                        viewport.maxWidth >= 620 &&
+                        widget.query.view != 0 &&
+                        widget.selected == null &&
+                        !widget.query.blocked;
+                    return RawScrollbar(
+                      controller: _scrollController,
+                      thumbVisibility: true,
+                      interactive: true,
+                      thickness: 5,
+                      radius: const Radius.circular(8),
+                      thumbColor: Theme.of(context).colorScheme.onSurfaceVariant
+                          .withValues(alpha: .38),
+                      child: ListView.builder(
+                        key: ValueKey('${widget.query.signature}:$generation'),
+                        controller: _scrollController,
+                        cacheExtent: 0,
+                        clipBehavior: Clip.hardEdge,
+                        padding: EdgeInsets.only(
+                          bottom:
+                              widget.bottomPadding ??
+                              (MediaQuery.sizeOf(context).width > 750
+                                  ? 24
+                                  : 96),
+                        ),
+                        itemExtent: compactGrid
+                            ? 92 *
+                                  MediaQuery.textScalerOf(context).scale(14) /
+                                  14
+                            : widget.query.view == 0
+                            ? _rowExtent
+                            : null,
+                        itemCount: compactGrid
+                            ? (result.total + 1) ~/ 2
+                            : result.total,
+                        itemBuilder: (_, i) {
+                          if (!compactGrid) return _virtualRow(i);
+                          final first = i * 2;
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Card.outlined(
+                                    margin: EdgeInsets.zero,
+                                    child: _virtualRow(first),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: first + 1 < result.total
+                                      ? Card.outlined(
+                                          margin: EdgeInsets.zero,
+                                          child: _virtualRow(first + 1),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
                 ),
           result: result,
         );

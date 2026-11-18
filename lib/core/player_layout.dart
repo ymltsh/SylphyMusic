@@ -17,6 +17,8 @@ enum PlayerPart {
   decoration,
 }
 
+enum PlayerProgressStyle { classic, wave, segmented }
+
 enum PlayerBackground { album, gradient, solid }
 
 /// The shape and rendering of an individual cover element, not a global switch.
@@ -52,6 +54,11 @@ class PlayerElement {
     this.playWidth = 64,
     this.playHeight = 64,
     this.controlSpacing = 12,
+    this.quickActionSpacing,
+    this.progressStyle = PlayerProgressStyle.classic,
+    this.progressThickness = 2,
+    this.waveAmplitude = 4,
+    this.waveLength = 24,
     this.lyricLineHeight = 1.5,
     this.align = 'center',
     this.color,
@@ -70,6 +77,9 @@ class PlayerElement {
   final Rect? wideFrame;
   final bool locked, hidden;
   final double fontSize, opacity, radius, playWidth, playHeight, controlSpacing;
+  final double? quickActionSpacing;
+  final PlayerProgressStyle progressStyle;
+  final double progressThickness, waveAmplitude, waveLength;
   final double lyricLineHeight;
   final String align;
   final int? color;
@@ -93,6 +103,12 @@ class PlayerElement {
     double? playWidth,
     double? playHeight,
     double? controlSpacing,
+    double? quickActionSpacing,
+    bool clearQuickActionSpacing = false,
+    PlayerProgressStyle? progressStyle,
+    double? progressThickness,
+    double? waveAmplitude,
+    double? waveLength,
     double? lyricLineHeight,
     String? align,
     int? color,
@@ -115,6 +131,13 @@ class PlayerElement {
     playWidth: playWidth ?? this.playWidth,
     playHeight: playHeight ?? this.playHeight,
     controlSpacing: controlSpacing ?? this.controlSpacing,
+    quickActionSpacing: clearQuickActionSpacing
+        ? null
+        : quickActionSpacing ?? this.quickActionSpacing,
+    progressStyle: progressStyle ?? this.progressStyle,
+    progressThickness: progressThickness ?? this.progressThickness,
+    waveAmplitude: waveAmplitude ?? this.waveAmplitude,
+    waveLength: waveLength ?? this.waveLength,
     lyricLineHeight: lyricLineHeight ?? this.lyricLineHeight,
     align: align ?? this.align,
     color: clearColor ? null : color ?? this.color,
@@ -140,6 +163,14 @@ class PlayerElement {
       'playWidth': playWidth,
       'playHeight': playHeight,
       'controlSpacing': controlSpacing,
+      if (type == PlayerPart.quickActions && quickActionSpacing != null)
+        'quickActionSpacing': quickActionSpacing,
+      if (type == PlayerPart.progress) ...{
+        'progressStyle': progressStyle.name,
+        'progressThickness': progressThickness,
+        'waveAmplitude': waveAmplitude,
+        'waveLength': waveLength,
+      },
       'lyricLineHeight': lyricLineHeight,
       'align': align,
       if (color != null) 'color': color,
@@ -182,6 +213,16 @@ class PlayerElement {
       playWidth: _number(props['playWidth'] ?? 64, 56, 96),
       playHeight: _number(props['playHeight'] ?? 64, 48, 96),
       controlSpacing: _number(props['controlSpacing'] ?? 12, 0, 32),
+      quickActionSpacing: props['quickActionSpacing'] == null
+          ? null
+          : _number(props['quickActionSpacing'], 0, 64),
+      progressStyle: _enum(
+        PlayerProgressStyle.values,
+        props['progressStyle'] ?? 'classic',
+      ),
+      progressThickness: _number(props['progressThickness'] ?? 2, 1, 8),
+      waveAmplitude: _number(props['waveAmplitude'] ?? 4, 0, 8),
+      waveLength: _number(props['waveLength'] ?? 24, 12, 64),
       lyricLineHeight: _number(props['lyricLineHeight'] ?? 1.5, 1, 2.5),
       fontSize: _number(props['fontSize'] ?? 22, 12, 40),
       opacity: _number(props['opacity'] ?? 1, .1, 1),

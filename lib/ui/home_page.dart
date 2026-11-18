@@ -15,6 +15,7 @@ import 'cover_art.dart';
 import 'library_browser.dart';
 import 'playing_song_tile.dart';
 import 'now_playing.dart';
+import 'wide_card_ratio.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -199,7 +200,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  Widget _albumCard(CatalogRow row, double size) {
+  Widget _albumCard(CatalogRow row, double size, {bool fillHeight = false}) {
     final app = widget.app, track = row.track;
     final artist = track.albumArtist.isEmpty ? track.artist : track.albumArtist;
     final album = track.album.trim().isNotEmpty
@@ -250,6 +251,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CoverArt(app: app, track: track, size: size, borderRadius: 12),
+          if (fillHeight) const Spacer(),
           const SizedBox(height: 6),
           Text(
             album,
@@ -275,46 +277,255 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final app = widget.app, scheme = Theme.of(context).colorScheme;
     final desktop = MediaQuery.sizeOf(context).width > 750;
     final current = app.playback.current;
-    return ListView(
-      padding: EdgeInsets.fromLTRB(
-        desktop ? 24 : 20,
-        desktop ? 8 : 12,
-        desktop ? 24 : 20,
-        desktop ? 24 : 110,
-      ),
-      children: [
-        Container(
-          padding: EdgeInsets.all(desktop ? 18 : 24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(desktop ? 20 : 28),
-            gradient: LinearGradient(
-              colors: [
-                scheme.primaryContainer,
-                scheme.secondaryContainer.withValues(alpha: .45),
+    return LayoutBuilder(
+      builder: (context, viewport) {
+        final compact =
+            useWideCardRatio(
+              context,
+              app.desktopPreferences.compactPageCards,
+            ) &&
+            viewport.maxWidth >= 620;
+        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final sectionWidth = (viewport.maxWidth - (desktop ? 48 : 40) - 14) / 2;
+        // Short landscape windows set the height budget, independently of width.
+        final minimumHeight = 164 + (textScale - 1).clamp(0.0, 3.0) * 110;
+        final sectionHeight = (viewport.maxHeight * .48)
+            .clamp(minimumHeight, max(220.0, minimumHeight))
+            .toDouble();
+        final coverBudget = max(64.0, sectionHeight - 56 * textScale);
+        final albumColumns = ((sectionWidth + 12) / (coverBudget + 12))
+            .ceil()
+            .clamp(1, 8);
+        final albumSize = min(
+          coverBudget,
+          (sectionWidth - (albumColumns - 1) * 12) / albumColumns,
+        );
+        final dailySection = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '每日精选',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
+                  ),
+                  child: const Text('查看全部'),
+                ),
               ],
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 8),
+            SizedBox(
+              height: compact ? sectionHeight : null,
+              child: RecommendationDeliveryBuilder(
+                key: ValueKey((
+                  app.recommendations,
+                  app.apiSettings.activeCardId,
+                )),
+                future: dailyMix,
+                service: app.recommendations,
+                compact: true,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return SizedBox(
+                      height: 104,
+                      child: Center(
+                        child: snapshot.hasError
+                            ? const Text('每日精选暂时不可用')
+                            : const CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  final mix = snapshot.data!;
+                  if (mix.items.isEmpty) {
+                    return Card.filled(
+                      child: ListTile(
+                        title: const Text('开始聆听，发现曲库里的好音乐'),
+                        subtitle: const Text('添加来源或播放歌曲后，精选会更懂你'),
+                        onTap: () => widget.onLibrary(0),
+                      ),
+                    );
+                  }
+                  return RecommendationShowcase(
+                    app: app,
+                    mix: mix,
+                    fillHeight: compact,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
+                    ),
+                    onPlay: () => unawaited(
+                      app.playback.setQueue(mix.refs).catchError((Object _) {}),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+        final albumSection = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '专辑精选',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => widget.onLibrary(1),
+                  child: const Text('查看全部'),
+                ),
+              ],
+            ),
+            SizedBox(
+              height: compact
+                  ? 8
+                  : desktop
+                  ? 6
+                  : 10,
+            ),
+            SizedBox(
+              height: compact ? sectionHeight : null,
+              child: FutureBuilder<CatalogPage>(
+                future: albums,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text('专辑加载失败，请刷新音乐库后重试。'),
+                    );
+                  }
+                  if (!snapshot.hasData) {
+                    return const SizedBox(
+                      height: 170,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snapshot.data!.rows.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: scheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(Icons.album_outlined, size: 36),
+                          SizedBox(height: 12),
+                          Text('你的下一张心爱专辑，就在这里'),
+                          SizedBox(height: 6),
+                          Text(
+                            '添加来源或导入本地音乐后，专辑会自动出现在这里。',
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final rows = snapshot.data!.rows;
+                  if (!desktop && !compact) {
+                    return SizedBox(
+                      height: 208,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: rows.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 16),
+                        itemBuilder: (_, index) => SizedBox(
+                          width: 144,
+                          child: _albumCard(rows[index], 144),
+                        ),
+                      ),
+                    );
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = compact
+                          ? albumColumns
+                          : (constraints.maxWidth / 152).floor().clamp(3, 8);
+                      final size = compact
+                          ? albumSize
+                          : (constraints.maxWidth - (columns - 1) * 12) /
+                                columns;
+                      return SizedBox(
+                        height: compact ? sectionHeight : size + 56,
+                        child: Row(
+                          crossAxisAlignment: compact
+                              ? CrossAxisAlignment.stretch
+                              : CrossAxisAlignment.start,
+                          children: [
+                            for (var i = 0; i < columns; i++) ...[
+                              if (i != 0) const SizedBox(width: 12),
+                              Expanded(
+                                child: i < rows.length
+                                    ? _albumCard(
+                                        rows[i],
+                                        size,
+                                        fillHeight: compact,
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+        final welcomeCard = compact
+            ? Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    colors: [
+                      scheme.primaryContainer,
+                      scheme.secondaryContainer.withValues(alpha: .45),
+                    ],
+                  ),
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      '属于你的音乐时光',
-                      style:
-                          (desktop
-                                  ? Theme.of(context).textTheme.titleLarge
-                                  : Theme.of(context).textTheme.headlineSmall)
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '属于你的音乐时光',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            app.apiSettings.quote,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: desktop ? 6 : 10),
-                    Text(
-                      app.apiSettings.quote,
-                      maxLines: desktop ? 2 : 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: desktop ? 12 : 20),
+                    const SizedBox(width: 12),
                     FilledButton.icon(
                       onPressed: _exploring ? null : _exploreLibrary,
                       icon: _exploring
@@ -332,200 +543,155 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
-              ),
-              if (MediaQuery.sizeOf(context).width > 460)
-                Padding(
-                  padding: const EdgeInsets.only(left: 24),
-                  child: Icon(
-                    Icons.air_rounded,
-                    size: desktop ? 56 : 80,
-                    color: scheme.primary.withValues(alpha: .5),
+              )
+            : Container(
+                padding: EdgeInsets.all(
+                  compact
+                      ? 14
+                      : desktop
+                      ? 18
+                      : 24,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(
+                    compact
+                        ? 18
+                        : desktop
+                        ? 20
+                        : 28,
+                  ),
+                  gradient: LinearGradient(
+                    colors: [
+                      scheme.primaryContainer,
+                      scheme.secondaryContainer.withValues(alpha: .45),
+                    ],
                   ),
                 ),
-            ],
-          ),
-        ),
-        SizedBox(height: desktop ? 16 : 24),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '每日精选',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
-              ),
-              child: const Text('查看全部'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        RecommendationDeliveryBuilder(
-          key: ValueKey((app.recommendations, app.apiSettings.activeCardId)),
-          future: dailyMix,
-          service: app.recommendations,
-          compact: true,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return SizedBox(
-                height: 104,
-                child: Center(
-                  child: snapshot.hasError
-                      ? const Text('每日精选暂时不可用')
-                      : const CircularProgressIndicator(),
-                ),
-              );
-            }
-            final mix = snapshot.data!;
-            if (mix.items.isEmpty) {
-              return Card.filled(
-                child: ListTile(
-                  title: const Text('开始聆听，发现曲库里的好音乐'),
-                  subtitle: const Text('添加来源或播放歌曲后，精选会更懂你'),
-                  onTap: () => widget.onLibrary(0),
-                ),
-              );
-            }
-            return RecommendationShowcase(
-              app: app,
-              mix: mix,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => DailyMixPage(app: app)),
-              ),
-              onPlay: () => unawaited(
-                app.playback.setQueue(mix.refs).catchError((Object _) {}),
-              ),
-            );
-          },
-        ),
-        SizedBox(height: desktop ? 16 : 24),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '专辑精选',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            TextButton(
-              onPressed: () => widget.onLibrary(1),
-              child: const Text('查看全部'),
-            ),
-          ],
-        ),
-        SizedBox(height: desktop ? 6 : 10),
-        FutureBuilder<CatalogPage>(
-          future: albums,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('专辑加载失败，请刷新音乐库后重试。'),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const SizedBox(
-                height: 170,
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snapshot.data!.rows.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  border: Border.all(color: scheme.outlineVariant),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Column(
+                child: Row(
                   children: [
-                    Icon(Icons.album_outlined, size: 36),
-                    SizedBox(height: 12),
-                    Text('你的下一张心爱专辑，就在这里'),
-                    SizedBox(height: 6),
-                    Text(
-                      '添加来源或导入本地音乐后，专辑会自动出现在这里。',
-                      textAlign: TextAlign.center,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '属于你的音乐时光',
+                            style:
+                                (desktop
+                                        ? Theme.of(context).textTheme.titleLarge
+                                        : Theme.of(context)
+                                              .textTheme
+                                              .headlineSmall)
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          SizedBox(height: desktop ? 6 : 10),
+                          Text(
+                            app.apiSettings.quote,
+                            maxLines: desktop ? 2 : 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(
+                            height: compact
+                                ? 8
+                                : desktop
+                                ? 12
+                                : 20,
+                          ),
+                          FilledButton.icon(
+                            onPressed: _exploring ? null : _exploreLibrary,
+                            icon: _exploring
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    app.sources.isEmpty
+                                        ? Icons.add_link
+                                        : Icons.play_arrow_rounded,
+                                  ),
+                            label: Text(
+                              app.sources.isEmpty ? '连接音乐库' : '探索音乐库',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    if (!compact && MediaQuery.sizeOf(context).width > 460)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 24),
+                        child: Icon(
+                          Icons.air_rounded,
+                          size: desktop ? 56 : 80,
+                          color: scheme.primary.withValues(alpha: .5),
+                        ),
+                      ),
                   ],
                 ),
               );
-            }
-            final rows = snapshot.data!.rows;
-            if (!desktop) {
-              return SizedBox(
-                height: 208,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: rows.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 16),
-                  itemBuilder: (_, index) =>
-                      SizedBox(width: 144, child: _albumCard(rows[index], 144)),
-                ),
-              );
-            }
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = (constraints.maxWidth / 152).floor().clamp(
-                  3,
-                  8,
-                );
-                final size =
-                    (constraints.maxWidth - (columns - 1) * 12) / columns;
-                return SizedBox(
-                  height: size + 56,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < columns; i++) ...[
-                        if (i != 0) const SizedBox(width: 12),
-                        Expanded(
-                          child: i < rows.length
-                              ? _albumCard(rows[i], size)
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
-        // The desktop footer already shows the current track and its controls.
-        if (!desktop) ...[
-          const SizedBox(height: 24),
-          Text('继续播放', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Card.filled(
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(12),
-              leading: current == null
-                  ? const Icon(Icons.headphones_rounded, size: 40)
-                  : CoverArt(app: app, track: current, size: 56),
-              title: Text(
-                current?.title ?? '留一点时间，听喜欢的歌',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(current?.artist ?? '从音乐库中选择一首歌曲开始'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: current == null
-                  ? () => widget.onLibrary(0)
-                  : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => NowPlayingPage(app: app),
-                      ),
-                    ),
-            ),
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            desktop ? 24 : 20,
+            desktop ? 8 : 12,
+            desktop ? 24 : 20,
+            desktop ? 24 : 110,
           ),
-        ],
-      ],
+          children: [
+            welcomeCard,
+            SizedBox(
+              height: compact
+                  ? 12
+                  : desktop
+                  ? 16
+                  : 24,
+            ),
+            if (compact)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: dailySection),
+                  const SizedBox(width: 14),
+                  Expanded(child: albumSection),
+                ],
+              )
+            else ...[
+              dailySection,
+              SizedBox(height: desktop ? 16 : 24),
+              albumSection,
+            ],
+            // The desktop footer already shows the current track and its controls.
+            if (!desktop) ...[
+              const SizedBox(height: 24),
+              Text('继续播放', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Card.filled(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(12),
+                  leading: current == null
+                      ? const Icon(Icons.headphones_rounded, size: 40)
+                      : CoverArt(app: app, track: current, size: 56),
+                  title: Text(
+                    current?.title ?? '留一点时间，听喜欢的歌',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(current?.artist ?? '从音乐库中选择一首歌曲开始'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: current == null
+                      ? () => widget.onLibrary(0)
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NowPlayingPage(app: app),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

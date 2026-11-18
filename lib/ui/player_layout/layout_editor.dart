@@ -806,6 +806,72 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                       style: TextStyle(fontSize: 12),
                     ),
                   ],
+                  if (e.type == PlayerPart.quickActions) ...[
+                    _pill(
+                      label: const Text('自动均分'),
+                      selected: e.quickActionSpacing == null,
+                      onSelected: (_) => draft.update(
+                        e.copyWith(clearQuickActionSpacing: true),
+                      ),
+                    ),
+                    _slider(
+                      '按钮间距',
+                      e.quickActionSpacing ?? 12,
+                      0,
+                      64,
+                      (v) => draft.update(e.copyWith(quickActionSpacing: v)),
+                      valueLabel: e.quickActionSpacing == null
+                          ? '自动'
+                          : '${e.quickActionSpacing!.round()} dp',
+                    ),
+                    const Text(
+                      '空间不足时自动收紧间距；按钮保留可点击尺寸。',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                  if (e.type == PlayerPart.progress) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final style in const {
+                          PlayerProgressStyle.classic: '经典',
+                          PlayerProgressStyle.wave: '波浪',
+                          PlayerProgressStyle.segmented: '分段',
+                        }.entries)
+                          _pill(
+                            label: Text(style.value),
+                            selected: e.progressStyle == style.key,
+                            onSelected: (_) => draft.update(
+                              e.copyWith(progressStyle: style.key),
+                            ),
+                          ),
+                      ],
+                    ),
+                    _slider(
+                      '进度条粗细',
+                      e.progressThickness,
+                      1,
+                      8,
+                      (v) => draft.update(e.copyWith(progressThickness: v)),
+                    ),
+                    if (e.progressStyle == PlayerProgressStyle.wave) ...[
+                      _slider(
+                        '波浪振幅',
+                        e.waveAmplitude,
+                        0,
+                        8,
+                        (v) => draft.update(e.copyWith(waveAmplitude: v)),
+                      ),
+                      _slider(
+                        '波浪长度',
+                        e.waveLength,
+                        12,
+                        64,
+                        (v) => draft.update(e.copyWith(waveLength: v)),
+                      ),
+                    ],
+                  ],
                   _slider(
                     '透明度',
                     e.opacity,

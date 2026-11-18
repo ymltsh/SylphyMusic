@@ -30,6 +30,7 @@ import 'player_cover.dart';
 import 'settings_page.dart';
 import 'music_sources_panel.dart';
 import 'music_space_card.dart';
+import 'wide_card_ratio.dart';
 import 'landscape_navigation_rail.dart';
 import 'music_source_connection_page.dart';
 import 'quick_start_wizard.dart';
@@ -46,8 +47,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
   final BatchSelection _librarySelection = BatchSelection();
   int libraryView = 0;
-  bool albumCoverFlow = false;
-  bool playlistCoverFlow = false;
+  bool get albumCoverFlow => app.appearance.albumCoverFlow;
+  bool get playlistCoverFlow => app.appearance.playlistCoverFlow;
   bool playerCollapsed = false;
   late bool _defaultPlayerFab;
   bool? onboarding;
@@ -208,10 +209,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return PlaybackNotice(
-      playback: app.playback,
-      readError: () => app.playback.error,
-      child: _buildContent(context),
+    return ListenableBuilder(
+      listenable: app.desktopPreferences,
+      builder: (context, _) => PlaybackNotice(
+        playback: app.playback,
+        readError: () => app.playback.error,
+        child: _buildContent(context),
+      ),
     );
   }
 
@@ -484,7 +488,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             key: const ValueKey('album-cover-flow-toggle'),
             tooltip: albumCoverFlow ? '切换到列表' : '切换到 Cover Flow',
             isSelected: albumCoverFlow,
-            onPressed: () => setState(() => albumCoverFlow = !albumCoverFlow),
+            onPressed: () =>
+                _act(() => app.appearance.toggleCoverFlow(playlist: false)),
             icon: const Icon(Icons.view_carousel_outlined),
             selectedIcon: const Icon(Icons.view_list_rounded),
           ),
@@ -577,21 +582,25 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     VoidCallback onTap,
   ) {
     final scheme = Theme.of(context).colorScheme;
+    final compact = useWideCardRatio(
+      context,
+      app.desktopPreferences.compactPageCards,
+    );
     return Card.filled(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(compact ? 12 : 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 42,
-                    height: 42,
+                    width: compact ? 34 : 42,
+                    height: compact ? 34 : 42,
                     decoration: BoxDecoration(
                       color: scheme.primaryContainer,
                       borderRadius: BorderRadius.circular(14),
@@ -599,7 +608,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     child: Icon(
                       icon,
                       color: scheme.onPrimaryContainer,
-                      size: 23,
+                      size: compact ? 20 : 23,
                     ),
                   ),
                   const Spacer(),
@@ -610,13 +619,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: compact ? 6 : 14),
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleSmall
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 5),
+              SizedBox(height: compact ? 3 : 5),
               Text(
                 subtitle,
                 maxLines: 2,
@@ -632,7 +641,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   }
 
   Widget _personalHeading(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 24, 4, 12),
+    padding: useWideCardRatio(context, app.desktopPreferences.compactPageCards)
+        ? const EdgeInsets.fromLTRB(4, 14, 4, 8)
+        : const EdgeInsets.fromLTRB(4, 24, 4, 12),
     child: Text(
       title,
       style: Theme.of(context).textTheme.titleMedium
@@ -640,108 +651,124 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _personal() => Align(
-    alignment: Alignment.topCenter,
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1040),
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          16,
-          20,
-          _usesDockedPlayer(context) || playerCollapsed ? 32 : 116,
-        ),
-        children: [
-          MusicSpaceCard(
-            sources: app.sources,
-            playlistCount: app.playlists.length,
-            onTap: () => _openSources(),
+  Widget _personal() {
+    final compact = useWideCardRatio(
+      context,
+      app.desktopPreferences.compactPageCards,
+    );
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1040),
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            _usesDockedPlayer(context) || playerCollapsed ? 32 : 116,
           ),
-          _personalHeading('我的音乐'),
-          LayoutBuilder(
-            builder: (context, size) {
-              final columns = size.maxWidth >= 760 ? 4 : 2;
-              final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-              return GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: columns,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio:
-                    size.maxWidth /
-                    columns /
-                    (158 + (textScale - 1).clamp(0.0, 3.0) * 65),
+          children: [
+            MusicSpaceCard(
+              compact: compact,
+              sources: app.sources,
+              playlistCount: app.playlists.length,
+              onTap: () => _openSources(),
+            ),
+            _personalHeading('我的音乐'),
+            LayoutBuilder(
+              builder: (context, size) {
+                final dense = compact && size.maxWidth >= 620;
+                final columns = dense
+                    ? 4
+                    : size.maxWidth >= 760
+                    ? 4
+                    : 2;
+                final textScale =
+                    MediaQuery.textScalerOf(context).scale(14) / 14;
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: dense
+                      ? 116.0 + (textScale - 1).clamp(0.0, 3.0).toDouble() * 64
+                      : null,
+                  childAspectRatio:
+                      size.maxWidth /
+                      columns /
+                      (158 + (textScale - 1).clamp(0.0, 3.0) * 65),
+                  children: [
+                    _personalShortcut(
+                      Icons.history_rounded,
+                      '最近播放',
+                      '最多 ${ListeningHistory.maxEntries} 首播放记录',
+                      () => _open('最近播放', () => ListeningHistoryPage(app: app)),
+                    ),
+                    _personalShortcut(
+                      Icons.favorite_outline,
+                      '我的收藏',
+                      '喜欢的歌曲集中收藏',
+                      _favorites,
+                    ),
+                    _personalShortcut(
+                      Icons.library_music_outlined,
+                      '全部音乐',
+                      '浏览曲库中的所有歌曲',
+                      () => _library(0),
+                    ),
+                    _personalShortcut(
+                      Icons.download_outlined,
+                      '本地下载',
+                      '查看下载与缓存任务',
+                      _downloads,
+                    ),
+                  ],
+                );
+              },
+            ),
+            _personalHeading('音乐管理'),
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
                 children: [
-                  _personalShortcut(
-                    Icons.history_rounded,
-                    '最近播放',
-                    '最多 ${ListeningHistory.maxEntries} 首播放记录',
-                    () => _open('最近播放', () => ListeningHistoryPage(app: app)),
-                  ),
-                  _personalShortcut(
-                    Icons.favorite_outline,
-                    '我的收藏',
-                    '喜欢的歌曲集中收藏',
-                    _favorites,
-                  ),
-                  _personalShortcut(
-                    Icons.library_music_outlined,
-                    '全部音乐',
-                    '浏览曲库中的所有歌曲',
-                    () => _library(0),
-                  ),
-                  _personalShortcut(
-                    Icons.download_outlined,
-                    '本地下载',
-                    '查看下载与缓存任务',
-                    _downloads,
-                  ),
-                ],
-              );
-            },
-          ),
-          _personalHeading('音乐管理'),
-          Card.outlined(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 6,
-                  ),
-                  leading: const Icon(Icons.storage_outlined),
-                  title: const Text('缓存与存储'),
-                  subtitle: const Text('查看空间占用，管理离线资源'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CacheStoragePage(app: app),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 6,
+                    ),
+                    leading: const Icon(Icons.storage_outlined),
+                    title: const Text('缓存与存储'),
+                    subtitle: const Text('查看空间占用，管理离线资源'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CacheStoragePage(app: app),
+                      ),
                     ),
                   ),
-                ),
-                const Divider(height: 1, indent: 62, endIndent: 18),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 6,
+                  const Divider(height: 1, indent: 62, endIndent: 18),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 6,
+                    ),
+                    leading: const Icon(Icons.block_outlined),
+                    title: const Text('歌曲黑名单'),
+                    subtitle: const Text('管理不希望在曲库中显示的歌曲'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _showBlacklist,
                   ),
-                  leading: const Icon(Icons.block_outlined),
-                  title: const Text('歌曲黑名单'),
-                  subtitle: const Text('管理不希望在曲库中显示的歌曲'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _showBlacklist,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _tracks(
     List<Track> tracks, {
@@ -935,7 +962,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               tooltip: playlistCoverFlow ? '切换到歌单网格' : '切换到歌单 Cover Flow',
               isSelected: playlistCoverFlow,
               onPressed: () =>
-                  setState(() => playlistCoverFlow = !playlistCoverFlow),
+                  _act(() => app.appearance.toggleCoverFlow(playlist: true)),
               icon: const Icon(Icons.view_carousel_outlined),
               selectedIcon: const Icon(Icons.grid_view_rounded),
             ),
@@ -994,6 +1021,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 emptyMessage: '还没有歌单',
               )
             : PlaylistReorderGrid(
+                compact: useWideCardRatio(
+                  context,
+                  app.desktopPreferences.compactPageCards,
+                ),
                 playlists: app.playlists,
                 onMove: app.movePlaylistDisplay,
                 cardBuilder: (context, playlist) => PlaylistGridCard(

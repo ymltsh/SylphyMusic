@@ -12,10 +12,12 @@ class MusicSpaceCard extends StatefulWidget {
     super.key,
     required this.sources,
     required this.playlistCount,
+    this.compact = false,
     required this.onTap,
   });
 
   final List<SourceProfile> sources;
+  final bool compact;
   final int playlistCount;
   final VoidCallback onTap;
 
@@ -151,12 +153,12 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
               child: InkWell(
                 onTap: widget.onTap,
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(widget.compact ? 14 : 20),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final deckWidth = (constraints.maxWidth * .36).clamp(
                         86.0,
-                        156.0,
+                        widget.compact ? 120.0 : 156.0,
                       );
                       return Row(
                         children: [
@@ -170,21 +172,21 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
                                   color: colors.onSurface,
                                   size: 30,
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: widget.compact ? 6 : 12),
                                 Text(
                                   '我的音乐空间',
                                   style: theme.textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                SizedBox(height: widget.compact ? 4 : 8),
                                 Text(
                                   '${widget.playlistCount} 个歌单 · ${sources.length} 个音乐来源',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colors.onSurfaceVariant,
                                   ),
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: widget.compact ? 6 : 12),
                                 Row(
                                   children: [
                                     Flexible(
@@ -207,7 +209,7 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
                           ExcludeSemantics(
                             child: SizedBox(
                               width: deckWidth,
-                              height: 146,
+                              height: widget.compact ? 110 : 146,
                               child: sources.isEmpty
                                   ? Center(
                                       child: Icon(

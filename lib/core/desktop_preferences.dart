@@ -16,6 +16,7 @@ class DesktopPreferences extends ChangeNotifier {
   bool shortcutsEnabled = true;
   bool showVolume = true;
   bool showExtraControls = true;
+  bool compactPageCards = false;
   String? fontFamily;
   String fontLabel = '系统默认';
   String? _fontName;
@@ -33,6 +34,7 @@ class DesktopPreferences extends ChangeNotifier {
     shortcutsEnabled = await db.setting('desktop_shortcuts') != 'false';
     showVolume = await db.setting('desktop_volume') != 'false';
     showExtraControls = await db.setting('desktop_extra_controls') != 'false';
+    compactPageCards = await db.setting('desktop_compact_page_cards') == 'true';
     if (!Platform.isWindows) return;
     final name = await db.setting('desktop_font_file');
     if (name == null || !_managedFont.hasMatch(name)) return;
@@ -46,26 +48,32 @@ class DesktopPreferences extends ChangeNotifier {
     }
   }
 
-  Future<void> update({bool? shortcuts, bool? volume, bool? extraControls}) =>
-      _queue(() async {
-        await db.db.transaction((tx) async {
-          for (final entry in <String, bool?>{
-            'desktop_shortcuts': shortcuts,
-            'desktop_volume': volume,
-            'desktop_extra_controls': extraControls,
-          }.entries) {
-            if (entry.value != null)
-              await tx.rawInsert(
-                'INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)',
-                [entry.key, '${entry.value}'],
-              );
-          }
-        });
-        shortcutsEnabled = shortcuts ?? shortcutsEnabled;
-        showVolume = volume ?? showVolume;
-        showExtraControls = extraControls ?? showExtraControls;
-        if (!_closed) notifyListeners();
-      });
+  Future<void> update({
+    bool? shortcuts,
+    bool? volume,
+    bool? extraControls,
+    bool? compactCards,
+  }) => _queue(() async {
+    await db.db.transaction((tx) async {
+      for (final entry in <String, bool?>{
+        'desktop_shortcuts': shortcuts,
+        'desktop_volume': volume,
+        'desktop_extra_controls': extraControls,
+        'desktop_compact_page_cards': compactCards,
+      }.entries) {
+        if (entry.value != null)
+          await tx.rawInsert(
+            'INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)',
+            [entry.key, '${entry.value}'],
+          );
+      }
+    });
+    shortcutsEnabled = shortcuts ?? shortcutsEnabled;
+    showVolume = volume ?? showVolume;
+    showExtraControls = extraControls ?? showExtraControls;
+    compactPageCards = compactCards ?? compactPageCards;
+    if (!_closed) notifyListeners();
+  });
 
   Future<void> _loadFont(File file, String name) async {
     final bytes = await file.readAsBytes();

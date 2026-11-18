@@ -179,6 +179,7 @@ class RecommendationShowcase extends StatefulWidget {
     required this.app,
     required this.mix,
     this.detailed = false,
+    this.fillHeight = false,
     this.onTap,
     this.onPlay,
     this.footerActions = const [],
@@ -188,6 +189,7 @@ class RecommendationShowcase extends StatefulWidget {
   final SylphyApp app;
   final DailyMix mix;
   final bool detailed;
+  final bool fillHeight;
   final VoidCallback? onTap;
   final VoidCallback? onPlay;
   final List<Widget> footerActions;
@@ -231,19 +233,27 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
         ? '今天从你的音乐库挑出一些熟悉的旋律，也留一点空间给新的发现。'
         : mix.introduction.trim();
 
-    Widget description() => Column(
+    Widget description({bool dense = false}) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (mix.llmSucceeded) ...[
+        if (mix.llmSucceeded && !dense) ...[
           Icon(Icons.auto_awesome_rounded, color: scheme.primary, size: 26),
           const SizedBox(height: 10),
         ],
         Text(
           mix.title,
+          maxLines: dense
+              ? 1
+              : widget.fillHeight
+              ? 2
+              : null,
+          overflow: widget.fillHeight ? TextOverflow.ellipsis : null,
           style:
               (detailed
                       ? theme.textTheme.headlineSmall
+                      : dense
+                      ? theme.textTheme.titleMedium
                       : theme.textTheme.titleLarge)
                   ?.copyWith(fontWeight: FontWeight.w700),
         ),
@@ -258,7 +268,13 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
         const SizedBox(height: 10),
         Text(
           intro,
-          maxLines: detailed ? null : 3,
+          maxLines: dense
+              ? 1
+              : detailed
+              ? null
+              : widget.fillHeight
+              ? 2
+              : 3,
           overflow: detailed ? TextOverflow.visible : TextOverflow.ellipsis,
           style: theme.textTheme.bodyMedium,
         ),
@@ -327,13 +343,32 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
               child: InkWell(
                 onTap: onTap,
                 child: Padding(
-                  padding: EdgeInsets.all(detailed ? 24 : 18),
+                  padding: EdgeInsets.all(
+                    detailed
+                        ? 24
+                        : widget.fillHeight
+                        ? 14
+                        : 18,
+                  ),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 580;
+                      final dense = widget.fillHeight;
+                      final naturalDeckSize = (constraints.maxWidth * .34)
+                          .clamp(96.0, 158.0);
+                      final textScale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
                       final deckSize = detailed
                           ? (wide ? 238.0 : 192.0)
-                          : (constraints.maxWidth * .34).clamp(96.0, 158.0);
+                          : dense
+                          ? math.min(
+                              naturalDeckSize,
+                              math.max(
+                                40.0,
+                                constraints.maxHeight - 56 * textScale,
+                              ),
+                            )
+                          : naturalDeckSize;
                       final deck = Semantics(
                         label: '每日精选的多张歌曲封面',
                         image: true,
@@ -365,7 +400,7 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             if (detailed) ...[deck, const SizedBox(width: 22)],
-                            Expanded(child: description()),
+                            Expanded(child: description(dense: dense)),
                             if (!detailed) ...[const SizedBox(width: 6), deck],
                           ],
                         );
@@ -374,7 +409,10 @@ class _RecommendationShowcaseState extends State<RecommendationShowcase> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          content,
+                          if (widget.fillHeight)
+                            Expanded(child: content)
+                          else
+                            content,
                           if (detailed) ...[
                             const SizedBox(height: 12),
                             LetterImageActions(
