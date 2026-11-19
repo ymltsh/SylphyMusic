@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.75",
-    "build": 88,
-    "name": "风灵音乐 v1.0.75",
-    "date": "2026-11-18",
-    "notes": "- 优化窄长横屏下的首页卡片比例：每日精选与专辑精选在保持对齐的同时，按可用高度调整显示大小，避免单张专辑封面把页面撑得过高。\n- 专辑列数随可用宽度和高度调整，封面保持方形；每日精选的封面组、标题和摘要采用更紧凑的预览，点击仍可查看完整来信。\n- 开启“横屏卡片比例优化”时，顶部欢迎区改为文字与探索按钮横向排列，减少纵向占用。\n- 保留大字号下的可读性和页面滚动；关闭优化或使用竖屏时沿用原布局。\n",
+    "version": "1.0.76",
+    "build": 89,
+    "name": "风灵音乐 v1.0.76",
+    "date": "2026-11-20",
+    "notes": "- 设置按使用场景重新分组，并新增搜索。输入「缓存」「密钥」或「羽化」，可以直接打开相关设置。\n- 「下载与缓存」新增用量概览，可查看音频、封面和歌词的占用，以及缓存上限。\n- 首次引导的「音乐笔友」步骤可选填称呼和个人简介，之后也可在「关于我的音乐笔友 → 日记与记忆」修改。开启模型增强时，已填写的资料会随聊天和新推荐请求发送到你配置的模型。\n- 播放页编辑器新增沉浸封面「四周羽化」，可调节中央清晰区域。\n- 添加音乐源时，选项底色标出所选类型，音源图标保持完整。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76%2B89/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76%2B89/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76%2B89/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76%2B89/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76%2B89/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.75+88"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.76+89"
   },
   "history": [
+    {
+      "version": "1.0.75",
+      "build": 88,
+      "name": "风灵音乐 v1.0.75",
+      "date": "2026-11-18",
+      "notes": "- 优化窄长横屏下的首页卡片比例：每日精选与专辑精选在保持对齐的同时，按可用高度调整显示大小，避免单张专辑封面把页面撑得过高。\n- 专辑列数随可用宽度和高度调整，封面保持方形；每日精选的封面组、标题和摘要采用更紧凑的预览，点击仍可查看完整来信。\n- 开启“横屏卡片比例优化”时，顶部欢迎区改为文字与探索按钮横向排列，减少纵向占用。\n- 保留大字号下的可读性和页面滚动；关闭优化或使用竖屏时沿用原布局。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.75%2B88/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.75+88"
+    },
     {
       "version": "1.0.74",
       "build": 87,
