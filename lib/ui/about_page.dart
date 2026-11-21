@@ -143,6 +143,27 @@ class _AboutPageState extends State<AboutPage> {
                             _AboutPill(icon: Icons.code_rounded, label: '开源'),
                           ],
                         ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            shape: const StadiumBorder(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                          ),
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => AppUpdateDialog(
+                              onCheck: widget.onCheckForUpdates,
+                              mirror: widget.updateMirror,
+                            ),
+                          ),
+                          icon: const SettingsIcon(
+                            Icons.system_update_alt_rounded,
+                          ),
+                          label: const Text('检查更新'),
+                        ),
                       ],
                     ),
                   ),
@@ -214,7 +235,7 @@ class _AboutPageState extends State<AboutPage> {
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
-                      _AboutSectionHeader(title: '应用信息', subtitle: '版本、更新与许可证'),
+                      _AboutSectionHeader(title: '应用信息', subtitle: '版本与许可证'),
                       FutureBuilder<AppVersion>(
                         future: _version,
                         builder: (context, snapshot) => ListTile(
@@ -228,21 +249,6 @@ class _AboutPageState extends State<AboutPage> {
                                 : snapshot.hasData
                                 ? snapshot.data.toString()
                                 : '正在读取版本…',
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 1, indent: 72, endIndent: 16),
-                      ListTile(
-                        leading: const _AboutLeadingIcon(
-                          icon: Icons.system_update_alt_rounded,
-                        ),
-                        title: const Text('检查更新'),
-                        trailing: const SettingsIcon(Icons.chevron_right),
-                        onTap: () => showDialog<void>(
-                          context: context,
-                          builder: (_) => AppUpdateDialog(
-                            onCheck: widget.onCheckForUpdates,
-                            mirror: widget.updateMirror,
                           ),
                         ),
                       ),

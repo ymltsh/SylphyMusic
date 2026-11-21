@@ -88,15 +88,16 @@ void main() {
     tester,
   ) async {
     await showAbout(tester);
-    await tester.scrollUntilVisible(find.text('1.0.0+12'), 200);
-    expect(find.text('1.0.0+12'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('检查更新'), 150);
-    await tester.tap(find.text('检查更新'));
+    final updateButton = find.widgetWithText(FilledButton, '检查更新');
+    await tester.scrollUntilVisible(updateButton, 150);
+    await tester.tap(updateButton);
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('尚未发布可用版本'), findsOneWidget);
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('1.0.0+12'), 200);
+    expect(find.text('1.0.0+12'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('开源许可证'), 150);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开源许可证'));

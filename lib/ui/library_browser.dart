@@ -25,6 +25,37 @@ double libraryListBottomPadding({
   required double overlayPadding,
 }) => (basePadding ?? (viewportWidth > 750 ? 24.0 : 96.0)) + overlayPadding;
 
+/// Actions are produced by the existing LibraryBrowser State. The collapsed
+/// menu only forwards them, keeping paging and playback in one place.
+class LibraryCollapsedActions {
+  const LibraryCollapsedActions({
+    required this.total,
+    required this.countUnit,
+    required this.playAll,
+    required this.locateCurrent,
+    required this.batchActive,
+    required this.selectionCount,
+    required this.allSelected,
+    required this.exitSelection,
+    required this.toggleSelectAll,
+  });
+
+  final int? total;
+  final String countUnit;
+  final VoidCallback? playAll;
+  final VoidCallback? locateCurrent;
+  final bool batchActive;
+  final int selectionCount;
+  final bool allSelected;
+  final VoidCallback? exitSelection;
+  final VoidCallback? toggleSelectAll;
+}
+
+typedef LibraryCollapsedControlsBuilder = Widget Function(
+  BuildContext context,
+  LibraryCollapsedActions actions,
+);
+
 class LibraryBrowser extends StatefulWidget {
   const LibraryBrowser({
     super.key,
@@ -33,6 +64,8 @@ class LibraryBrowser extends StatefulWidget {
     required this.onAction,
     this.songActions,
     this.viewControls,
+    this.compactToolbar = false,
+    this.collapsedControlsBuilder,
     this.coverFlow = false,
     this.bottomPadding,
     this.bottomOverlayPadding = 0,
@@ -45,6 +78,8 @@ class LibraryBrowser extends StatefulWidget {
   final Future<void> Function(String, Track) onAction;
   final Widget? songActions;
   final Widget? viewControls;
+  final bool compactToolbar;
+  final LibraryCollapsedControlsBuilder? collapsedControlsBuilder;
   final bool coverFlow;
 
   /// Space owned by an overlay; a docked route player needs no extra reserve.
@@ -710,66 +745,113 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
     ),
   );
 
-  Widget _withViewControls(Widget content, {CatalogPage? result}) => Column(
-    children: [
-      if (widget.selected == null &&
-          !widget.query.blocked &&
-          widget.batchSelection?.active == true)
-        ListTile(
-          key: const ValueKey('batch-summary'),
-          contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 12),
-          leading: IconButton(
-            tooltip: '退出多选',
-            icon: const Icon(Icons.close),
-            onPressed: widget.batchSelection!.clear,
-          ),
-          title: Text(
-            '已选 ${widget.batchSelection!.count} '
-            '${widget.query.countUnit}',
-          ),
-          trailing: TextButton(
-            onPressed: result == null
-                ? null
-                : widget.batchSelection!.all
-                ? widget.batchSelection!.deselectAll
-                : () => widget.batchSelection!.selectAll(result.total),
-            child: Text(widget.batchSelection!.all ? '取消全选' : '全选'),
-          ),
-        )
-      else if (widget.selected == null && !widget.query.blocked)
-        ListTile(
-          key: const ValueKey('song-summary'),
-          contentPadding: const EdgeInsetsDirectional.only(start: 16, end: 16),
-          leading: IconButton(
-            key: const ValueKey('play-all-library-tracks'),
-            tooltip: '播放全部',
-            icon: const Icon(Icons.play_circle),
-            onPressed: result == null || result.total == 0
-                ? null
-                : () => _act(_play),
-          ),
-          title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.query.view == 0)
-                SizedBox.square(
-                  dimension: 48,
-                  child: IconButton(
-                    key: const ValueKey('locate-current-library-track'),
-                    tooltip: '定位当前播放歌曲',
-                    icon: const Icon(Icons.gps_fixed_rounded, size: 24),
-                    onPressed: result == null || result.total == 0
-                        ? null
-                        : () => _act(_locateCurrentTrack),
+  Widget _withViewControls(Widget content, {CatalogPage? result}) {
+    final batch = widget.batchSelection;
+    final canAct = result != null && result.total > 0;
+    final folded =
+        widget.compactToolbar &&
+        widget.collapsedControlsBuilder != null &&
+        widget.selected == null &&
+        !widget.query.blocked;
+    final foldedActions = LibraryCollapsedActions(
+      total: result?.total,
+      countUnit: widget.query.countUnit,
+      playAll: canAct ? () => _act(_play) : null,
+      locateCurrent: canAct && widget.query.view == 0
+          ? () => _act(_locateCurrentTrack)
+          : null,
+      batchActive: batch?.active ?? false,
+      selectionCount: batch?.count ?? 0,
+      allSelected: batch?.all ?? false,
+      exitSelection: batch?.active == true ? batch?.clear : null,
+      toggleSelectAll: !canAct || batch?.active != true
+          ? null
+          : batch!.all
+          ? batch.deselectAll
+          : () => batch.selectAll(result!.total),
+    );
+    final expanded = Column(
+      key: const ValueKey('library-expanded-controls'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.selected == null &&
+            !widget.query.blocked &&
+            batch?.active == true)
+          ListTile(
+            key: const ValueKey('batch-summary'),
+            contentPadding: const EdgeInsetsDirectional.only(
+              start: 16,
+              end: 12,
+            ),
+            leading: IconButton(
+              tooltip: '退出多选',
+              icon: const Icon(Icons.close),
+              onPressed: batch!.clear,
+            ),
+            title: Text('已选 ${batch!.count} ${widget.query.countUnit}'),
+            trailing: TextButton(
+              onPressed: result == null
+                  ? null
+                  : batch!.all
+                  ? batch.deselectAll
+                  : () => batch.selectAll(result.total),
+              child: Text(batch!.all ? '取消全选' : '全选'),
+            ),
+          )
+        else if (widget.selected == null && !widget.query.blocked)
+          ListTile(
+            key: const ValueKey('song-summary'),
+            contentPadding: const EdgeInsetsDirectional.only(
+              start: 16,
+              end: 16,
+            ),
+            leading: IconButton(
+              key: const ValueKey('play-all-library-tracks'),
+              tooltip: '播放全部',
+              icon: const Icon(Icons.play_circle),
+              onPressed: canAct ? () => _act(_play) : null,
+            ),
+            title: Text(result == null ? '—' : '${result.total}', maxLines: 1),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.query.view == 0)
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton(
+                      key: const ValueKey('locate-current-library-track'),
+                      tooltip: '定位当前播放歌曲',
+                      icon: const Icon(Icons.gps_fixed_rounded, size: 24),
+                      onPressed: canAct
+                          ? () => _act(_locateCurrentTrack)
+                          : null,
+                    ),
                   ),
-                ),
-              if (widget.songActions != null) widget.songActions!,
-            ],
+                if (widget.songActions != null) widget.songActions!,
+              ],
+            ),
           ),
+        if (widget.viewControls != null) widget.viewControls!,
+      ],
+    );
+    return Column(
+      children: [
+        AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          child: folded
+              ? KeyedSubtree(
+                  key: const ValueKey('library-collapsed-controls'),
+                  child: widget.collapsedControlsBuilder!(
+                    context,
+                    foldedActions,
+                  ),
+                )
+              : expanded,
         ),
-      if (widget.viewControls != null) widget.viewControls!,
-      Expanded(child: content),
-    ],
-  );
+        Expanded(child: content),
+      ],
+    );
+  }
 }

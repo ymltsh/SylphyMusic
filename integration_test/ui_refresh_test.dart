@@ -668,13 +668,14 @@ void main() {
           findsOneWidget,
         );
         await capture('about-mobile');
+        final updateButton = find.widgetWithText(FilledButton, '检查更新');
+        await tester.scrollUntilVisible(updateButton, 150);
+        expect(updateButton, findsOneWidget);
         final installed = await AppVersion.installed();
         expect(installed.build, greaterThan(0));
         await tester.scrollUntilVisible(find.text('$installed'), 250);
         await tester.pumpAndSettle();
         await waitFor(find.text('$installed'));
-        await tester.scrollUntilVisible(find.text('检查更新'), 150);
-        expect(find.text('检查更新'), findsOneWidget);
         await tester.scrollUntilVisible(find.text('开源许可证'), 150);
         await tester.pumpAndSettle();
         await tester.tap(find.text('开源许可证'));

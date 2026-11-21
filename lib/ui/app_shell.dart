@@ -34,6 +34,7 @@ import 'landscape_navigation_rail.dart';
 import 'music_source_connection_page.dart';
 import 'quick_start_wizard.dart';
 import '../data/library_catalog.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 import 'design_system/ui_style_availability.dart';
 import 'design_system/miuix_adaptive.dart';
 import 'miuix/miuix_ambient_background.dart';
@@ -60,6 +61,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   bool? onboarding;
   bool descending = false;
   String sort = 'name';
+  bool _toolsCollapsed = false;
+  bool? _queuedFold;
+  int? _queuedFoldTab;
   static const labels = ['首页', '音乐库', '歌单', '我的'];
   static const icons = [
     Icons.home_outlined,
@@ -179,6 +183,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     _librarySelection.clear();
     setState(() {
       tab = 1;
+      _toolsCollapsed = false;
       libraryView = app.appearance.libraryCategories.contains(view)
           ? view
           : app.appearance.libraryCategories.first;
@@ -224,6 +229,56 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         readError: () => app.playback.error,
         child: _buildContent(context),
       ),
+    );
+  }
+
+  // Scroll notifications arrive during layout; delay UI changes until the
+  // next frame so a gesture cannot call setState during build.
+  bool _onToolScroll(ScrollNotification notification) {
+    if ((tab != 1 && tab != 2) ||
+        notification.depth != 0 ||
+        notification.metrics.axis != Axis.vertical ||
+        notification is! ScrollUpdateNotification ||
+        notification.dragDetails == null) {
+      return false;
+    }
+    final next = sylphyToolbarFoldDecision(
+      folded: _queuedFold ?? _toolsCollapsed,
+      scrollOffset: notification.metrics.pixels,
+      scrollDelta: notification.scrollDelta ?? 0,
+    );
+    if (next != null) _queueToolFold(next);
+    return false;
+  }
+
+  void _queueToolFold(bool next) {
+    if (_queuedFoldTab == null && next == _toolsCollapsed) return;
+    _queuedFold = next;
+    if (_queuedFoldTab != null) return;
+    _queuedFoldTab = tab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _queuedFold;
+      final targetTab = _queuedFoldTab;
+      _queuedFold = null;
+      _queuedFoldTab = null;
+      if (mounted &&
+          targetTab == tab &&
+          target != null &&
+          target != _toolsCollapsed) {
+        setState(() => _toolsCollapsed = target);
+      }
+    });
+  }
+
+  Widget _scrollAwarePage(double dockReserve, bool compactLayout) {
+    final page = _page(
+      dockReserve,
+      toolbarFolded: compactLayout && _toolsCollapsed,
+    );
+    if (tab != 1 && tab != 2) return page;
+    return NotificationListener<ScrollNotification>(
+      onNotification: compactLayout ? _onToolScroll : null,
+      child: page,
     );
   }
 
@@ -274,10 +329,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           // Navigation width does not force the user's normal floating bar
           // into the dedicated PC footer.
           child: dockPlayer
-              ? _page(dockReserve)
+              ? _scrollAwarePage(dockReserve, !wide)
               : Stack(
                   children: [
-                    Positioned.fill(child: _page(dockReserve)),
+                    Positioned.fill(
+                      child: _scrollAwarePage(dockReserve, !wide),
+                    ),
                     Positioned(
                       left: 12,
                       right: 12,
@@ -322,7 +379,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     );
     void selectDestination(int value) {
       if (value != 1) _librarySelection.clear();
-      setState(() => tab = value);
+      setState(() {
+        tab = value;
+        _toolsCollapsed = false;
+      });
     }
 
     return MiuixAmbientBackground(
@@ -342,39 +402,25 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     ? scheme.surface.withValues(alpha: .90)
                     : null,
                 surfaceTintColor: solidBackground ? Colors.transparent : null,
+                flexibleSpace: !solidBackground && !customBackground
+                    ? const SylphyGradientHeader()
+                    : null,
                 title: Text(
                   tab == 0 ? appDisplayName() : labels[tab],
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 actionsPadding: const EdgeInsetsDirectional.only(end: 16),
                 actions: [
-                  SizedBox.square(
-                    dimension: 48,
-                    child: IconButton(
-                      tooltip: '搜索',
-                      onPressed: _openSearch,
-                      icon: miuixPortrait
-                          ? MiuixIcon(
-                              icon: Icons.search_rounded,
-                              size: 25,
-                              tint: MiuixTheme.of(context).colors.onSurface,
-                            )
-                          : const Icon(Icons.search),
-                    ),
+                  SylphyHeaderAction(
+                    icon: Icons.search_rounded,
+                    tooltip: '搜索',
+                    onPressed: _openSearch,
                   ),
-                  SizedBox.square(
-                    dimension: 48,
-                    child: IconButton(
-                      tooltip: '设置',
-                      onPressed: _openSettings,
-                      icon: miuixPortrait
-                          ? MiuixIcon(
-                              icon: Icons.settings_rounded,
-                              size: 25,
-                              tint: MiuixTheme.of(context).colors.onSurface,
-                            )
-                          : const Icon(Icons.settings_outlined),
-                    ),
+                  const SizedBox(width: 6),
+                  SylphyHeaderAction(
+                    icon: Icons.settings_rounded,
+                    tooltip: '设置',
+                    onPressed: _openSettings,
                   ),
                 ],
               ),
@@ -579,7 +625,146 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ],
   );
 
-  Widget _page(double dockReserve) {
+  Widget _collapsedLibraryToolbar(LibraryCollapsedActions actions) {
+    final titleColor = SylphyMiuixStyle.enabled(context)
+        ? MiuixTheme.of(context).colors.onSurface
+        : Theme.of(context).colorScheme.onSurface;
+    final batchActive = actions.batchActive;
+    return Padding(
+      key: const ValueKey('library-folded-controls'),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              batchActive
+                  ? '已选 ${actions.selectionCount} ${actions.countUnit}'
+                  : '${actions.total ?? '—'} ${actions.countUnit}',
+              maxLines: 1,
+              style: TextStyle(color: titleColor, fontWeight: FontWeight.w600),
+            ),
+          ),
+          SylphyFoldedMoreMenu(
+            tooltip: '音乐库更多操作',
+            items: [
+              if (batchActive) ...[
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.close_rounded),
+                  onPressed: actions.exitSelection,
+                  child: const Text('退出多选'),
+                ),
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.select_all_rounded),
+                  onPressed: actions.toggleSelectAll,
+                  child: Text(actions.allSelected ? '取消全选' : '全选'),
+                ),
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.more_horiz_rounded),
+                  onPressed: actions.selectionCount == 0
+                      ? null
+                      : () => unawaited(_libraryBatchActions()),
+                  child: const Text('多选操作'),
+                ),
+                const Divider(height: 1),
+              ] else ...[
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.play_circle_rounded),
+                  onPressed: actions.playAll,
+                  child: const Text('播放全部'),
+                ),
+                if (libraryView == 0)
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.gps_fixed_rounded),
+                    onPressed: actions.locateCurrent,
+                    child: const Text('定位当前播放歌曲'),
+                  ),
+                const Divider(height: 1),
+              ],
+              SubmenuButton(
+                leadingIcon: const Icon(Icons.library_music_rounded),
+                menuChildren: [
+                  for (final category in app.appearance.libraryCategories)
+                    MenuItemButton(
+                      leadingIcon: Icon(
+                        Appearance.libraryCategoryIcons[category],
+                      ),
+                      trailingIcon: category == libraryView
+                          ? const Icon(Icons.check_rounded)
+                          : null,
+                      onPressed: () {
+                        _librarySelection.clear();
+                        setState(() {
+                          libraryView = category;
+                          _toolsCollapsed = false;
+                        });
+                      },
+                      child: Text(Appearance.libraryCategoryNames[category]),
+                    ),
+                ],
+                child: const Text('分类'),
+              ),
+              SubmenuButton(
+                leadingIcon: const Icon(Icons.sort_rounded),
+                menuChildren: [
+                  for (final (value, label) in const [
+                    ('name', '名称'),
+                    ('artist', '艺术家'),
+                    ('album', '专辑'),
+                    ('duration', '时长'),
+                    ('year', '年份'),
+                  ])
+                    MenuItemButton(
+                      trailingIcon: sort == value
+                          ? const Icon(Icons.check_rounded)
+                          : null,
+                      onPressed: () {
+                        _librarySelection.clear();
+                        setState(() {
+                          sort = value;
+                          _toolsCollapsed = false;
+                        });
+                      },
+                      child: Text(label),
+                    ),
+                ],
+                child: const Text('排序'),
+              ),
+              MenuItemButton(
+                leadingIcon: Icon(
+                  descending
+                      ? Icons.arrow_downward_rounded
+                      : Icons.arrow_upward_rounded,
+                ),
+                onPressed: () {
+                  _librarySelection.clear();
+                  setState(() {
+                    descending = !descending;
+                    _toolsCollapsed = false;
+                  });
+                },
+                child: Text(descending ? '改为升序' : '改为降序'),
+              ),
+              if (libraryView == 1 && !batchActive)
+                MenuItemButton(
+                  leadingIcon: const Icon(Icons.view_carousel_rounded),
+                  onPressed: () {
+                    setState(() => _toolsCollapsed = false);
+                    unawaited(
+                      _act(
+                        () => app.appearance.toggleCoverFlow(playlist: false),
+                      ),
+                    );
+                  },
+                  child: Text(albumCoverFlow ? '切换到列表' : '切换到 Cover Flow'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _page(double dockReserve, {required bool toolbarFolded}) {
     switch (tab) {
       case 0:
         return HomePage(
@@ -613,10 +798,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 libraryView == 1 && albumCoverFlow && !_librarySelection.active,
             viewControls: _libraryFilterBar(),
             songActions: _sortControls(),
+            compactToolbar: toolbarFolded,
+            collapsedControlsBuilder: (context, actions) =>
+                _collapsedLibraryToolbar(actions),
           ),
         );
       case 2:
-        return _playlists(dockReserve);
+        return _playlists(dockReserve, toolbarFolded: toolbarFolded);
       default:
         return _personal(dockReserve);
     }
@@ -1010,106 +1198,177 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     if (success) selection.clear();
   }
 
-  Widget _playlists(double dockReserve) => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
-          children: [
-            FilledButton.icon(
-              key: const ValueKey('new-playlist'),
-              style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+  Widget _collapsedPlaylistToolbar() {
+    final titleColor = SylphyMiuixStyle.enabled(context)
+        ? MiuixTheme.of(context).colors.onSurface
+        : Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      key: const ValueKey('playlist-folded-controls'),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${app.playlists.length} 个歌单',
+              style: TextStyle(color: titleColor, fontWeight: FontWeight.w600),
+            ),
+          ),
+          SylphyFoldedMoreMenu(
+            tooltip: '歌单更多操作',
+            items: [
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.add_rounded),
+                onPressed: _newPlaylist,
+                child: const Text('新建歌单'),
               ),
-              onPressed: _newPlaylist,
-              icon: const Icon(Icons.add),
-              label: const Text('新建歌单'),
-            ),
-            const Spacer(),
-            IconButton(
-              tooltip: playlistCoverFlow ? '切换到歌单网格' : '切换到歌单 Cover Flow',
-              isSelected: playlistCoverFlow,
-              onPressed: () =>
-                  _act(() => app.appearance.toggleCoverFlow(playlist: true)),
-              icon: const Icon(Icons.view_carousel_outlined),
-              selectedIcon: const Icon(Icons.grid_view_rounded),
-            ),
-            IconButton(
-              tooltip: '同步云歌单',
-              onPressed: app.busy
-                  ? null
-                  : () => _act(() async {
-                      await app.cloud.syncAll();
-                      await app.reload();
-                    }),
-              icon: const Icon(Icons.cloud_sync_outlined),
-            ),
-          ],
-        ),
-      ),
-      Expanded(
-        child: app.playlists.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.queue_music_rounded,
-                      size: 56,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('还没有歌单'),
-                    const SizedBox(height: 4),
-                    const Text('创建一个歌单，收纳喜欢的音乐。'),
-                  ],
+              MenuItemButton(
+                leadingIcon: Icon(
+                  playlistCoverFlow
+                      ? Icons.grid_view_rounded
+                      : Icons.view_carousel_rounded,
                 ),
-              )
-            : playlistCoverFlow
-            ? CoverFlowView(
-                key: const ValueKey('playlist-cover-flow'),
-                itemCount: app.playlists.length,
-                coverBuilder: (context, index, size) => PlaylistCoverFlowArt(
-                  app: app,
-                  playlist: app.playlists[index],
-                  size: size,
-                ),
-                titleBuilder: (index) => app.playlists[index].name,
-                subtitleBuilder: (index) {
-                  final playlist = app.playlists[index];
-                  return switch (playlist.kind) {
-                    PlaylistKind.favorites => '我的收藏',
-                    PlaylistKind.local => '本地歌单',
-                    PlaylistKind.cloud =>
-                      '云端 · ${_sourceName(playlist.sourceId ?? '')}',
-                  };
+                onPressed: () {
+                  setState(() => _toolsCollapsed = false);
+                  unawaited(
+                    _act(() => app.appearance.toggleCoverFlow(playlist: true)),
+                  );
                 },
-                onActivate: (index) => _playlistDetails(app.playlists[index]),
-                bottomPadding: 84 + dockReserve,
-                emptyMessage: '还没有歌单',
-              )
-            : PlaylistReorderGrid(
-                bottomOverlayPadding: dockReserve,
-                compact: useWideCardRatio(
-                  context,
-                  app.desktopPreferences.compactPageCards,
-                ),
-                playlists: app.playlists,
-                onMove: app.movePlaylistDisplay,
-                cardBuilder: (context, playlist) => PlaylistGridCard(
-                  key: ValueKey('playlist/${playlist.id}'),
-                  app: app,
-                  playlist: playlist,
-                  sourceName: _sourceName(playlist.sourceId ?? ''),
-                  onOpen: () => _playlistDetails(playlist),
-                  onAction: (value) => _playlistAction(value, playlist),
-                ),
+                child: Text(playlistCoverFlow ? '切换到歌单网格' : '切换到 Cover Flow'),
               ),
+              MenuItemButton(
+                leadingIcon: const Icon(Icons.cloud_sync_rounded),
+                onPressed: app.busy
+                    ? null
+                    : () => unawaited(
+                        _act(() async {
+                          await app.cloud.syncAll();
+                          await app.reload();
+                        }),
+                      ),
+                child: const Text('同步云歌单'),
+              ),
+            ],
+          ),
+        ],
       ),
-    ],
-  );
+    );
+  }
+
+  Widget _playlists(double dockReserve, {required bool toolbarFolded}) =>
+      Column(
+        children: [
+          AnimatedSwitcher(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            child: toolbarFolded
+                ? _collapsedPlaylistToolbar()
+                : Padding(
+                    key: const ValueKey('playlist-expanded-controls'),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Row(
+                      children: [
+                        FilledButton.icon(
+                          key: const ValueKey('new-playlist'),
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: _newPlaylist,
+                          icon: const Icon(Icons.add),
+                          label: const Text('新建歌单'),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: playlistCoverFlow
+                              ? '切换到歌单网格'
+                              : '切换到歌单 Cover Flow',
+                          isSelected: playlistCoverFlow,
+                          onPressed: () => _act(
+                            () =>
+                                app.appearance.toggleCoverFlow(playlist: true),
+                          ),
+                          icon: const Icon(Icons.view_carousel_outlined),
+                          selectedIcon: const Icon(Icons.grid_view_rounded),
+                        ),
+                        IconButton(
+                          tooltip: '同步云歌单',
+                          onPressed: app.busy
+                              ? null
+                              : () => _act(() async {
+                                  await app.cloud.syncAll();
+                                  await app.reload();
+                                }),
+                          icon: const Icon(Icons.cloud_sync_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          Expanded(
+            child: app.playlists.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.queue_music_rounded,
+                          size: 56,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('还没有歌单'),
+                        const SizedBox(height: 4),
+                        const Text('创建一个歌单，收纳喜欢的音乐。'),
+                      ],
+                    ),
+                  )
+                : playlistCoverFlow
+                ? CoverFlowView(
+                    key: const ValueKey('playlist-cover-flow'),
+                    itemCount: app.playlists.length,
+                    coverBuilder: (context, index, size) =>
+                        PlaylistCoverFlowArt(
+                          app: app,
+                          playlist: app.playlists[index],
+                          size: size,
+                        ),
+                    titleBuilder: (index) => app.playlists[index].name,
+                    subtitleBuilder: (index) {
+                      final playlist = app.playlists[index];
+                      return switch (playlist.kind) {
+                        PlaylistKind.favorites => '我的收藏',
+                        PlaylistKind.local => '本地歌单',
+                        PlaylistKind.cloud =>
+                          '云端 · ${_sourceName(playlist.sourceId ?? '')}',
+                      };
+                    },
+                    onActivate: (index) =>
+                        _playlistDetails(app.playlists[index]),
+                    bottomPadding: 84 + dockReserve,
+                    emptyMessage: '还没有歌单',
+                  )
+                : PlaylistReorderGrid(
+                    bottomOverlayPadding: dockReserve,
+                    compact: useWideCardRatio(
+                      context,
+                      app.desktopPreferences.compactPageCards,
+                    ),
+                    playlists: app.playlists,
+                    onMove: app.movePlaylistDisplay,
+                    cardBuilder: (context, playlist) => PlaylistGridCard(
+                      key: ValueKey('playlist/${playlist.id}'),
+                      app: app,
+                      playlist: playlist,
+                      sourceName: _sourceName(playlist.sourceId ?? ''),
+                      onOpen: () => _playlistDetails(playlist),
+                      onAction: (value) => _playlistAction(value, playlist),
+                    ),
+                  ),
+          ),
+        ],
+      );
   Future<void> _newPlaylist() async {
     final name = TextEditingController();
     String id = 'local';
