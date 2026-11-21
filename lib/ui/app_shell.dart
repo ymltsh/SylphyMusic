@@ -739,6 +739,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 final textScale =
                     MediaQuery.textScalerOf(context).scale(14) / 14;
                 return GridView.count(
+                  // The outer list reserves room for the floating dock.
+                  padding: dockReserve > 0 ? EdgeInsets.zero : null,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisCount: columns,

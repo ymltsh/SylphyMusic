@@ -14,6 +14,7 @@ import 'about_page.dart';
 import 'app_update_page.dart';
 import 'cache_storage.dart';
 import 'cache_tasks.dart';
+import 'design_system/miuix_adaptive.dart';
 import 'design_system/ui_style_availability.dart';
 import 'desktop_settings_page.dart';
 import 'device_transfer_page.dart';
@@ -660,6 +661,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
   List<Widget> _directory() {
     final query = _searchController.text.trim().toLowerCase();
+    final clearButton = _searchController.text.isEmpty
+        ? null
+        : IconButton(
+            tooltip: '清空搜索',
+            icon: const Icon(Icons.clear),
+            onPressed: () => setState(_searchController.clear),
+          );
     return [
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -667,18 +675,18 @@ class _SettingsPageState extends State<SettingsPage> {
           controller: _searchController,
           textInputAction: TextInputAction.search,
           onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-            labelText: '搜索设置',
-            prefixIcon: const Icon(Icons.search),
-            border: const OutlineInputBorder(),
-            suffixIcon: _searchController.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: '清空搜索',
-                    icon: const Icon(Icons.clear),
-                    onPressed: () => setState(_searchController.clear),
-                  ),
-          ),
+          decoration: SylphyMiuixStyle.enabled(context)
+              ? SylphyMiuixStyle.searchDecoration(
+                  context,
+                  hintText: '搜索设置',
+                  suffixIcon: clearButton,
+                )
+              : InputDecoration(
+                  labelText: '搜索设置',
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: clearButton,
+                ),
         ),
       ),
       if (query.isEmpty)
