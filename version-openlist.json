@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.76-openlist.57",
-    "build": 89,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.76-openlist.57 (arm64-v8a)",
-    "date": "2026-11-20",
-    "notes": "- 设置按使用场景重新分组，并新增搜索。输入「缓存」「密钥」或「羽化」，可以直接打开相关设置。\n- 「下载与缓存」新增用量概览，可查看音频、封面和歌词的占用，以及缓存上限。\n- 首次引导的「音乐笔友」步骤可选填称呼和个人简介，之后也可在「关于我的音乐笔友 → 日记与记忆」修改。开启模型增强时，已填写的资料会随聊天和新推荐请求发送到你配置的模型。\n- 播放页编辑器新增沉浸封面「四周羽化」，可调节中央清晰区域。\n- 添加音乐源时，选项底色标出所选类型，音源图标保持完整。\n\nOpenList 特别版适用于 Android arm64-v8a，可与普通版共存，两版各自保存应用数据。\n",
+    "version": "1.0.77-openlist.58",
+    "build": 90,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.77-openlist.58 (arm64-v8a)",
+    "date": "2026-11-22",
+    "notes": "- Android 新增 Miuix 界面风格，可在「设置 → 主题与背景」切换。悬浮 Dock 支持短款和与迷你播放器等宽的长款，也可选择磨砂或液态玻璃。\n- 首页、音乐库、歌单和「我的」之间新增横向翻页动效，遵循系统的减少动画设置。\n- 窄屏音乐库和歌单的工具栏可以随滚动折叠，数量和「更多」菜单会移到顶栏。「主题与背景」也可以设置默认折叠并锁定。\n- 歌单和搜索页的迷你播放器浮在内容上方，长按可折叠。歌单的编辑、添加歌曲和缓存操作可从「更多」进入。\n- 「检查更新」移到「关于风灵音乐」，在介绍卡片内点击按钮即可打开更新弹窗。\n\nOpenList 特别版适用于 Android ARM64，可与普通版共存。两版各自保存应用数据。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76-openlist.57%2B89/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.77-openlist.58%2B90/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.76-openlist.57%2B89"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.77-openlist.58%2B90"
   },
   "history": [
+    {
+      "version": "1.0.76-openlist.57",
+      "build": 89,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.76-openlist.57 (arm64-v8a)",
+      "date": "2026-11-20",
+      "notes": "- 设置按使用场景重新分组，并新增搜索。输入「缓存」「密钥」或「羽化」，可以直接打开相关设置。\n- 「下载与缓存」新增用量概览，可查看音频、封面和歌词的占用，以及缓存上限。\n- 首次引导的「音乐笔友」步骤可选填称呼和个人简介，之后也可在「关于我的音乐笔友 → 日记与记忆」修改。开启模型增强时，已填写的资料会随聊天和新推荐请求发送到你配置的模型。\n- 播放页编辑器新增沉浸封面「四周羽化」，可调节中央清晰区域。\n- 添加音乐源时，选项底色标出所选类型，音源图标保持完整。\n\nOpenList 特别版适用于 Android arm64-v8a，可与普通版共存，两版各自保存应用数据。\n",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.76-openlist.57%2B89/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.76-openlist.57%2B89"
+    },
     {
       "version": "1.0.75-openlist.56",
       "build": 88,
