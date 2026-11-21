@@ -160,6 +160,7 @@ class _RecommendationSettingsPageState
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
+      leading: settingsBackButton(context),
       title: const Text('推荐与音乐笔友'),
       bottom: _busy
           ? const PreferredSize(
@@ -181,7 +182,9 @@ class _RecommendationSettingsPageState
                 title: '基础推荐',
                 children: [
                   SwitchListTile(
-                    secondary: const Icon(Icons.favorite_border_rounded),
+                    secondary: const SettingsIcon(
+                      Icons.favorite_border_rounded,
+                    ),
                     title: const Text('根据我的喜好选曲'),
                     subtitle: const Text('参考收藏和收听习惯；关闭后随机探索，并停止新增收听统计。'),
                     value: app.listeningAnalytics.enabled,
@@ -209,7 +212,9 @@ class _RecommendationSettingsPageState
                           ),
                         );
                       return SwitchListTile(
-                        secondary: const Icon(Icons.trending_up_rounded),
+                        secondary: const SettingsIcon(
+                          Icons.trending_up_rounded,
+                        ),
                         title: const Text('参考公开热度'),
                         subtitle: const Text('联网获取公开榜单辅助选曲，不上传个人曲库或收听记录。'),
                         value: snapshot.data ?? false,
@@ -243,7 +248,7 @@ class _RecommendationSettingsPageState
                         const SizedBox(height: 12),
                         FilledButton.icon(
                           onPressed: _locked ? null : _refresh,
-                          icon: const Icon(Icons.refresh_rounded),
+                          icon: const SettingsIcon(Icons.refresh_rounded),
                           label: Text(_busy ? _activity : '立即更新推荐'),
                         ),
                       ],
@@ -263,10 +268,12 @@ class _RecommendationSettingsPageState
                 children: [
                   ListTile(
                     key: const ValueKey('recommendation-letters-archive'),
-                    leading: const Icon(Icons.markunread_mailbox_outlined),
+                    leading: const SettingsIcon(
+                      Icons.markunread_mailbox_outlined,
+                    ),
                     title: const Text('每日推荐文案'),
                     subtitle: const Text('回看已存档的推荐信件和逐曲理由'),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const SettingsIcon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push<void>(
                       MaterialPageRoute(
                         builder: (_) => RecommendationLettersPage(app: app),
@@ -275,10 +282,10 @@ class _RecommendationSettingsPageState
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
                   ListTile(
-                    leading: const Icon(Icons.delete_outline),
+                    leading: const SettingsIcon(Icons.delete_outline),
                     title: const Text('清除推荐统计'),
                     subtitle: const Text('删除收听统计和推荐快照，保留收藏、歌单与笔友内容'),
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const SettingsIcon(Icons.chevron_right),
                     onTap: _locked ? null : _clear,
                   ),
                 ],

@@ -6,7 +6,7 @@ import 'package:sylphy_music/ui/miuix/miuix_dock_navigation.dart';
 
 void main() {
   testWidgets(
-    'indicator moves through intermediate positions without teleport',
+    'native glass dock responds to tab selection with rounded icons',
     (tester) async {
       var selected = 0;
       await tester.pumpWidget(
@@ -36,20 +36,20 @@ void main() {
           ),
         ),
       );
-      final indicator = find.byKey(const ValueKey('miuix-selection-indicator'));
-      expect(find.byType(BackdropFilter), findsOneWidget);
-      final dock = find.byKey(const ValueKey('miuix-bottom-navigation'));
-      expect(tester.getSize(dock).height, 58);
-      final start = tester.getTopLeft(indicator).dx;
+      final dock = find.byType(MiuixGlassNavigationBar);
+      expect(dock, findsOneWidget);
+      expect(tester.getSize(dock).height, 56);
+      final glass = tester.widget<MiuixGlassNavigationBar>(dock);
+      expect(glass.items, hasLength(4));
+      expect(glass.indicatorColor, isNotNull);
+      expect(find.byType(MiuixIcon), findsNWidgets(4));
+      expect(
+        tester.widget<MiuixIcon>(find.byType(MiuixIcon).first).icon,
+        Icons.cottage_rounded,
+      );
       await tester.tap(find.text('我的'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 160));
-      final middle = tester.getTopLeft(indicator).dx;
       await tester.pumpAndSettle();
-      final finish = tester.getTopLeft(indicator).dx;
       expect(selected, 3);
-      expect(middle, greaterThan(start));
-      expect(middle, lessThan(finish));
       expect(find.byType(MiuixNavigationBarItem), findsNothing);
     },
   );
@@ -78,9 +78,12 @@ void main() {
         ),
       ),
     );
-    final inactive = tester.widget<Icon>(find.byIcon(Icons.library_music));
-    expect(inactive.color, palette.colors.onSurface);
-    expect(inactive.color!.a, 1);
+    final glass = tester.widget<MiuixGlassNavigationBar>(
+      find.byType(MiuixGlassNavigationBar),
+    );
+    expect(glass.unselectedColor, palette.colors.onSurface);
+    expect(glass.unselectedColor!.a, 1);
+    expect(glass.selectedColor, palette.colors.primary);
   });
 
   testWidgets('Miuix outlined section does not insert Material Card', (

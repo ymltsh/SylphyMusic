@@ -95,14 +95,14 @@ class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               ListTile(
-                leading: const Icon(Icons.hub_outlined),
+                leading: const SettingsIcon(Icons.hub_outlined),
                 title: const Text('模型连接'),
                 subtitle: Text(
                   '${app.apiSettings.llmModel} · 接口、密钥与连接测试',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const SettingsIcon(Icons.chevron_right),
                 onTap: _locked
                     ? null
                     : () => Navigator.push(
@@ -149,12 +149,12 @@ class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
             children: [
               ListTile(
                 key: const ValueKey('recommendation-llm-user-prompt'),
-                leading: const Icon(Icons.badge_outlined),
+                leading: const SettingsIcon(Icons.badge_outlined),
                 title: const Text('音乐笔友与角色卡'),
                 subtitle: Text(
                   '当前：${app.apiSettings.cards.activeName} · 管理角色与提示词',
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const SettingsIcon(Icons.chevron_right),
                 onTap: _locked
                     ? null
                     : () => Navigator.push(
@@ -165,10 +165,10 @@ class _LlmRecommendationSettingsState extends State<LlmRecommendationSettings> {
                       ),
               ),
               ListTile(
-                leading: const Icon(Icons.auto_stories_outlined),
+                leading: const SettingsIcon(Icons.auto_stories_outlined),
                 title: const Text('记忆与相处'),
                 subtitle: const Text('管理当前角色的记忆、补充设定与隐私'),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const SettingsIcon(Icons.chevron_right),
                 onTap: _locked
                     ? null
                     : () => Navigator.push(

@@ -112,7 +112,7 @@ class _AboutPageState extends State<AboutPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          '让音乐库回归简单，让每一首歌自由流动。',
+                          '让音乐回归简单，让每首歌自由奔涌。',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(height: 1.55),
@@ -129,9 +129,9 @@ class _AboutPageState extends State<AboutPage> {
                             ),
                             _AboutPill(
                               icon: Icons.album_outlined,
-                              label: '专注聆听',
+                              label: '纯粹',
                             ),
-                            _AboutPill(icon: Icons.code_rounded, label: '开源项目'),
+                            _AboutPill(icon: Icons.code_rounded, label: '开源'),
                           ],
                         ),
                       ],

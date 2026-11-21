@@ -37,8 +37,7 @@ class DeviceTransferPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              '两台设备连接同一个可互通的局域网，不经过云端。'
-              '仅迁移你手动填写的配置，不传歌曲、缓存或播放记录。',
+              '请将设备连接同一局域网，让我们开始吧！',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
@@ -224,7 +223,7 @@ class _SendState extends State<DeviceTransferSendPage> {
               const SizedBox(height: 8),
               const Text(
                 '请在新设备上选择「接收其他设备的配置」。'
-                '扫描只在本页面开启期间进行。',
+                '请不要离开本页面',
               ),
               const SizedBox(height: 12),
               SegmentedButton<TransferScope>(

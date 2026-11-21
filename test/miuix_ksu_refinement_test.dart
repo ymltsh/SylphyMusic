@@ -95,12 +95,8 @@ void main() {
       ),
     );
     expect(find.byType(MiuixNavigationBar), findsNothing);
-    expect(find.byType(MiuixPressable), findsNWidgets(4));
-    expect(
-      find.byKey(const ValueKey('miuix-selection-indicator')),
-      findsOneWidget,
-    );
-    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(find.byType(MiuixGlassNavigationBar), findsOneWidget);
+    expect(find.byType(MiuixIcon), findsNWidgets(4));
     await tester.tap(find.text('音乐库'));
     expect(selected, 1);
   });

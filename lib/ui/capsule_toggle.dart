@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_miuix/miuix.dart';
 
 import 'design_system/miuix_adaptive.dart';
+import 'miuix/miuix_iconography.dart';
 
 /// One entry of a [CapsuleToggle].
 class CapsuleOption<T> {
@@ -115,7 +116,11 @@ class CapsuleToggle<T> extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(option.icon, size: 16, color: foreground),
+                MiuixIcon(
+                  icon: SylphyMiuixIconography.rounded(option.icon),
+                  size: 16,
+                  tint: foreground,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   option.label,

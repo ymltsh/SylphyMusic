@@ -20,7 +20,6 @@ import 'capsule_toggle.dart';
 import 'cover_art.dart';
 import 'cover_flow.dart';
 import 'library_browser.dart';
-import 'track_lookup.dart';
 import 'track_actions.dart';
 import 'batch_selection.dart';
 import 'home_page.dart';
@@ -51,6 +50,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
   final BatchSelection _librarySelection = BatchSelection();
   final _pageBodyKey = GlobalKey();
+  final _mainContentKey = GlobalKey();
+  final MiuixLayerBackdrop _dockBackdrop = MiuixLayerBackdrop();
   int libraryView = 0;
   bool get albumCoverFlow => app.appearance.albumCoverFlow;
   bool get playlistCoverFlow => app.appearance.playlistCoverFlow;
@@ -109,6 +110,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     app.playback.removeListener(_update);
     app.appearance.removeListener(_appearanceChanged);
     _librarySelection.dispose();
+    _dockBackdrop.dispose();
     super.dispose();
   }
 
@@ -164,7 +166,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           ]),
           builder: (context, _) => Scaffold(
             appBar: AppBar(title: Text(title)),
-            body: SafeArea(top: false, child: page()),
+            extendBody: showPlayer,
+            body: SafeArea(top: false, bottom: !showPlayer, child: page()),
             bottomNavigationBar: showPlayer ? RoutePlayerBar(app: app) : null,
           ),
         ),
@@ -253,6 +256,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     final miuixPortrait =
         !wide &&
         UiStyleAvailability.effective(app.appearance.uiStyle) == UiStyle.miuix;
+    final glassBackdrop = miuixPortrait && app.appearance.miuixLiquidGlass
+        ? _dockBackdrop
+        : null;
     final dockReserve = miuixPortrait
         ? MiuixDockNavigation.reserveHeight(context)
         : 0.0;
@@ -261,6 +267,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         ? Duration.zero
         : const Duration(milliseconds: 260);
     final main = Column(
+      key: _mainContentKey,
       children: [
         if (app.busy) const LinearProgressIndicator(),
         Expanded(
@@ -346,7 +353,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     child: IconButton(
                       tooltip: '搜索',
                       onPressed: _openSearch,
-                      icon: const Icon(Icons.search),
+                      icon: miuixPortrait
+                          ? MiuixIcon(
+                              icon: Icons.search_rounded,
+                              size: 25,
+                              tint: MiuixTheme.of(context).colors.onSurface,
+                            )
+                          : const Icon(Icons.search),
                     ),
                   ),
                   SizedBox.square(
@@ -354,7 +367,13 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     child: IconButton(
                       tooltip: '设置',
                       onPressed: _openSettings,
-                      icon: const Icon(Icons.settings_outlined),
+                      icon: miuixPortrait
+                          ? MiuixIcon(
+                              icon: Icons.settings_rounded,
+                              size: 25,
+                              tint: MiuixTheme.of(context).colors.onSurface,
+                            )
+                          : const Icon(Icons.settings_outlined),
                     ),
                   ),
                 ],
@@ -400,6 +419,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     ],
                   ),
                 )
+              : glassBackdrop != null
+              ? MiuixLayerBackdropCapture(backdrop: glassBackdrop, child: main)
               : main,
         ),
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
@@ -410,6 +431,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 selectedIndex: tab,
                 labels: labels,
                 icons: icons,
+                backdrop: glassBackdrop,
                 onSelected: selectDestination,
               )
             : Stack(
@@ -1166,128 +1188,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                 : null,
           ),
           onAction: (action) => _playlistAction(action, latest()),
-          onEdit: () => _editPlaylist(latest()),
-          onAdd: () => _addToPlaylist(latest()),
           onCache: () => _act(() => app.cachePlaylist(latest())),
         ),
       ),
     );
-  }
-
-  Future<void> _editPlaylist(PlaylistModel p) async {
-    final keys = await app.db.playlistKeys(p.id);
-    if (!mounted) return;
-    final working = [...keys];
-    final accept = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, refresh) => AlertDialog(
-          title: Text('编辑歌单 · ${p.name}'),
-          content: SizedBox(
-            width: 520,
-            height: 420,
-            child: ReorderableListView.builder(
-              itemCount: working.length,
-              buildDefaultDragHandles: true,
-              onReorderItem: (oldIndex, newIndex) {
-                refresh(() {
-                  final item = working.removeAt(oldIndex);
-                  working.insert(newIndex, item);
-                });
-              },
-              itemBuilder: (ctx, index) {
-                final key = working[index];
-                return TrackLookup(
-                  key: ValueKey('$index-$key'),
-                  app: app,
-                  ref: TrackRef.parse(key),
-                  builder: (ctx, track) => ListTile(
-                    title: Text(track?.title ?? '不可用歌曲'),
-                    subtitle: Text(track?.artist ?? key),
-                    trailing: IconButton(
-                      tooltip: '移除这条歌单记录',
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: () => refresh(() => working.removeAt(index)),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('保存修改'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (accept == true) await _act(() => app.setPlaylistKeys(p, working));
-  }
-
-  Future<void> _addToPlaylist(PlaylistModel p) async {
-    var search = '';
-    final additions = <String>{};
-    final accepted = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, refresh) => AlertDialog(
-          title: const Text('添加歌曲'),
-          content: SizedBox(
-            width: 500,
-            height: 420,
-            child: Column(
-              children: [
-                TextField(
-                  decoration: const InputDecoration(labelText: '搜索歌曲'),
-                  onChanged: (value) => refresh(() => search = value),
-                ),
-                Expanded(
-                  child: LibraryBrowser(
-                    app: app,
-                    query: CatalogQuery(
-                      search: search,
-                      sourceId: p.kind == PlaylistKind.cloud
-                          ? p.sourceId
-                          : null,
-                    ),
-                    onAction: _trackAction,
-                    selected: additions,
-                    onSelection: (track, selected) => refresh(() {
-                      if (selected) {
-                        additions.add(track.ref.key);
-                      } else {
-                        additions.remove(track.ref.key);
-                      }
-                    }),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('添加'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (accepted != true || additions.isEmpty) return;
-    await _act(() async {
-      final keys = await app.db.playlistKeys(p.id);
-      await app.setPlaylistKeys(p, [...keys, ...additions]);
-    });
   }
 
   Future<void> _playlistAction(String action, PlaylistModel p) async {

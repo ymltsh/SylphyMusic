@@ -184,6 +184,7 @@ class WideMiniPlayer extends StatelessWidget {
           children: [
             InkWell(
               onTap: track == null ? null : onOpen,
+              onLongPress: onCollapse,
               borderRadius: BorderRadius.circular(12),
               child: PlayerCover(
                 app: app,
@@ -202,6 +203,7 @@ class WideMiniPlayer extends StatelessWidget {
                 children: [
                   InkWell(
                     onTap: track == null ? null : onOpen,
+                    onLongPress: onCollapse,
                     child: Text(
                       track?.title ?? '选择一首音乐',
                       maxLines: 1,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_miuix/miuix.dart';
 
+import '../miuix/miuix_iconography.dart';
+
 /// Reports the effective selection while the theme bridge stays mounted.
 class SylphyMiuixStyle extends InheritedWidget {
   const SylphyMiuixStyle({
@@ -89,7 +91,11 @@ class SylphyAdaptiveQuickIcon extends StatelessWidget {
       ),
       child: SizedBox.square(
         dimension: compact ? 38 : 46,
-        child: Icon(icon, color: primary, size: compact ? 20 : 24),
+        child: MiuixIcon(
+          icon: SylphyMiuixIconography.rounded(icon),
+          tint: primary,
+          size: compact ? 20 : 24,
+        ),
       ),
     );
   }

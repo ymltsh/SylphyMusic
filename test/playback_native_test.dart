@@ -295,8 +295,6 @@ void main() {
           app: app,
           id: 'favorites',
           buildTracks: (tracks) => Text('Visible ${tracks.length}'),
-          onEdit: () {},
-          onAdd: () {},
           onCache: () {},
         ),
       ),

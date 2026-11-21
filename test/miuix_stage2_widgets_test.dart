@@ -69,9 +69,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     final nav = find.byKey(const ValueKey('miuix-bottom-navigation'));
-    expect(tester.getSize(nav).height, 58);
+    expect(tester.getSize(nav).height, 56);
     final totalHeight = tester.getSize(find.byType(Scaffold)).height;
     final barBottom = tester.getBottomLeft(nav).dy;
-    expect(totalHeight - barBottom, closeTo(26, 1));
+    expect(totalHeight - barBottom, closeTo(28, 1));
   });
 }

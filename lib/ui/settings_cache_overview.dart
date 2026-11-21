@@ -78,7 +78,7 @@ class _SettingsCacheOverviewState extends State<SettingsCacheOverview> {
             children: [
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Icon(
+                child: SettingsIcon(
                   Icons.storage_outlined,
                   color: colors.onPrimaryContainer,
                 ),
@@ -140,8 +140,8 @@ class _SettingsCacheOverviewState extends State<SettingsCacheOverview> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(icon, color: theme.colorScheme.primary),
-                  const Icon(Icons.chevron_right, size: 18),
+                  SettingsIcon(icon, color: theme.colorScheme.primary),
+                  const SettingsIcon(Icons.chevron_right, size: 18),
                 ],
               ),
               const SizedBox(height: 8),
@@ -205,7 +205,7 @@ class _SettingsCacheOverviewState extends State<SettingsCacheOverview> {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     child: Row(
       children: [
-        Icon(icon, size: 20),
+        SettingsIcon(icon, size: 20),
         const SizedBox(width: 12),
         Expanded(child: Text(name)),
         const SizedBox(width: 8),
@@ -240,7 +240,7 @@ class _SettingsCacheOverviewState extends State<SettingsCacheOverview> {
                     trailing: IconButton(
                       tooltip: '刷新缓存统计',
                       onPressed: loading || _busy ? null : _refresh,
-                      icon: const Icon(Icons.refresh),
+                      icon: const SettingsIcon(Icons.refresh),
                     ),
                   ),
                   if (snapshot.hasError && !loading)
@@ -266,21 +266,21 @@ class _SettingsCacheOverviewState extends State<SettingsCacheOverview> {
         children: [
           ListTile(
             key: const ValueKey('cache-manage'),
-            leading: const Icon(Icons.library_music_outlined),
+            leading: const SettingsIcon(Icons.library_music_outlined),
             title: const Text('管理音乐缓存'),
             subtitle: const Text('按歌曲、来源查看和清理缓存'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const SettingsIcon(Icons.chevron_right),
             onTap: _busy ? null : () => _run(widget.onManage),
           ),
           ListTile(
             key: const ValueKey('cache-clear-all'),
-            leading: Icon(
+            leading: SettingsIcon(
               Icons.delete_outline,
               color: Theme.of(context).colorScheme.error,
             ),
             title: const Text('清理所有缓存资源'),
             subtitle: const Text('保留原始音乐和手动歌词'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const SettingsIcon(Icons.chevron_right),
             onTap: _busy ? null : () => _run(widget.onClearAll),
           ),
         ],

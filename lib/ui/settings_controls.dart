@@ -1,6 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_miuix/miuix.dart';
 
 import 'design_system/miuix_adaptive.dart';
+import 'miuix/miuix_iconography.dart';
+
+class SettingsIcon extends StatelessWidget {
+  const SettingsIcon(this.icon, {super.key, this.size, this.color});
+
+  final IconData icon;
+  final double? size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!SylphyMiuixStyle.enabled(context)) {
+      return Icon(icon, size: size, color: color);
+    }
+
+    final colors = MiuixTheme.of(context).colors;
+    if (icon == Icons.chevron_right || icon == Icons.chevron_right_rounded) {
+      return MiuixIcon(
+        vector: MiuixIcons.basic.arrowRight,
+        size: size ?? 11,
+        tint: color ?? colors.onSurfaceVariantActions,
+      );
+    }
+
+    final theme = IconTheme.of(context);
+    return MiuixIcon(
+      icon: SylphyMiuixIconography.rounded(icon),
+      size: size ?? theme.size,
+      tint: color ?? theme.color ?? colors.onSurfaceVariantActions,
+    );
+  }
+}
+
+Widget? settingsBackButton(BuildContext context) {
+  if (!SylphyMiuixStyle.enabled(context)) return null;
+  final route = ModalRoute.of(context);
+  if (route?.impliesAppBarDismissal != true) return null;
+
+  return ActionIconTheme(
+    data: ActionIconThemeData(
+      backButtonIconBuilder: (_) => const SettingsIcon(Icons.arrow_back),
+      closeButtonIconBuilder: (_) => const SettingsIcon(Icons.close),
+    ),
+    child: route is PageRoute && route.fullscreenDialog
+        ? const CloseButton()
+        : const BackButton(),
+  );
+}
 
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({super.key, this.title, required this.children});
@@ -63,6 +112,7 @@ class SettingsSelect<T> extends StatelessWidget {
           constraints.maxWidth >= 440 &&
           MediaQuery.textScalerOf(context).scale(16) <= 20;
       final menu = DropdownButton<T>(
+        icon: const SettingsIcon(Icons.arrow_drop_down),
         isExpanded: true,
         itemHeight: null,
         value: value,
@@ -79,7 +129,7 @@ class SettingsSelect<T> extends StatelessWidget {
       );
       final detail = description;
       return ListTile(
-        leading: icon == null ? null : Icon(icon),
+        leading: icon == null ? null : SettingsIcon(icon!),
         title: Text(title),
         enabled: onChanged != null,
         subtitle: inline
@@ -118,7 +168,7 @@ class SettingsSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    leading: icon == null ? null : Icon(icon),
+    leading: icon == null ? null : SettingsIcon(icon!),
     title: Text(title),
     subtitle: Column(
       crossAxisAlignment: CrossAxisAlignment.start,

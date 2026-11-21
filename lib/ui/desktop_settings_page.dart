@@ -37,7 +37,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   Widget build(BuildContext context) {
     final prefs = widget.app.desktopPreferences;
     return Scaffold(
-      appBar: AppBar(title: const Text('横屏与 PC')),
+      appBar: AppBar(
+        leading: settingsBackButton(context),
+        title: const Text('横屏与 PC'),
+      ),
       body: SafeArea(
         top: false,
         child: Align(
@@ -54,8 +57,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       key: const ValueKey('compact-wide-page-cards'),
                       title: const Text('横屏卡片比例优化'),
                       subtitle: const Text(
-                        '优化首页、音乐库、歌单和我的页面的功能卡片比例；'
-                        '仅在足够宽的横向窗口生效，竖屏保持原布局。默认关闭。',
+                        '优化各页面的功能卡片比例；'
                       ),
                       value: prefs.compactPageCards,
                       onChanged: _busy
@@ -68,7 +70,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                     const Padding(
                       padding: EdgeInsets.all(16),
                       child: Text(
-                        '宽屏集中显示歌曲、播放控制和进度；空间不足时切换为单行极简底栏，其他操作可在更多菜单中使用。',
+                        '宽屏场景按需选择QwQ',
                       ),
                     ),
                     SwitchListTile(
@@ -122,7 +124,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       ),
                       for (final font in DesktopFont.values)
                         ListTile(
-                          leading: Icon(
+                          leading: SettingsIcon(
                             prefs.fontLabel == font.label
                                 ? Icons.check_circle
                                 : Icons.cloud_download_outlined,
@@ -138,7 +140,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                               : () => _act(() => prefs.downloadFont(font)),
                           trailing: IconButton(
                             tooltip: '${font.label} 官网与许可',
-                            icon: const Icon(Icons.open_in_new),
+                            icon: const SettingsIcon(Icons.open_in_new),
                             onPressed: () => _act(() async {
                               if (!await launchUrl(
                                 Uri.parse(font.licenseUrl),
@@ -178,10 +180,12 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                         ),
                       const Divider(height: 1),
                       ListTile(
-                        leading: const Icon(Icons.font_download_outlined),
+                        leading: const SettingsIcon(
+                          Icons.font_download_outlined,
+                        ),
                         title: const Text('导入本地字体'),
                         subtitle: Text(prefs.fontLabel),
-                        trailing: const Icon(Icons.chevron_right),
+                        trailing: const SettingsIcon(Icons.chevron_right),
                         onTap: _busy ? null : () => _act(prefs.pickFont),
                       ),
                       const Padding(

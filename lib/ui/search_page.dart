@@ -56,6 +56,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    extendBody: true,
     bottomNavigationBar: RoutePlayerBar(app: widget.app),
     appBar: AppBar(
       title: TextField(
@@ -129,14 +130,18 @@ class _SearchPageState extends State<SearchPage> {
         Expanded(
           child: query.isEmpty
               ? const Center(child: Text('输入关键词，搜索你的音乐库'))
-              : LibraryBrowser(
-                  app: widget.app,
-                  query: CatalogQuery(
-                    view: view,
-                    search: query,
-                    sourceId: source,
+              : Builder(
+                  builder: (context) => LibraryBrowser(
+                    app: widget.app,
+                    query: CatalogQuery(
+                      view: view,
+                      search: query,
+                      sourceId: source,
+                    ),
+                    bottomPadding: 16,
+                    bottomOverlayPadding: MediaQuery.paddingOf(context).bottom,
+                    onAction: widget.onAction,
                   ),
-                  onAction: widget.onAction,
                 ),
         ),
       ],

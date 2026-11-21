@@ -38,6 +38,8 @@ class Appearance extends ChangeNotifier {
   Future<void> _backgroundWork = Future.value();
   Future<void> _coverFlowWork = Future.value();
   Future<void> _uiStyleWork = Future.value();
+  bool _miuixLiquidGlass = false;
+  bool get miuixLiquidGlass => _miuixLiquidGlass;
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
   static final _managedName = RegExp(r'^background-[0-9a-f-]+\.png$');
@@ -75,16 +77,27 @@ class Appearance extends ChangeNotifier {
     await db.setSetting('ui_library_categories', '$next');
   }
 
-  /// Serialize preferences so rapid taps cannot reorder writes.
-  /// Updating the in-memory value only after a successful write preserves
-  /// the old style if persistence fails.
-  Future<void> setUiStyle(UiStyle next) {
+  Future<void> setUiStyle(UiStyle next) => _updateUiStyle(() async {
+    if (uiStyle == next) return false;
+    await db.setSetting('ui_style', next.name);
+    uiStyle = next;
+    return true;
+  });
+
+  Future<void> setMiuixLiquidGlass(bool enabled) => _updateUiStyle(() async {
+    if (_miuixLiquidGlass == enabled) return false;
+    await db.setSetting('ui_miuix_liquid_glass', '$enabled');
+    _miuixLiquidGlass = enabled;
+    return true;
+  });
+
+  /// Serialize appearance writes and notify only after persistence succeeds.
+  Future<void> _updateUiStyle(Future<bool> Function() write) {
     if (_closed) return Future.value();
     final operation = _uiStyleWork.then((_) async {
-      if (_closed || uiStyle == next) return;
-      await db.setSetting('ui_style', next.name);
-      uiStyle = next;
-      if (!_closed) notifyListeners();
+      if (_closed) return;
+      final changed = await write();
+      if (changed && !_closed) notifyListeners();
     });
     // A failed write must not poison later attempts or the shutdown drain.
     _uiStyleWork = operation.catchError((Object _) {});
@@ -133,6 +146,7 @@ class Appearance extends ChangeNotifier {
       (value) => value.name == savedStyle,
       orElse: () => UiStyle.material3,
     );
+    _miuixLiquidGlass = await db.setting('ui_miuix_liquid_glass') == 'true';
     final savedMode = await db.setting('ui_theme');
     mode = ThemeMode.values.firstWhere(
       (v) => v.name == savedMode,

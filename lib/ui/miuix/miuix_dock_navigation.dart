@@ -3,12 +3,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_miuix/miuix.dart';
 
-/// Miuix floating pill navigation. The caller owns tab and route state.
+import 'miuix_iconography.dart';
+
+/// KSU-inspired Miuix dock. Only paints navigation chrome; SylphyShell owns
+/// selectedIndex and the page state. Do not add a second Navigator or SafeArea.
 ///
-/// One indicator travels between tabs; rendering four separately animated
-/// backgrounds would make the highlight disappear and reappear on each tap.
-/// Scaffold should use `extendBody: true` so its content is visible through
-/// the transparent margin around this dock.
+/// The native GlassNavigationBar handles spring-driven indicator edges,
+/// quick successive taps, cross-tab dragging, RTL, and reduced motion.
 class MiuixDockNavigation extends StatelessWidget {
   const MiuixDockNavigation({
     super.key,
@@ -16,195 +17,112 @@ class MiuixDockNavigation extends StatelessWidget {
     required this.labels,
     required this.icons,
     required this.onSelected,
+    this.backdrop,
   }) : assert(labels.length == icons.length),
        assert(labels.length >= 2 && labels.length <= 5),
        assert(selectedIndex >= 0 && selectedIndex < labels.length);
 
-  static const double barHeight = 58;
+  static const double barHeight = 56;
   static const double topGap = 6;
-  static const double bottomGap = 2;
-  static const double _horizontalInset = 22;
-  static const double _cornerRadius = 34;
-  static const double _selectionRadius = 30;
+  static const double bottomGap = 4;
+  static const double horizontalInset = 28;
+  static final _frostBlur = ImageFilter.blur(sigmaX: 14, sigmaY: 14);
 
-  /// Space reserved by the pill plus the single system gesture inset.
+  /// The native component uses a larger label at accessibility text scales.
+  /// Keep its height and the mini-player's reserved space in sync.
+  static double effectiveBarHeight(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(1) >= 1.6 ? 64 : barHeight;
+
+  /// Fixed layout reserve + precisely one system navigation inset.
   static double reserveHeight(BuildContext context) =>
-      barHeight + topGap + bottomGap + MediaQuery.viewPaddingOf(context).bottom;
+      effectiveBarHeight(context) +
+      topGap +
+      bottomGap +
+      MediaQuery.viewPaddingOf(context).bottom;
 
   final int selectedIndex;
   final List<String> labels;
   final List<IconData> icons;
   final ValueChanged<int> onSelected;
+  final MiuixBackdrop? backdrop;
 
   @override
   Widget build(BuildContext context) {
     final theme = MiuixTheme.of(context);
     final colors = theme.colors;
     final dark = theme.brightness == Brightness.dark;
-    final base = colors.surfaceContainer.withValues(alpha: dark ? .78 : .74);
-    final selected = Color.alphaBlend(
-      colors.primaryContainer.withValues(alpha: dark ? .70 : .60),
-      base,
+    final liquidGlass = backdrop != null;
+    const shape = MiuixGlassShape(cornerRadius: 999);
+    // Keep the native tab gestures and indicator in both surface styles.
+    final navigation = MiuixGlassNavigationBar(
+      key: const ValueKey('miuix-bottom-navigation'),
+      backdrop: backdrop,
+      alpha: liquidGlass ? 1 : 0,
+      selectedIndex: selectedIndex,
+      onSelect: onSelected,
+      height: effectiveBarHeight(context),
+      shape: shape,
+      material: MiuixGlassMaterials.puredThinGlass(dark),
+      // In dark mode KSU has a charcoal, not cyan, selected capsule.
+      indicatorColor: dark
+          ? Colors.white.withValues(alpha: .12)
+          : colors.primary.withValues(alpha: .12),
+      indicatorPressedColor: dark
+          ? Colors.white.withValues(alpha: .22)
+          : colors.primary.withValues(alpha: .20),
+      // KSU uses a theme accent for the active icon + label. Inactive
+      // glyphs stay fully opaque instead of Material's 40% alpha.
+      selectedColor: colors.primary,
+      unselectedColor: colors.onSurface,
+      items: [
+        for (var i = 0; i < labels.length; i++)
+          MiuixGlassNavigationItem(
+            label: labels[i],
+            contentDescription: labels[i],
+            icon: MiuixIcon(
+              icon: SylphyMiuixIconography.dock(labels[i], icons[i]),
+              size: 28,
+            ),
+          ),
+      ],
     );
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    // SafeArea owns the *only* bottom gesture inset; the library navigation
-    // widget (which adds its own inset and dims unselected icons) is not used.
+    // KSU's own floating bar also reserves the real navigation-bar inset.
+    // The GlassNavigationBar does not add a second inset internally.
     return SafeArea(
       top: false,
       maintainBottomViewPadding: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          _horizontalInset,
+          horizontalInset,
           topGap,
-          _horizontalInset,
+          horizontalInset,
           bottomGap,
         ),
         child: Center(
           heightFactor: 1,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 448),
-            child: DecoratedBox(
-              decoration: ShapeDecoration(
-                shape: const MiuixSquircleBorder(cornerRadius: _cornerRadius),
-                shadows: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: dark ? .22 : .10),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipPath(
-                clipper: const ShapeBorderClipper(
-                  shape: MiuixSquircleBorder(cornerRadius: _cornerRadius),
-                ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: DecoratedBox(
-                    decoration: ShapeDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color.alphaBlend(
-                            Colors.white.withValues(alpha: dark ? .12 : .35),
-                            base,
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                if (!liquidGlass)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ClipPath(
+                        clipper: const ShapeBorderClipper(shape: shape),
+                        child: BackdropFilter(
+                          filter: _frostBlur,
+                          child: ColoredBox(
+                            color: colors.surfaceContainer.withValues(
+                              alpha: dark ? .82 : .78,
+                            ),
                           ),
-                          Color.alphaBlend(
-                            Colors.white.withValues(alpha: dark ? .04 : .12),
-                            base,
-                          ),
-                        ],
-                      ),
-                      shape: MiuixSquircleBorder(
-                        cornerRadius: _cornerRadius,
-                        side: BorderSide(
-                          color: Colors.white.withValues(
-                            alpha: dark ? .18 : .72,
-                          ),
-                          width: 1,
                         ),
                       ),
                     ),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final tabWidth = constraints.maxWidth / labels.length;
-                        return SizedBox(
-                          key: const ValueKey('miuix-bottom-navigation'),
-                          height: barHeight,
-                          child: Stack(
-                            children: [
-                              AnimatedPositionedDirectional(
-                                key: const ValueKey(
-                                  'miuix-selection-indicator',
-                                ),
-                                duration: reduceMotion
-                                    ? Duration.zero
-                                    : const Duration(milliseconds: 360),
-                                curve: MiuixMotion.standardDecelerate,
-                                top: 3,
-                                bottom: 3,
-                                start: tabWidth * selectedIndex + 3,
-                                width: tabWidth - 6,
-                                child: DecoratedBox(
-                                  decoration: ShapeDecoration(
-                                    color: selected,
-                                    shape: const MiuixSquircleBorder(
-                                      cornerRadius: _selectionRadius,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  for (
-                                    var index = 0;
-                                    index < labels.length;
-                                    index++
-                                  )
-                                    Expanded(
-                                      child: _tab(
-                                        index,
-                                        colors: colors,
-                                        selected: index == selectedIndex,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
                   ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _tab(
-    int index, {
-    required MiuixColors colors,
-    required bool selected,
-  }) {
-    final foreground = selected ? colors.onPrimaryContainer : colors.onSurface;
-    return Semantics(
-      selected: selected,
-      child: MiuixPressable(
-        key: ValueKey('miuix-tab-$index'),
-        onPressed: () => onSelected(index),
-        semanticLabel: labels[index],
-        feedbackType: MiuixPressFeedbackType.none,
-        shape: const MiuixSquircleBorder(cornerRadius: _selectionRadius),
-        child: ExcludeSemantics(
-          child: SizedBox(
-            height: barHeight,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icons[index], size: 23, color: foreground),
-                const SizedBox(height: 2),
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      labels[index],
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: foreground,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
+                navigation,
               ],
             ),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/launcher_icon_service.dart';
 import '../services/api_settings.dart';
+import 'settings_controls.dart';
 
 /// Uses installed Android aliases as the source of truth; preview is local.
 class LauncherIconPicker extends StatefulWidget {
@@ -156,7 +157,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
       errorBuilder: (context, error, stackTrace) => SizedBox(
         width: size,
         height: size,
-        child: const Icon(Icons.image_not_supported_outlined),
+        child: const SettingsIcon(Icons.image_not_supported_outlined),
       ),
     ),
   );
@@ -167,10 +168,10 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
     builder: (context, snapshot) {
       if (snapshot.hasError) {
         return ListTile(
-          leading: const Icon(Icons.error_outline),
+          leading: const SettingsIcon(Icons.error_outline),
           title: const Text('读取应用图标失败'),
           subtitle: Text('${snapshot.error}'),
-          trailing: const Icon(Icons.refresh),
+          trailing: const SettingsIcon(Icons.refresh),
           onTap: () => setState(() => _selection = widget.service.load()),
         );
       }
@@ -279,7 +280,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                SettingsIcon(
                                   Icons.check_circle,
                                   size: 14,
                                   color: colors.primary,
@@ -392,7 +393,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                                 Positioned(
                                   top: 8,
                                   right: 8,
-                                  child: Icon(
+                                  child: SettingsIcon(
                                     Icons.check_circle_rounded,
                                     size: 20,
                                     color: colors.primary,
@@ -457,7 +458,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                           onPressed: () => setState(
                             () => _showInspiration = !_showInspiration,
                           ),
-                          icon: Icon(
+                          icon: SettingsIcon(
                             _showInspiration
                                 ? Icons.expand_less
                                 : Icons.auto_awesome,
@@ -497,7 +498,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                               onPressed: _applyingCard
                                   ? null
                                   : () => _applyCharacter(isVenti),
-                              icon: const Icon(
+                              icon: const SettingsIcon(
                                 Icons.auto_fix_high_rounded,
                                 size: 16,
                               ),
@@ -549,7 +550,7 @@ class _LauncherIconPickerState extends State<LauncherIconPicker> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : Icon(
+                            : SettingsIcon(
                                 isActive
                                     ? Icons.check
                                     : Icons.app_shortcut_rounded,

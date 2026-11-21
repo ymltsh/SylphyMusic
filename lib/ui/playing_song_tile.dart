@@ -7,6 +7,7 @@ import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
 import 'design_system/miuix_adaptive.dart';
+import 'miuix/miuix_song_row_style.dart';
 
 /// A song row with a quiet current-track tint and a live equalizer badge.
 /// Progress notifications do not trigger a rebuild unless the active track or
@@ -81,15 +82,23 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
     final scheme = Theme.of(context).colorScheme;
     final miuix = SylphyMiuixStyle.enabled(context);
     final palette = miuix ? MiuixTheme.of(context).colors : null;
-    final highlight = widget.selectedInBatch
-        ? (palette?.primaryContainer.withValues(alpha: .85) ??
-              scheme.primary.withValues(alpha: .15))
+    // Keep a single continuous list. Only the current/batch-selected row is
+    // tinted; ordinary rows remain transparent instead of becoming cards.
+    final highlight = miuix
+        ? MiuixSongRowStyle.highlight(
+            palette!,
+            current: _isCurrent,
+            selectedInBatch: widget.selectedInBatch,
+          )
+        : widget.selectedInBatch
+        ? scheme.primary.withValues(alpha: .15)
         : _isCurrent
-        ? (palette?.primaryContainer.withValues(alpha: .45) ??
-              scheme.primary.withValues(alpha: .09))
+        ? scheme.primary.withValues(alpha: .09)
         : Colors.transparent;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: miuix && MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
       curve: miuix ? MiuixMotion.standardDecelerate : Curves.easeOut,
       decoration: miuix
           ? ShapeDecoration(
@@ -103,7 +112,10 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
         child: ListTile(
           contentPadding: widget.contentPadding,
           selected: _isCurrent || widget.selectedInBatch,
-          selectedColor: scheme.primary,
+          selectedColor: palette?.primary ?? scheme.primary,
+          // The outer Squircle owns the only row highlight in Miuix mode.
+          tileColor: miuix ? Colors.transparent : null,
+          selectedTileColor: miuix ? Colors.transparent : null,
           leading: SizedBox.square(
             dimension: 48,
             child: Stack(
@@ -112,17 +124,28 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
                 Positioned.fill(
                   child:
                       widget.leading ??
-                      CoverArt(app: widget.app, track: widget.track),
+                      CoverArt(
+                        app: widget.app,
+                        track: widget.track,
+                        borderRadius: miuix
+                            ? MiuixSongRowStyle.coverRadius
+                            : 10,
+                      ),
                 ),
                 if (_isCurrent)
                   Positioned(
                     right: 0,
                     bottom: 0,
                     child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.primary,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                      decoration: miuix
+                          ? ShapeDecoration(
+                              color: palette!.primary,
+                              shape: const MiuixSquircleBorder(cornerRadius: 5),
+                            )
+                          : BoxDecoration(
+                              color: scheme.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 3,
@@ -130,7 +153,7 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
                         ),
                         child: PlaybackEqualizer(
                           playing: _isPlaying,
-                          color: scheme.onPrimary,
+                          color: palette?.onPrimary ?? scheme.onPrimary,
                         ),
                       ),
                     ),
@@ -142,7 +165,12 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
             widget.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: _isCurrent
+            style: miuix
+                ? TextStyle(
+                    color: palette!.onSurface,
+                    fontWeight: _isCurrent ? FontWeight.w600 : null,
+                  )
+                : _isCurrent
                 ? const TextStyle(fontWeight: FontWeight.w600)
                 : null,
           ),
@@ -150,12 +178,17 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
             widget.subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            style: miuix
+                ? TextStyle(color: palette!.onSurfaceVariantSummary)
+                : null,
           ),
           onTap: miuix && widget.onTap != null ? null : widget.onTap,
           onLongPress: miuix && widget.onTap != null
               ? null
               : widget.onLongPress,
-          trailing: widget.trailing,
+          trailing: miuix && widget.trailing != null
+              ? MiuixSongMenuTheme(child: widget.trailing!)
+              : widget.trailing,
         ),
       ),
     );

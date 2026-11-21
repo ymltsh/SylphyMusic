@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_miuix/miuix.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
@@ -9,9 +10,20 @@ import '../data/library_catalog.dart';
 import 'batch_selection.dart';
 import 'cover_flow.dart';
 import 'cover_art.dart';
+import 'design_system/miuix_adaptive.dart';
 import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
 import 'wide_card_ratio.dart';
+
+/// Space after the final item. The floating dock is allowed to overlay rows
+/// while scrolling, but the last song must scroll completely above it.
+/// The shell passes its floating dock reserve as [overlayPadding].
+@visibleForTesting
+double libraryListBottomPadding({
+  required double viewportWidth,
+  double? basePadding,
+  required double overlayPadding,
+}) => (basePadding ?? (viewportWidth > 750 ? 24.0 : 96.0)) + overlayPadding;
 
 class LibraryBrowser extends StatefulWidget {
   const LibraryBrowser({
@@ -341,6 +353,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   : row.track.artist,
             ),
           ),
+          extendBody: true,
           bottomNavigationBar: RoutePlayerBar(app: widget.app),
           body: Column(
             children: [
@@ -358,13 +371,16 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   ),
                 ),
               Expanded(
-                child: LibraryBrowser(
-                  app: widget.app,
-                  query: folder
-                      ? widget.query.folderIn(row.key)
-                      : widget.query.songsIn(widget.query.groupType, row.key),
-                  bottomPadding: folder ? 12 : null,
-                  onAction: widget.onAction,
+                child: Builder(
+                  builder: (context) => LibraryBrowser(
+                    app: widget.app,
+                    query: folder
+                        ? widget.query.folderIn(row.key)
+                        : widget.query.songsIn(widget.query.groupType, row.key),
+                    bottomPadding: folder ? 12 : 16,
+                    bottomOverlayPadding: MediaQuery.paddingOf(context).bottom,
+                    onAction: widget.onAction,
+                  ),
                 ),
               ),
             ],
@@ -624,26 +640,35 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                         widget.query.view != 0 &&
                         widget.selected == null &&
                         !widget.query.blocked;
+                    final miuix = SylphyMiuixStyle.enabled(context);
+                    Widget compactCard(Widget row) => miuix
+                        ? SylphyAdaptiveCard(cornerRadius: 18, child: row)
+                        : Card.outlined(margin: EdgeInsets.zero, child: row);
+
                     return RawScrollbar(
                       controller: _scrollController,
                       thumbVisibility: true,
                       interactive: true,
                       thickness: 5,
                       radius: const Radius.circular(8),
-                      thumbColor: Theme.of(context).colorScheme.onSurfaceVariant
-                          .withValues(alpha: .38),
+                      thumbColor: miuix
+                          ? MiuixTheme.of(context)
+                                .colors
+                                .onSurfaceVariantActions
+                                .withValues(alpha: .38)
+                          : Theme.of(context).colorScheme.onSurfaceVariant
+                                .withValues(alpha: .38),
                       child: ListView.builder(
                         key: ValueKey('${widget.query.signature}:$generation'),
                         controller: _scrollController,
                         cacheExtent: 0,
                         clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.only(
-                          bottom:
-                              (widget.bottomPadding ??
-                                  (MediaQuery.sizeOf(context).width > 750
-                                      ? 24
-                                      : 96)) +
-                              widget.bottomOverlayPadding,
+                          bottom: libraryListBottomPadding(
+                            viewportWidth: MediaQuery.sizeOf(context).width,
+                            basePadding: widget.bottomPadding,
+                            overlayPadding: widget.bottomOverlayPadding,
+                          ),
                         ),
                         itemExtent: compactGrid
                             ? 92 *
@@ -663,18 +688,12 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: Card.outlined(
-                                    margin: EdgeInsets.zero,
-                                    child: _virtualRow(first),
-                                  ),
+                                  child: compactCard(_virtualRow(first)),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: first + 1 < result.total
-                                      ? Card.outlined(
-                                          margin: EdgeInsets.zero,
-                                          child: _virtualRow(first + 1),
-                                        )
+                                      ? compactCard(_virtualRow(first + 1))
                                       : const SizedBox.shrink(),
                                 ),
                               ],

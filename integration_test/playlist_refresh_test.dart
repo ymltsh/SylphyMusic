@@ -310,11 +310,16 @@ void main() {
         expect(app.playback.snapshot.tracks, keys);
         await app.playback.pause();
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('编辑歌单'));
+        final firstTrackMenu = find
+            .descendant(
+              of: find.byType(NestedScrollView),
+              matching: find.byType(PopupMenuButton<String>),
+            )
+            .first;
+        await tester.ensureVisible(firstTrackMenu);
+        await tester.tap(firstTrackMenu);
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('移除这条歌单记录').first);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('保存修改'));
+        await tester.tap(find.text('从此歌单移除'));
         await tester.pumpAndSettle();
         expect(await app.db.playlistKeys(local.id), [keys[1], keys[2]]);
         expect(find.text('2 首歌曲'), findsOneWidget);

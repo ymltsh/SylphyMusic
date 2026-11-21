@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/appearance.dart';
+import 'settings_controls.dart';
 
 class ThemeColorDialog extends StatefulWidget {
   const ThemeColorDialog({super.key, required this.initial});
@@ -50,7 +51,7 @@ class _ThemeColorDialogState extends State<ThemeColorDialog> {
                     input.text = hex(color);
                     error = null;
                   }),
-                  icon: Icon(
+                  icon: SettingsIcon(
                     input.text.toUpperCase() == hex(color)
                         ? Icons.check
                         : Icons.circle_outlined,

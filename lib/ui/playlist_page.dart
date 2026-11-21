@@ -6,7 +6,7 @@ import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'batch_selection.dart';
 import 'cover_art.dart';
-import 'player_bar.dart';
+import 'route_player_bar.dart';
 import 'design_system/miuix_adaptive.dart';
 
 /// Cover-first playlist card used by the playlist grid.
@@ -312,6 +312,11 @@ bool playlistCanEdit(SylphyApp app, PlaylistModel playlist) {
       playlist.status != SyncStatus.syncing;
 }
 
+const _cachePlaylistMenuItem = PopupMenuItem<String>(
+  value: 'cache',
+  child: Text('缓存歌单'),
+);
+
 List<PopupMenuEntry<String>> playlistMenuItems(
   SylphyApp app,
   PlaylistModel playlist,
@@ -324,7 +329,7 @@ List<PopupMenuEntry<String>> playlistMenuItems(
   final online = source != null && source.enabled;
   return [
     const PopupMenuItem(value: 'enqueue', child: Text('添加到播放队列')),
-    const PopupMenuItem(value: 'cache', child: Text('缓存歌单')),
+    _cachePlaylistMenuItem,
     if (playlist.kind != PlaylistKind.favorites && editable)
       const PopupMenuItem(value: 'rename', child: Text('重命名歌单')),
     if (playlist.kind != PlaylistKind.local)
@@ -349,8 +354,6 @@ class PlaylistPage extends StatefulWidget {
     required this.app,
     required this.id,
     required this.buildTracks,
-    required this.onEdit,
-    required this.onAdd,
     required this.onCache,
     this.buildEntryTracks,
     this.onAction,
@@ -362,7 +365,7 @@ class PlaylistPage extends StatefulWidget {
   final Widget Function(List<Track>, List<String>, BatchSelection)?
   buildEntryTracks;
   final ValueChanged<String>? onAction;
-  final VoidCallback onEdit, onAdd, onCache;
+  final VoidCallback onCache;
 
   @override
   State<PlaylistPage> createState() => _PlaylistPageState();
@@ -515,6 +518,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
         if (!didPop) _selection.clear();
       },
       child: Scaffold(
+        extendBody: true,
         appBar: AppBar(
           leading: _selection.active
               ? IconButton(
@@ -525,39 +529,22 @@ class _PlaylistPageState extends State<PlaylistPage> {
               : null,
           title: Text(_selection.active ? '已选 ${_selection.count} 首' : '歌单详情'),
           actions: [
-            if (!_selection.active &&
-                playlist != null &&
-                playlistCanEdit(widget.app, playlist))
-              IconButton(
-                tooltip: '编辑歌单',
-                onPressed: playlist.status == SyncStatus.readonly
-                    ? null
-                    : widget.onEdit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
-            if (!_selection.active &&
-                playlist != null &&
-                playlistCanEdit(widget.app, playlist))
-              IconButton(
-                tooltip: '添加歌曲',
-                onPressed: playlist.status == SyncStatus.readonly
-                    ? null
-                    : widget.onAdd,
-                icon: const Icon(Icons.playlist_add),
-              ),
-            if (!_selection.active)
-              IconButton(
-                tooltip: '缓存歌单',
-                onPressed: playlist == null ? null : widget.onCache,
-                icon: const Icon(Icons.download_outlined),
-              ),
-            if (!_selection.active &&
-                playlist != null &&
-                widget.onAction != null)
+            if (!_selection.active && playlist != null)
               PopupMenuButton<String>(
                 tooltip: '歌单操作',
-                onSelected: widget.onAction,
-                itemBuilder: (_) => playlistMenuItems(widget.app, playlist),
+                onSelected: (action) {
+                  if (action == 'cache') {
+                    widget.onCache();
+                  } else {
+                    widget.onAction?.call(action);
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (widget.onAction != null)
+                    ...playlistMenuItems(widget.app, playlist)
+                  else
+                    _cachePlaylistMenuItem,
+                ],
               ),
           ],
         ),
@@ -728,19 +715,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
             },
           ),
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: ListenableBuilder(
-              listenable: Listenable.merge([
-                widget.app.playback,
-                widget.app.appearance,
-              ]),
-              builder: (context, _) =>
-                  PlayerBar(app: widget.app, compact: true),
-            ),
-          ),
+        bottomNavigationBar: RoutePlayerBar(
+          app: widget.app,
+          showWhenIdle: true,
         ),
       ),
     );

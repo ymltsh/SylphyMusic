@@ -19,7 +19,6 @@ import 'design_system/miuix_adaptive.dart';
 import 'design_system/ui_style_availability.dart';
 import 'desktop_settings_page.dart';
 import 'device_transfer_page.dart';
-import 'miuix/miuix_settings_preview_page.dart';
 import 'launcher_icon_picker.dart';
 import 'player_layout/layout_editor.dart';
 import 'recommendation_letters_page.dart';
@@ -135,7 +134,10 @@ class _SettingsPageState extends State<SettingsPage> {
     builder: (context, _) {
       final destination = widget._destination;
       return Scaffold(
-        appBar: AppBar(title: Text(destination?.title ?? '设置')),
+        appBar: AppBar(
+          leading: settingsBackButton(context),
+          title: Text(destination?.title ?? '设置'),
+        ),
         body: SafeArea(
           top: false,
           child: Align(
@@ -178,7 +180,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _group('界面风格 · 实验性', [
         for (final style in UiStyle.values)
           ListTile(
-            leading: Icon(
+            leading: SettingsIcon(
               style == UiStyle.material3
                   ? Icons.widgets_outlined
                   : Icons.auto_awesome_outlined,
@@ -188,7 +190,7 @@ class _SettingsPageState extends State<SettingsPage> {
               style == UiStyle.material3 ? '经典界面 · 默认' : 'HyperOS 风格 · 实验性',
             ),
             trailing: app.appearance.uiStyle == style
-                ? const Icon(
+                ? const SettingsIcon(
                     Icons.check_circle,
                     key: ValueKey('ui-style-selected'),
                   )
@@ -196,15 +198,13 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () => _act(() => app.appearance.setUiStyle(style)),
           ),
         if (app.appearance.uiStyle == UiStyle.miuix)
-          ListTile(
-            title: const Text('Miuix 组件预览'),
-            subtitle: const Text('查看真实的 HyperOS 风格卡片、设置项与动画'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const MiuixSettingsPreviewPage(),
-              ),
-            ),
+          MiuixSwitchPreference(
+            title: '液态玻璃',
+            summary: '开启后，竖屏底部浮栏由磨砂切换为液态玻璃',
+            startAction: const SettingsIcon(Icons.blur_on_rounded),
+            value: app.appearance.miuixLiquidGlass,
+            onChanged: (enabled) =>
+                _act(() => app.appearance.setMiuixLiquidGlass(enabled)),
           ),
       ]),
     SettingsGroup(
@@ -228,7 +228,7 @@ class _SettingsPageState extends State<SettingsPage> {
             backgroundColor: app.appearance.seed,
             radius: 12,
           ),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: const SettingsIcon(Icons.chevron_right),
           onTap: _chooseThemeColor,
         ),
       ],
@@ -244,7 +244,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   List<Widget> _backgroundControls() => [
     SwitchListTile(
-      secondary: const Icon(Icons.format_color_fill_outlined),
+      secondary: const SettingsIcon(Icons.format_color_fill_outlined),
       title: const Text('纯色底色'),
       subtitle: const Text('浅色纯白、深色炭灰；关闭后使用背景图片或主题底色'),
       value: app.appearance.solidBackground,
@@ -259,12 +259,12 @@ class _SettingsPageState extends State<SettingsPage> {
             ? '已选择 · 关闭纯色背景后显示'
             : '已设置背景图片',
       ),
-      leading: const Icon(Icons.wallpaper_outlined),
+      leading: const SettingsIcon(Icons.wallpaper_outlined),
       trailing: app.appearance.backgroundFile == null
-          ? const Icon(Icons.chevron_right)
+          ? const SettingsIcon(Icons.chevron_right)
           : IconButton(
               tooltip: '移除背景',
-              icon: const Icon(Icons.delete_outline),
+              icon: const SettingsIcon(Icons.delete_outline),
               onPressed: () => _act(app.appearance.clearBackground),
             ),
       onTap: () => _act(app.appearance.pickBackground),
@@ -289,10 +289,10 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         ListTile(
           key: const ValueKey('edit-player-layout'),
-          leading: const Icon(Icons.dashboard_customize_outlined),
+          leading: const SettingsIcon(Icons.dashboard_customize_outlined),
           title: Text(_Destination.playerEditor.title),
           subtitle: Text('当前布局：${app.playerLayouts.active?.name ?? '系统默认'}'),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: const SettingsIcon(Icons.chevron_right),
           onTap: () => _open(_Destination.playerEditor),
         ),
         const Padding(
@@ -341,19 +341,16 @@ class _SettingsPageState extends State<SettingsPage> {
   ];
 
   Widget _entry(_SettingEntry entry, String detail) => ListTile(
-    leading: SylphyMiuixStyle.enabled(context)
-        ? SizedBox(
-            width: 28,
-            child: Icon(
-              entry.icon,
-              size: 24,
-              color: MiuixTheme.of(context).colors.primary,
-            ),
-          )
-        : Icon(entry.icon, color: Theme.of(context).colorScheme.primary),
+    leading: SizedBox(
+      width: SylphyMiuixStyle.enabled(context) ? 28 : null,
+      child: SettingsIcon(
+        entry.icon,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
     title: Text(entry.title),
     subtitle: Text(detail),
-    trailing: const Icon(Icons.chevron_right),
+    trailing: const SettingsIcon(Icons.chevron_right),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     onTap: () => _open(entry.destination),
   );
@@ -363,10 +360,15 @@ class _SettingsPageState extends State<SettingsPage> {
     IconData icon,
     String summary,
   ) => ListTile(
-    leading: Icon(icon),
+    leading: SettingsIcon(
+      icon,
+      color: SylphyMiuixStyle.enabled(context)
+          ? Theme.of(context).colorScheme.primary
+          : null,
+    ),
     title: Text(destination.title),
     subtitle: Text(summary),
-    trailing: const Icon(Icons.chevron_right),
+    trailing: const SettingsIcon(Icons.chevron_right),
     onTap: () => _open(destination),
   );
 
@@ -456,20 +458,20 @@ class _SettingsPageState extends State<SettingsPage> {
     _group('每日一言', [
       ListTile(
         key: const ValueKey('api-quote'),
-        leading: const Icon(Icons.format_quote_rounded),
+        leading: const SettingsIcon(Icons.format_quote_rounded),
         title: const Text('每日一言 API'),
         subtitle: Text(app.apiSettings.quoteUrl),
-        trailing: const Icon(Icons.edit_outlined),
+        trailing: const SettingsIcon(Icons.edit_outlined),
         onTap: () => _editApiUrl(quote: true),
       ),
     ]),
     _group('GitHub 加速', [
       ListTile(
         key: const ValueKey('api-github-mirror'),
-        leading: const Icon(Icons.cloud_download_outlined),
+        leading: const SettingsIcon(Icons.cloud_download_outlined),
         title: const Text('GitHub 加速 API'),
         subtitle: Text(app.apiSettings.githubMirror),
-        trailing: const Icon(Icons.edit_outlined),
+        trailing: const SettingsIcon(Icons.edit_outlined),
         onTap: () => _editApiUrl(quote: false),
       ),
     ]),
@@ -486,7 +488,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _onlineLyricsCard() => _group('自动补充歌词', [
     SwitchListTile(
       key: const ValueKey('api-lrc-enabled'),
-      secondary: const Icon(Icons.lyrics_outlined),
+      secondary: const SettingsIcon(Icons.lyrics_outlined),
       title: const Text('补充在线歌词'),
       subtitle: const Text('自动补充缺失的歌词'),
       value: app.apiSettings.lrcApiEnabled,
@@ -500,18 +502,18 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
     ListTile(
       key: const ValueKey('api-lrc-url'),
-      leading: const Icon(Icons.link_outlined),
+      leading: const SettingsIcon(Icons.link_outlined),
       title: const Text('歌词服务地址'),
       subtitle: Text(app.apiSettings.lrcApiUrl),
-      trailing: const Icon(Icons.edit_outlined),
+      trailing: const SettingsIcon(Icons.edit_outlined),
       onTap: _editLrcApiUrl,
     ),
     ListTile(
       key: const ValueKey('api-lrc-auth'),
-      leading: const Icon(Icons.key_outlined),
+      leading: const SettingsIcon(Icons.key_outlined),
       title: const Text('歌词服务密钥'),
       subtitle: const Text('可选'),
-      trailing: const Icon(Icons.edit_outlined),
+      trailing: const SettingsIcon(Icons.edit_outlined),
       onTap: _editLrcApiToken,
     ),
   ]);
@@ -519,34 +521,34 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _llmConnectionCard() => _group('接口配置', [
     ListTile(
       key: const ValueKey('api-llm-url'),
-      leading: const Icon(Icons.link_outlined),
+      leading: const SettingsIcon(Icons.link_outlined),
       title: const Text('LLM 接口地址'),
       subtitle: Text(app.apiSettings.llmUrl),
-      trailing: const Icon(Icons.edit_outlined),
+      trailing: const SettingsIcon(Icons.edit_outlined),
       onTap: _editLlmUrl,
     ),
     ListTile(
       key: const ValueKey('api-llm-model'),
-      leading: const Icon(Icons.psychology_outlined),
+      leading: const SettingsIcon(Icons.psychology_outlined),
       title: const Text('LLM 模型'),
       subtitle: Text(app.apiSettings.llmModel),
-      trailing: const Icon(Icons.edit_outlined),
+      trailing: const SettingsIcon(Icons.edit_outlined),
       onTap: _editLlmModel,
     ),
     ListTile(
       key: const ValueKey('api-llm-token'),
-      leading: const Icon(Icons.key_outlined),
+      leading: const SettingsIcon(Icons.key_outlined),
       title: const Text('LLM API Key'),
       subtitle: const Text('保存在系统安全存储；留空清除'),
-      trailing: const Icon(Icons.edit_outlined),
+      trailing: const SettingsIcon(Icons.edit_outlined),
       onTap: _editLlmToken,
     ),
     ListTile(
       key: const ValueKey('api-llm-test'),
-      leading: const Icon(Icons.network_check_outlined),
+      leading: const SettingsIcon(Icons.network_check_outlined),
       title: Text(_llmTestRunning ? '正在测试 LLM 连接…' : '测试 LLM 连接'),
       subtitle: const Text('仅发送合成歌曲元数据，不会开启增强推荐；可能产生少量 API 用量'),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: const SettingsIcon(Icons.chevron_right),
       onTap: _llmTestRunning ? null : _testLlmConnection,
     ),
   ]);
@@ -584,7 +586,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           title: const Text('选择歌词颜色'),
           onTap: () => _pickLyricsColor(desktop: false),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: const SettingsIcon(Icons.chevron_right),
         ),
     ]),
     _group('播放页迷你歌词', [
@@ -603,7 +605,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (app.desktopLyrics.supported)
       _group('桌面歌词', [
         SwitchListTile(
-          secondary: const Icon(Icons.picture_in_picture_alt_outlined),
+          secondary: const SettingsIcon(Icons.picture_in_picture_alt_outlined),
           title: const Text('显示桌面歌词'),
           subtitle: Text(
             Platform.isWindows ? '置顶显示歌词，可拖动调整位置，点击右侧 × 关闭' : '在其他应用上方显示歌词',
@@ -646,7 +648,7 @@ class _SettingsPageState extends State<SettingsPage> {
               backgroundColor: app.appearance.desktopLyricFixedColor,
             ),
             title: const Text('选择桌面歌词颜色'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const SettingsIcon(Icons.chevron_right),
             onTap: () => _pickLyricsColor(desktop: true),
           ),
       ]),
@@ -675,7 +677,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ? null
         : IconButton(
             tooltip: '清空搜索',
-            icon: const Icon(Icons.clear),
+            icon: const SettingsIcon(Icons.clear),
             onPressed: () => setState(_searchController.clear),
           );
     return [
@@ -693,7 +695,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 )
               : InputDecoration(
                   labelText: '搜索设置',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const SettingsIcon(Icons.search),
                   border: const OutlineInputBorder(),
                   suffixIcon: clearButton,
                 ),
@@ -758,7 +760,7 @@ class _SettingsPageState extends State<SettingsPage> {
       for (var category = 0; category < 4; category++)
         SwitchListTile(
           title: Text(Appearance.libraryCategoryNames[category]),
-          secondary: Icon(Appearance.libraryCategoryIcons[category]),
+          secondary: SettingsIcon(Appearance.libraryCategoryIcons[category]),
           value: app.appearance.libraryCategories.contains(category),
           onChanged:
               app.appearance.libraryCategories.length == 1 &&
@@ -870,7 +872,7 @@ class _SettingsPageState extends State<SettingsPage> {
       children: [
         SwitchListTile(
           key: const ValueKey('diagnostics-toggle'),
-          secondary: const Icon(Icons.bug_report_outlined),
+          secondary: const SettingsIcon(Icons.bug_report_outlined),
           title: const Text('记录诊断日志'),
           subtitle: const Text('记录播放问题，便于排查'),
           value: app.diagnostics.enabled,
@@ -878,21 +880,21 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         ListTile(
           key: const ValueKey('diagnostics-export'),
-          leading: const Icon(Icons.save_alt),
+          leading: const SettingsIcon(Icons.save_alt),
           title: const Text('导出诊断日志'),
           subtitle: const Text('保存到文件'),
           onTap: () => _act(_exportDiagnosticLogs),
         ),
         ListTile(
           key: const ValueKey('diagnostics-share'),
-          leading: const Icon(Icons.share_outlined),
+          leading: const SettingsIcon(Icons.share_outlined),
           title: const Text('分享诊断日志'),
           subtitle: Text(Platform.isLinux ? '保存到文件' : '通过系统分享'),
           onTap: () => _act(_shareDiagnosticLogs),
         ),
         ListTile(
           key: const ValueKey('diagnostics-clear'),
-          leading: const Icon(Icons.delete_outline),
+          leading: const SettingsIcon(Icons.delete_outline),
           title: const Text('清除诊断日志'),
           onTap: () async {
             if (await _confirm('确认删除全部已记录的诊断日志？')) {
