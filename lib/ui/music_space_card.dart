@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/models.dart';
 import 'music_source_ui.dart';
+import 'design_system/miuix_adaptive.dart';
 
 /// A source-management entry with a small, locally rendered brand-card deck.
 class MusicSpaceCard extends StatefulWidget {
@@ -135,9 +136,7 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
           return Card(
             margin: EdgeInsets.zero,
             clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
+            shape: SylphyMiuixStyle.cardShape(context, cornerRadius: 28),
             child: Ink(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -150,8 +149,9 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
                   ],
                 ),
               ),
-              child: InkWell(
+              child: SylphyAdaptivePressable(
                 onTap: widget.onTap,
+                cornerRadius: 28,
                 child: Padding(
                   padding: EdgeInsets.all(widget.compact ? 14 : 20),
                   child: LayoutBuilder(

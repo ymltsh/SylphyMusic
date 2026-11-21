@@ -9,9 +9,11 @@ class PlaylistReorderGrid extends StatefulWidget {
     required this.cardBuilder,
     required this.onMove,
     this.compact = false,
+    this.bottomOverlayPadding = 0,
   });
 
   final bool compact;
+  final double bottomOverlayPadding;
   final List<PlaylistModel> playlists;
   final Widget Function(BuildContext, PlaylistModel) cardBuilder;
   final Future<void> Function(String id, String targetId) onMove;
@@ -73,7 +75,12 @@ class _PlaylistReorderGridState extends State<PlaylistReorderGrid> {
           16;
       return GridView.builder(
         key: const PageStorageKey('playlist-reorder-grid'),
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          4,
+          16,
+          120 + widget.bottomOverlayPadding,
+        ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           crossAxisSpacing: 14,

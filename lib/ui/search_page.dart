@@ -8,6 +8,7 @@ import '../data/library_catalog.dart';
 import 'capsule_toggle.dart';
 import 'library_browser.dart';
 import 'route_player_bar.dart';
+import 'design_system/miuix_adaptive.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({
@@ -61,9 +62,9 @@ class _SearchPageState extends State<SearchPage> {
         controller: input,
         autofocus: true,
         textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
+        decoration: SylphyMiuixStyle.searchDecoration(
+          context,
           hintText: '搜索歌曲、专辑、艺术家',
-          border: InputBorder.none,
           suffixIcon: IconButton(
             tooltip: '清空搜索',
             icon: const Icon(Icons.close),

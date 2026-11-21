@@ -7,6 +7,7 @@ import '../core/models.dart';
 import 'batch_selection.dart';
 import 'cover_art.dart';
 import 'player_bar.dart';
+import 'design_system/miuix_adaptive.dart';
 
 /// Cover-first playlist card used by the playlist grid.
 class PlaylistGridCard extends StatefulWidget {
@@ -90,8 +91,8 @@ class _PlaylistGridCardState extends State<PlaylistGridCard> {
 
       return Material(
         color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+        child: SylphyAdaptivePressable(
+          cornerRadius: 14,
           onTap: widget.onOpen,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,8 +100,13 @@ class _PlaylistGridCardState extends State<PlaylistGridCard> {
               AspectRatio(
                 aspectRatio: 1,
                 child: LayoutBuilder(
-                  builder: (context, constraints) => ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                  builder: (context, constraints) => ClipPath(
+                    clipper: ShapeBorderClipper(
+                      shape: SylphyMiuixStyle.cardShape(
+                        context,
+                        cornerRadius: 12,
+                      ),
+                    ),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [

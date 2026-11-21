@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_miuix/miuix.dart';
 
 import '../core/app_controller.dart';
 import '../core/models.dart';
 import 'cover_art.dart';
+import 'design_system/miuix_adaptive.dart';
 
 /// A song row with a quiet current-track tint and a live equalizer badge.
 /// Progress notifications do not trigger a rebuild unless the active track or
@@ -77,68 +79,84 @@ class _PlayingSongTileState extends State<PlayingSongTile> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final miuix = SylphyMiuixStyle.enabled(context);
+    final palette = miuix ? MiuixTheme.of(context).colors : null;
+    final highlight = widget.selectedInBatch
+        ? (palette?.primaryContainer.withValues(alpha: .85) ??
+              scheme.primary.withValues(alpha: .15))
+        : _isCurrent
+        ? (palette?.primaryContainer.withValues(alpha: .45) ??
+              scheme.primary.withValues(alpha: .09))
+        : Colors.transparent;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      color: widget.selectedInBatch
-          ? scheme.primary.withValues(alpha: .15)
-          : _isCurrent
-          ? scheme.primary.withValues(alpha: .09)
-          : Colors.transparent,
-      child: ListTile(
-        contentPadding: widget.contentPadding,
-        selected: _isCurrent || widget.selectedInBatch,
-        selectedColor: scheme.primary,
-        leading: SizedBox.square(
-          dimension: 48,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child:
-                    widget.leading ??
-                    CoverArt(app: widget.app, track: widget.track),
-              ),
-              if (_isCurrent)
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: scheme.primary,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 3,
-                        vertical: 2,
+      curve: miuix ? MiuixMotion.standardDecelerate : Curves.easeOut,
+      decoration: miuix
+          ? ShapeDecoration(
+              color: highlight,
+              shape: const MiuixSquircleBorder(cornerRadius: 16),
+            )
+          : BoxDecoration(color: highlight),
+      child: SylphyMiuixPressable(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: ListTile(
+          contentPadding: widget.contentPadding,
+          selected: _isCurrent || widget.selectedInBatch,
+          selectedColor: scheme.primary,
+          leading: SizedBox.square(
+            dimension: 48,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child:
+                      widget.leading ??
+                      CoverArt(app: widget.app, track: widget.track),
+                ),
+                if (_isCurrent)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: PlaybackEqualizer(
-                        playing: _isPlaying,
-                        color: scheme.onPrimary,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 2,
+                        ),
+                        child: PlaybackEqualizer(
+                          playing: _isPlaying,
+                          color: scheme.onPrimary,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
+          title: Text(
+            widget.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _isCurrent
+                ? const TextStyle(fontWeight: FontWeight.w600)
+                : null,
+          ),
+          subtitle: Text(
+            widget.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onTap: miuix && widget.onTap != null ? null : widget.onTap,
+          onLongPress: miuix && widget.onTap != null
+              ? null
+              : widget.onLongPress,
+          trailing: widget.trailing,
         ),
-        title: Text(
-          widget.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: _isCurrent
-              ? const TextStyle(fontWeight: FontWeight.w600)
-              : null,
-        ),
-        subtitle: Text(
-          widget.subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
-        trailing: widget.trailing,
       ),
     );
   }

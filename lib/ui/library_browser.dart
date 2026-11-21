@@ -23,6 +23,7 @@ class LibraryBrowser extends StatefulWidget {
     this.viewControls,
     this.coverFlow = false,
     this.bottomPadding,
+    this.bottomOverlayPadding = 0,
     this.batchSelection,
     this.selected,
     this.onSelection,
@@ -36,6 +37,7 @@ class LibraryBrowser extends StatefulWidget {
 
   /// Space owned by an overlay; a docked route player needs no extra reserve.
   final double? bottomPadding;
+  final double bottomOverlayPadding;
   final BatchSelection? batchSelection;
   final Set<String>? selected;
   final void Function(Track, bool)? onSelection;
@@ -564,6 +566,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
+    bottom: widget.bottomOverlayPadding == 0,
     child: FutureBuilder<CatalogPage>(
       future: page,
       builder: (context, snapshot) {
@@ -605,9 +608,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   titleBuilder: _coverFlowTitle,
                   subtitleBuilder: _coverFlowSubtitle,
                   onActivate: _activateCoverFlow,
-                  bottomPadding: MediaQuery.sizeOf(context).width > 750
-                      ? 16
-                      : 84,
+                  bottomPadding:
+                      (MediaQuery.sizeOf(context).width > 750 ? 16 : 84) +
+                      widget.bottomOverlayPadding,
                   emptyMessage: emptyMessage,
                 )
               : LayoutBuilder(
@@ -636,10 +639,11 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                         clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.only(
                           bottom:
-                              widget.bottomPadding ??
-                              (MediaQuery.sizeOf(context).width > 750
-                                  ? 24
-                                  : 96),
+                              (widget.bottomPadding ??
+                                  (MediaQuery.sizeOf(context).width > 750
+                                      ? 24
+                                      : 96)) +
+                              widget.bottomOverlayPadding,
                         ),
                         itemExtent: compactGrid
                             ? 92 *

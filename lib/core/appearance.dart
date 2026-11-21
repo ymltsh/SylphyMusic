@@ -16,11 +16,15 @@ enum LyricColorMode { album, system, fixed }
 
 enum MiniPlayerBarStyle { automatic, pc, standard }
 
+/// User preference. Whether Miuix can render is decided by UiStyleAvailability.
+enum UiStyle { material3, miuix }
+
 class Appearance extends ChangeNotifier {
   Appearance(this.db);
   final AppDb db;
   static const defaultSeed = Color(0xff5094b2);
   ThemeMode mode = ThemeMode.system;
+  UiStyle uiStyle = UiStyle.material3;
   Color seed = defaultSeed;
   LyricColorMode lyricPageColorMode = LyricColorMode.album;
   Color lyricPageFixedColor = const Color(0xffd5f1ea);
@@ -33,6 +37,7 @@ class Appearance extends ChangeNotifier {
   bool _closed = false;
   Future<void> _backgroundWork = Future.value();
   Future<void> _coverFlowWork = Future.value();
+  Future<void> _uiStyleWork = Future.value();
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
   static final _managedName = RegExp(r'^background-[0-9a-f-]+\.png$');
@@ -68,6 +73,22 @@ class Appearance extends ChangeNotifier {
     _libraryCategoryMask = next;
     notifyListeners();
     await db.setSetting('ui_library_categories', '$next');
+  }
+
+  /// Serialize preferences so rapid taps cannot reorder writes.
+  /// Updating the in-memory value only after a successful write preserves
+  /// the old style if persistence fails.
+  Future<void> setUiStyle(UiStyle next) {
+    if (_closed) return Future.value();
+    final operation = _uiStyleWork.then((_) async {
+      if (_closed || uiStyle == next) return;
+      await db.setSetting('ui_style', next.name);
+      uiStyle = next;
+      if (!_closed) notifyListeners();
+    });
+    // A failed write must not poison later attempts or the shutdown drain.
+    _uiStyleWork = operation.catchError((Object _) {});
+    return operation;
   }
 
   double lyricFontSize = 24;
@@ -107,6 +128,11 @@ class Appearance extends ChangeNotifier {
   Future<void> initialize() async {
     albumCoverFlow = await db.setting('ui_album_cover_flow') == 'true';
     playlistCoverFlow = await db.setting('ui_playlist_cover_flow') == 'true';
+    final savedStyle = await db.setting('ui_style');
+    uiStyle = UiStyle.values.firstWhere(
+      (value) => value.name == savedStyle,
+      orElse: () => UiStyle.material3,
+    );
     final savedMode = await db.setting('ui_theme');
     mode = ThemeMode.values.firstWhere(
       (v) => v.name == savedMode,
@@ -411,6 +437,7 @@ class Appearance extends ChangeNotifier {
     _closed = true;
     await _backgroundWork;
     await _coverFlowWork;
+    await _uiStyleWork;
     dispose();
   }
 }

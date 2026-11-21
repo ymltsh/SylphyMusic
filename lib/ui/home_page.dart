@@ -24,8 +24,10 @@ class HomePage extends StatefulWidget {
     required this.onLibrary,
     required this.onSources,
     required this.onAction,
+    this.bottomOverlayPadding = 0,
   });
   final SylphyApp app;
+  final double bottomOverlayPadding;
   final void Function(int) onLibrary;
   final VoidCallback onSources;
   final Future<void> Function(String, Track) onAction;
@@ -635,7 +637,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             desktop ? 24 : 20,
             desktop ? 8 : 12,
             desktop ? 24 : 20,
-            desktop ? 24 : 110,
+            (desktop ? 24 : 110) + widget.bottomOverlayPadding,
           ),
           children: [
             welcomeCard,

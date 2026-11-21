@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_miuix/miuix.dart';
 
 import '../core/app_controller.dart';
 import '../core/appearance.dart';
@@ -24,7 +25,6 @@ import 'track_actions.dart';
 import 'batch_selection.dart';
 import 'home_page.dart';
 import 'search_page.dart';
-import 'app_background.dart';
 import 'app_identity.dart';
 import 'player_cover.dart';
 import 'settings_page.dart';
@@ -35,6 +35,10 @@ import 'landscape_navigation_rail.dart';
 import 'music_source_connection_page.dart';
 import 'quick_start_wizard.dart';
 import '../data/library_catalog.dart';
+import 'design_system/ui_style_availability.dart';
+import 'design_system/miuix_adaptive.dart';
+import 'miuix/miuix_ambient_background.dart';
+import 'miuix/miuix_dock_navigation.dart';
 
 class SylphyShell extends StatefulWidget {
   const SylphyShell({super.key, required this.app});
@@ -46,6 +50,7 @@ class SylphyShell extends StatefulWidget {
 class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   int tab = 0;
   final BatchSelection _librarySelection = BatchSelection();
+  final _pageBodyKey = GlobalKey();
   int libraryView = 0;
   bool get albumCoverFlow => app.appearance.albumCoverFlow;
   bool get playlistCoverFlow => app.appearance.playlistCoverFlow;
@@ -225,8 +230,10 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     final labelHeight = MediaQuery.textScalerOf(context).scale(12);
     final extra = ((labelHeight - 12) * 2).clamp(0.0, 32.0).toDouble();
     final shortScreen = MediaQuery.sizeOf(context).height < 600;
-    return (72.0 + extra - (shortScreen ? 4.0 : 0.0))
-        .clamp(68.0, 104.0)
+    // Same compact baseline as the Miuix dock; preserve extra space for
+    // accessibility text sizes and let NavigationBar own the system inset.
+    return (64.0 + extra - (shortScreen ? 4.0 : 0.0))
+        .clamp(60.0, 96.0)
         .toDouble();
   }
 
@@ -241,6 +248,14 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         Theme.of(context).platform == TargetPlatform.android &&
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final wide = androidLandscape || MediaQuery.sizeOf(context).width > 750;
+    // Only the visual chrome changes. The existing tab/page/action/queue tree
+    // remains intact in both modes, as in the original Sylphy layout.
+    final miuixPortrait =
+        !wide &&
+        UiStyleAvailability.effective(app.appearance.uiStyle) == UiStyle.miuix;
+    final dockReserve = miuixPortrait
+        ? MiuixDockNavigation.reserveHeight(context)
+        : 0.0;
     final dockPlayer = _usesDockedPlayer(context);
     final playerAnimation = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -252,14 +267,14 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           // Navigation width does not force the user's normal floating bar
           // into the dedicated PC footer.
           child: dockPlayer
-              ? _page()
+              ? _page(dockReserve)
               : Stack(
                   children: [
-                    Positioned.fill(child: _page()),
+                    Positioned.fill(child: _page(dockReserve)),
                     Positioned(
                       left: 12,
                       right: 12,
-                      bottom: 8,
+                      bottom: dockReserve + 8,
                       child: IgnorePointer(
                         ignoring: playerCollapsed,
                         child: AnimatedSlide(
@@ -272,7 +287,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                             opacity: playerCollapsed ? 0 : 1,
                             duration: playerAnimation,
                             curve: Curves.easeOutCubic,
-                            child: SafeArea(top: false, child: _playerBar()),
+                            child: SafeArea(
+                              top: false,
+                              bottom: !miuixPortrait,
+                              child: _playerBar(),
+                            ),
                           ),
                         ),
                       ),
@@ -294,15 +313,19 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         label: Text(labels[i]),
       ),
     );
-    void selectRailDestination(int value) {
+    void selectDestination(int value) {
       if (value != 1) _librarySelection.clear();
       setState(() => tab = value);
     }
 
-    return AppBackground(
+    return MiuixAmbientBackground(
       appearance: app.appearance,
+      enabled: miuixPortrait,
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        // Make the content visible through the pill's transparent margins.
+        // The same SylphyShell still owns every tab and playback action.
+        extendBody: miuixPortrait,
         appBar: androidLandscape
             ? null
             : AppBar(
@@ -336,48 +359,59 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-        body: wide
-            ? SafeArea(
-                // With no AppBar, reserve only the real system cutout/status
-                // insets. The background still paints behind the status bar.
-                top: androidLandscape,
-                left: androidLandscape,
-                right: androidLandscape,
-                bottom: false,
-                child: Row(
-                  children: [
-                    if (androidLandscape)
-                      LandscapeNavigationRail(
-                        backgroundColor: solidBackground
-                            ? Colors.transparent
-                            : null,
-                        selectedIndex: tab,
-                        onDestinationSelected: selectRailDestination,
-                        destinations: railDestinations,
-                        onSearch: _openSearch,
-                        onSettings: _openSettings,
-                      )
-                    else
-                      NavigationRail(
-                        extended: MediaQuery.sizeOf(context).width > 1050,
-                        minExtendedWidth: 208,
-                        minWidth: 72,
-                        backgroundColor: solidBackground
-                            ? Colors.transparent
-                            : null,
-                        selectedIndex: tab,
-                        onDestinationSelected: selectRailDestination,
-                        destinations: railDestinations,
-                      ),
-                    const VerticalDivider(width: 1),
-                    Expanded(child: main),
-                  ],
-                ),
-              )
-            : main,
+        // Scaffold changes its body wrapper when extendBody changes.
+        body: KeyedSubtree(
+          key: _pageBodyKey,
+          child: wide
+              ? SafeArea(
+                  // With no AppBar, reserve only the real system cutout/status
+                  // insets. The background still paints behind the status bar.
+                  top: androidLandscape,
+                  left: androidLandscape,
+                  right: androidLandscape,
+                  bottom: false,
+                  child: Row(
+                    children: [
+                      if (androidLandscape)
+                        LandscapeNavigationRail(
+                          backgroundColor: solidBackground
+                              ? Colors.transparent
+                              : null,
+                          selectedIndex: tab,
+                          onDestinationSelected: selectDestination,
+                          destinations: railDestinations,
+                          onSearch: _openSearch,
+                          onSettings: _openSettings,
+                        )
+                      else
+                        NavigationRail(
+                          extended: MediaQuery.sizeOf(context).width > 1050,
+                          minExtendedWidth: 208,
+                          minWidth: 72,
+                          backgroundColor: solidBackground
+                              ? Colors.transparent
+                              : null,
+                          selectedIndex: tab,
+                          onDestinationSelected: selectDestination,
+                          destinations: railDestinations,
+                        ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: main),
+                    ],
+                  ),
+                )
+              : main,
+        ),
         floatingActionButton: playerCollapsed ? _collapsedPlayerFab() : null,
         bottomNavigationBar: wide
             ? (dockPlayer && !playerCollapsed ? _desktopPlayerBar() : null)
+            : miuixPortrait
+            ? MiuixDockNavigation(
+                selectedIndex: tab,
+                labels: labels,
+                icons: icons,
+                onSelected: selectDestination,
+              )
             : Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -398,10 +432,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                     height: _navigationBarHeight(context),
                     maintainBottomViewPadding: true,
                     selectedIndex: tab,
-                    onDestinationSelected: (v) {
-                      if (v != 1) _librarySelection.clear();
-                      setState(() => tab = v);
-                    },
+                    onDestinationSelected: selectDestination,
                     destinations: List.generate(
                       labels.length,
                       (i) => NavigationDestination(
@@ -526,11 +557,12 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ],
   );
 
-  Widget _page() {
+  Widget _page(double dockReserve) {
     switch (tab) {
       case 0:
         return HomePage(
           app: app,
+          bottomOverlayPadding: dockReserve,
           onLibrary: _library,
           onSources: () => _openSources(),
           onAction: _trackAction,
@@ -547,6 +579,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             ),
             onAction: _trackAction,
             batchSelection: _librarySelection,
+            bottomOverlayPadding: dockReserve,
             bottomPadding: libraryView == 3
                 ? (_usesDockedPlayer(context) ||
                           playerCollapsed ||
@@ -561,9 +594,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           ),
         );
       case 2:
-        return _playlists();
+        return _playlists(dockReserve);
       default:
-        return _personal();
+        return _personal(dockReserve);
     }
   }
 
@@ -582,15 +615,18 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     VoidCallback onTap,
   ) {
     final scheme = Theme.of(context).colorScheme;
+    final miuix = SylphyMiuixStyle.enabled(context);
+    final miuixColors = miuix ? MiuixTheme.of(context).colors : null;
     final compact = useWideCardRatio(
       context,
       app.desktopPreferences.compactPageCards,
     );
-    return Card.filled(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+    return SylphyAdaptiveCard(
+      cornerRadius: 24,
+      materialFilled: true,
+      child: SylphyAdaptivePressable(
         onTap: onTap,
+        cornerRadius: 24,
         child: Padding(
           padding: EdgeInsets.all(compact ? 12 : 18),
           child: Column(
@@ -598,24 +634,40 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: compact ? 34 : 42,
-                    height: compact ? 34 : 42,
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(14),
+                  // In Miuix mode, the native card itself is the surface.
+                  // Avoid layering the old M3 primaryContainer icon tile on it.
+                  if (miuixColors != null)
+                    SizedBox.square(
+                      dimension: compact ? 34 : 42,
+                      child: Center(
+                        child: Icon(
+                          icon,
+                          color: miuixColors.onSurfaceContainer,
+                          size: compact ? 22 : 26,
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: compact ? 34 : 42,
+                      height: compact ? 34 : 42,
+                      decoration: BoxDecoration(
+                        color: scheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: scheme.onPrimaryContainer,
+                        size: compact ? 20 : 23,
+                      ),
                     ),
-                    child: Icon(
-                      icon,
-                      color: scheme.onPrimaryContainer,
-                      size: compact ? 20 : 23,
-                    ),
-                  ),
                   const Spacer(),
                   Icon(
                     Icons.arrow_forward_rounded,
                     size: 18,
-                    color: scheme.onSurfaceVariant,
+                    color:
+                        miuixColors?.onSurfaceVariantActions ??
+                        scheme.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -651,7 +703,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _personal() {
+  Widget _personal(double dockReserve) {
     final compact = useWideCardRatio(
       context,
       app.desktopPreferences.compactPageCards,
@@ -665,7 +717,8 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
             20,
             16,
             20,
-            _usesDockedPlayer(context) || playerCollapsed ? 32 : 116,
+            (_usesDockedPlayer(context) || playerCollapsed ? 32 : 116) +
+                dockReserve,
           ),
           children: [
             MusicSpaceCard(
@@ -728,9 +781,9 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
               },
             ),
             _personalHeading('音乐管理'),
-            Card.outlined(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
+            SylphyAdaptiveCard(
+              cornerRadius: 24,
+              materialOutlined: true,
               child: Column(
                 children: [
                   ListTile(
@@ -940,7 +993,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
     if (success) selection.clear();
   }
 
-  Widget _playlists() => Column(
+  Widget _playlists(double dockReserve) => Column(
     children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -1017,10 +1070,11 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                   };
                 },
                 onActivate: (index) => _playlistDetails(app.playlists[index]),
-                bottomPadding: 84,
+                bottomPadding: 84 + dockReserve,
                 emptyMessage: '还没有歌单',
               )
             : PlaylistReorderGrid(
+                bottomOverlayPadding: dockReserve,
                 compact: useWideCardRatio(
                   context,
                   app.desktopPreferences.compactPageCards,

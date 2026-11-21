@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   disk_space_2
+  dynamic_color
   flutter_secure_storage_windows
   media_kit_libs_windows_audio
   share_plus

@@ -12,6 +12,7 @@ import 'ui/system_bars.dart';
 import 'ui/app_theme.dart';
 import 'ui/playback_shortcuts.dart';
 import 'ui/player_bar.dart';
+import 'ui/design_system/miuix_theme_scope.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,10 +48,12 @@ class _BootstrapState extends State<_Bootstrap> {
           navigatorKey: _navigator,
           themeMode: app?.appearance.mode ?? ThemeMode.system,
           builder: (context, child) {
-            final content = AppSystemBars(
-              child: child ?? const SizedBox.shrink(),
+            final route = child ?? const SizedBox.shrink();
+            if (app == null) return AppSystemBars(child: route);
+            final content = MiuixThemeScope(
+              appearance: app.appearance,
+              child: AppSystemBars(child: route),
             );
-            if (app == null) return content;
             return PlaybackShortcuts(
               app: app,
               child: content,

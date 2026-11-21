@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'design_system/miuix_adaptive.dart';
+
 class SettingsGroup extends StatelessWidget {
   const SettingsGroup({super.key, this.title, required this.children});
 
@@ -24,9 +26,7 @@ class SettingsGroup extends StatelessWidget {
                 ),
               ),
             ),
-          Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
+          SylphyAdaptiveCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: children,

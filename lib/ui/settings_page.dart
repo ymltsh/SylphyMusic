@@ -14,8 +14,10 @@ import 'about_page.dart';
 import 'app_update_page.dart';
 import 'cache_storage.dart';
 import 'cache_tasks.dart';
+import 'design_system/ui_style_availability.dart';
 import 'desktop_settings_page.dart';
 import 'device_transfer_page.dart';
+import 'miuix/miuix_settings_preview_page.dart';
 import 'launcher_icon_picker.dart';
 import 'player_layout/layout_editor.dart';
 import 'recommendation_letters_page.dart';
@@ -170,6 +172,39 @@ class _SettingsPageState extends State<SettingsPage> {
   };
 
   List<Widget> _themeCards() => [
+    if (UiStyleAvailability.miuixAvailable)
+      _group('界面风格 · 实验性', [
+        for (final style in UiStyle.values)
+          ListTile(
+            leading: Icon(
+              style == UiStyle.material3
+                  ? Icons.widgets_outlined
+                  : Icons.auto_awesome_outlined,
+            ),
+            title: Text(style == UiStyle.material3 ? 'Material 3' : 'Miuix'),
+            subtitle: Text(
+              style == UiStyle.material3 ? '经典界面 · 默认' : 'HyperOS 风格 · 实验性',
+            ),
+            trailing: app.appearance.uiStyle == style
+                ? const Icon(
+                    Icons.check_circle,
+                    key: ValueKey('ui-style-selected'),
+                  )
+                : null,
+            onTap: () => _act(() => app.appearance.setUiStyle(style)),
+          ),
+        if (app.appearance.uiStyle == UiStyle.miuix)
+          ListTile(
+            title: const Text('Miuix 组件预览'),
+            subtitle: const Text('查看真实的 HyperOS 风格卡片、设置项与动画'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const MiuixSettingsPreviewPage(),
+              ),
+            ),
+          ),
+      ]),
     SettingsGroup(
       title: '主题与配色',
       children: [
