@@ -706,7 +706,9 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                   if (e.type == PlayerPart.cover &&
                       e.coverStyle == PlayerCoverStyle.immersive) ...[
                     _slider(
-                      '渐隐起点',
+                      e.coverFadeDirection == CoverFadeDirection.all
+                          ? '中心清晰范围'
+                          : '渐隐起点',
                       e.coverFadeStart,
                       0,
                       .95,
@@ -721,8 +723,12 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           CoverFadeDirection.left: '向左渐隐',
                           CoverFadeDirection.bottom: '向下渐隐',
                           CoverFadeDirection.top: '向上渐隐',
+                          CoverFadeDirection.all: '四周羽化',
                         }.entries)
                           _pill(
+                            key: ValueKey(
+                              'editor-cover-fade-${direction.key.name}',
+                            ),
                             label: Text(direction.value),
                             selected: e.coverFadeDirection == direction.key,
                             onSelected: (_) => draft.update(
@@ -731,6 +737,11 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           ),
                       ],
                     ),
+                    if (e.coverFadeDirection == CoverFadeDirection.all)
+                      const Text(
+                        '四周逐渐透明、中心清晰；数值越大，羽化范围越窄。',
+                        style: TextStyle(fontSize: 12),
+                      ),
                   ],
                   if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
                     Padding(

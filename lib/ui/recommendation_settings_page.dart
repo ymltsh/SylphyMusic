@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../services/recommendation_service.dart';
 import 'llm_recommendation_settings.dart';
-import 'recommendation_settings_section.dart';
+import 'recommendation_letters_page.dart';
+import 'settings_controls.dart';
 
 class RecommendationSettingsPage extends StatefulWidget {
   const RecommendationSettingsPage({super.key, required this.app});
@@ -158,7 +159,15 @@ class _RecommendationSettingsPageState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('推荐设置')),
+    appBar: AppBar(
+      title: const Text('推荐与音乐笔友'),
+      bottom: _busy
+          ? const PreferredSize(
+              preferredSize: Size.fromHeight(4),
+              child: LinearProgressIndicator(),
+            )
+          : null,
+    ),
     body: SafeArea(
       top: false,
       child: Align(
@@ -168,11 +177,8 @@ class _RecommendationSettingsPageState
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
-              RecommendationSettingsSection(
-                icon: Icons.library_music_outlined,
+              SettingsGroup(
                 title: '基础推荐',
-                description: '从自己的曲库发现音乐，决定选曲依据。',
-                status: '始终可用',
                 children: [
                   SwitchListTile(
                     secondary: const Icon(Icons.favorite_border_rounded),
@@ -218,7 +224,33 @@ class _RecommendationSettingsPageState
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SettingsGroup(
+                title: '每日换新',
+                children: [
+                  _refreshSchedule(),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('更新每日精选和专辑推荐。开启模型增强时可能产生费用。'),
+                        if (_needsRefresh)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text('已保存选曲偏好，将在下次换新时生效。'),
+                          ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _locked ? null : _refresh,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: Text(_busy ? _activity : '立即更新推荐'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               LlmRecommendationSettings(
                 app: app,
                 disabled: _busy,
@@ -226,13 +258,21 @@ class _RecommendationSettingsPageState
                   if (mounted) setState(() => _llmBusy = value);
                 },
               ),
-              const SizedBox(height: 24),
-              RecommendationSettingsSection(
-                icon: Icons.update_rounded,
-                title: '换新与数据',
-                description: '安排每日精选的节奏，管理推荐使用的收听统计。',
+              SettingsGroup(
+                title: '推荐数据',
                 children: [
-                  _refreshSchedule(),
+                  ListTile(
+                    key: const ValueKey('recommendation-letters-archive'),
+                    leading: const Icon(Icons.markunread_mailbox_outlined),
+                    title: const Text('每日推荐文案'),
+                    subtitle: const Text('回看已存档的推荐信件和逐曲理由'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => RecommendationLettersPage(app: app),
+                      ),
+                    ),
+                  ),
                   const Divider(height: 1, indent: 16, endIndent: 16),
                   ListTile(
                     leading: const Icon(Icons.delete_outline),
@@ -242,36 +282,6 @@ class _RecommendationSettingsPageState
                     onTap: _locked ? null : _clear,
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              Card(
-                margin: EdgeInsets.zero,
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        _needsRefresh ? '设置已保存，选曲调整将在下次换新生效' : '想现在听到新的选择？',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 6),
-                      const Text('立即更新每日精选和专辑推荐；开启 LLM 时会请求模型服务，可能产生费用。'),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: _locked ? null : _refresh,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(_busy ? _activity : '立即更新推荐'),
-                      ),
-                      if (_busy)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: LinearProgressIndicator(),
-                        ),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),

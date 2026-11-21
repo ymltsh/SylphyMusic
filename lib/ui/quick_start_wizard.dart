@@ -7,6 +7,7 @@ import '../services/device_transfer_config.dart';
 import 'device_transfer_page.dart';
 import 'llm_recommendation_settings.dart';
 import 'music_source_ui.dart';
+import 'rp_user_profile_card.dart';
 
 /// Welcome, transfer, sources, music penpal, then optional public APIs.
 class QuickStartWizard extends StatefulWidget {
@@ -550,6 +551,8 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
         '选择或创建一位音乐笔友，让 TA 从你的收藏中分享旋律，'
         '用来信、聊天和留言回应，延续你们的相处。',
       ),
+      const SizedBox(height: 16),
+      RpUserProfileCard(app: widget.app),
       const SizedBox(height: 12),
       const Text(
         '先在“模型连接”填写兼容 Chat Completions 的接口、模型与密钥，'
@@ -565,7 +568,7 @@ class _QuickStartWizardState extends State<QuickStartWizard> {
       ),
       const SizedBox(height: 16),
       Text(
-        '开启后，候选音乐信息、角色提示词及按设置引用的记忆会发送至你配置的服务；'
+        '开启后，候选音乐信息、角色提示词、已填写的用户资料及按设置引用的记忆会发送至你配置的服务；'
         '聊天和留言回复还会发送相应内容。音频文件和音源登录凭据不会发送。'
         '服务可能收费；不启用 LLM 也能完整使用私人音乐播放器。',
         style: theme.textTheme.bodySmall?.copyWith(

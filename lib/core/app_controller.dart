@@ -46,6 +46,7 @@ import '../data/penpal_chat_repository.dart';
 import '../data/rp_repository.dart';
 import '../services/rp_runtime.dart';
 import '../data/rp_journal_repository.dart';
+import '../data/rp_user_profile_repository.dart';
 import '../services/rp_journal_service.dart';
 import '../data/penpal_mailbox_repository.dart';
 import '../services/penpal_chat.dart';
@@ -93,6 +94,7 @@ class SylphyApp extends ChangeNotifier {
     loadLyrics: loadLyrics,
   );
   late final apiSettings = ApiSettings(db);
+  late final userProfile = RpUserProfileRepository(db);
   late final lrcApi = LrcApiClient(apiSettings, vault);
   late final playerLayouts = PlayerLayoutStore(db);
   late final history = ListeningHistory(db, playback);
@@ -118,6 +120,7 @@ class SylphyApp extends ChangeNotifier {
     PenpalChatRepository(db),
     rpRuntime: rpRuntime,
     journal: rpJournal,
+    userProfile: userProfile,
   );
   late final listeningAnalytics = ListeningAnalytics(
     playback,
@@ -131,7 +134,12 @@ class SylphyApp extends ChangeNotifier {
     rpRuntime: rpRuntime,
     journal: rpJournal,
     mailbox: penpalMailbox,
-    llm: LlmRecommendationClient(apiSettings, vault, diagnostics: diagnostics),
+    llm: LlmRecommendationClient(
+      apiSettings,
+      vault,
+      diagnostics: diagnostics,
+      userProfile: userProfile,
+    ),
   );
   List<PlaylistModel> playlists = [];
   Set<String> blacklist = {};

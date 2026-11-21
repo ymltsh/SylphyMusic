@@ -68,48 +68,83 @@ class PlayerCover extends StatelessWidget {
     if (style == PlayerCoverStyle.immersive) {
       final h = height ?? size;
       final side = math.max(size, h);
-      final (begin, end) = switch (fadeDirection) {
-        CoverFadeDirection.right => (
-          Alignment.centerLeft,
-          Alignment.centerRight,
+      final artwork = SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox.square(dimension: side, child: _art(context, side)),
         ),
-        CoverFadeDirection.left => (
-          Alignment.centerRight,
-          Alignment.centerLeft,
-        ),
-        CoverFadeDirection.bottom => (
-          Alignment.topCenter,
-          Alignment.bottomCenter,
-        ),
-        CoverFadeDirection.top => (Alignment.bottomCenter, Alignment.topCenter),
-      };
+      );
+      Widget maskedArtwork;
+      if (fadeDirection == CoverFadeDirection.all) {
+        // Feather each opposing pair of edges. Multiplying the horizontal
+        // and vertical alpha masks also softens the four corners, while the
+        // central fadeStart fraction stays fully opaque on each axis.
+        final edge = (1 - fadeStart) / 2;
+        const colors = [
+          Colors.transparent,
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+        ];
+        final stops = [0.0, edge, 1 - edge, 1.0];
+        maskedArtwork = ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (rect) => LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: colors,
+            stops: stops,
+          ).createShader(rect),
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (rect) => LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: colors,
+              stops: stops,
+            ).createShader(rect),
+            child: artwork,
+          ),
+        );
+      } else {
+        final (begin, end) = switch (fadeDirection) {
+          CoverFadeDirection.right => (
+            Alignment.centerLeft,
+            Alignment.centerRight,
+          ),
+          CoverFadeDirection.left => (
+            Alignment.centerRight,
+            Alignment.centerLeft,
+          ),
+          CoverFadeDirection.bottom => (
+            Alignment.topCenter,
+            Alignment.bottomCenter,
+          ),
+          CoverFadeDirection.top => (
+            Alignment.bottomCenter,
+            Alignment.topCenter,
+          ),
+          CoverFadeDirection.all => throw StateError('四周羽化已单独处理'),
+        };
+        maskedArtwork = ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (rect) => LinearGradient(
+            begin: begin,
+            end: end,
+            colors: const [Colors.white, Colors.white, Colors.transparent],
+            stops: [0, fadeStart, 1],
+          ).createShader(rect),
+          child: artwork,
+        );
+      }
       return Semantics(
         container: true,
         label: '沉浸封面',
         child: SizedBox(
           width: size,
           height: h,
-          child: ClipRect(
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (rect) => LinearGradient(
-                begin: begin,
-                end: end,
-                colors: const [Colors.white, Colors.white, Colors.transparent],
-                stops: [0, fadeStart, 1],
-              ).createShader(rect),
-              child: SizedBox.expand(
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox.square(
-                    dimension: side,
-                    child: _art(context, side),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: ClipRect(child: maskedArtwork),
         ),
       );
     }

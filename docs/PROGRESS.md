@@ -2277,3 +2277,19 @@ dart format 已执行；tool/build_review.ps1 成功完成 Android 三 ABI Relea
 根据用户实机截图，修正上一轮仅用专辑宽度决定两栏等高造成的单列封面过大。开启横屏卡片比例优化时，按内容区实际高度的约 48% 分配推荐区高度，标准字号限制为 164–220 dp，大字号增加最低高度；以高度预算反推专辑列数与封面尺寸，封面保持方形、上下边界继续对齐。每日精选压缩为单行标题和摘要，封面组按高度缩小；欢迎区改为文字与探索按钮横向排列。关闭优化与竖屏保持旧布局，窗口极矮或大字号时保留纵向滚动。
 
 两个分支已同步，四个源码文件已 dart format。普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 与内部打包，产物 build/internal-review/；OpenList 三 ABI Android Release 编译成功，产物 build/app/outputs/flutter-apk/。日志均为 build/test_logs/short-landscape-cards-build.log。未使用测试凭据，未运行 analyze、测试、启动或设备检查，窄长屏显示效果由用户验收。本次修正未提交、推送或发布，不在已发布的 1.0.74+87 / 1.0.74-openlist.55+87 内。
+
+
+## 2026-11-18 窄长横屏首页比例修正版发布
+
+按用户“推送更新”授权，普通版 1.0.75+88（三 ABI Android、Windows 安装程序 / 便携包及对应源码）与 OpenList 1.0.75-openlist.56+88（arm64 APK、含后端 / 前端对应源码）已发布。更新包含按可用高度控制首页两栏尺寸、专辑列数与方形封面自适应、紧凑欢迎横条及推荐摘要。七个普通版和三个特别版附件大小 / SHA-256、Release 标题 / 正文 / 状态及普通版 Latest 核对通过，正式签名一致，OpenList libgojni.so 与上一版摘要一致。
+
+仅提交推送清单：main/version.json 为 b65d304，feature/version.json 与 version-openlist.json 为 16b1938，main/version-openlist.json 为 f8db354。源码保留工作区并随发布附件交付。清单推送后曾读取到上一版 CDN 缓存；只重查远端读取，未重复发布。OpenList 通过发布入口 --finish-verification 核对全部原始 / 加速入口，publish-state.json 为 complete；普通版原始入口改用 requests 传输，原始 / 加速入口分别完整核对 latest 通过，不同传输读取的缓存更新存在时间差，未修改项目发布工具源码。
+
+普通版产物 build/releases/1.0.75-88/，日志 build/release88-publish.log 与 build/release88-finish-final.log；特别版产物 build/releases/1.0.75-openlist.56-88/，日志 build/openlist-release88-build.log、build/openlist-release88-prepare.log、build/openlist-release88-publish.log 和 build/openlist-release88-finish.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，实机效果由用户验收。
+
+
+## 2026-11-19 沉浸封面四周羽化补丁
+
+按用户要求，将 SylphyMusic_Immersive_Four_Edge_Feather.zip 同步应用到 main 与 feature/android-openlist-lite。两工作区 git apply --check 与应用成功，保留原有改动。CoverFadeDirection 新增 all，沉浸封面通过水平与垂直两轴 dstIn 蒙版使四边及四角透明；编辑器新增“四周羽化”，复用 coverFadeStart 并显示“中心清晰范围”。单向渐隐继续原行为，布局保持 v4，保存 / 导入导出使用现有字段，无迁移或数据清理。
+
+补丁附带模型及 widget 测试文件已保留但未运行，相关 Dart 文件已格式化。普通版 tool/build_review.ps1 完成三 ABI Android、Windows Release 与内部打包（build/internal-review/）；OpenList 三 ABI Android Release 编译成功（build/app/outputs/flutter-apk/）。两工作区日志 build/test_logs/immersive-four-edge-build.log。本轮未使用测试凭据，未运行 analyze、测试、启动或设备检查，实际羽化效果及性能由用户验收。未提交、推送或发布。

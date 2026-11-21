@@ -25,7 +25,8 @@ enum PlayerBackground { album, gradient, solid }
 enum PlayerCoverStyle { rounded, vinyl, immersive }
 
 /// The edge where an immersive cover fades into the canvas behind it.
-enum CoverFadeDirection { right, left, bottom, top }
+/// [CoverFadeDirection.all] feathers all four edges, leaving the center clear.
+enum CoverFadeDirection { right, left, bottom, top, all }
 
 const partLabels = {
   PlayerPart.cover: '专辑封面',

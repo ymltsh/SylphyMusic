@@ -207,6 +207,7 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
                           .map(
                             (option) => ChoiceChip(
                               selected: _kind == option.kind,
+                              showCheckmark: false,
                               avatar: MusicSourceIcon(
                                 kind: option.kind,
                                 size: 24,

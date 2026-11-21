@@ -38,11 +38,17 @@ def check(label, data):
     if any(needle in data for needle in needles):
         raise SystemExit(f'Private-data check failed in {label}; no package created.')
 
-tracked = subprocess.check_output(
-    ['git', 'ls-files', '-z'], cwd=root
+source_names = subprocess.check_output(
+    ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=root
 ).decode('utf-8').split('\0')
-for filename in filter(None, tracked):
-    check(filename, (root / filename).read_bytes())
+scanned = 0
+for filename in filter(None, source_names):
+    try:
+        data = (root / filename).read_bytes()
+    except FileNotFoundError:
+        continue
+    check(filename, data)
+    scanned += 1
 files = sorted(path for path in windows.rglob('*') if path.is_file() and (not optimized or path.suffix.lower() != '.pdb'))
 for path in files:
     check(str(path.relative_to(root)), path.read_bytes())
@@ -85,7 +91,7 @@ for path in artifacts:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     hashes.append(f'{digest}  {path.name}')
 (output / f'SHA256SUMS-{args.mode}.txt').write_text('\n'.join(hashes) + '\n', encoding='utf-8')
-print(f'Checked {len(list(filter(None, tracked)))} tracked files and application contents.')
+print(f'Checked {scanned} workspace files and application contents.')
 for path in artifacts:
     print(f'{path.name}: {path.stat().st_size / 1_000_000:.2f} MB')
 print(f'Internal review packages: {output}')

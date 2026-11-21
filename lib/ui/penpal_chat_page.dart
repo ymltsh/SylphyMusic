@@ -308,7 +308,7 @@ class _PenpalChatPageState extends State<PenpalChatPage> {
                             child: Text(
                               enabled
                                   ? '这次的选曲，有哪一首让你想说点什么？\n\n也可以从今天的一件小事聊起。'
-                                  : '请在推荐设置开启 LLM，并在 API 设置配置连接，再来与笔友聊天。',
+                                  : '请在「推荐与音乐笔友」开启模型增强，并配置模型连接。',
                               textAlign: TextAlign.center,
                               style: TextStyle(color: colors.onSurfaceVariant),
                             ),

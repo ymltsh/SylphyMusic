@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_controller.dart';
 import '../services/desktop_fonts.dart';
+import 'settings_controls.dart';
 
 class DesktopSettingsPage extends StatefulWidget {
   const DesktopSettingsPage({super.key, required this.app});
@@ -29,23 +30,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
     }
   }
 
-  Widget _group(String title, List<Widget> children) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
-        child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-      ),
-      Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      ),
-    ],
-  );
+  SettingsGroup _group(String title, List<Widget> children) =>
+      SettingsGroup(title: title, children: children);
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +47,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
             child: ListenableBuilder(
               listenable: prefs,
               builder: (context, _) => ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
                   _group('横屏页面布局', [
                     SwitchListTile(
@@ -122,11 +108,11 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                       ListTile(
                         dense: true,
                         title: Text(row.$2),
-                        trailing: Text(row.$1),
+                        subtitle: Text(row.$1),
                       ),
                   ]),
-                  _group('Windows 字体', [
-                    if (Platform.isWindows) ...[
+                  if (Platform.isWindows)
+                    _group('Windows 字体', [
                       const Padding(
                         padding: EdgeInsets.all(16),
                         child: Text(
@@ -223,12 +209,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           ),
                         ),
                       ),
-                    ] else
-                      const ListTile(
-                        title: Text('仅 Windows 支持自定义字体'),
-                        subtitle: Text('移动端继续使用系统字体'),
-                      ),
-                  ]),
+                    ]),
                   if (_busy && prefs.downloadingFont == null)
                     const Padding(
                       padding: EdgeInsets.only(top: 16),

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/recommendation_models.dart';
+import '../data/rp_user_profile_repository.dart';
 import 'api_settings.dart';
 import 'diagnostic_logs.dart';
 import 'sources.dart' show AuthVault;
@@ -53,10 +54,12 @@ class LlmRecommendationClient {
     this.settings,
     this.vault, {
     this.diagnostics,
+    this.userProfile,
     http.Client Function()? clientFactory,
   }) : _clientFactory = clientFactory ?? http.Client.new;
 
   final DiagnosticLogs? diagnostics;
+  final RpUserProfileRepository? userProfile;
   int _requestSequence = 0;
   final ApiSettings settings;
   final AuthVault vault;
@@ -335,6 +338,8 @@ class LlmRecommendationClient {
       final configured = settings.llmRevision;
       final endpoint = Uri.parse(settings.llmUrl);
       token = (await vault.read('llm', 'token') ?? '').trim();
+      // A new selection or writing request reads the latest explicit profile.
+      final profile = connectionTest ? null : await userProfile?.read();
       if (!canRequest() ||
           revision != _revision ||
           configured != settings.llmRevision) {
@@ -355,7 +360,7 @@ class LlmRecommendationClient {
         'kind': kind,
         'count': count,
         'mode': settings.llmMode,
-        'context': context,
+        'context': {...context, if (profile != null) ...profile.asContext()},
         'candidates': choices,
       });
       request.body = jsonEncode({

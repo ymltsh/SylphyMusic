@@ -163,6 +163,36 @@ void main() {
     }
   });
 
+  test('four-side feather round-trips as a normal immersive cover', () {
+    final layout = playerTemplate();
+    final cover = layout.elements.firstWhere((e) => e.type == PlayerPart.cover);
+    final feathered = cover.copyWith(
+      coverStyle: PlayerCoverStyle.immersive,
+      coverFadeDirection: CoverFadeDirection.all,
+      coverFadeStart: .6,
+      frame: const Rect.fromLTWH(0, 0, 1, .5),
+      wideFrame: const Rect.fromLTWH(0, 0, 1, .5),
+    );
+    final restored = PlayerLayout.decode(
+      layout
+          .copyWith(elements: [feathered, ...layout.elements.skip(1)])
+          .encode(),
+    );
+    final result = restored.elements.first;
+    expect(result.coverStyle, PlayerCoverStyle.immersive);
+    expect(result.coverFadeDirection, CoverFadeDirection.all);
+    expect(result.coverFadeStart, .6);
+    expect(
+      restored.bounds(result, const Size(1200, 800)),
+      const Rect.fromLTWH(0, 0, 1200, 400),
+    );
+    expect(restored.toJson()['version'], 4);
+    final json = jsonDecode(restored.encode()) as Map<String, dynamic>;
+    ((json['elements'] as List).first['props'] as Map)['coverFadeDirection'] =
+        'unknown';
+    expect(() => PlayerLayout.fromJson(json), throwsFormatException);
+  });
+
   test('full canvas bounds stay inside portrait and wide screens', () {
     for (final lyrics in [false, true]) {
       final layout = playerTemplate(lyrics: lyrics);
