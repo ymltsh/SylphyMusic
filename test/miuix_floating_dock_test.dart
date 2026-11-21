@@ -37,6 +37,9 @@ void main() {
         ),
       );
       final indicator = find.byKey(const ValueKey('miuix-selection-indicator'));
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      final dock = find.byKey(const ValueKey('miuix-bottom-navigation'));
+      expect(tester.getSize(dock).height, 58);
       final start = tester.getTopLeft(indicator).dx;
       await tester.tap(find.text('我的'));
       await tester.pump();

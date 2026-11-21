@@ -628,27 +628,19 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
         onTap: onTap,
         cornerRadius: 24,
         child: Padding(
-          padding: EdgeInsets.all(compact ? 12 : 18),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 18,
+            vertical: (compact ? 12.0 : 18.0) - (miuix ? 2 : 0),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  // In Miuix mode, the native card itself is the surface.
-                  // Avoid layering the old M3 primaryContainer icon tile on it.
-                  if (miuixColors != null)
-                    SizedBox.square(
-                      dimension: compact ? 34 : 42,
-                      child: Center(
-                        child: Icon(
-                          icon,
-                          color: miuixColors.onSurfaceContainer,
-                          size: compact ? 22 : 26,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
+                  SylphyAdaptiveQuickIcon(
+                    icon: icon,
+                    compact: compact,
+                    materialIcon: Container(
                       width: compact ? 34 : 42,
                       height: compact ? 34 : 42,
                       decoration: BoxDecoration(
@@ -661,6 +653,7 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
                         size: compact ? 20 : 23,
                       ),
                     ),
+                  ),
                   const Spacer(),
                   Icon(
                     Icons.arrow_forward_rounded,

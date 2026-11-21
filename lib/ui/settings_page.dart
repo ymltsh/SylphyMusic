@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter_miuix/miuix.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/app_controller.dart';
@@ -340,7 +341,16 @@ class _SettingsPageState extends State<SettingsPage> {
   ];
 
   Widget _entry(_SettingEntry entry, String detail) => ListTile(
-    leading: Icon(entry.icon, color: Theme.of(context).colorScheme.primary),
+    leading: SylphyMiuixStyle.enabled(context)
+        ? SizedBox(
+            width: 28,
+            child: Icon(
+              entry.icon,
+              size: 24,
+              color: MiuixTheme.of(context).colors.primary,
+            ),
+          )
+        : Icon(entry.icon, color: Theme.of(context).colorScheme.primary),
     title: Text(entry.title),
     subtitle: Text(detail),
     trailing: const Icon(Icons.chevron_right),

@@ -64,6 +64,37 @@ class SylphyMiuixStyle extends InheritedWidget {
   }
 }
 
+/// A tinted squircle icon with the caller's existing Material treatment.
+class SylphyAdaptiveQuickIcon extends StatelessWidget {
+  const SylphyAdaptiveQuickIcon({
+    super.key,
+    required this.icon,
+    required this.materialIcon,
+    this.compact = false,
+  });
+
+  final IconData icon;
+  final Widget materialIcon;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!SylphyMiuixStyle.enabled(context)) return materialIcon;
+
+    final primary = MiuixTheme.of(context).colors.primary;
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: primary.withValues(alpha: .10),
+        shape: const MiuixSquircleBorder(cornerRadius: 14),
+      ),
+      child: SizedBox.square(
+        dimension: compact ? 38 : 46,
+        child: Icon(icon, color: primary, size: compact ? 20 : 24),
+      ),
+    );
+  }
+}
+
 /// Use native MiuixCard to restyle a section without changing its children,
 /// their callbacks, or the original page's grid/list arrangement.
 class SylphyAdaptiveCard extends StatelessWidget {

@@ -100,7 +100,7 @@ void main() {
       find.byKey(const ValueKey('miuix-selection-indicator')),
       findsOneWidget,
     );
-    expect(find.byType(BackdropFilter), findsNothing);
+    expect(find.byType(BackdropFilter), findsOneWidget);
     await tester.tap(find.text('音乐库'));
     expect(selected, 1);
   });

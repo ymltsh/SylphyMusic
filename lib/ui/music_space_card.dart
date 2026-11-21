@@ -167,10 +167,13 @@ class _MusicSpaceCardState extends State<MusicSpaceCard>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.air_rounded,
-                                  color: colors.onSurface,
-                                  size: 30,
+                                SylphyAdaptiveQuickIcon(
+                                  icon: Icons.air_rounded,
+                                  materialIcon: Icon(
+                                    Icons.air_rounded,
+                                    color: colors.onSurface,
+                                    size: 30,
+                                  ),
                                 ),
                                 SizedBox(height: widget.compact ? 6 : 12),
                                 Text(
