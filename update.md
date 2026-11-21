@@ -13,7 +13,7 @@
 | 测试清单 | 将文件名换为 version-beta.json |
 | 发布页 | https://github.com/ymltsh/SylphyMusic/releases/latest |
 
-App 启动不主动检查；用户在“设置 → 检查更新”读取清单，比较安装包版本号和构建号，展示更新说明和下载按钮。加速前缀可在 API 设置修改，失败不回退原始地址。
+App 启动不主动检查；用户在“设置 → 关于风灵音乐 → 检查更新”读取清单，比较安装包版本号和构建号，展示更新说明和下载按钮。加速前缀可在 API 设置修改，失败不回退原始地址。
 
 清单包含 `latest` 和 `history`。`latest` 使用 `version`、`build`、`name`、`date`、`notes`、`urls`、`page`；下载字段为 `android_arm64`、`android_armv7`、`android_x64`、`windows`、`windows_portable`。旧版 latest 自动进入 history。
 

@@ -5,10 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/app_updates.dart';
+import 'app_update_dialog.dart';
+import 'settings_controls.dart';
 
 /// A project-focused About page with a hidden, music-themed constellation.
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key});
+  const AboutPage({
+    super.key,
+    required this.onCheckForUpdates,
+    this.updateMirror = AppUpdates.defaultMirror,
+  });
+
+  final Future<UpdateCheck> Function({bool beta}) onCheckForUpdates;
+  final String updateMirror;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -205,7 +214,7 @@ class _AboutPageState extends State<AboutPage> {
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
-                      _AboutSectionHeader(title: '应用信息', subtitle: '版本与许可证'),
+                      _AboutSectionHeader(title: '应用信息', subtitle: '版本、更新与许可证'),
                       FutureBuilder<AppVersion>(
                         future: _version,
                         builder: (context, snapshot) => ListTile(
@@ -219,6 +228,21 @@ class _AboutPageState extends State<AboutPage> {
                                 : snapshot.hasData
                                 ? snapshot.data.toString()
                                 : '正在读取版本…',
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1, indent: 72, endIndent: 16),
+                      ListTile(
+                        leading: const _AboutLeadingIcon(
+                          icon: Icons.system_update_alt_rounded,
+                        ),
+                        title: const Text('检查更新'),
+                        trailing: const SettingsIcon(Icons.chevron_right),
+                        onTap: () => showDialog<void>(
+                          context: context,
+                          builder: (_) => AppUpdateDialog(
+                            onCheck: widget.onCheckForUpdates,
+                            mirror: widget.updateMirror,
                           ),
                         ),
                       ),

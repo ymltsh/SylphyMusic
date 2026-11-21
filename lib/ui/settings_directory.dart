@@ -19,7 +19,6 @@ enum _Destination {
   onlineServices('在线服务'),
   onlineLyrics('在线歌词服务'),
   llmConnection('模型连接'),
-  updates('检查更新'),
   diagnostics('诊断与反馈'),
   about('关于风灵音乐');
 
@@ -253,12 +252,6 @@ const _settingsGroups = [
     title: '应用与帮助',
     entries: [
       _SettingEntry(
-        _Destination.updates,
-        Icons.system_update_alt,
-        '查看新版本与更新内容',
-        '升级 版本更新',
-      ),
-      _SettingEntry(
         _Destination.diagnostics,
         Icons.bug_report_outlined,
         '记录、导出、分享和清理诊断日志',
@@ -267,8 +260,8 @@ const _settingsGroups = [
       _SettingEntry(
         _Destination.about,
         Icons.info_outline_rounded,
-        '查看应用信息与开源许可证',
-        '版本号 关于 版权 开源许可',
+        '查看应用信息、检查更新与开源许可证',
+        '版本号 关于 版权 开源许可 检查更新 更新 升级 版本更新',
       ),
     ],
   ),

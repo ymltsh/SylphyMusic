@@ -12,7 +12,6 @@ import '../core/appearance.dart';
 import '../core/player_layout.dart';
 import '../services/llm_recommendations.dart';
 import 'about_page.dart';
-import 'app_update_page.dart';
 import 'cache_storage.dart';
 import 'cache_tasks.dart';
 import 'design_system/miuix_adaptive.dart';
@@ -92,11 +91,10 @@ class _SettingsPageState extends State<SettingsPage> {
           _Destination.letters => RecommendationLettersPage(app: app),
           _Destination.cacheStorage => CacheStoragePage(app: app),
           _Destination.downloads => CacheTasksPage(app: app),
-          _Destination.updates => AppUpdatePage(
-            onCheck: app.checkForUpdates,
-            mirror: app.apiSettings.githubMirror,
+          _Destination.about => AboutPage(
+            onCheckForUpdates: app.checkForUpdates,
+            updateMirror: app.apiSettings.githubMirror,
           ),
-          _Destination.about => const AboutPage(),
           _ => SettingsPage._(app: app, destination: destination),
         },
       ),

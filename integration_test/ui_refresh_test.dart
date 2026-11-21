@@ -645,12 +645,6 @@ void main() {
         expect(app.apiSettings.lrcApiEnabled, isFalse);
         await tester.pageBack();
         await tester.pumpAndSettle();
-        await openSetting('检查更新');
-        expect(find.text('点击获取最新版本安装包'), findsOneWidget);
-        expect(find.text('正在检查…'), findsNothing);
-        await capture('settings-update-mobile');
-        await tester.pageBack();
-        await tester.pumpAndSettle();
         await openSetting('诊断与反馈');
         expect(find.text('记录诊断日志'), findsOneWidget);
         expect(app.diagnostics.enabled, isFalse);
@@ -679,6 +673,8 @@ void main() {
         await tester.scrollUntilVisible(find.text('$installed'), 250);
         await tester.pumpAndSettle();
         await waitFor(find.text('$installed'));
+        await tester.scrollUntilVisible(find.text('检查更新'), 150);
+        expect(find.text('检查更新'), findsOneWidget);
         await tester.scrollUntilVisible(find.text('开源许可证'), 150);
         await tester.pumpAndSettle();
         await tester.tap(find.text('开源许可证'));

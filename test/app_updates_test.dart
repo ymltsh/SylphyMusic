@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sylphy_music/services/app_updates.dart';
-import 'package:sylphy_music/ui/app_update_page.dart';
+import 'package:sylphy_music/ui/app_update_dialog.dart';
 
 Map<String, dynamic> release({String version = '0.3.0', int build = 3}) => {
   'version': version,
@@ -22,6 +22,20 @@ Map<String, dynamic> release({String version = '0.3.0', int build = 3}) => {
 
 http.Response reply(String body, int status) =>
     http.Response.bytes(utf8.encode(body), status);
+
+Widget updateLauncher(AppUpdateDialog dialog) => MaterialApp(
+  home: Scaffold(
+    body: Builder(
+      builder: (context) => FilledButton(
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => dialog,
+        ),
+        child: const Text('检查更新'),
+      ),
+    ),
+  ),
+);
 
 void main() {
   test('compares numeric versions, channels and builds without downgrades', () {
@@ -183,8 +197,8 @@ void main() {
       final request = Completer<UpdateCheck>();
       final opened = <Uri>[];
       await tester.pumpWidget(
-        MaterialApp(
-          home: AppUpdatePage(
+        updateLauncher(
+          AppUpdateDialog(
             onCheck: ({bool beta = false}) {
               calls++;
               if (calls == 1) return request.future;
@@ -206,8 +220,9 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, '检查更新'));
       await tester.pump();
       expect(calls, 1);
+      expect(find.text('正在检查…'), findsOneWidget);
       expect(
-        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged,
         isNull,
       );
       request.completeError(StateError('offline'));
@@ -221,7 +236,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(opened.single.toString(), startsWith(AppUpdates.defaultMirror));
       expect(opened.single.path, endsWith('/setup.exe'));
-      await tester.ensureVisible(find.text('查看发布页'));
       await tester.tap(find.text('查看发布页'));
       await tester.pumpAndSettle();
       expect(
@@ -236,8 +250,8 @@ void main() {
     'same version and missing platform links show no download buttons',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: AppUpdatePage(
+        updateLauncher(
+          AppUpdateDialog(
             onCheck: ({bool beta = false}) async => UpdateCheck(
               AppVersion('0.3.0', 3),
               UpdateRelease.fromJson(release()),

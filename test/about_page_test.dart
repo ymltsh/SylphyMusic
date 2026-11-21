@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:sylphy_music/services/app_updates.dart';
 import 'package:sylphy_music/ui/about_page.dart';
 
 void main() {
@@ -44,7 +45,10 @@ void main() {
               .copyWith(textScaler: TextScaler.linear(scale)),
           child: child!,
         ),
-        home: const AboutPage(),
+        home: AboutPage(
+          onCheckForUpdates: ({bool beta = false}) async =>
+              UpdateCheck(AppVersion('1.0.0', 12), null),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -80,10 +84,19 @@ void main() {
     expect(find.text('无法打开链接，请稍后重试'), findsOneWidget);
   });
 
-  testWidgets('installed version and licenses are reachable', (tester) async {
+  testWidgets('installed version, update dialog and licenses are reachable', (
+    tester,
+  ) async {
     await showAbout(tester);
     await tester.scrollUntilVisible(find.text('1.0.0+12'), 200);
     expect(find.text('1.0.0+12'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('检查更新'), 150);
+    await tester.tap(find.text('检查更新'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('尚未发布可用版本'), findsOneWidget);
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('开源许可证'), 150);
     await tester.pumpAndSettle();
     await tester.tap(find.text('开源许可证'));
