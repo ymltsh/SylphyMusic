@@ -52,9 +52,15 @@ Widget? settingsBackButton(BuildContext context) {
 }
 
 class SettingsGroup extends StatelessWidget {
-  const SettingsGroup({super.key, this.title, required this.children});
+  const SettingsGroup({
+    super.key,
+    this.title,
+    this.icon,
+    required this.children,
+  });
 
   final String? title;
+  final IconData? icon;
   final List<Widget> children;
 
   @override
@@ -68,11 +74,25 @@ class SettingsGroup extends StatelessWidget {
           if (title case final title?)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-              child: Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
+              child: Row(
+                children: [
+                  if (icon case final icon?) ...[
+                    SettingsIcon(
+                      icon,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           SylphyAdaptiveCard(

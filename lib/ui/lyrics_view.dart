@@ -146,7 +146,7 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   List<InlineSpan> _spans(String text, {Color? secondaryColor}) {
-    if (text.isEmpty) return const [TextSpan(text: '···')];
+    if (text.isEmpty) return const [TextSpan(text: ' ')];
     final parts = text.split('\n');
     return [
       TextSpan(text: parts.first),
@@ -505,7 +505,7 @@ class _LyricsPreviewState extends State<LyricsPreview> {
                     : scheme.onSurface.withValues(alpha: .42),
               ),
             );
-        String lineAt(int index) => lines[index].isEmpty ? '···' : lines[index];
+        String lineAt(int index) => lines[index].isEmpty ? ' ' : lines[index];
         final heights = <int, double>{};
         double heightAt(int index) => heights.putIfAbsent(index, () {
           final painter = TextPainter(

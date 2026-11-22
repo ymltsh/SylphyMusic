@@ -8,6 +8,7 @@ import '../core/penpal_chat_models.dart';
 import '../services/penpal_chat.dart';
 import 'penpal_memory_page.dart';
 import 'penpal_avatar.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class PenpalChatPage extends StatefulWidget {
   const PenpalChatPage({
@@ -232,7 +233,7 @@ class _PenpalChatPageState extends State<PenpalChatPage> {
     final colors = Theme.of(context).colorScheme;
     final enabled = widget.app.apiSettings.llmEnabled;
     return Scaffold(
-      appBar: AppBar(
+      appBar: sylphyGradientAppBar(
         title: Row(
           children: [
             PenpalAvatar(store: widget.app.apiSettings.cards, radius: 18),

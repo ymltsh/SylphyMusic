@@ -6,6 +6,7 @@ import '../../data/library_catalog.dart';
 import '../library_browser.dart';
 import '../track_actions.dart';
 import 'metadata_text.dart';
+import '../design_system/adaptive_collapsing_chrome.dart';
 
 class PlayerMetadataLinks extends StatelessWidget {
   const PlayerMetadataLinks({
@@ -33,7 +34,7 @@ class PlayerMetadataLinks extends StatelessWidget {
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
-          appBar: AppBar(title: Text(album ? t.album : t.artist)),
+          appBar: sylphyGradientAppBar(title: Text(album ? t.album : t.artist)),
           body: LibraryBrowser(
             app: app,
             query: const CatalogQuery().songsIn(

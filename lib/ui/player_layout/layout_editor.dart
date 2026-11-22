@@ -10,6 +10,7 @@ import '../../core/player_layout.dart';
 import '../system_bars.dart';
 import 'layout_editing.dart';
 import 'layout_renderer.dart';
+import '../design_system/adaptive_collapsing_chrome.dart';
 
 class PlayerLayoutEditor extends StatefulWidget {
   const PlayerLayoutEditor({
@@ -1173,7 +1174,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
           },
           child: AppSystemBars(
             child: Scaffold(
-              appBar: AppBar(
+              appBar: sylphyGradientAppBar(
                 leading: IconButton(
                   tooltip: '关闭编辑器',
                   onPressed: _leave,

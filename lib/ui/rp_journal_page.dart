@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/rp_journal_models.dart';
 import 'rp_user_profile_card.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// Profile editing and management of the three long-term memory tiers.
 class RpJournalPage extends StatefulWidget {
@@ -138,7 +139,7 @@ class _RpJournalPageState extends State<RpJournalPage> {
   Widget build(BuildContext context) => widget.embedded
       ? _content()
       : Scaffold(
-          appBar: AppBar(title: const Text('关于我的音乐笔友')),
+          appBar: sylphyGradientAppBar(title: const Text('关于我的音乐笔友')),
           body: _content(),
         );
 
@@ -173,12 +174,7 @@ class _RpJournalPageState extends State<RpJournalPage> {
       _ => '下一轮新推荐前，按实际需要自动整理',
     };
     return [
-      const Text(
-        '日记、周记、月记均属于长期记忆。互动先成为日记；'
-        '至少 7 天后按周浓缩，每 4 本周记归纳为月记。'
-        '旧经历不是被禁止提起，而是随时间减少细节。'
-        '纯自动生成且无人回应的来信不会重复写进记忆。',
-      ),
+      const Text('笔友会每天记录与你的点点滴滴~'),
       const SizedBox(height: 12),
       Card(
         child: Column(
@@ -193,9 +189,9 @@ class _RpJournalPageState extends State<RpJournalPage> {
         ),
       ),
       const SizedBox(height: 8),
-      _tier('日记', '同一天合并一篇，保留最近交流的细节', 'day', state),
+      _tier('日记', '同一天合并为一篇，保留最近交流的细节', 'day', state),
       const SizedBox(height: 8),
-      _tier('周记', '日记经过至少七天后归纳，保留主要变化', 'week', state),
+      _tier('周记', '日记经过七天后归纳，保留主要变化', 'week', state),
       const SizedBox(height: 8),
       _tier('月记', '四本周记归纳，保留更加稳定的认知', 'month', state),
       const SizedBox(height: 8),
@@ -203,8 +199,8 @@ class _RpJournalPageState extends State<RpJournalPage> {
         child: Column(
           children: [
             const ListTile(
-              title: Text('尚未整理的真实交流'),
-              subtitle: Text('仍可用于下一次聊天与推荐，但不是已归档的长期记忆'),
+              title: Text('尚未整理的记忆'),
+              subtitle: Text('记录：'),
             ),
             for (final turn in state.drafts.reversed)
               ExpansionTile(

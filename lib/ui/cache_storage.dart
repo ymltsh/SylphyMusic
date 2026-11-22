@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../data/cache_catalog.dart';
 import '../services/unified_cache_quota.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class _CacheListResult {
   const _CacheListResult(this.catalog, this.usage);
@@ -86,7 +87,7 @@ class _CacheStoragePageState extends State<CacheStoragePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       title: const Text('管理音乐缓存'),
       actions: [
         IconButton(

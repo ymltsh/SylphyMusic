@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/app_controller.dart';
 import '../services/desktop_fonts.dart';
 import 'settings_controls.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class DesktopSettingsPage extends StatefulWidget {
   const DesktopSettingsPage({super.key, required this.app});
@@ -37,7 +38,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   Widget build(BuildContext context) {
     final prefs = widget.app.desktopPreferences;
     return Scaffold(
-      appBar: AppBar(
+      appBar: sylphyGradientAppBar(
         leading: settingsBackButton(context),
         title: const Text('横屏与 PC'),
       ),

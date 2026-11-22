@@ -8,6 +8,7 @@ import '../data/library_catalog.dart';
 import 'capsule_toggle.dart';
 import 'library_browser.dart';
 import 'route_player_bar.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 import 'design_system/miuix_adaptive.dart';
 
 class SearchPage extends StatefulWidget {
@@ -58,7 +59,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) => Scaffold(
     extendBody: true,
     bottomNavigationBar: RoutePlayerBar(app: widget.app),
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       title: TextField(
         controller: input,
         autofocus: true,

@@ -10,6 +10,7 @@ import '../data/library_catalog.dart';
 import 'batch_selection.dart';
 import 'cover_flow.dart';
 import 'cover_art.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 import 'design_system/miuix_adaptive.dart';
 import 'playing_song_tile.dart';
 import 'route_player_bar.dart';
@@ -51,11 +52,6 @@ class LibraryCollapsedActions {
   final VoidCallback? toggleSelectAll;
 }
 
-typedef LibraryCollapsedControlsBuilder = Widget Function(
-  BuildContext context,
-  LibraryCollapsedActions actions,
-);
-
 class LibraryBrowser extends StatefulWidget {
   const LibraryBrowser({
     super.key,
@@ -65,7 +61,8 @@ class LibraryBrowser extends StatefulWidget {
     this.songActions,
     this.viewControls,
     this.compactToolbar = false,
-    this.collapsedControlsBuilder,
+    this.drawBehindHeader = false,
+    this.onToolbarActionsChanged,
     this.coverFlow = false,
     this.bottomPadding,
     this.bottomOverlayPadding = 0,
@@ -79,7 +76,8 @@ class LibraryBrowser extends StatefulWidget {
   final Widget? songActions;
   final Widget? viewControls;
   final bool compactToolbar;
-  final LibraryCollapsedControlsBuilder? collapsedControlsBuilder;
+  final bool drawBehindHeader;
+  final ValueChanged<LibraryCollapsedActions>? onToolbarActionsChanged;
   final bool coverFlow;
 
   /// Space owned by an overlay; a docked route player needs no extra reserve.
@@ -93,6 +91,12 @@ class LibraryBrowser extends StatefulWidget {
 }
 
 class _LibraryBrowserState extends State<LibraryBrowser> {
+  bool get _toolbarFolded =>
+      widget.compactToolbar && widget.selected == null && !widget.query.blocked;
+
+  double get _headerPadding =>
+      widget.drawBehindHeader ? MediaQuery.paddingOf(context).top : 0;
+
   int revision = 0;
   late Future<CatalogPage> page;
   int generation = 0;
@@ -355,7 +359,9 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         MediaQuery.textScalerOf(context).scale(14) /
         14;
     final position = _scrollController.position;
-    final offset = (index * extent - (position.viewportDimension - extent) / 2)
+    final contentOffset =
+        index * extent + (_toolbarFolded ? _headerPadding : 0);
+    final offset = (contentOffset - (position.viewportDimension - extent) / 2)
         .clamp(0.0, position.maxScrollExtent)
         .toDouble();
     await _scrollController.animateTo(
@@ -379,7 +385,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          appBar: AppBar(
+          appBar: sylphyGradientAppBar(
             title: Text(
               folder
                   ? row.folderTitle
@@ -640,6 +646,13 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           );
         }
         final result = snapshot.data!;
+        final showCoverFlow =
+            widget.coverFlow &&
+            widget.query.view == 1 &&
+            widget.selected == null &&
+            !widget.query.blocked;
+        final listBehindHeader =
+            _toolbarFolded && result.total > 0 && !showCoverFlow;
         final emptyMessage = widget.query.blocked
             ? '尚未屏蔽歌曲'
             : widget.query.search.isNotEmpty
@@ -648,10 +661,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         return _withViewControls(
           result.total == 0
               ? Center(child: Text(emptyMessage))
-              : widget.coverFlow &&
-                    widget.query.view == 1 &&
-                    widget.selected == null &&
-                    !widget.query.blocked
+              : showCoverFlow
               ? CoverFlowView(
                   key: const ValueKey('album-cover-flow'),
                   itemCount: result.total,
@@ -699,6 +709,7 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                         cacheExtent: 0,
                         clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.only(
+                          top: listBehindHeader ? _headerPadding : 0,
                           bottom: libraryListBottomPadding(
                             viewportWidth: MediaQuery.sizeOf(context).width,
                             basePadding: widget.bottomPadding,
@@ -740,19 +751,19 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
                   },
                 ),
           result: result,
+          listBehindHeader: listBehindHeader,
         );
       },
     ),
   );
 
-  Widget _withViewControls(Widget content, {CatalogPage? result}) {
+  Widget _withViewControls(
+    Widget content, {
+    CatalogPage? result,
+    bool listBehindHeader = false,
+  }) {
     final batch = widget.batchSelection;
     final canAct = result != null && result.total > 0;
-    final folded =
-        widget.compactToolbar &&
-        widget.collapsedControlsBuilder != null &&
-        widget.selected == null &&
-        !widget.query.blocked;
     final foldedActions = LibraryCollapsedActions(
       total: result?.total,
       countUnit: widget.query.countUnit,
@@ -770,6 +781,17 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
           ? batch.deselectAll
           : () => batch.selectAll(result!.total),
     );
+    // Keep menu callbacks in the LibraryBrowser State. Publishing after the
+    // frame avoids mutating AppBar listeners during a FutureBuilder build.
+    final onToolbarActionsChanged = widget.onToolbarActionsChanged;
+    if (onToolbarActionsChanged != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            widget.onToolbarActionsChanged == onToolbarActionsChanged) {
+          onToolbarActionsChanged(foldedActions);
+        }
+      });
+    }
     final expanded = Column(
       key: const ValueKey('library-expanded-controls'),
       mainAxisSize: MainAxisSize.min,
@@ -834,24 +856,18 @@ class _LibraryBrowserState extends State<LibraryBrowser> {
         if (widget.viewControls != null) widget.viewControls!,
       ],
     );
-    return Column(
-      children: [
-        AnimatedSwitcher(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          child: folded
-              ? KeyedSubtree(
-                  key: const ValueKey('library-collapsed-controls'),
-                  child: widget.collapsedControlsBuilder!(
-                    context,
-                    foldedActions,
-                  ),
-                )
-              : expanded,
-        ),
-        Expanded(child: content),
-      ],
+    return Padding(
+      padding: EdgeInsets.only(top: listBehindHeader ? 0 : _headerPadding),
+      child: Column(
+        children: [
+          SylphyAnimatedToolbar(
+            collapsed: _toolbarFolded,
+            expanded: expanded,
+            compact: const SizedBox(width: double.infinity, height: 0),
+          ),
+          Expanded(child: content),
+        ],
+      ),
     );
   }
 }

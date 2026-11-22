@@ -4,6 +4,7 @@ import '../core/models.dart';
 import '../services/sources.dart' show WebDavDirectory;
 import 'music_source_ui.dart';
 import 'webdav_folder_picker.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// The form collects data; the shell remains responsible for authentication.
 class MusicSourceConnectionDraft {
@@ -174,7 +175,7 @@ class _MusicSourceConnectionPageState extends State<MusicSourceConnectionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_editing ? '编辑音乐源' : '添加音乐源')),
+      appBar: sylphyGradientAppBar(title: Text(_editing ? '编辑音乐源' : '添加音乐源')),
       body: SafeArea(
         bottom: false,
         child: Center(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class CacheTasksPage extends StatefulWidget {
   const CacheTasksPage({super.key, required this.app});
@@ -43,7 +44,7 @@ class _CacheTasksPageState extends State<CacheTasksPage> {
   });
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       title: const Text('缓存任务'),
       actions: [
         IconButton(

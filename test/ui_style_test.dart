@@ -54,11 +54,10 @@ void main() {
     expect(await db.setting('ui_style'), 'miuix');
   });
 
-  test('effective style is gated by platform and experiment flag', () {
+  test('Miuix is available on native Android', () {
     expect(
       UiStyleAvailability.effective(
         UiStyle.material3,
-        experimentalEnabled: true,
         web: false,
         platform: TargetPlatform.android,
       ),
@@ -67,7 +66,6 @@ void main() {
     expect(
       UiStyleAvailability.effective(
         UiStyle.miuix,
-        experimentalEnabled: true,
         web: false,
         platform: TargetPlatform.android,
       ),
@@ -76,16 +74,6 @@ void main() {
     expect(
       UiStyleAvailability.effective(
         UiStyle.miuix,
-        experimentalEnabled: false,
-        web: false,
-        platform: TargetPlatform.android,
-      ),
-      UiStyle.material3,
-    );
-    expect(
-      UiStyleAvailability.effective(
-        UiStyle.miuix,
-        experimentalEnabled: true,
         web: false,
         platform: TargetPlatform.windows,
       ),
@@ -94,7 +82,6 @@ void main() {
     expect(
       UiStyleAvailability.effective(
         UiStyle.miuix,
-        experimentalEnabled: true,
         web: true,
         platform: TargetPlatform.android,
       ),

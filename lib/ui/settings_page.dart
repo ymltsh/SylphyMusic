@@ -12,8 +12,10 @@ import '../core/appearance.dart';
 import '../core/player_layout.dart';
 import '../services/llm_recommendations.dart';
 import 'about_page.dart';
+import 'app_background.dart';
 import 'cache_storage.dart';
 import 'cache_tasks.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 import 'design_system/miuix_adaptive.dart';
 import 'design_system/ui_style_availability.dart';
 import 'desktop_settings_page.dart';
@@ -27,6 +29,7 @@ import 'settings_controls.dart';
 import 'theme_color_dialog.dart';
 
 part 'settings_directory.dart';
+part 'settings_theme.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.app, required this.onSources})
@@ -132,7 +135,7 @@ class _SettingsPageState extends State<SettingsPage> {
     builder: (context, _) {
       final destination = widget._destination;
       return Scaffold(
-        appBar: AppBar(
+        appBar: sylphyGradientAppBar(
           leading: settingsBackButton(context),
           title: Text(destination?.title ?? '设置'),
         ),
@@ -172,114 +175,6 @@ class _SettingsPageState extends State<SettingsPage> {
     _Destination.diagnostics => _diagnosticCards(),
     _ => throw StateError('No settings content for $destination'),
   };
-
-  List<Widget> _themeCards() => [
-    if (UiStyleAvailability.miuixAvailable)
-      _group('界面风格 · 实验性', [
-        for (final style in UiStyle.values)
-          ListTile(
-            leading: SettingsIcon(
-              style == UiStyle.material3
-                  ? Icons.widgets_outlined
-                  : Icons.auto_awesome_outlined,
-            ),
-            title: Text(style == UiStyle.material3 ? 'Material 3' : 'Miuix'),
-            subtitle: Text(
-              style == UiStyle.material3 ? '经典界面 · 默认' : 'HyperOS 风格 · 实验性',
-            ),
-            trailing: app.appearance.uiStyle == style
-                ? const SettingsIcon(
-                    Icons.check_circle,
-                    key: ValueKey('ui-style-selected'),
-                  )
-                : null,
-            onTap: () => _act(() => app.appearance.setUiStyle(style)),
-          ),
-        if (app.appearance.uiStyle == UiStyle.miuix)
-          MiuixSwitchPreference(
-            title: '液态玻璃',
-            summary: '开启后，竖屏底部浮栏由磨砂切换为液态玻璃',
-            startAction: const SettingsIcon(Icons.blur_on_rounded),
-            value: app.appearance.miuixLiquidGlass,
-            onChanged: (enabled) =>
-                _act(() => app.appearance.setMiuixLiquidGlass(enabled)),
-          ),
-      ]),
-    SettingsGroup(
-      title: '主题与配色',
-      children: [
-        SettingsSelect<ThemeMode>(
-          title: '外观模式',
-          icon: Icons.palette_outlined,
-          value: app.appearance.mode,
-          labels: const {
-            ThemeMode.system: '跟随系统',
-            ThemeMode.light: '浅色',
-            ThemeMode.dark: '深色',
-          },
-          onChanged: (value) => _act(() => app.appearance.update(theme: value)),
-        ),
-        ListTile(
-          title: const Text('主题颜色'),
-          subtitle: Text(app.appearance.seedHex),
-          leading: CircleAvatar(
-            backgroundColor: app.appearance.seed,
-            radius: 12,
-          ),
-          trailing: const SettingsIcon(Icons.chevron_right),
-          onTap: _chooseThemeColor,
-        ),
-      ],
-    ),
-    _group('页面背景', [
-      const Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text('主题颜色对所有页面生效；背景图片显示在首页、音乐库、歌单和我的页面。'),
-      ),
-      ..._backgroundControls(),
-    ]),
-  ];
-
-  List<Widget> _backgroundControls() => [
-    SwitchListTile(
-      secondary: const SettingsIcon(Icons.format_color_fill_outlined),
-      title: const Text('纯色底色'),
-      subtitle: const Text('浅色纯白、深色炭灰；关闭后使用背景图片或主题底色'),
-      value: app.appearance.solidBackground,
-      onChanged: (v) => _act(() => app.appearance.update(solid: v)),
-    ),
-    ListTile(
-      title: const Text('自定义背景图'),
-      subtitle: Text(
-        app.appearance.backgroundFile == null
-            ? '选择背景图片'
-            : app.appearance.solidBackground
-            ? '已选择 · 关闭纯色背景后显示'
-            : '已设置背景图片',
-      ),
-      leading: const SettingsIcon(Icons.wallpaper_outlined),
-      trailing: app.appearance.backgroundFile == null
-          ? const SettingsIcon(Icons.chevron_right)
-          : IconButton(
-              tooltip: '移除背景',
-              icon: const SettingsIcon(Icons.delete_outline),
-              onPressed: () => _act(app.appearance.clearBackground),
-            ),
-      onTap: () => _act(app.appearance.pickBackground),
-    ),
-    if (app.appearance.backgroundFile != null &&
-        !app.appearance.solidBackground)
-      SettingsSlider(
-        title: '背景可见度',
-        formatValue: (value) => '${(value * 100).round()}%',
-        min: .1,
-        max: .4,
-        divisions: 30,
-        value: app.appearance.backgroundVisibility,
-        onChanged: (value) =>
-            _act(() => app.appearance.update(visibility: value)),
-      ),
-  ];
 
   List<Widget> _playerAppearanceCards() => [
     SettingsGroup(

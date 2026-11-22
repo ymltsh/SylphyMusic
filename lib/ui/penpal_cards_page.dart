@@ -8,6 +8,7 @@ import '../core/app_controller.dart';
 import '../core/penpal_card.dart';
 import '../services/api_settings.dart';
 import 'penpal_avatar.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class PenpalCardsPage extends StatefulWidget {
   const PenpalCardsPage({super.key, required this.app});
@@ -174,7 +175,7 @@ class _PenpalCardsPageState extends State<PenpalCardsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('我的音乐笔友')),
+    appBar: sylphyGradientAppBar(title: const Text('我的音乐笔友')),
     body: SafeArea(
       top: false,
       child: FutureBuilder<List<PenpalCard>>(
@@ -196,7 +197,7 @@ class _PenpalCardsPageState extends State<PenpalCardsPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  const Text('每位笔友有独立的头像、设定、聊天和记忆。点击头像可更换，角色名称与提示词均可编辑。'),
+                  const Text('与君初相识，犹如故人归'),
                   const SizedBox(height: 12),
                   for (final card in snapshot.data!) _card(card),
                   const SizedBox(height: 12),

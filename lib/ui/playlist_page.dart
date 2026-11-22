@@ -7,6 +7,7 @@ import '../core/models.dart';
 import 'batch_selection.dart';
 import 'cover_art.dart';
 import 'route_player_bar.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 import 'design_system/miuix_adaptive.dart';
 
 /// Cover-first playlist card used by the playlist grid.
@@ -519,7 +520,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       },
       child: Scaffold(
         extendBody: true,
-        appBar: AppBar(
+        appBar: sylphyGradientAppBar(
           leading: _selection.active
               ? IconButton(
                   tooltip: '退出多选',

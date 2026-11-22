@@ -18,6 +18,7 @@ class MiuixDockNavigation extends StatelessWidget {
     required this.icons,
     required this.onSelected,
     this.backdrop,
+    this.fullWidthInset,
   }) : assert(labels.length == icons.length),
        assert(labels.length >= 2 && labels.length <= 5),
        assert(selectedIndex >= 0 && selectedIndex < labels.length);
@@ -45,6 +46,10 @@ class MiuixDockNavigation extends StatelessWidget {
   final List<IconData> icons;
   final ValueChanged<int> onSelected;
   final MiuixBackdrop? backdrop;
+
+  /// Horizontal inset for the full-width dock. The short dock has its own
+  /// fixed margins and maximum width.
+  final double? fullWidthInset;
 
   @override
   Widget build(BuildContext context) {
@@ -89,20 +94,18 @@ class MiuixDockNavigation extends StatelessWidget {
 
     // KSU's own floating bar also reserves the real navigation-bar inset.
     // The GlassNavigationBar does not add a second inset internally.
+    final inset = fullWidthInset ?? horizontalInset;
     return SafeArea(
       top: false,
       maintainBottomViewPadding: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          horizontalInset,
-          topGap,
-          horizontalInset,
-          bottomGap,
-        ),
+        padding: EdgeInsets.fromLTRB(inset, topGap, inset, bottomGap),
         child: Center(
           heightFactor: 1,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: BoxConstraints(
+              maxWidth: fullWidthInset == null ? 440 : double.infinity,
+            ),
             child: Stack(
               fit: StackFit.passthrough,
               children: [

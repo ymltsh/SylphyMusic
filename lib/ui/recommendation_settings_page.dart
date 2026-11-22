@@ -5,6 +5,7 @@ import '../services/recommendation_service.dart';
 import 'llm_recommendation_settings.dart';
 import 'recommendation_letters_page.dart';
 import 'settings_controls.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class RecommendationSettingsPage extends StatefulWidget {
   const RecommendationSettingsPage({super.key, required this.app});
@@ -159,7 +160,7 @@ class _RecommendationSettingsPageState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       leading: settingsBackButton(context),
       title: const Text('推荐与音乐笔友'),
       bottom: _busy

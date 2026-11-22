@@ -16,6 +16,10 @@ enum LyricColorMode { album, system, fixed }
 
 enum MiniPlayerBarStyle { automatic, pc, standard }
 
+enum MiuixDockWidth { short, long }
+
+enum ToolbarFoldMode { always, automatic, never }
+
 /// User preference. Whether Miuix can render is decided by UiStyleAvailability.
 enum UiStyle { material3, miuix }
 
@@ -40,6 +44,11 @@ class Appearance extends ChangeNotifier {
   Future<void> _uiStyleWork = Future.value();
   bool _miuixLiquidGlass = false;
   bool get miuixLiquidGlass => _miuixLiquidGlass;
+  MiuixDockWidth _miuixDockWidth = MiuixDockWidth.short;
+  MiuixDockWidth get miuixDockWidth => _miuixDockWidth;
+  static const _toolbarFoldModeKey = 'ui_toolbar_fold_mode';
+  ToolbarFoldMode _toolbarFoldMode = ToolbarFoldMode.always;
+  ToolbarFoldMode get toolbarFoldMode => _toolbarFoldMode;
   bool albumCoverFlow = false;
   bool playlistCoverFlow = false;
   static final _managedName = RegExp(r'^background-[0-9a-f-]+\.png$');
@@ -90,6 +99,22 @@ class Appearance extends ChangeNotifier {
     _miuixLiquidGlass = enabled;
     return true;
   });
+
+  Future<void> setMiuixDockWidth(MiuixDockWidth width) =>
+      _updateUiStyle(() async {
+        if (_miuixDockWidth == width) return false;
+        await db.setSetting('ui_miuix_dock_width', width.name);
+        _miuixDockWidth = width;
+        return true;
+      });
+
+  Future<void> setToolbarFoldMode(ToolbarFoldMode mode) =>
+      _updateUiStyle(() async {
+        if (_toolbarFoldMode == mode) return false;
+        await db.setSetting(_toolbarFoldModeKey, mode.name);
+        _toolbarFoldMode = mode;
+        return true;
+      });
 
   /// Serialize appearance writes and notify only after persistence succeeds.
   Future<void> _updateUiStyle(Future<bool> Function() write) {
@@ -147,6 +172,19 @@ class Appearance extends ChangeNotifier {
       orElse: () => UiStyle.material3,
     );
     _miuixLiquidGlass = await db.setting('ui_miuix_liquid_glass') == 'true';
+    final savedDockWidth = await db.setting('ui_miuix_dock_width');
+    _miuixDockWidth = MiuixDockWidth.values.firstWhere(
+      (width) => width.name == savedDockWidth,
+      orElse: () => MiuixDockWidth.short,
+    );
+    final savedFoldMode = await db.setting(_toolbarFoldModeKey);
+    _toolbarFoldMode =
+        ToolbarFoldMode.values
+            .where((mode) => mode.name == savedFoldMode)
+            .firstOrNull ??
+        (await db.setting('ui_fold_toolbars_by_default') == 'false'
+            ? ToolbarFoldMode.automatic
+            : ToolbarFoldMode.always);
     final savedMode = await db.setting('ui_theme');
     mode = ThemeMode.values.firstWhere(
       (v) => v.name == savedMode,

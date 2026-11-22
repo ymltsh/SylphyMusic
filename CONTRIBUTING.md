@@ -38,6 +38,8 @@ flutter build windows --release
 ./tool/build_review.ps1
 ```
 
+Android 正式构建包含 Material 3 和 Miuix。在「设置 → 主题与背景 → 界面风格」切换。
+
 使用 `dart format` 保持改动文件的风格。仅文档或流程配置变更不重建应用。默认不新增验证测试或运行 analyze/test；编译成功不代表功能或设备验证通过。
 
 已有 `test/`、`integration_test/` 和 `tool/check_local.ps1` 保留为用户主动验证工具，不属于日常开发、交付或发布流程；历史结果见 [PROGRESS](docs/PROGRESS.md)。

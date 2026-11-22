@@ -16,6 +16,7 @@ import 'library_browser.dart';
 import 'playing_song_tile.dart';
 import 'now_playing.dart';
 import 'wide_card_ratio.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -25,9 +26,11 @@ class HomePage extends StatefulWidget {
     required this.onSources,
     required this.onAction,
     this.bottomOverlayPadding = 0,
+    this.drawBehindHeader = false,
   });
   final SylphyApp app;
   final double bottomOverlayPadding;
+  final bool drawBehindHeader;
   final void Function(int) onLibrary;
   final VoidCallback onSources;
   final Future<void> Function(String, Track) onAction;
@@ -214,7 +217,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         context,
         MaterialPageRoute(
           builder: (_) => Scaffold(
-            appBar: AppBar(title: Text(album)),
+            appBar: sylphyGradientAppBar(title: Text(album)),
             body: Column(
               children: [
                 if (_albumReasons['${track.ref.sourceId}|${row.key}'] != null)
@@ -632,10 +635,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ],
                 ),
               );
+        final headerPadding = widget.drawBehindHeader
+            ? MediaQuery.paddingOf(context).top
+            : 0.0;
         return ListView(
           padding: EdgeInsets.fromLTRB(
             desktop ? 24 : 20,
-            desktop ? 8 : 12,
+            headerPadding + (desktop ? 8 : 12),
             desktop ? 24 : 20,
             (desktop ? 24 : 110) + widget.bottomOverlayPadding,
           ),

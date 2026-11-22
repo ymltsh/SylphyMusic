@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_controller.dart';
 import '../core/rp_models.dart';
 import 'rp_journal_page.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// Character-scoped RP controls. No network calls or generated autobiography.
 class RpManagementPage extends StatefulWidget {
@@ -167,7 +168,7 @@ class _RpManagementPageState extends State<RpManagementPage> {
   Widget build(BuildContext context) => DefaultTabController(
     length: 2,
     child: Scaffold(
-      appBar: AppBar(
+      appBar: sylphyGradientAppBar(
         title: const Text('关于我的音乐笔友'),
         bottom: const TabBar(
           tabs: [
@@ -200,8 +201,7 @@ class _RpManagementPageState extends State<RpManagementPage> {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 12),
                     child: Text(
-                      '这里管理角色背景、当前状态和虚构世界事件。'
-                      '真实交流只在来信中进行；所有经历与连续记忆统一在前一页签查看。',
+                      '通过世界书，你可以影响笔友的故事',
                     ),
                   ),
                   _section('角色当前状态', [
@@ -375,7 +375,7 @@ class _RpManagementPageState extends State<RpManagementPage> {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      '用户资料、角色状态与情节都仅保存在本机；开启 LLM 后，被选中的上下文会发送到你配置的模型服务。',
+                      'For you，with you.',
                     ),
                   ),
                   OutlinedButton.icon(

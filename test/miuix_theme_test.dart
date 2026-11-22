@@ -71,10 +71,7 @@ void main() {
         await tester.pumpWidget(buildApp());
         expect(navigatorKey.currentState, same(original));
         expect(find.text('open route'), findsOneWidget);
-        expect(
-          UiStyleAvailability.effective(appearance.uiStyle),
-          UiStyleAvailability.experimentalMiuix ? style : UiStyle.material3,
-        );
+        expect(UiStyleAvailability.effective(appearance.uiStyle), style);
       }
       await tester.pumpWidget(const SizedBox.shrink());
     }, variant: TargetPlatformVariant.only(TargetPlatform.android));

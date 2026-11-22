@@ -8,6 +8,7 @@ import '../core/app_controller.dart';
 import '../services/device_transfer_config.dart';
 import '../services/device_transfer_transport.dart';
 import 'device_transfer_troubleshooting_page.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// Entry from Settings. The receiver is also offered on the *second* welcome
 /// page, so users do not need to configure a music source before transferring.
@@ -17,7 +18,7 @@ class DeviceTransferPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('设备间快速迁移')),
+    appBar: sylphyGradientAppBar(title: const Text('设备间快速迁移')),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 580),
@@ -211,7 +212,7 @@ class _SendState extends State<DeviceTransferSendPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('发送配置')),
+    appBar: sylphyGradientAppBar(title: const Text('发送配置')),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620),
@@ -496,7 +497,7 @@ class _ReceiveState extends State<DeviceTransferReceivePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       title: const Text('接收配置'),
       actions: [
         IconButton(

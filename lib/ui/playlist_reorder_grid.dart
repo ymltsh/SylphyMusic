@@ -9,10 +9,12 @@ class PlaylistReorderGrid extends StatefulWidget {
     required this.cardBuilder,
     required this.onMove,
     this.compact = false,
+    this.topOverlayPadding = 0,
     this.bottomOverlayPadding = 0,
   });
 
   final bool compact;
+  final double topOverlayPadding;
   final double bottomOverlayPadding;
   final List<PlaylistModel> playlists;
   final Widget Function(BuildContext, PlaylistModel) cardBuilder;
@@ -77,7 +79,7 @@ class _PlaylistReorderGridState extends State<PlaylistReorderGrid> {
         key: const PageStorageKey('playlist-reorder-grid'),
         padding: EdgeInsets.fromLTRB(
           16,
-          4,
+          4 + widget.topOverlayPadding,
           16,
           120 + widget.bottomOverlayPadding,
         ),

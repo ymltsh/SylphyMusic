@@ -11,6 +11,7 @@ import 'recommendation_delivery.dart';
 import 'penpal_chat_page.dart';
 import 'penpal_mailbox_page.dart';
 import 'route_player_bar.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// A dated, independent queue snapshot: regeneration never edits a playing queue.
 class DailyMixPage extends StatefulWidget {
@@ -164,7 +165,7 @@ class _DailyMixPageState extends State<DailyMixPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+    appBar: sylphyGradientAppBar(
       title: const Text('每日精选'),
       actions: [
         IconButton(

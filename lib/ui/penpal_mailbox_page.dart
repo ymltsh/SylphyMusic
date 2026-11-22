@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_controller.dart';
 import '../core/penpal_mailbox_models.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// A physical-letter-like outbox: no immediate model call on submission.
 class PenpalMailboxPage extends StatefulWidget {
@@ -171,7 +172,7 @@ class _PenpalMailboxPageState extends State<PenpalMailboxPage> {
     final name = widget.app.apiSettings.cards.activeName;
     final pending = _pending;
     return Scaffold(
-      appBar: AppBar(title: Text('给$name留言')),
+      appBar: sylphyGradientAppBar(title: Text('给$name留言')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),

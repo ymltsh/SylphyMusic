@@ -10,6 +10,7 @@ import 'recommendation_showcase.dart';
 import 'penpal_memory_page.dart';
 import 'penpal_chat_page.dart';
 import 'penpal_mailbox_page.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// Private letters from each daily recommendation generation, kept separately
 /// from diagnostic logs and independent of old recommendation snapshots.
@@ -186,7 +187,7 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
       context,
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(
-          appBar: AppBar(
+          appBar: sylphyGradientAppBar(
             title: Text('${letter.day} · 第 ${letter.generation + 1} 封信'),
           ),
           body: SafeArea(
@@ -307,7 +308,7 @@ class _RecommendationLettersPageState extends State<RecommendationLettersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: sylphyGradientAppBar(
         title: Text(_showLegacy ? '旧版未归属来信' : '每日推荐文案'),
         actions: [
           if (!_showLegacy)

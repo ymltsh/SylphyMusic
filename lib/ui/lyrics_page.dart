@@ -38,6 +38,7 @@ class _LyricsPageState extends State<LyricsPage> {
       widget.lyrics ?? widget.app.loadLyrics(widget.track);
   bool busy = false;
   bool _leaving = false;
+  bool _immersive = false;
 
   PlayerElement? get _playControls =>
       (widget.app.playerLayouts.active ?? playerTemplate()).elements
@@ -162,6 +163,97 @@ class _LyricsPageState extends State<LyricsPage> {
     },
   );
 
+  Widget _immersiveButton() => IconButton(
+    tooltip: _immersive ? '退出沉浸模式' : '沉浸模式',
+    onPressed: () => setState(() => _immersive = !_immersive),
+    icon: Icon(
+      _immersive ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+    ),
+  );
+
+  Widget _header(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+    child: Row(
+      children: [
+        IconButton(
+          tooltip: '返回播放页',
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+        const SizedBox(width: 4),
+        PlayerCover(
+          app: widget.app,
+          track: widget.track,
+          size: 40,
+          radius: 10,
+          shadow: false,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.track.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                widget.track.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: .55),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuButton<double>(
+          tooltip: '完整歌词字号',
+          icon: const Icon(Icons.text_fields_rounded),
+          initialValue: widget.app.appearance.lyricFontSize,
+          onSelected: (size) => widget.app.appearance.update(lyricFont: size),
+          itemBuilder: (_) => [
+            for (final entry in {20.0: '小', 24.0: '标准', 28.0: '大'}.entries)
+              CheckedPopupMenuItem(
+                value: entry.key,
+                checked: widget.app.appearance.lyricFontSize == entry.key,
+                child: Text(entry.value),
+              ),
+          ],
+        ),
+        _immersiveButton(),
+      ],
+    ),
+  );
+
+  Widget _footer() => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PlayerProgress(app: widget.app),
+            SizedBox(
+              height: 72,
+              child: PlayerControls(
+                app: widget.app,
+                radius: _playControls?.radius ?? 24,
+                color: _playControls?.color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([
@@ -189,108 +281,31 @@ class _LyricsPageState extends State<LyricsPage> {
                   ),
                 ),
                 SafeArea(
-                  child: Column(
+                  child: Stack(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              tooltip: '返回播放页',
-                              onPressed: () => Navigator.maybePop(context),
-                              icon: const Icon(Icons.arrow_back_rounded),
-                            ),
-                            const SizedBox(width: 4),
-                            PlayerCover(
-                              app: widget.app,
-                              track: widget.track,
-                              size: 40,
-                              radius: 10,
-                              shadow: false,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.track.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    widget.track.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: .55),
-                                        ),
-                                  ),
-                                ],
+                      Column(
+                        children: [
+                          if (!_immersive) _header(context),
+                          Expanded(
+                            key: const ValueKey('lyrics-content'),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 760,
+                                ),
+                                child: _body(context),
                               ),
                             ),
-                            PopupMenuButton<double>(
-                              tooltip: '完整歌词字号',
-                              icon: const Icon(Icons.text_fields_rounded),
-                              initialValue: widget.app.appearance.lyricFontSize,
-                              onSelected: (size) =>
-                                  widget.app.appearance.update(lyricFont: size),
-                              itemBuilder: (_) => [
-                                for (final entry in {
-                                  20.0: '小',
-                                  24.0: '标准',
-                                  28.0: '大',
-                                }.entries)
-                                  CheckedPopupMenuItem(
-                                    value: entry.key,
-                                    checked:
-                                        widget.app.appearance.lyricFontSize ==
-                                        entry.key,
-                                    child: Text(entry.value),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 760),
-                            child: _body(context),
                           ),
-                        ),
+                          if (!_immersive) _footer(),
+                        ],
                       ),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                PlayerProgress(app: widget.app),
-                                SizedBox(
-                                  height: 72,
-                                  child: PlayerControls(
-                                    app: widget.app,
-                                    radius: _playControls?.radius ?? 24,
-                                    color: _playControls?.color,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      if (_immersive)
+                        PositionedDirectional(
+                          top: 4,
+                          end: 8,
+                          child: _immersiveButton(),
                         ),
-                      ),
                     ],
                   ),
                 ),

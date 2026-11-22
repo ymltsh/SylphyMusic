@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../services/device_transfer_diagnostics.dart';
 import '../services/device_transfer_transport.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 class DeviceTransferTroubleshootingPage extends StatefulWidget {
   const DeviceTransferTroubleshootingPage({
@@ -117,7 +118,7 @@ class _DeviceTransferTroubleshootingState
     final canRestart = {'waiting', 'error'}.contains(widget.stage());
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('故障排除')),
+      appBar: sylphyGradientAppBar(title: const Text('故障排除')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),

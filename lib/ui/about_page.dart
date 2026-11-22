@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/app_updates.dart';
 import 'app_update_dialog.dart';
 import 'settings_controls.dart';
+import 'design_system/adaptive_collapsing_chrome.dart';
 
 /// A project-focused About page with a hidden, music-themed constellation.
 class AboutPage extends StatefulWidget {
@@ -75,7 +76,7 @@ class _AboutPageState extends State<AboutPage> {
     final muted = scheme.onSurfaceVariant;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('关于风灵音乐')),
+      appBar: sylphyGradientAppBar(title: const Text('关于风灵音乐')),
       body: SafeArea(
         top: false,
         child: Center(

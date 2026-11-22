@@ -182,7 +182,7 @@ const _settingsGroups = [
         _Destination.theme,
         Icons.palette_outlined,
         '设置外观模式、主题颜色和背景图片',
-        '主题颜色 主色 深色 浅色 夜间 外观模式 自定义背景图 壁纸 纯色 透明度 背景可见度',
+        '主题预览 跟随系统 主题颜色 主色 深色 浅色 夜间 外观模式 自定义背景图 壁纸 纯色 透明度 背景可见度 默认折叠 默认折叠工具栏 折叠按钮 工具栏 工具栏折叠 始终折叠 自动折叠 从不折叠 默认折叠并锁定工具栏 锁定工具栏 悬浮 Dock Dock栏 底部浮栏 短款 长款',
       ),
       _SettingEntry(
         _Destination.desktop,
