@@ -1,20 +1,35 @@
 {
   "latest": {
-    "version": "1.0.78",
-    "build": 91,
-    "name": "风灵音乐 v1.0.78",
+    "version": "1.0.79",
+    "build": 92,
+    "name": "风灵音乐 v1.0.79",
     "date": "2026-11-22",
-    "notes": "- 完整歌词新增「浮光沉际」。当前歌词随播放淡入淡出，两侧文字平滑下沉，英文显示首尾完整单词。\n- 歌词页右上角的「更多」收纳沉浸模式、八档字号滑块和五档粗细。字号和粗细会自动保存。\n- 自动切歌时留在歌词页并更新歌曲信息。滚动歌词的间奏空行更紧凑，高亮会移到下一句。Android 歌词沉浸模式可尝试隐藏系统状态栏和导航栏。\n- 更新「主题与背景」设置页。工具栏新增始终折叠、自动折叠、从不折叠三种选择，默认始终折叠。\n- 多个页面的标题栏加入渐变，调整折叠菜单的右侧留白。",
+    "notes": "- 播放页的歌词预览跳过间奏空行。播放进入间奏时，高亮直接移到下一句有文字的歌词。\n- 完整歌词新增「浮光沉际」。当前歌词随播放淡入淡出，两侧文字平滑下沉，英文显示首尾完整单词。\n- 歌词页右上角的「更多」收纳沉浸模式、八档字号滑块和五档粗细。字号和粗细会自动保存。\n- 自动切歌时留在歌词页并更新歌曲信息。滚动歌词的间奏空行更紧凑，高亮会移到下一句。Android 歌词沉浸模式可尝试隐藏系统状态栏和导航栏。\n- 更新「主题与背景」设置页。工具栏新增始终折叠、自动折叠、从不折叠三种选择，默认始终折叠。\n- 多个页面的标题栏加入渐变，调整折叠菜单的右侧留白。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-arm64-v8a.apk",
-      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-armeabi-v7a.apk",
-      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-x86_64.apk",
-      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-setup.exe",
-      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-windows.zip"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79%2B92/sylphy-music-arm64-v8a.apk",
+      "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79%2B92/sylphy-music-armeabi-v7a.apk",
+      "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79%2B92/sylphy-music-x86_64.apk",
+      "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79%2B92/sylphy-music-setup.exe",
+      "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79%2B92/sylphy-music-windows.zip"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.78+91"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.79+92"
   },
   "history": [
+    {
+      "version": "1.0.78",
+      "build": 91,
+      "name": "风灵音乐 v1.0.78",
+      "date": "2026-11-22",
+      "notes": "- 完整歌词新增「浮光沉际」。当前歌词随播放淡入淡出，两侧文字平滑下沉，英文显示首尾完整单词。\n- 歌词页右上角的「更多」收纳沉浸模式、八档字号滑块和五档粗细。字号和粗细会自动保存。\n- 自动切歌时留在歌词页并更新歌曲信息。滚动歌词的间奏空行更紧凑，高亮会移到下一句。Android 歌词沉浸模式可尝试隐藏系统状态栏和导航栏。\n- 更新「主题与背景」设置页。工具栏新增始终折叠、自动折叠、从不折叠三种选择，默认始终折叠。\n- 多个页面的标题栏加入渐变，调整折叠菜单的右侧留白。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-arm64-v8a.apk",
+        "android_armv7": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-armeabi-v7a.apk",
+        "android_x64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-x86_64.apk",
+        "windows": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-setup.exe",
+        "windows_portable": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.78%2B91/sylphy-music-windows.zip"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.78+91"
+    },
     {
       "version": "1.0.77",
       "build": 90,
