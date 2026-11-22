@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.79-openlist.60",
-    "build": 92,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.79-openlist.60 (arm64-v8a)",
+    "version": "1.0.81-openlist.61",
+    "build": 94,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.81-openlist.61 (arm64-v8a)",
     "date": "2026-11-22",
-    "notes": "- 播放页的歌词预览跳过间奏空行。播放进入间奏时，高亮直接移到下一句有文字的歌词。\n- 完整歌词新增「浮光沉际」。当前歌词随播放淡入淡出，两侧文字平滑下沉，英文显示首尾完整单词。\n- 歌词页右上角的「更多」收纳沉浸模式、八档字号滑块和五档粗细。字号和粗细会自动保存。\n- 自动切歌时留在歌词页并更新歌曲信息。滚动歌词的间奏空行更紧凑，高亮会移到下一句。Android 歌词沉浸模式可尝试隐藏系统状态栏和导航栏。\n- 更新「主题与背景」设置页。工具栏新增始终折叠、自动折叠、从不折叠三种选择，默认始终折叠。\n- 多个页面的标题栏加入渐变，调整折叠菜单的右侧留白。",
+    "notes": "- 「我的音乐」里的最近播放、我的收藏、全部音乐和本地下载卡片去掉右上角箭头，点击卡片仍可打开对应页面。\n- 播放页歌词预览支持五档字号和五档字重。字重滑块位于字号下方，拖动时可在编辑器里预览。\n- 歌词预览支持靠左、居中和靠右对齐。对齐与字重随布局保存。\n- 播放页编辑器集中显示歌词样式控件，并精简了行距和间距等重复说明。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79-openlist.60%2B92/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.81-openlist.61%2B94/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.79-openlist.60+92"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.81-openlist.61+94"
   },
   "history": [
+    {
+      "version": "1.0.79-openlist.60",
+      "build": 92,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.79-openlist.60 (arm64-v8a)",
+      "date": "2026-11-22",
+      "notes": "- 播放页的歌词预览跳过间奏空行。播放进入间奏时，高亮直接移到下一句有文字的歌词。\n- 完整歌词新增「浮光沉际」。当前歌词随播放淡入淡出，两侧文字平滑下沉，英文显示首尾完整单词。\n- 歌词页右上角的「更多」收纳沉浸模式、八档字号滑块和五档粗细。字号和粗细会自动保存。\n- 自动切歌时留在歌词页并更新歌曲信息。滚动歌词的间奏空行更紧凑，高亮会移到下一句。Android 歌词沉浸模式可尝试隐藏系统状态栏和导航栏。\n- 更新「主题与背景」设置页。工具栏新增始终折叠、自动折叠、从不折叠三种选择，默认始终折叠。\n- 多个页面的标题栏加入渐变，调整折叠菜单的右侧留白。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.79-openlist.60%2B92/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.79-openlist.60+92"
+    },
     {
       "version": "1.0.78-openlist.59",
       "build": 91,
