@@ -24,6 +24,21 @@ class CoverPalette {
   Color get tertiary => Color(_roles[8]);
   Color get onTertiary => Color(_roles[9]);
   Color get inversePrimary => Color(_roles[10]);
+
+  ColorScheme applyTo(ColorScheme base) => base.copyWith(
+    primary: primary,
+    onPrimary: onPrimary,
+    primaryContainer: primaryContainer,
+    onPrimaryContainer: onPrimaryContainer,
+    secondary: secondary,
+    onSecondary: onSecondary,
+    secondaryContainer: secondaryContainer,
+    onSecondaryContainer: onSecondaryContainer,
+    tertiary: tertiary,
+    onTertiary: onTertiary,
+    inversePrimary: inversePrimary,
+    surfaceTint: primary,
+  );
 }
 
 final _palettes = <String, Future<CoverPalette?>>{};

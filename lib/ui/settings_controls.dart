@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_miuix/miuix.dart';
 
+import '../core/appearance.dart';
 import 'design_system/miuix_adaptive.dart';
 import 'miuix/miuix_iconography.dart';
 
@@ -205,5 +206,97 @@ class SettingsSlider extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class LyricFontSizeSlider extends StatefulWidget {
+  const LyricFontSizeSlider({
+    super.key,
+    required this.appearance,
+    this.preview = false,
+  });
+
+  final Appearance appearance;
+  final bool preview;
+
+  @override
+  State<LyricFontSizeSlider> createState() => _LyricFontSizeSliderState();
+}
+
+class _LyricFontSizeSliderState extends State<LyricFontSizeSlider> {
+  int? _previewStep;
+  int _adjustment = 0;
+
+  List<double> get _sizes => widget.preview
+      ? Appearance.miniLyricFontSizes
+      : Appearance.lyricFontSizes;
+
+  String _label(double size) =>
+      widget.preview ? '${size.round()}' : Appearance.lyricFontLabel(size);
+
+  Future<void> _save(double step) async {
+    final adjustment = _adjustment;
+    final size = _sizes[step.round()];
+    try {
+      await widget.appearance.update(
+        lyricFont: widget.preview ? null : size,
+        miniLyricFont: widget.preview ? size : null,
+      );
+    } catch (_) {
+      if (mounted && adjustment == _adjustment) {
+        ScaffoldMessenger.maybeOf(context)
+            ?.showSnackBar(const SnackBar(content: Text('歌词字号保存失败，请重试')));
+      }
+    } finally {
+      if (mounted && adjustment == _adjustment) {
+        setState(() => _previewStep = null);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: widget.appearance,
+    builder: (context, _) {
+      final sizes = _sizes;
+      final saved = Appearance.nearestLyricFontSize(
+        widget.preview
+            ? widget.appearance.miniLyricFontSize
+            : widget.appearance.lyricFontSize,
+        preview: widget.preview,
+      );
+      final step = _previewStep ?? sizes.indexOf(saved);
+      final label = _label(sizes[step]);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(label, textAlign: TextAlign.center),
+          Semantics(
+            label: '歌词字号',
+            child: Slider(
+              max: (sizes.length - 1).toDouble(),
+              divisions: sizes.length - 1,
+              value: step.toDouble(),
+              label: label,
+              semanticFormatterCallback: (value) =>
+                  _label(sizes[value.round()]),
+              onChanged: (value) => setState(() {
+                _adjustment++;
+                _previewStep = value.round();
+              }),
+              onChangeEnd: _save,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [const Text('小'), Text(widget.preview ? '大' : '超大')],
+            ),
+          ),
+        ],
+      );
+    },
   );
 }

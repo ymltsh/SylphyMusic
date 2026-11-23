@@ -3,6 +3,7 @@
 import argparse
 from datetime import date
 import hashlib
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -184,7 +185,10 @@ def openlist_source_archive(output, version, build, source):
         candidate = Path(temporary) / OPENLIST_SOURCE
         with zipfile.ZipFile(source) as upstream, zipfile.ZipFile(candidate, 'w', zipfile.ZIP_DEFLATED) as archive:
             names = upstream.namelist()
-            frontends = [name for name in names if re.fullmatch(r'OpenList-Frontend-[\w.]+-source\.tar\.gz', name)]
+            frontends = [
+                name for name in names
+                if re.fullmatch(r'OpenList-Frontend-[A-Za-z0-9._-]+-source\.tar\.gz', name)
+            ]
             if 'OpenList/go.mod' not in names or 'OpenList/openlistlib/bridge.go' not in names or not frontends:
                 raise ValueError('OpenList source archive must include the backend, bridge and frontend source.')
             for entry in upstream.infolist():
@@ -198,7 +202,8 @@ def openlist_source_archive(output, version, build, source):
                 'SylphyMusic/ contains the local application source.\n'
                 'OpenList/ contains the backend, Go module locks, embedded frontend and native bridge.\n'
                 f'Frontend source: {", ".join(frontends)}.\n'
-                'See SylphyMusic/docs/OPENLIST_LITE_ANDROID.md for build instructions.\n')
+                'See SylphyMusic/docs/OPENLIST_LITE_ANDROID.md and '
+                'SylphyMusic/tools/openlist_lite/build_openlist_aar.sh for build instructions.\n')
             write_application_sources(archive)
         candidate.replace(destination)
 
@@ -343,7 +348,7 @@ def verify_manifests(targets, latest, *, wait_seconds=45):
                     'User-Agent': 'SylphyMusic-release', 'Cache-Control': 'no-cache'})
                 with urllib.request.urlopen(request, timeout=min(8, remaining)) as response:
                     data = json.load(response)
-            except (OSError, ValueError):
+            except (OSError, HTTPException, ValueError):
                 continue
             if isinstance(data, dict) and data.get('latest') == latest:
                 print(f'PASS: {label}.', flush=True)
@@ -391,6 +396,7 @@ def publish(args, record, output, tag, latest):
 
     token = token_from_environment()
     prefix = f'/repos/{REPO}'
+    ordinary_latest = api('GET', prefix + '/releases/latest', token)['tag_name'] if openlist else None
     refs = api('GET', prefix + '/git/matching-refs/tags/' + urllib.parse.quote(tag, safe=''), token)
     if any(ref['ref'] == 'refs/tags/' + tag for ref in refs):
         raise ValueError('The release tag already exists; no existing assets were overwritten.')
@@ -408,6 +414,8 @@ def publish(args, record, output, tag, latest):
         'draft': False, 'make_latest': 'false' if prerelease else 'true'})
     print('Release published: ' + latest['page'], flush=True)
     verify_published_release(token, tag, latest, output, record['sha256'], prerelease=prerelease)
+    if openlist and api('GET', prefix + '/releases/latest', token)['tag_name'] != ordinary_latest:
+        raise ValueError('The ordinary Latest release changed while publishing OpenList.')
     for root, branch, files in targets:
         for filename in files:
             (root / filename).write_text(data, encoding='utf-8')

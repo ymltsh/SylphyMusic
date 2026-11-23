@@ -947,7 +947,6 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
   ) {
     final scheme = Theme.of(context).colorScheme;
     final miuix = SylphyMiuixStyle.enabled(context);
-    final miuixColors = miuix ? MiuixTheme.of(context).colors : null;
     final compact = useWideCardRatio(
       context,
       app.desktopPreferences.compactPageCards,
@@ -966,34 +965,22 @@ class _SylphyShellState extends State<SylphyShell> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  SylphyAdaptiveQuickIcon(
-                    icon: icon,
-                    compact: compact,
-                    materialIcon: Container(
-                      width: compact ? 34 : 42,
-                      height: compact ? 34 : 42,
-                      decoration: BoxDecoration(
-                        color: scheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        icon,
-                        color: scheme.onPrimaryContainer,
-                        size: compact ? 20 : 23,
-                      ),
-                    ),
+              SylphyAdaptiveQuickIcon(
+                icon: icon,
+                compact: compact,
+                materialIcon: Container(
+                  width: compact ? 34 : 42,
+                  height: compact ? 34 : 42,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  const Spacer(),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
-                    color:
-                        miuixColors?.onSurfaceVariantActions ??
-                        scheme.onSurfaceVariant,
+                  child: Icon(
+                    icon,
+                    color: scheme.onPrimaryContainer,
+                    size: compact ? 20 : 23,
                   ),
-                ],
+                ),
               ),
               SizedBox(height: compact ? 6 : 14),
               Text(

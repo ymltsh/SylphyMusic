@@ -222,6 +222,12 @@ class PlayerWidgetRegistry {
                 position: data.app.playback.position,
                 fontSize: data.app.appearance.miniLyricFontSize,
                 lineHeight: e.lyricLineHeight,
+                fontWeight: e.lyricFontWeight,
+                textAlign: switch (e.align) {
+                  'left' => TextAlign.left,
+                  'right' => TextAlign.right,
+                  _ => TextAlign.center,
+                },
                 highlightColor: highlightColor,
               );
             },

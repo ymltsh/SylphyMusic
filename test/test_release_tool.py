@@ -58,12 +58,31 @@ class ReleaseTests(unittest.TestCase):
                   'sha256': {name: release.digest(output / name) for name in [*artifacts.values(), 'SHA256SUMS.txt']}}
         latest = {'version': record['version'], 'build': 3, 'name': 'test', 'notes': 'test', 'page': 'https://github.com/ymltsh/SylphyMusic/releases/tag/test'}
         calls = []
+        targets = patch.object(release, 'check_publish_targets')
+        self.addCleanup(targets.stop)
+        targets.start()
+        delivery = patch.object(release, 'verify_manifests', return_value=[])
+        self.addCleanup(delivery.stop)
+        delivery.start()
+
+        def attachment(name):
+            return {'name': name, 'size': (output / name).stat().st_size,
+                    'digest': 'sha256:' + record['sha256'][name]}
+
         def api(method, path, token, body=None, upload=None):
             calls.append((method, path, body))
             if method == 'POST' and path.endswith('/releases'):
                 return {'id': 9, 'upload_url': 'https://uploads.github.com/repos/ymltsh/SylphyMusic/releases/9/assets{?name,label}'}
-            if upload and fail_upload:
-                raise ValueError('simulated upload failure')
+            if upload:
+                if fail_upload:
+                    raise ValueError('simulated upload failure')
+                return attachment(upload.name)
+            if method == 'GET' and '/releases/tags/' in path:
+                return {'draft': False, 'prerelease': record['version'].endswith('-beta'),
+                        'name': latest['name'], 'body': latest['notes'],
+                        'assets': [attachment(name) for name in record['sha256']]}
+            if method == 'GET' and path.endswith('/releases/latest'):
+                return {'tag_name': f'v{record["version"]}+{record["build"]}'}
             return [] if method == 'GET' else {}
         return output, record, latest, calls, api
 
@@ -88,7 +107,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(commands[0], ['git', 'add', '--', 'version-beta.json'])
         self.assertEqual(commands[1][-2:], ['--', 'version-beta.json'])
         self.assertIn('--only', commands[1])
-        self.assertEqual(commands[2], ['git', 'push', 'origin', 'main'])
+        self.assertEqual(commands[2], ['git', 'push', 'origin', 'HEAD:refs/heads/main'])
         self.assertIsNone(json.loads((self.root / 'version.json').read_text())['latest'])
 
     def test_upload_failure_leaves_manifest_and_git_untouched(self):

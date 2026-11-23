@@ -64,7 +64,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     if (!identical(base, _themeBase) || !identical(palette, _themePalette)) {
       _themeBase = base;
       _themePalette = palette;
-      final scheme = _withCoverPalette(base.colorScheme, palette);
+      final scheme = palette?.applyTo(base.colorScheme) ?? base.colorScheme;
       _playerTheme = base.copyWith(
         colorScheme: scheme,
         scaffoldBackgroundColor: scheme.surface,
@@ -111,24 +111,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     final file = await widget.app.artwork.load(track);
     if (file == null) return null;
     return coverColorScheme(file, brightness: brightness);
-  }
-
-  ColorScheme _withCoverPalette(ColorScheme base, CoverPalette? cover) {
-    if (cover == null) return base;
-    return base.copyWith(
-      primary: cover.primary,
-      onPrimary: cover.onPrimary,
-      primaryContainer: cover.primaryContainer,
-      onPrimaryContainer: cover.onPrimaryContainer,
-      secondary: cover.secondary,
-      onSecondary: cover.onSecondary,
-      secondaryContainer: cover.secondaryContainer,
-      onSecondaryContainer: cover.onSecondaryContainer,
-      tertiary: cover.tertiary,
-      onTertiary: cover.onTertiary,
-      inversePrimary: cover.inversePrimary,
-      surfaceTint: cover.primary,
-    );
   }
 
   Future<void> _openLyrics(

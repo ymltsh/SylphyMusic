@@ -23,13 +23,13 @@ App 启动不主动检查；用户在“设置 → 关于风灵音乐 → 检查
 
 ### 0. 一键发布
 
-根目录 `release.py` 自动执行：
+普通版和 OpenList 特别版共用工作区根目录的 `release.py`。
 
 更新版本 → 构建 Android / Windows → 打包 EXE / ZIP → 上传 GitHub Release → 更新版本清单 → 只提交并推送清单。
 
-发布结果核对直接集成在 `release.py`，不再创建或运行单独的 `verify-release` 脚本。上传时核对附件大小与 SHA-256；发布后核对 Release 状态、标题、正文和全部附件，正式版同时确认 Latest；清单推送后核对原始与加速入口的 latest 完整内容。仅对读取失败或清单传播延迟进行有限重试，不自动重试发布写操作。
+脚本上传时核对附件大小与 SHA-256，发布后核对 Release 状态、标题、正文和全部附件。正式版确认 GitHub Latest，OpenList 确认普通版 Latest。清单推送后，脚本核对原始和加速入口的 `latest` 完整内容。
 
-全部步骤完成后，发布脚本直接输出 `Release succeeded: <发布页>`，退出码为 0；任一步失败输出 `Release failed: <原因>`，退出码为 1。`--no-push` 仅报告 Release 发布结果，并明确提示清单未推送，不核对远程清单。核对失败可能发生在发布已完成之后，必须先检查远端状态，不能直接重复发布。OpenList 发布入口须同样复用 `release.py` 中的结果核对函数，在其清单同步后直接报告成功或失败，不另设核对脚本。
+发布并推送清单后，脚本分别报告两项进度。如果清单入口在重试期间仍未返回目标版本，脚本列出待核对的地址，输出可直接执行的 `--verify-only` 命令，退出码为 2。该命令只读取公开清单，可在缓存刷新后再次执行。全部核对通过时退出码为 0，发布步骤发生错误时退出码为 1。使用 `--no-push` 时，发布结果以 Release 已发布、本地清单已更新为准。
 
 编译成功即可交付；流程不运行静态分析或测试，也不因历史验证失败追加修复。功能与设备验证由用户负责。
 
@@ -47,9 +47,12 @@ python release.py --version 1.0.1 --build 13 --dry-run
 | --- | --- |
 | --version / --build | 版本号和构建号，建议显式指定 build |
 | --beta / --beta2 | 预发布，更新 version-beta.json |
+| --openlist | 发布 Android ARM64 OpenList 特别版 |
 | --name / --notes | 标题 / 发布说明；--notes-file 可读取多行说明 |
 | --dry-run | 只预览 |
-| --skip-build | 复用本版本已生成的 APK / EXE / ZIP |
+| --skip-build | 复用本版本目录中已准备的附件 |
+| --openlist-source-archive | 指定与 APK 内置 OpenList 库对应的后端及前端源码 ZIP |
+| --verify-only | 只核对选定频道的远程清单，可用版本号和构建号限定目标 |
 | --no-push | 发布资产并更新本地清单，不提交推送清单 |
 
 Flutter 或 Inno 不在 PATH 时可设置 `FLUTTER_BIN` / `INNO_SETUP_COMPILER`。Token 自动使用 Git 凭据或 `GH_TOKEN` / `GITHUB_TOKEN`。关闭运行中的播放器，避免 Windows EXE 被占用。旧命令的 `--skip-checks` 参数仍兼容，但已无需传入；测试和验收由用户独立进行。
@@ -81,7 +84,7 @@ flutter build windows --release
 
 ### 3. 创建 GitHub Release
 
-Tag 如 `v1.0.1+13`，上传上述资产。Android 使用正式签名，Windows 当前未代码签名。上传失败保留草稿，不推进清单。
+Tag 如 `v1.0.1+13`，上传上述资产。Android 使用正式签名，Windows 当前未代码签名。上传失败时草稿会保留，可按日志中的 Release ID 查看当前状态。
 
 #### Release 描述规范
 
@@ -108,3 +111,15 @@ Invoke-RestMethod "https://hub.wgen.top/https://raw.githubusercontent.com/ymltsh
 `main/version-openlist.json` 是 OpenList 独立更新入口，结构与 `version.json` 相同，保存特别版的 latest / history，仅指向特别版附件。普通版仍读取 main/version.json。OpenList 客户端正式更新读取新入口；测试更新仍使用 feature/android-openlist-lite/version-beta.json。
 
 两分支均保存 version-openlist.json。旧 feature/android-openlist-lite/version.json 继续保留，供既有安装包使用。后续发布 OpenList 时，将其更新后的 version.json 同步到两分支的 version-openlist.json，并只提交、推送对应清单；普通版发布不覆盖 OpenList 清单。新增接口本身不改变版本号或已发布附件。
+
+从 `sylphy_music_feature` 运行以下命令。脚本会构建并检查正式签名的 ARM64 APK，打包对应源码，以 GitHub 预发布形式上传附件，并同步三个 OpenList 清单。与所属远程分支同步的工作区可以只推送本次生成的清单提交。
+
+```powershell
+python release.py --openlist --version 1.0.78-openlist.59 --build 91 --dry-run
+python release.py --openlist --version 1.0.78-openlist.59 --build 91 --notes-file .private/openlist-notes.md
+python release.py --openlist --verify-only
+```
+
+脚本在本地上一次发布目录查找 APK 和 OpenList 源码 ZIP。若两版 APK 内的 OpenList 原生库一致，就复用上版 ZIP 中的 OpenList 后端和前端源码，并打包当前应用源码。若缺少上版附件或原生库已更新，传入 `--openlist-source-archive` 指定对应源码 ZIP，其中应包含 `OpenList/` 后端及 `OpenList-Frontend-*-source.tar.gz`。若当前版本的 APK 和完整源码 ZIP 都已准备好，可用 `--skip-build` 直接复用。
+
+普通版可在 `sylphy_music` 执行 `python release.py --verify-only` 核对当前正式版清单，或加 `--beta` 核对测试清单。

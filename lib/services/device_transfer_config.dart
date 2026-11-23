@@ -31,6 +31,8 @@ const transferConfigKeys = <String>{
   'ui_seed',
   'ui_background_visibility',
   'ui_lyrics_font_size',
+  'ui_lyric_page_weight',
+  'ui_lyric_skyline_enabled',
   'ui_mini_lyrics_font_size',
   'ui_lyric_page_color_mode',
   'ui_lyric_page_fixed_color',

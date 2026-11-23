@@ -448,15 +448,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   List<Widget> _lyricCards() => [
     _group('歌词页面', [
-      SettingsSlider(
-        icon: Icons.lyrics_outlined,
-        title: '完整歌词字号',
-        formatValue: Appearance.lyricFontLabel,
-        value: app.appearance.lyricFontSize,
-        min: Appearance.lyricFontSizes.first,
-        max: Appearance.lyricFontSizes.last,
-        divisions: Appearance.lyricFontSizes.length - 1,
-        onChanged: (size) => _act(() => app.appearance.update(lyricFont: size)),
+      ListTile(
+        leading: const SettingsIcon(Icons.lyrics_outlined),
+        title: const Text('完整歌词字号'),
+        subtitle: LyricFontSizeSlider(appearance: app.appearance),
       ),
       SettingsSelect<LyricColorMode>(
         icon: Icons.palette_outlined,
@@ -483,16 +478,13 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
     ]),
     _group('播放页迷你歌词', [
-      SettingsSlider(
-        icon: Icons.text_fields_rounded,
-        title: '迷你歌词字号',
-        formatValue: Appearance.miniLyricFontLabel,
-        value: app.appearance.miniLyricFontSize,
-        min: Appearance.miniLyricFontSizes.first,
-        max: Appearance.miniLyricFontSizes.last,
-        divisions: Appearance.miniLyricFontSizes.length - 1,
-        onChanged: (size) =>
-            _act(() => app.appearance.update(miniLyricFont: size)),
+      ListTile(
+        leading: const SettingsIcon(Icons.text_fields_rounded),
+        title: const Text('迷你歌词字号'),
+        subtitle: LyricFontSizeSlider(
+          appearance: app.appearance,
+          preview: true,
+        ),
       ),
     ]),
     if (app.desktopLyrics.supported)

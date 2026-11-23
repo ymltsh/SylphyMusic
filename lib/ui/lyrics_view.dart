@@ -35,6 +35,7 @@ class LyricsView extends StatefulWidget {
     required this.position,
     this.onSeek,
     this.initialFontSize = 22,
+    this.fontWeight,
     this.highlightColor,
     this.textAlign = TextAlign.center,
     this.showToolbar = true,
@@ -43,6 +44,7 @@ class LyricsView extends StatefulWidget {
   final Duration position;
   final ValueChanged<Duration>? onSeek;
   final double initialFontSize;
+  final FontWeight? fontWeight;
   final Color? highlightColor;
   final TextAlign textAlign;
   final bool showToolbar;
@@ -54,6 +56,7 @@ class _LyricsViewState extends State<LyricsView> {
   final controller = ScrollController();
   late List<LrcLine> lines;
   int active = -1;
+  int _cue = -1;
   bool following = true;
   double fontSize = 22;
   List<double> heights = [];
@@ -88,7 +91,7 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _parse() {
     lines = mergedLyricLines(widget.text);
-    active = activeLrcIndex(lines, widget.position);
+    _selectCue(activeLrcIndex(lines, widget.position));
     geometryKey = null;
     following = true;
     _scheduleFollow();
@@ -99,6 +102,9 @@ class _LyricsViewState extends State<LyricsView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialFontSize != widget.initialFontSize) {
       fontSize = widget.initialFontSize;
+    }
+    if (oldWidget.initialFontSize != widget.initialFontSize ||
+        oldWidget.fontWeight != widget.fontWeight) {
       geometryKey = null;
     }
     if (oldWidget.text != widget.text) {
@@ -106,10 +112,21 @@ class _LyricsViewState extends State<LyricsView> {
       return;
     }
     final next = activeLrcIndex(lines, widget.position);
-    if (next != active) {
-      active = next;
-      _scheduleFollow();
+    if (next != _cue) {
+      final previousTarget = _scrollIndex;
+      _selectCue(next);
+      if (_scrollIndex != previousTarget) _scheduleFollow();
     }
+  }
+
+  int get _scrollIndex => active < 0 ? math.max(0, _cue) : active;
+
+  void _selectCue(int index) {
+    _cue = index;
+    while (index >= 0 && index < lines.length && lines[index].text.isEmpty) {
+      index++;
+    }
+    active = index < lines.length ? index : -1;
   }
 
   void _scheduleFollow() {
@@ -120,7 +137,7 @@ class _LyricsViewState extends State<LyricsView> {
       if (!mounted || !following || !controller.hasClients || offsets.isEmpty) {
         return;
       }
-      final index = active < 0 ? 0 : active;
+      final index = _scrollIndex;
       final target =
           (edge +
                   offsets[index] +
@@ -156,7 +173,7 @@ class _LyricsViewState extends State<LyricsView> {
           style: TextStyle(
             fontSize: fontSize * .65,
             height: 1.5,
-            fontWeight: FontWeight.w400,
+            fontWeight: widget.fontWeight ?? FontWeight.w400,
             color: secondaryColor,
           ),
         ),
@@ -170,7 +187,7 @@ class _LyricsViewState extends State<LyricsView> {
     final style = theme.textTheme.titleLarge!.copyWith(
       fontSize: fontSize,
       height: 1.5,
-      fontWeight: FontWeight.w600,
+      fontWeight: widget.fontWeight ?? FontWeight.w600,
     );
     return Column(
       children: [
@@ -269,7 +286,10 @@ class _LyricsViewState extends State<LyricsView> {
                           textAlign: widget.textAlign,
                         )..layout(maxWidth: width);
                         offsets.add(offset);
-                        final height = painter.height + 28;
+                        final rowHeight = painter.height + 28;
+                        final height = line.text.isEmpty
+                            ? rowHeight / 4
+                            : rowHeight;
                         heights.add(height);
                         offset += height;
                         painter.dispose();
@@ -335,44 +355,49 @@ class _LyricsViewState extends State<LyricsView> {
                                               );
                                               _scheduleFollow();
                                             },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 28,
-                                          vertical: 14,
-                                        ),
-                                        child: AnimatedDefaultTextStyle(
-                                          duration:
-                                              MediaQuery.disableAnimationsOf(
-                                                context,
-                                              )
-                                              ? Duration.zero
-                                              : const Duration(
-                                                  milliseconds: 220,
-                                                ),
-                                          style: style.copyWith(
-                                            color: selected
-                                                ? widget.highlightColor ??
-                                                      scheme.primary
-                                                : scheme.onSurface.withValues(
-                                                    alpha: .48,
+                                      child: line.text.isEmpty
+                                          ? const SizedBox.expand()
+                                          : Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 28,
+                                                    vertical: 14,
                                                   ),
-                                          ),
-                                          textAlign: widget.textAlign,
-                                          child: Text.rich(
-                                            TextSpan(
-                                              children: _spans(
-                                                line.text,
-                                                secondaryColor: scheme.onSurface
-                                                    .withValues(
-                                                      alpha: selected
-                                                          ? .68
-                                                          : .38,
+                                              child: AnimatedDefaultTextStyle(
+                                                duration:
+                                                    MediaQuery.disableAnimationsOf(
+                                                      context,
+                                                    )
+                                                    ? Duration.zero
+                                                    : const Duration(
+                                                        milliseconds: 220,
+                                                      ),
+                                                style: style.copyWith(
+                                                  color: selected
+                                                      ? widget.highlightColor ??
+                                                            scheme.primary
+                                                      : scheme.onSurface
+                                                            .withValues(
+                                                              alpha: .48,
+                                                            ),
+                                                ),
+                                                textAlign: widget.textAlign,
+                                                child: Text.rich(
+                                                  TextSpan(
+                                                    children: _spans(
+                                                      line.text,
+                                                      secondaryColor: scheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: selected
+                                                                ? .68
+                                                                : .38,
+                                                          ),
                                                     ),
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                   );
                                 },
@@ -416,12 +441,16 @@ class LyricsPreview extends StatefulWidget {
     required this.position,
     this.fontSize = 24,
     this.lineHeight = 1.5,
+    this.fontWeight,
+    this.textAlign = TextAlign.center,
     this.highlightColor,
   });
   final String text;
   final Duration position;
   final double fontSize;
   final double lineHeight;
+  final FontWeight? fontWeight;
+  final TextAlign textAlign;
   final Color? highlightColor;
 
   @override
@@ -432,6 +461,7 @@ class _LyricsPreviewState extends State<LyricsPreview> {
   Object? _windowInputs;
   Widget? _window;
   late List<LrcLine> _merged;
+  late List<LrcLine> _visibleCues;
   late List<String> _lines;
   String get text => widget.text;
   Duration get position => widget.position;
@@ -453,27 +483,45 @@ class _LyricsPreviewState extends State<LyricsPreview> {
 
   void _parse() {
     _merged = mergedLyricLines(text);
+    _visibleCues = _merged.where((line) => line.text.isNotEmpty).toList();
     _lines = _merged.isEmpty
         ? text
               .split('\n')
               .map((line) => line.trim())
               .where((line) => line.isNotEmpty)
               .toList()
-        : [for (final line in _merged) line.text.split('\n').first.trim()];
-    if (_lines.isEmpty) _lines = ['···'];
+        : [for (final line in _visibleCues) line.text.split('\n').first.trim()];
+    if (_merged.isEmpty && _lines.isEmpty) _lines = ['···'];
+  }
+
+  int _highlightedIndex() {
+    final active = activeLrcIndex(_merged, position);
+    if (active < 0) return 0;
+    final previous = activeLrcIndex(_visibleCues, position);
+    // An empty cue advances the highlight. A trailing gap lands past the list.
+    return _merged[active].text.isEmpty ? previous + 1 : previous;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_lines.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final merged = _merged;
-    final plain = merged.isEmpty;
-    final active = plain ? 0 : activeLrcIndex(merged, position);
+    final plain = _merged.isEmpty;
+    final current = _highlightedIndex();
+    final textAlign = widget.textAlign;
+    final alignment = switch (textAlign) {
+      TextAlign.left => Alignment.centerLeft,
+      TextAlign.right => Alignment.centerRight,
+      TextAlign.start => AlignmentDirectional.centerStart,
+      TextAlign.end => AlignmentDirectional.centerEnd,
+      _ => Alignment.center,
+    };
+    final emphasisWeight = widget.fontWeight ?? FontWeight.w600;
+    final otherWeight = widget.fontWeight ?? FontWeight.w400;
     return LayoutBuilder(
       builder: (context, constraints) {
         final lines = _lines;
-        final current = plain || active < 0 ? 0 : active;
         final scaler = MediaQuery.textScalerOf(context);
         final locale = Localizations.maybeLocaleOf(context);
         final inputs = (
@@ -485,6 +533,8 @@ class _LyricsPreviewState extends State<LyricsPreview> {
           locale,
           fontSize,
           lineHeight,
+          widget.fontWeight,
+          textAlign,
           highlightColor,
           Directionality.of(context),
           DefaultTextStyle.of(context).style,
@@ -492,29 +542,26 @@ class _LyricsPreviewState extends State<LyricsPreview> {
         );
         if (_windowInputs == inputs && _window != null) return _window!;
         _windowInputs = inputs;
-        TextStyle styleFor(int index) => DefaultTextStyle.of(context).style
-            .merge(
+        TextStyle styleFor(int index) =>
+            DefaultTextStyle.of(context).style.merge(
               (theme.textTheme.titleLarge ?? const TextStyle()).copyWith(
                 fontSize: fontSize,
                 height: lineHeight,
-                fontWeight: index == current
-                    ? FontWeight.w600
-                    : FontWeight.w400,
+                fontWeight: index == current ? emphasisWeight : otherWeight,
                 color: index == current
                     ? highlightColor ?? scheme.primary
                     : scheme.onSurface.withValues(alpha: .42),
               ),
             );
-        String lineAt(int index) => lines[index].isEmpty ? ' ' : lines[index];
         final heights = <int, double>{};
         double heightAt(int index) => heights.putIfAbsent(index, () {
           final painter = TextPainter(
             text: TextSpan(
-              text: lineAt(index),
-              style: styleFor(index).copyWith(fontWeight: FontWeight.w600),
+              text: lines[index],
+              style: styleFor(index).copyWith(fontWeight: emphasisWeight),
             ),
             textDirection: Directionality.of(context),
-            textAlign: TextAlign.center,
+            textAlign: textAlign,
             textScaler: scaler,
             locale: locale,
             maxLines: 2,
@@ -583,17 +630,18 @@ class _LyricsPreviewState extends State<LyricsPreview> {
                       for (var index = start; index < start + count; index++)
                         SizedBox(
                           height: heightAt(index),
-                          child: Center(
+                          child: Align(
+                            alignment: alignment,
                             child: AnimatedDefaultTextStyle(
                               duration: duration,
                               curve: Curves.easeInOutCubic,
                               style: styleFor(index),
                               child: Text(
-                                lineAt(index),
+                                lines[index],
                                 maxLines: 2,
                                 softWrap: true,
                                 overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
+                                textAlign: textAlign,
                                 textScaler: scaler,
                                 locale: locale,
                               ),

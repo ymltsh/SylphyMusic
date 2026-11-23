@@ -7,6 +7,7 @@ import '../../core/app_controller.dart';
 import '../../core/appearance.dart';
 import '../../core/models.dart';
 import '../../core/player_layout.dart';
+import '../settings_controls.dart';
 import '../system_bars.dart';
 import 'layout_editing.dart';
 import 'layout_renderer.dart';
@@ -462,6 +463,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     double max,
     ValueChanged<double> update, {
     String? valueLabel,
+    String Function(double)? semanticLabel,
     int? steps,
     Key? sliderKey,
   }) => Row(
@@ -478,6 +480,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
           max: max,
           divisions: steps,
           label: valueLabel,
+          semanticFormatterCallback: semanticLabel,
           onChangeStart: (_) => draft.begin(),
           onChangeEnd: (_) => draft.commit(),
           onChanged: update,
@@ -495,8 +498,9 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
     required bool selected,
     required ValueChanged<bool>? onSelected,
     Key? key,
+    double width = 96,
   }) => SizedBox(
-    width: 96,
+    width: width,
     height: 40,
     child: ChoiceChip(
       key: key,
@@ -513,6 +517,78 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
   );
+
+  Widget _lyricStyleControls(PlayerElement element) {
+    final labelStyle = Theme.of(context).textTheme.labelMedium;
+    final selectedWeight = element.lyricFontWeight;
+    const weights = LyricPageWeight.values;
+    const defaultWeight = FontWeight.w600;
+    final currentWeight = selectedWeight ?? defaultWeight;
+    int distance(LyricPageWeight weight) =>
+        (currentWeight.value - (weight.fontWeight ?? defaultWeight).value)
+            .abs();
+    final nearestWeight = weights.reduce(
+      (a, b) => distance(a) <= distance(b) ? a : b,
+    );
+    final weightLabel = nearestWeight.fontWeight == selectedWeight
+        ? nearestWeight.label
+        : '${currentWeight.value}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('歌词字号', style: labelStyle),
+        LyricFontSizeSlider(appearance: widget.app.appearance, preview: true),
+        const SizedBox(height: 8),
+        _slider(
+          '字重',
+          nearestWeight.index.toDouble(),
+          0,
+          (weights.length - 1).toDouble(),
+          (step) {
+            final weight = weights[step.round()].fontWeight;
+            draft.update(
+              element.copyWith(
+                lyricFontWeight: weight,
+                clearLyricFontWeight: weight == null,
+              ),
+            );
+          },
+          steps: weights.length - 1,
+          valueLabel: weightLabel,
+          semanticLabel: (step) => weights[step.round()].label,
+          sliderKey: const ValueKey('editor-lyric-weight'),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final option in const {
+              'left': '靠左',
+              'center': '居中',
+              'right': '靠右',
+            }.entries)
+              _pill(
+                width: 76,
+                label: Text(option.value),
+                selected: element.align == option.key,
+                onSelected: (_) =>
+                    draft.update(element.copyWith(align: option.key)),
+              ),
+          ],
+        ),
+        _slider(
+          '歌词行距',
+          element.lyricLineHeight,
+          1,
+          2.5,
+          (value) => draft.update(element.copyWith(lyricLineHeight: value)),
+          steps: 30,
+          sliderKey: const ValueKey('editor-lyric-line-height'),
+          valueLabel: '${element.lyricLineHeight.toStringAsFixed(2)}×',
+        ),
+      ],
+    );
+  }
 
   Widget _inspector(Size canvas, {bool wide = false}) {
     final e = draft.selected;
@@ -594,6 +670,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
               opacity: e.locked ? .4 : 1,
               child: Column(
                 children: [
+                  if (e.type == PlayerPart.lyrics) _lyricStyleControls(e),
                   if (e.type == PlayerPart.cover) ...[
                     Wrap(
                       spacing: 8,
@@ -738,11 +815,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           ),
                       ],
                     ),
-                    if (e.coverFadeDirection == CoverFadeDirection.all)
-                      const Text(
-                        '四周逐渐透明、中心清晰；数值越大，羽化范围越窄。',
-                        style: TextStyle(fontSize: 12),
-                      ),
                   ],
                   if ([PlayerPart.title, PlayerPart.artist].contains(e.type))
                     Padding(
@@ -773,51 +845,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                       40,
                       (v) => draft.update(e.copyWith(fontSize: v)),
                     ),
-                  if (e.type == PlayerPart.lyrics) ...[
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final size in Appearance.miniLyricFontSizes)
-                            _pill(
-                              label: Text(
-                                '${Appearance.miniLyricFontLabel(size)} · ${size.toInt()}',
-                              ),
-                              selected:
-                                  widget.app.appearance.miniLyricFontSize ==
-                                  size,
-                              onSelected: saving
-                                  ? null
-                                  : (_) => _run(
-                                      () => widget.app.appearance.update(
-                                        miniLyricFont: size,
-                                      ),
-                                    ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const Text(
-                      '字号自动保存；完整歌词字号在歌词页内调整。',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    _slider(
-                      '歌词行距',
-                      e.lyricLineHeight,
-                      1,
-                      2.5,
-                      (v) => draft.update(e.copyWith(lyricLineHeight: v)),
-                      steps: 30,
-                      sliderKey: const ValueKey('editor-lyric-line-height'),
-                      valueLabel: '${e.lyricLineHeight.toStringAsFixed(2)}×',
-                    ),
-                    const Text(
-                      '行距随布局保存；空间不足时优先完整显示当前句。',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ],
                   if (e.type == PlayerPart.quickActions) ...[
                     _pill(
                       label: const Text('自动均分'),
@@ -835,10 +862,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                       valueLabel: e.quickActionSpacing == null
                           ? '自动'
                           : '${e.quickActionSpacing!.round()} dp',
-                    ),
-                    const Text(
-                      '空间不足时自动收紧间距；按钮保留可点击尺寸。',
-                      style: TextStyle(fontSize: 12),
                     ),
                   ],
                   if (e.type == PlayerPart.progress) ...[
@@ -935,7 +958,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                         if (e.type == PlayerPart.lyrics)
                           _pill(
                             key: const ValueKey('editor-lyric-default-color'),
-                            label: const Text('默认'),
+                            label: const Text('跟随系统'),
                             selected:
                                 e.color == null && e.lyricFollowSystemColor,
                             onSelected: (_) => draft.update(
@@ -974,11 +997,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           ),
                       ],
                     ),
-                    if (e.type == PlayerPart.lyrics)
-                      const Text(
-                        '默认颜色随系统切换：浅色为黑色，深色为白色。',
-                        style: TextStyle(fontSize: 12),
-                      ),
                   ],
                 ],
               ),
@@ -1017,7 +1035,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
             key: const ValueKey('editor-ambient'),
             contentPadding: EdgeInsets.zero,
             title: const Text('封面模糊背景'),
-            subtitle: const Text('默认关闭，win有性能问题'),
             value: widget.app.appearance.ambient,
             onChanged: saving
                 ? null
@@ -1025,10 +1042,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                     () => widget.app.appearance.update(background: value),
                   ),
           ),
-        const Text(
-          '拖动组件摆放，拖动右下角缩放；9 / 16 宫格和吸附可开关。',
-          style: TextStyle(fontSize: 12),
-        ),
+        const Text('拖动组件移动，拖动右下角缩放。', style: TextStyle(fontSize: 12)),
       ],
     );
   }
@@ -1215,17 +1229,6 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                         padding: EdgeInsets.all(8),
                         child: Text('原布局无法读取，暂用默认布局；原数据保留，保存后才替换。'),
                       ),
-                    if (widget.app.playerLayouts.active == null)
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, 2),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '当前未启用自定义布局；保存后成为独立自定义模板。',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ),
                     _toolbar(),
                     Expanded(
                       child: LayoutBuilder(
@@ -1264,6 +1267,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                             return Row(
                               children: [
                                 Expanded(child: canvas),
+                                const VerticalDivider(width: 1),
                                 SizedBox(
                                   width: 320,
                                   child: _inspector(canvasSize, wide: true),
@@ -1274,6 +1278,7 @@ class _PlayerLayoutEditorState extends State<PlayerLayoutEditor> {
                           return Column(
                             children: [
                               Expanded(child: canvas),
+                              const Divider(height: 1),
                               SizedBox(
                                 height: math.min(
                                   360,

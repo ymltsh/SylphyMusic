@@ -14,6 +14,19 @@ import '../data/app_db.dart';
 /// system/fixed; album colour is only used on the in-app full-lyrics page.
 enum LyricColorMode { album, system, fixed }
 
+enum LyricPageWeight {
+  light('细', FontWeight.w300),
+  regular('常规', FontWeight.w400),
+  standard('标准', null),
+  bold('粗', FontWeight.w700),
+  heavy('特粗', FontWeight.w900);
+
+  const LyricPageWeight(this.label, this.fontWeight);
+
+  final String label;
+  final FontWeight? fontWeight;
+}
+
 enum MiniPlayerBarStyle { automatic, pc, standard }
 
 enum MiuixDockWidth { short, long }
@@ -130,19 +143,38 @@ class Appearance extends ChangeNotifier {
   }
 
   double lyricFontSize = 24;
+  LyricPageWeight lyricPageWeight = LyricPageWeight.standard;
+  bool lyricSkylineEnabled = false;
   double miniLyricFontSize = 20;
-  static const lyricFontSizes = [20.0, 24.0, 28.0];
-  static const miniLyricFontSizes = [16.0, 20.0, 24.0];
-  static String lyricFontLabel(double size) => size <= 20
-      ? '小'
-      : size >= 28
-      ? '大'
-      : '标准';
-  static String miniLyricFontLabel(double size) => size <= 16
-      ? '小'
-      : size >= 24
-      ? '大'
-      : '标准';
+  static const _largeLyricFont = 28.0;
+  static const _extraLargeLyricFont = _largeLyricFont * 2;
+  static const lyricFontSizes = [
+    20.0,
+    24.0,
+    _largeLyricFont,
+    32.0,
+    38.0,
+    44.0,
+    50.0,
+    _extraLargeLyricFont,
+  ];
+  static const miniLyricFontSizes = [16.0, 18.0, 20.0, 22.0, 24.0];
+  static String lyricFontLabel(double size) {
+    final label = switch (size) {
+      20.0 => '小',
+      24.0 => '标准',
+      _largeLyricFont => '大',
+      _extraLargeLyricFont => '超大',
+      _ => null,
+    };
+    final number = size.round();
+    return label == null ? '$number' : '$label（$number）';
+  }
+
+  static double nearestLyricFontSize(double size, {bool preview = false}) =>
+      (preview ? miniLyricFontSizes : lyricFontSizes).reduce(
+        (a, b) => (a - size).abs() <= (b - size).abs() ? a : b,
+      );
 
   Future<void> toggleCoverFlow({required bool playlist}) {
     if (_closed) return Future.value();
@@ -266,21 +298,22 @@ class Appearance extends ChangeNotifier {
     if (desktopFont != null && desktopFont.isFinite) {
       desktopLyricFontSize = desktopFont.clamp(12.0, 40.0);
     }
+    lyricSkylineEnabled =
+        await db.setting('ui_lyric_skyline_enabled') == 'true';
     final font = double.tryParse(await db.setting('ui_lyrics_font_size') ?? '');
     if (font != null && font.isFinite) {
-      final clamped = font.clamp(16.0, 40.0);
-      lyricFontSize = lyricFontSizes.reduce(
-        (a, b) => (a - clamped).abs() <= (b - clamped).abs() ? a : b,
-      );
+      lyricFontSize = nearestLyricFontSize(font);
     }
+    final savedLyricWeight = await db.setting('ui_lyric_page_weight');
+    lyricPageWeight = LyricPageWeight.values.firstWhere(
+      (weight) => weight.name == savedLyricWeight,
+      orElse: () => LyricPageWeight.standard,
+    );
     final miniFont = double.tryParse(
       await db.setting('ui_mini_lyrics_font_size') ?? '',
     );
     if (miniFont != null && miniFont.isFinite) {
-      final clamped = miniFont.clamp(14.0, 32.0);
-      miniLyricFontSize = miniLyricFontSizes.reduce(
-        (a, b) => (a - clamped).abs() <= (b - clamped).abs() ? a : b,
-      );
+      miniLyricFontSize = nearestLyricFontSize(miniFont, preview: true);
     }
   }
 
@@ -294,6 +327,8 @@ class Appearance extends ChangeNotifier {
     bool? playerFab,
     MiniPlayerBarStyle? miniPlayerBarStyle,
     double? lyricFont,
+    LyricPageWeight? lyricPageWeight,
+    bool? lyricSkyline,
     double? miniLyricFont,
     LyricColorMode? lyricPageColorMode,
     Color? lyricPageFixedColor,
@@ -314,7 +349,9 @@ class Appearance extends ChangeNotifier {
       throw ArgumentError('背景可见度超出范围');
     }
     if (lyricFont != null &&
-        (!lyricFont.isFinite || lyricFont < 16 || lyricFont > 40)) {
+        (!lyricFont.isFinite ||
+            lyricFont < 16 ||
+            lyricFont > _extraLargeLyricFont)) {
       throw ArgumentError('歌词字号超出范围');
     }
     if (miniLyricFont != null &&
@@ -337,6 +374,12 @@ class Appearance extends ChangeNotifier {
     }
     if (lyricFont != null) {
       await db.setSetting('ui_lyrics_font_size', '$lyricFont');
+    }
+    if (lyricPageWeight != null) {
+      await db.setSetting('ui_lyric_page_weight', lyricPageWeight.name);
+    }
+    if (lyricSkyline != null) {
+      await db.setSetting('ui_lyric_skyline_enabled', '$lyricSkyline');
     }
     if (miniLyricFont != null) {
       await db.setSetting('ui_mini_lyrics_font_size', '$miniLyricFont');
@@ -379,6 +422,8 @@ class Appearance extends ChangeNotifier {
     this.playerFab = playerFab ?? this.playerFab;
     this.miniPlayerBarStyle = miniPlayerBarStyle ?? this.miniPlayerBarStyle;
     lyricFontSize = lyricFont ?? lyricFontSize;
+    this.lyricPageWeight = lyricPageWeight ?? this.lyricPageWeight;
+    lyricSkylineEnabled = lyricSkyline ?? lyricSkylineEnabled;
     miniLyricFontSize = miniLyricFont ?? miniLyricFontSize;
     this.lyricPageColorMode = lyricPageColorMode ?? this.lyricPageColorMode;
     this.lyricPageFixedColor = lyricPageFixedColor ?? this.lyricPageFixedColor;

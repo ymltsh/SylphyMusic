@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : FlutterActivity() {
     private var letterImages: LetterImageStore? = null
@@ -35,6 +38,15 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         localFolders = LocalFolderBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/system_bars")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "setImmersive") {
+                    setSystemBarsImmersive(call.arguments == true)
+                    result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/notification_permission")
             .setMethodCallHandler { call, result ->
                 if (call.method != "request") {
@@ -91,6 +103,19 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    private fun setSystemBarsImmersive(enabled: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        val bars = WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars()
+        if (enabled) {
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(bars)
+        } else {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+            controller.show(bars)
+        }
+    }
+
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -134,6 +159,8 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/notification_permission")
             .setMethodCallHandler(null)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/local_network")
+            .setMethodCallHandler(null)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "music.sylphy/system_bars")
             .setMethodCallHandler(null)
         super.cleanUpFlutterEngine(flutterEngine)
     }

@@ -61,6 +61,7 @@ class PlayerElement {
     this.waveAmplitude = 4,
     this.waveLength = 24,
     this.lyricLineHeight = 1.5,
+    this.lyricFontWeight,
     this.align = 'center',
     this.color,
     this.lyricFollowSystemColor = true,
@@ -82,6 +83,7 @@ class PlayerElement {
   final PlayerProgressStyle progressStyle;
   final double progressThickness, waveAmplitude, waveLength;
   final double lyricLineHeight;
+  final FontWeight? lyricFontWeight;
   final String align;
   final int? color;
 
@@ -111,6 +113,8 @@ class PlayerElement {
     double? waveAmplitude,
     double? waveLength,
     double? lyricLineHeight,
+    FontWeight? lyricFontWeight,
+    bool clearLyricFontWeight = false,
     String? align,
     int? color,
     bool clearColor = false,
@@ -140,6 +144,9 @@ class PlayerElement {
     waveAmplitude: waveAmplitude ?? this.waveAmplitude,
     waveLength: waveLength ?? this.waveLength,
     lyricLineHeight: lyricLineHeight ?? this.lyricLineHeight,
+    lyricFontWeight: clearLyricFontWeight
+        ? null
+        : lyricFontWeight ?? this.lyricFontWeight,
     align: align ?? this.align,
     color: clearColor ? null : color ?? this.color,
     lyricFollowSystemColor:
@@ -173,6 +180,8 @@ class PlayerElement {
         'waveLength': waveLength,
       },
       'lyricLineHeight': lyricLineHeight,
+      if (type == PlayerPart.lyrics && lyricFontWeight != null)
+        'lyricFontWeight': lyricFontWeight!.value,
       'align': align,
       if (color != null) 'color': color,
       if (type == PlayerPart.lyrics)
@@ -195,6 +204,13 @@ class PlayerElement {
     final color = props['color'];
     if (color != null && (color is! int || color < 0 || color > 0xffffffff)) {
       throw const FormatException('无效颜色');
+    }
+    final rawLyricWeight = props['lyricFontWeight'];
+    final lyricFontWeight = FontWeight.values
+        .where((weight) => weight.value == rawLyricWeight)
+        .firstOrNull;
+    if (rawLyricWeight != null && lyricFontWeight == null) {
+      throw const FormatException('无效歌词字重');
     }
     bool flag(String key, {bool defaultValue = false}) {
       final v = props[key] ?? defaultValue;
@@ -225,6 +241,7 @@ class PlayerElement {
       waveAmplitude: _number(props['waveAmplitude'] ?? 4, 0, 8),
       waveLength: _number(props['waveLength'] ?? 24, 12, 64),
       lyricLineHeight: _number(props['lyricLineHeight'] ?? 1.5, 1, 2.5),
+      lyricFontWeight: lyricFontWeight,
       fontSize: _number(props['fontSize'] ?? 22, 12, 40),
       opacity: _number(props['opacity'] ?? 1, .1, 1),
       radius: _number(props['radius'] ?? 24, 0, 64),
