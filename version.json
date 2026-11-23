@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.81-openlist.61",
-    "build": 94,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.81-openlist.61 (arm64-v8a)",
-    "date": "2026-11-22",
-    "notes": "- 「我的音乐」里的最近播放、我的收藏、全部音乐和本地下载卡片去掉右上角箭头，点击卡片仍可打开对应页面。\n- 播放页歌词预览支持五档字号和五档字重。字重滑块位于字号下方，拖动时可在编辑器里预览。\n- 歌词预览支持靠左、居中和靠右对齐。对齐与字重随布局保存。\n- 播放页编辑器集中显示歌词样式控件，并精简了行距和间距等重复说明。",
+    "version": "1.0.82-openlist.62",
+    "build": 95,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.82-openlist.62 (arm64-v8a)",
+    "date": "2026-11-24",
+    "notes": "- Android 的「设置 → 播放与音效」新增独立十段均衡器。选择预设可直接看到各频段的增益，微调以当前预设为起点，支持全部归零和撤销上一步。\n- Android 新增「允许与其他应用同时播放」开关，默认关闭。实际能否同时出声取决于 Android 和其他应用。\n- Android 可显示 USB DAC 或小尾巴的连接状态，实际输出由系统管理。\n- 移除实验性 De-click 平滑跳转开关。",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.81-openlist.61%2B94/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.82-openlist.62%2B95/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.81-openlist.61+94"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.82-openlist.62+95"
   },
   "history": [
+    {
+      "version": "1.0.81-openlist.61",
+      "build": 94,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.81-openlist.61 (arm64-v8a)",
+      "date": "2026-11-22",
+      "notes": "- 「我的音乐」里的最近播放、我的收藏、全部音乐和本地下载卡片去掉右上角箭头，点击卡片仍可打开对应页面。\n- 播放页歌词预览支持五档字号和五档字重。字重滑块位于字号下方，拖动时可在编辑器里预览。\n- 歌词预览支持靠左、居中和靠右对齐。对齐与字重随布局保存。\n- 播放页编辑器集中显示歌词样式控件，并精简了行距和间距等重复说明。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.81-openlist.61%2B94/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.81-openlist.61+94"
+    },
     {
       "version": "1.0.79-openlist.60",
       "build": 92,
