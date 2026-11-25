@@ -1,16 +1,27 @@
 {
   "latest": {
-    "version": "1.0.82-openlist.62",
-    "build": 95,
-    "name": "风灵音乐 OpenList-Lite 特别版 1.0.82-openlist.62 (arm64-v8a)",
-    "date": "2026-11-24",
-    "notes": "- Android 的「设置 → 播放与音效」新增独立十段均衡器。选择预设可直接看到各频段的增益，微调以当前预设为起点，支持全部归零和撤销上一步。\n- Android 新增「允许与其他应用同时播放」开关，默认关闭。实际能否同时出声取决于 Android 和其他应用。\n- Android 可显示 USB DAC 或小尾巴的连接状态，实际输出由系统管理。\n- 移除实验性 De-click 平滑跳转开关。",
+    "version": "1.0.84-openlist.64",
+    "build": 97,
+    "name": "风灵音乐 OpenList-Lite 特别版 1.0.84-openlist.64 (arm64-v8a)",
+    "date": "2026-11-26",
+    "notes": "- 修复文件夹和专辑详情中长按无法多选的问题。选中歌曲或子文件夹后，可全选、批量添加到歌单或播放队列等。\n- 新增歌单 JSON 导入和导出。点开「新建歌单」菜单即可导入，在歌单操作菜单可导出。导入会新建本地歌单，保留歌曲顺序和重复条目。\n- Android 从音乐库点歌时减少队列准备开销，切歌时提前准备下一首的播放来源。\n- 改善 Android 对小米手环等穿戴设备的媒体控制兼容性。\n- 音乐笔友的聊天和待回留言支持输入 @ 或点击加号引用曲库歌曲，可单独分享歌曲，也可和正文一起发送。引用的曲目信息与可用歌词会随请求发送给已配置的模型。\n- 调整笔友记忆的整理节奏。同一天的内容合并为一篇日记，整周日记在该周结束满七天后汇总为周记，成熟的周记再归纳为月记。\n",
     "urls": {
-      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.82-openlist.62%2B95/sylphy-music-arm64-v8a.apk"
+      "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.84-openlist.64%2B97/sylphy-music-arm64-v8a.apk"
     },
-    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.82-openlist.62+95"
+    "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.84-openlist.64+97"
   },
   "history": [
+    {
+      "version": "1.0.82-openlist.62",
+      "build": 95,
+      "name": "风灵音乐 OpenList-Lite 特别版 1.0.82-openlist.62 (arm64-v8a)",
+      "date": "2026-11-24",
+      "notes": "- Android 的「设置 → 播放与音效」新增独立十段均衡器。选择预设可直接看到各频段的增益，微调以当前预设为起点，支持全部归零和撤销上一步。\n- Android 新增「允许与其他应用同时播放」开关，默认关闭。实际能否同时出声取决于 Android 和其他应用。\n- Android 可显示 USB DAC 或小尾巴的连接状态，实际输出由系统管理。\n- 移除实验性 De-click 平滑跳转开关。",
+      "urls": {
+        "android_arm64": "https://github.com/ymltsh/SylphyMusic/releases/download/v1.0.82-openlist.62%2B95/sylphy-music-arm64-v8a.apk"
+      },
+      "page": "https://github.com/ymltsh/SylphyMusic/releases/tag/v1.0.82-openlist.62+95"
+    },
     {
       "version": "1.0.81-openlist.61",
       "build": 94,
